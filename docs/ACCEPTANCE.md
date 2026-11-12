@@ -46,3 +46,9 @@ The versioned policy is documented in DECISIONS/0001-pending-entry-reservations.
 ## Nine-family signal milestone
 
 53 application tests pass with formatting, Clippy all targets and release compilation. Six family tests cover all nine families, distinct canonical identities, nonzero signals and actual closed tick trades, future-prefix invariance, repeated cache reuse, deterministic cache eviction, brute-force prior extrema equivalence and overnight/weekday UTC publication masks. Family labels are metadata outside effective concept identity. RSI comparisons use nearest basis-point values from Wilder smoothing; channel references exclude the current bar. These are synthetic fixture results, not independent validation or broker session approval.
+
+## Durable loop and conditional screen audit
+
+64 tests, formatting, Clippy and release build pass. Six loop tests cover pause/resume/stop, restart cursors, competing coordinators and stale fencing, recovery after result commit before cursor advance, novel bounded regions, configuration limits, state-pressure pause and restored cursors. An independent Rust-process test exercises live controls and graceful safe-checkpoint exit; its initial startup JSON framing failure was corrected and rerun, with a child cleanup guard.
+
+The documented standalone smoke command completed ten synthetic steps: three newly completed tick simulations, seven zero-signal rejections, zero failures. It released its lease and left no process running. Counters do not claim full-history tests or qualification. Four screen tests include 4,000 seeded conditional bound queries against sequential events, collisions, entry/deadline ambiguity and unknown effective-ask minimum correlation. Every family replay is also checked against conditional M1 receipt bounds. Candidate-level net outcome screening remains incomplete; no unjustified performance rejection is enabled.

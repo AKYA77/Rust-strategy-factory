@@ -1,4 +1,5 @@
-use rust_strategy_factory::storage::{Claim, ExperimentKey, Outcome, Registry, Stage};
+use rust_strategy_factory::research;
+use rust_strategy_factory::storage::Registry;
 use rust_strategy_factory::{
     Result,
     candles::{self, Timeframe},
@@ -55,6 +56,68 @@ fn save<T: serde::Serialize>(path: &str, value: &T) -> Result<()> {
     let cleanup = fs::remove_file(&temp);
     publication.and(cleanup).map_err(|e| e.to_string())
 }
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ResearchFile {
+    #[serde(default)]
+    limits: research::Config,
+    inputs: Vec<InputFile>,
+}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct InputFile {
+    dataset: String,
+    conversions: Option<String>,
+}
+fn research_driver(config_path: &str, database: &str) -> Result<research::Driver> {
+    let config: ResearchFile = read_json(config_path)?;
+    if config.inputs.is_empty() || config.inputs.len() > 8 {
+        return Err("one to eight input datasets required".into());
+    }
+    let base = Path::new(config_path).parent().unwrap_or(Path::new("."));
+    let mut bytes = 0_u64;
+    for input in &config.inputs {
+        for path in std::iter::once(&input.dataset).chain(input.conversions.iter()) {
+            bytes = bytes
+                .checked_add(
+                    fs::metadata(base.join(path))
+                        .map_err(|e| e.to_string())?
+                        .len(),
+                )
+                .ok_or("input byte overflow")?;
+        }
+    }
+    if bytes > 128 * 1024 * 1024 {
+        return Err("loaded research JSON input files exceed 128 MiB budget; native full-history storage remains pending".into());
+    }
+    let mut inputs = Vec::new();
+    for input in config.inputs {
+        let dataset: Dataset = read_json(
+            base.join(input.dataset)
+                .to_str()
+                .ok_or("non-UTF8 input path")?,
+        )?;
+        let conversions = if let Some(path) = input.conversions {
+            read_json(base.join(path).to_str().ok_or("non-UTF8 conversion path")?)?
+        } else if dataset.profile.quote == "USD" {
+            vec![Conversion::usd(); dataset.ticks.len()]
+        } else {
+            return Err(
+                "non-USD input requires an explicit event-aligned conversion JSON file".into(),
+            );
+        };
+        inputs.push(research::Input {
+            dataset,
+            conversions,
+        });
+    }
+    research::Driver::open(
+        Path::new(database),
+        inputs,
+        config.limits,
+        research::executable_revision()?,
+    )
+}
 fn run(args: &[String]) -> Result<()> {
     match args
         .iter()
@@ -62,6 +125,11 @@ fn run(args: &[String]) -> Result<()> {
         .collect::<Vec<_>>()
         .as_slice()
     {
+        ["fixture", symbol, output] => {
+            let dataset = data::synthetic_fixture(symbol)?;
+            save(output, &dataset)?;
+            print(&dataset.manifest)
+        }
         ["profiles"] => print(
             &SYMBOLS
                 .iter()
@@ -116,90 +184,76 @@ fn run(args: &[String]) -> Result<()> {
         }
         ["experiment", path, strategy_path, database] => {
             let d: Dataset = read_json(path)?;
-            d.verify()?;
             if d.profile.quote != "USD" {
                 return Err(
-                    "CLI requires USD quote; use explicit event conversions through library".into(),
+                    "non-USD evaluation requires explicit event-aligned conversions".into(),
                 );
             }
+            let conversions = vec![Conversion::usd(); d.ticks.len()];
             let s: Strategy = read_json(strategy_path)?;
-            let costs = Costs::default();
-            let key = ExperimentKey {
-                concept_hash: s.identity()?,
-                instrument: d.profile.symbol.clone(),
-                dataset_hash: d.manifest.content_hash.clone(),
-                start_ms: d.manifest.first_ms,
-                end_exclusive_ms: d.manifest.last_ms.checked_add(1).ok_or("range overflow")?,
-                signal_version: rust_strategy_factory::SIGNAL_VERSION.into(),
-                indicator_version: rust_strategy_factory::INDICATOR_VERSION.into(),
-                cost_hash: data::hash(&costs)?,
-                fill_policy: "full-l1-assumption-target-at-limit-preflight-v2".into(),
-                profile_hash: d.manifest.profile_hash.clone(),
-                engine_version: rust_strategy_factory::ENGINE_VERSION.into(),
-                protocol_hash: data::hash(&"training-only-conservative-signals-v1")?,
-                code_revision: format!(
-                    "binary-blake3:{}",
-                    data::file_hash(&std::env::current_exe().map_err(|e| e.to_string())?)?
-                ),
-                configuration_hash: data::hash(&(4_000_000_usize, &costs))?,
-                stage: Stage::TickVerification,
-            };
             let mut registry = Registry::open(Path::new(database))?;
-            let id = registry.register(&key)?;
-            let now = chrono::Utc::now().timestamp_millis();
-            match registry.claim(&id, now, 300_000)? {
-                Claim::Busy => Err("experiment already leased to an active worker".into()),
-                Claim::Reused(result) => {
-                    print(&serde_json::json!({"experiment_id":id,"reused":true,"result":result}))
-                }
-                Claim::Acquired(lease) => {
-                    let run = || -> Result<serde_json::Value> {
-                        let c = candles::build(&d, s.timeframe)?;
-                        let mut features = Features::new(&c, 4_000_000)?;
-                        let screen = strategies::screen(&mut features, &s)?;
-                        if !screen.requires_tick_verification {
-                            return Ok(serde_json::json!({"screen":screen,"tick_replay":null}));
-                        }
-                        let mask = features.signal(&s.rule)?;
-                        let replay = tick_engine::replay(
-                            &d,
-                            &c,
-                            &mask,
-                            &s,
-                            &costs,
-                            &vec![Conversion::usd(); d.ticks.len()],
-                        )?;
-                        Ok(serde_json::json!({"screen":screen,"tick_replay":replay}))
-                    };
-                    match run() {
-                        Ok(result) => {
-                            let outcome = if result["tick_replay"].is_null() {
-                                Outcome::Rejected
-                            } else {
-                                Outcome::Completed
-                            };
-                            registry.finish(
-                                &lease,
-                                chrono::Utc::now().timestamp_millis(),
-                                outcome,
-                                &result,
-                            )?;
-                            print(
-                                &serde_json::json!({"experiment_id":id,"reused":false,"result":result}),
-                            )
-                        }
-                        Err(error) => {
-                            registry.finish(
-                                &lease,
-                                chrono::Utc::now().timestamp_millis(),
-                                Outcome::Failed,
-                                &serde_json::json!({"error":error}),
-                            )?;
-                            Err(error)
-                        }
+            print(&research::evaluate(
+                &mut registry,
+                &research::Input {
+                    dataset: d,
+                    conversions,
+                },
+                &s,
+                &Costs::default(),
+                &research::executable_revision()?,
+                4_000_000,
+            )?)
+        }
+        ["research-status", database, id] => {
+            if !Path::new(database).is_file() {
+                return Err("registry does not exist".into());
+            }
+            print(&research::status(
+                &Registry::open(Path::new(database))?,
+                id,
+                chrono::Utc::now().timestamp_millis(),
+            )?)
+        }
+        ["research-control", database, id, state] => {
+            if !Path::new(database).is_file() {
+                return Err("registry does not exist".into());
+            }
+            research::control(&Registry::open(Path::new(database))?, id, state)
+        }
+        ["research", config, database] | ["research", config, database, _] => {
+            let max_steps = args
+                .get(3)
+                .map(|s| s.parse::<u64>().map_err(|_| "invalid step budget"))
+                .transpose()?
+                .unwrap_or(u64::MAX);
+            let mut driver = research_driver(config, database)?;
+            driver.acquire(chrono::Utc::now().timestamp_millis())?;
+            println!(
+                "{}",
+                serde_json::json!({"run_id":driver.id,"worker_count":1,"queue_capacity":1,"state":"coordinator_started"})
+            );
+            let mut completed = 0;
+            while completed < max_steps {
+                if driver.step(chrono::Utc::now().timestamp_millis())? {
+                    completed += 1;
+                } else {
+                    let s = research::status(
+                        &driver.registry,
+                        &driver.id,
+                        chrono::Utc::now().timestamp_millis(),
+                    )?;
+                    if s.state == "stopped" {
+                        break;
                     }
+                    std::thread::sleep(std::time::Duration::from_millis(250));
                 }
             }
+            driver.release()?;
+            print(&research::status(
+                &driver.registry,
+                &driver.id,
+                chrono::Utc::now().timestamp_millis(),
+            )?)
         }
         ["evaluate", path, strategy_path, output] => {
             let d: Dataset = read_json(path)?;
@@ -223,7 +277,7 @@ fn run(args: &[String]) -> Result<()> {
         }
         [] | ["--help"] | ["help"] => {
             println!(
-                "Rust Strategy Factory — historical research only; SOFTWARE_INCOMPLETE\n\nprofiles\ngenerate\nimport <normalized.csv> <profile.json> <source-url-or-description> <new-dataset.json> <real|synthetic>\ninspect <dataset.json>\ncandles <dataset.json> <M1|M5|M15|M30|H1|H4|D1>\nevaluate <dataset.json> <strategy.json> <new-result.json>\nexperiment <dataset.json> <strategy.json> <registry.sqlite>\nregistry-check <registry.sqlite>\nbackup <registry.sqlite> <new-backup.sqlite>\n\nSynthetic profiles do not establish broker feasibility. No strategy qualification is implemented."
+                "Rust Strategy Factory — historical research only; SOFTWARE_INCOMPLETE\n\nprofiles\nfixture <symbol> <new-dataset.json>\ngenerate\nimport <normalized.csv> <profile.json> <source-url-or-description> <new-dataset.json> <real|synthetic>\ninspect <dataset.json>\ncandles <dataset.json> <M1|M5|M15|M30|H1|H4|D1>\nevaluate <dataset.json> <strategy.json> <new-result.json>\nexperiment <dataset.json> <strategy.json> <registry.sqlite>\nregistry-check <registry.sqlite>\nbackup <registry.sqlite> <new-backup.sqlite>\nresearch <config.json> <registry.sqlite> [max-steps]\nresearch-status <registry.sqlite> <run-id>\nresearch-control <registry.sqlite> <run-id> <running|paused|stopped>\n\nSynthetic profiles do not establish broker feasibility. No strategy qualification is implemented."
             );
             Ok(())
         }

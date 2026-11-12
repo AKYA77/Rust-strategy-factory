@@ -1,0 +1,11 @@
+{
+  "limits": {
+    "seed": 42,
+    "feature_cells": 1000000,
+    "max_total_events": 500000,
+    "max_regions": 10000,
+    "lease_ms": 300000,
+    "state_budget_bytes": 268435456
+  },
+  "inputs": [{"dataset": "../state/fixture.json"}]
+}

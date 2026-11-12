@@ -99,7 +99,7 @@ pub struct Counts {
     pub attempts: i64,
 }
 pub struct Registry {
-    connection: Connection,
+    pub(crate) connection: Connection,
 }
 fn db_err(e: rusqlite::Error) -> String {
     e.to_string()
@@ -118,7 +118,7 @@ impl Registry {
         let version: i64 = connection
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .map_err(db_err)?;
-        if version > 2 {
+        if version > 3 {
             return Err("database schema newer than supported".into());
         }
         if version == 0 {
@@ -152,6 +152,24 @@ impl Registry {
                 experiment_id TEXT NOT NULL REFERENCES experiments(id),
                 PRIMARY KEY(dataset_hash,concept_hash), UNIQUE(experiment_id)
             ); PRAGMA user_version=2;").map_err(db_err)?;
+            tx.commit().map_err(db_err)?;
+        }
+        if version < 3 {
+            let tx = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(db_err)?;
+            tx.execute_batch("CREATE TABLE IF NOT EXISTS research_runs (
+                id TEXT PRIMARY KEY, configuration TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'running' CHECK(state IN ('running','paused','stopped')),
+                cursor INTEGER NOT NULL DEFAULT 0 CHECK(cursor>=0), token TEXT, expires_ms INTEGER,
+                executed INTEGER NOT NULL DEFAULT 0, reused INTEGER NOT NULL DEFAULT 0,
+                rejected INTEGER NOT NULL DEFAULT 0, failed INTEGER NOT NULL DEFAULT 0,
+                active INTEGER NOT NULL DEFAULT 0 CHECK(active IN (0,1)), latest TEXT, last_error TEXT
+            );
+            CREATE TABLE IF NOT EXISTS research_steps (
+                run_id TEXT NOT NULL REFERENCES research_runs(id), cursor INTEGER NOT NULL,
+                experiment_id TEXT, outcome TEXT NOT NULL, reused INTEGER NOT NULL, error TEXT,
+                PRIMARY KEY(run_id,cursor)
+            ); PRAGMA user_version=3;").map_err(db_err)?;
             tx.commit().map_err(db_err)?;
         }
         Ok(Self { connection })

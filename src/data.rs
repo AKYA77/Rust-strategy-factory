@@ -261,3 +261,39 @@ impl Dataset {
         Ok(())
     }
 }
+
+/// Small deterministic development history; deliberately not market evidence.
+pub fn synthetic_fixture(symbol: &str) -> Result<Dataset> {
+    let p = Profile::synthetic(symbol)?;
+    let base = if symbol == "USDJPY" {
+        150 * p.price_scale
+    } else if symbol == "XAUUSD" {
+        2500 * p.price_scale
+    } else {
+        p.price_scale
+    };
+    let ticks = (0..2000)
+        .map(|i| {
+            let phase = i % 80;
+            let wave = if phase < 40 { phase } else { 80 - phase };
+            let bid = base + wave * 5 * p.pip;
+            Tick {
+                timestamp_ms: if i < 1000 {
+                    1735689600000 + i * 10000
+                } else {
+                    1767225600000 + (i - 1000) * 10000
+                },
+                sequence: i as u64,
+                bid,
+                ask: bid + p.pip,
+            }
+        })
+        .collect();
+    dataset(
+        p,
+        ticks,
+        "SYNTHETIC_TEST_ONLY generated-fixture-v1; two short artificial 2025/2026 windows",
+        "generated-no-raw-archive".into(),
+        true,
+    )
+}

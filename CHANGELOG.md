@@ -11,3 +11,5 @@ Order checkpoint: pending entry lifecycle, expiry/cancel/restart snapshots and s
 Pending-entry integration: typed strategy intents, exclusive fixed-quantity reservations, pre-fill risk/margin rejection, causally ordered cancellation, receipts and cost-aware marked initial margin. Engine v2; 47 tests pass. Synthetic benchmark rerun.
 
 Nine-family milestone: causal RSI/mean crosses and trends, prior channels, range expansion, UTC sessions and bounded cache eviction. Fifty-three tests and release build pass; every family has nonzero synthetic tick trades.
+
+Durable loop milestone: schema-v3 cursors/coordinator fencing, controls, fair inputs, bounded new regions, shared CLI evaluation, state-budget backpressure and conditional candle-bound audits. Sixty-four tests and standalone process smoke pass.

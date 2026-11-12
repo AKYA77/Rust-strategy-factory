@@ -21,7 +21,10 @@
     "cost-aware initial sizing on exact volume grid",
     "nine typed family grids with causal RSI/mean/channel/volatility/session primitives",
     "bounded shared feature and signal caches with deterministic eviction",
-    "prefix-causality and nonzero tick cohort tests for every family"
+    "prefix-causality and nonzero tick cohort tests for every family",
+    "standalone Rust research loop with durable fair cursors, expanding regions and fenced coordinator leases",
+    "pause/resume/stop controls, exact cached-result recovery and state-budget backpressure",
+    "conditional M1 barrier sets with bid/ask floor correlation bounds and persisted tick receipt audits"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -29,8 +32,8 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Implement conservative M1 barrier uncertainty and durable resource-bounded research scheduling; then full independent validation and authenticated dashboard.",
+  "next_action": "Implement authenticated local dashboard against persisted research/experiment state, then complete independent scientific workflow, data/native storage and production reliability.",
   "qualified_strategies": 0,
-  "tests_passed": 53,
+  "tests_passed": 64,
   "benchmark": "docs/BENCHMARKS/2026-11-12-synthetic-replay.json"
 }

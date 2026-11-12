@@ -239,5 +239,7 @@ fn every_family_reaches_nonzero_closed_tick_trades_on_actual_synthetic_events() 
         )
         .unwrap();
         assert!(!r.trades.is_empty(), "no closed trades for {family:?}");
+        let audit = rust_strategy_factory::screen::audit_replay(&d, &Costs::default(), &r).unwrap();
+        assert!(audit.audited_trades > 0);
     }
 }
