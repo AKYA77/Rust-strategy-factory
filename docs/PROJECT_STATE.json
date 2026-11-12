@@ -8,7 +8,12 @@
     "causal primitives and shared mean masks",
     "bounded canonical rules and initial grid",
     "conservative signal-only screening",
-    "sequential market-entry L1 replay and CLI"
+    "sequential market-entry L1 replay and CLI",
+    "SQLite WAL exact experiment registry with fenced expiring leases",
+    "immutable result hashes and online verified backup/restore",
+    "per-dataset frozen holdout reservations and one-experiment exposure constraints",
+    "numeric qualification boundary checks and chronological three-month folds",
+    "experimental disabled fixed-barrier index with seeded differential checks"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -16,6 +21,8 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Harden core and add persistent experiment registry and independent qualification boundary tests; see queue.",
-  "qualified_strategies": 0
+  "next_action": "Finish exact execution order lifecycle and conversion/profile provenance; expand strategy grammar and candle outcome screening, then durable scheduler. See IMPLEMENTATION_QUEUE.md.",
+  "qualified_strategies": 0,
+  "tests_passed": 28,
+  "benchmark": "docs/BENCHMARKS/2026-11-12-synthetic-replay.json"
 }

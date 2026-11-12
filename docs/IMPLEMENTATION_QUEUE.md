@@ -10,9 +10,9 @@ Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 6. Implement real candle outcome estimates/bounds, collision ambiguity and rejection audits. Current signal-only conservative screening cannot reject performance failures.
 7. Complete order lifecycle: pending market/stop/limit orders, expirations/cancellations, supported partial fills, richer diagnostics and receipts. Test all eight instruments and conversions independently.
 8. Prototype first-hit index only after sequential reference correctness; differential-test and benchmark before enabling.
-9. SQLite WAL migrations, full experiment identity, durable dedup, leases, atomic results, crash recovery, immutable artifacts, backups and verified restore.
+9. SQLite WAL migrations/schema-v2, experiment keys, fenced leases, immutable result hashes, atomic file publication and online verified backup are implemented/tested. Remaining: writer backpressure, large-artifact lifecycle, supervised crash injection, retention quotas and production restore/runbooks.
 10. Persistent bounded research scheduler, resource pressure handling, fairness, cancellation, adaptive region expansion and meaningful counters.
-11. Freeze chronological splits; three-month walk-forward, purge/embargo, protected one-use holdout, multiplicity safeguards, cost/neighborhood/regime robustness.
+11. Frozen per-dataset holdout reservations and three-month fold utilities exist; the complete scientific workflow is unfinished. Implement immutable corpus-wide split/exposure provenance; three-month walk-forward, purge/embargo, protected one-use holdout, multiplicity safeguards, cost/neighborhood/regime robustness.
 12. Qualification boundary tests and evidence gates; eight independent diverse top-five boards. Synthetic data must never qualify.
 13. Deterministic diagnostics and bounded improvements with parent/child provenance; never use protected holdout for adaptation.
 14. Authenticated Axum API and embedded responsive dashboard using actual persisted state; browser workflows, security and exports.

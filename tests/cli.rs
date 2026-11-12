@@ -57,5 +57,45 @@ fn import_inspect_evaluate_and_overwrite_protection() {
     let r: Replay = serde_json::from_slice(&fs::read(&result).unwrap()).unwrap();
     assert_eq!(r.trades.len(), 1);
     assert_eq!(r.trades[0].net_micro_usd, 1_798_200);
+    let registry = dir.join("registry.sqlite");
+    let backup = dir.join("backup.sqlite");
+    let args = [
+        "experiment",
+        dataset.to_str().unwrap(),
+        strategy.to_str().unwrap(),
+        registry.to_str().unwrap(),
+    ];
+    let first = invoke(&args);
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+    let first: serde_json::Value = serde_json::from_slice(&first.stdout).unwrap();
+    assert_eq!(first["reused"], false);
+    let second = invoke(&args);
+    assert!(second.status.success());
+    let second: serde_json::Value = serde_json::from_slice(&second.stdout).unwrap();
+    assert_eq!(second["reused"], true);
+    assert_eq!(first["experiment_id"], second["experiment_id"]);
+    let counts = invoke(&["registry-check", registry.to_str().unwrap()]);
+    assert!(counts.status.success());
+    let counts: serde_json::Value = serde_json::from_slice(&counts.stdout).unwrap();
+    assert_eq!(counts["completed"], 1);
+    assert_eq!(counts["attempts"], 1);
+    assert!(
+        invoke(&[
+            "backup",
+            registry.to_str().unwrap(),
+            backup.to_str().unwrap()
+        ])
+        .status
+        .success()
+    );
+    assert!(
+        invoke(&["registry-check", backup.to_str().unwrap()])
+            .status
+            .success()
+    );
     fs::remove_dir_all(dir).unwrap();
 }

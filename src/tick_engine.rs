@@ -115,6 +115,7 @@ pub struct Replay {
     pub dataset_id: String,
     pub profile_id: String,
     pub cost_id: String,
+    pub conversion_id: String,
     pub fill_assumption: String,
     pub initial_micro_usd: i128,
     pub realized_micro_usd: i128,
@@ -349,6 +350,7 @@ pub fn replay(
     }
     Ok(Replay { version: "ordered-l1-v1".into(), strategy_id: strategy.identity()?, dataset_id: data.manifest.content_hash.clone(),
         profile_id: data.manifest.profile_hash.clone(), cost_id: crate::data::hash(costs)?,
+        conversion_id: crate::data::hash(&conversions)?,
         fill_assumption: "L1 full-fill research assumption; no historical depth/queue verification; target limit at requested price; deadline cancels protective orders; USD-per-quote marks supplied explicitly".into(),
         initial_micro_usd: contracts::INITIAL_EQUITY, realized_micro_usd: balance, final_marked_micro_usd: marked,
         maximum_drawdown_micro_usd: drawdown, trades, rejections, unresolved: position })

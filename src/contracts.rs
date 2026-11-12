@@ -181,7 +181,14 @@ pub fn size(
     fx: Conversion,
 ) -> Result<i64> {
     p.validate()?;
-    if equity <= 0 || entry <= 0 || stop_distance <= 0 || fx.usd_num <= 0 || fx.quote_den <= 0 {
+    if equity <= 0
+        || entry <= 0
+        || stop_distance <= 0
+        || fx.usd_num <= 0
+        || fx.quote_den <= 0
+        || fx.usd_num > 1_000_000_000
+        || fx.quote_den > 1_000_000_000
+    {
         return Err("invalid sizing inputs".into());
     }
     let budget = equity / 10;

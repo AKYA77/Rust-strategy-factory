@@ -1,0 +1,418 @@
+//! Durable exact experiment identities and fenced, restart-safe leases.
+use crate::{Result, contracts::SYMBOLS, data::hash};
+use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use serde::{Deserialize, Serialize};
+use std::{path::Path, time::Duration};
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Stage {
+    CandleScreen,
+    TickVerification,
+    IndependentValidation,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExperimentKey {
+    pub concept_hash: String,
+    pub instrument: String,
+    pub dataset_hash: String,
+    pub start_ms: i64,
+    pub end_exclusive_ms: i64,
+    pub signal_version: String,
+    pub indicator_version: String,
+    pub cost_hash: String,
+    pub fill_policy: String,
+    pub profile_hash: String,
+    pub engine_version: String,
+    pub protocol_hash: String,
+    pub code_revision: String,
+    pub configuration_hash: String,
+    pub stage: Stage,
+}
+impl ExperimentKey {
+    pub fn identity(&self) -> Result<String> {
+        if !SYMBOLS.contains(&self.instrument.as_str())
+            || self.start_ms >= self.end_exclusive_ms
+            || [
+                &self.concept_hash,
+                &self.dataset_hash,
+                &self.signal_version,
+                &self.indicator_version,
+                &self.cost_hash,
+                &self.fill_policy,
+                &self.profile_hash,
+                &self.engine_version,
+                &self.protocol_hash,
+                &self.code_revision,
+                &self.configuration_hash,
+            ]
+            .iter()
+            .any(|s| s.trim().is_empty() || s.len() > 256)
+        {
+            return Err("incomplete experiment identity".into());
+        }
+        hash(&("experiment-v1", self))
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Outcome {
+    Completed,
+    Rejected,
+    Invalid,
+    Inconclusive,
+    Failed,
+}
+impl Outcome {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Completed => "completed",
+            Self::Rejected => "rejected",
+            Self::Invalid => "invalid",
+            Self::Inconclusive => "inconclusive",
+            Self::Failed => "failed",
+        }
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Lease {
+    pub experiment_id: String,
+    pub token: String,
+    pub expires_ms: i64,
+    pub attempt: i64,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredResult {
+    pub outcome: String,
+    pub result: serde_json::Value,
+    pub result_hash: String,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Claim {
+    Acquired(Lease),
+    Busy,
+    Reused(StoredResult),
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Counts {
+    pub registered: i64,
+    pub completed: i64,
+    pub running: i64,
+    pub attempts: i64,
+}
+pub struct Registry {
+    connection: Connection,
+}
+fn db_err(e: rusqlite::Error) -> String {
+    e.to_string()
+}
+impl Registry {
+    pub fn open(path: &Path) -> Result<Self> {
+        let mut connection = Connection::open(path).map_err(db_err)?;
+        connection
+            .busy_timeout(Duration::from_secs(5))
+            .map_err(db_err)?;
+        connection
+            .execute_batch(
+                "PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;",
+            )
+            .map_err(db_err)?;
+        let version: i64 = connection
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .map_err(db_err)?;
+        if version > 2 {
+            return Err("database schema newer than supported".into());
+        }
+        if version == 0 {
+            let tx = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(db_err)?;
+            tx.execute_batch("CREATE TABLE IF NOT EXISTS experiments (
+                id TEXT PRIMARY KEY, key_json TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('queued','running','completed','rejected','invalid','inconclusive','failed')),
+                token TEXT, expires_ms INTEGER, attempt INTEGER NOT NULL DEFAULT 0,
+                result_json TEXT, result_hash TEXT,
+                CHECK ((state IN ('queued','running') AND result_json IS NULL AND result_hash IS NULL)
+                    OR (state NOT IN ('queued','running') AND result_json IS NOT NULL AND result_hash IS NOT NULL))
+            );
+            CREATE TABLE IF NOT EXISTS events (
+                event_id INTEGER PRIMARY KEY, experiment_id TEXT NOT NULL REFERENCES experiments(id),
+                at_ms INTEGER NOT NULL, action TEXT NOT NULL, attempt INTEGER NOT NULL
+            );
+            PRAGMA user_version=1;").map_err(db_err)?;
+            tx.commit().map_err(db_err)?;
+        }
+        if version < 2 {
+            let tx = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(db_err)?;
+            tx.execute_batch("CREATE TABLE IF NOT EXISTS holdouts (
+                dataset_hash TEXT PRIMARY KEY, start_ms INTEGER NOT NULL, end_ms INTEGER NOT NULL,
+                protocol_hash TEXT NOT NULL, selected_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS holdout_exposures (
+                dataset_hash TEXT NOT NULL REFERENCES holdouts(dataset_hash), concept_hash TEXT NOT NULL,
+                experiment_id TEXT NOT NULL REFERENCES experiments(id),
+                PRIMARY KEY(dataset_hash,concept_hash), UNIQUE(experiment_id)
+            ); PRAGMA user_version=2;").map_err(db_err)?;
+            tx.commit().map_err(db_err)?;
+        }
+        Ok(Self { connection })
+    }
+    /// Freeze a final holdout and selected concepts before any recorded experiment touches it.
+    /// One reservation per immutable dataset; there is deliberately no reset/unlock API.
+    pub fn reserve_holdout(
+        &mut self,
+        dataset_hash: &str,
+        period: &crate::validation::Interval,
+        protocol_hash: &str,
+        selected: &[String],
+    ) -> Result<()> {
+        period.validate()?;
+        let mut selection = selected.to_vec();
+        selection.sort();
+        selection.dedup();
+        if dataset_hash.is_empty()
+            || protocol_hash.is_empty()
+            || selection.is_empty()
+            || selection.len() > 100
+            || selection.iter().any(|s| s.is_empty() || s.len() > 256)
+        {
+            return Err("invalid frozen holdout selection".into());
+        }
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(db_err)?;
+        {
+            let mut query=tx.prepare("SELECT key_json FROM experiments WHERE json_extract(key_json,'$.dataset_hash')=?1").map_err(db_err)?;
+            let rows = query
+                .query_map([dataset_hash], |r| r.get::<_, String>(0))
+                .map_err(db_err)?;
+            for row in rows {
+                let key: ExperimentKey =
+                    serde_json::from_str(&row.map_err(db_err)?).map_err(|e| e.to_string())?;
+                if key.start_ms < period.end_exclusive_ms && key.end_exclusive_ms > period.start_ms
+                {
+                    return Err("holdout already exposed to registered research".into());
+                }
+            }
+        }
+        tx.execute("INSERT INTO holdouts(dataset_hash,start_ms,end_ms,protocol_hash,selected_json) VALUES (?1,?2,?3,?4,?5)",params![dataset_hash,period.start_ms,period.end_exclusive_ms,protocol_hash,serde_json::to_string(&selection).map_err(|e|e.to_string())?]).map_err(db_err)?;
+        tx.commit().map_err(db_err)
+    }
+    pub fn register(&mut self, key: &ExperimentKey) -> Result<String> {
+        let id = key.identity()?;
+        let json = serde_json::to_string(key).map_err(|e| e.to_string())?;
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(db_err)?;
+        let reservation:Option<(i64,i64,String,String)>=tx.query_row("SELECT start_ms,end_ms,protocol_hash,selected_json FROM holdouts WHERE dataset_hash=?1",[&key.dataset_hash],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).optional().map_err(db_err)?;
+        if let Some((start, end, protocol, selected_json)) = reservation {
+            let touches = key.start_ms < end && key.end_exclusive_ms > start;
+            if key.stage == Stage::IndependentValidation {
+                let selected: Vec<String> =
+                    serde_json::from_str(&selected_json).map_err(|e| e.to_string())?;
+                if key.start_ms != start
+                    || key.end_exclusive_ms != end
+                    || key.protocol_hash != protocol
+                    || !selected.contains(&key.concept_hash)
+                {
+                    return Err(
+                        "experiment inconsistent with frozen holdout selection/protocol".into(),
+                    );
+                }
+            } else if touches {
+                return Err(
+                    "protected holdout cannot feed screening, training or diagnostics".into(),
+                );
+            }
+        } else if key.stage == Stage::IndependentValidation {
+            return Err("independent evaluation requires a pre-reserved holdout".into());
+        }
+        tx.execute(
+            "INSERT OR IGNORE INTO experiments(id,key_json,state) VALUES (?1,?2,'queued')",
+            params![id, json],
+        )
+        .map_err(db_err)?;
+        let stored: String = tx
+            .query_row("SELECT key_json FROM experiments WHERE id=?1", [&id], |r| {
+                r.get(0)
+            })
+            .map_err(db_err)?;
+        if stored != json {
+            return Err("experiment identity collision".into());
+        }
+        if key.stage == Stage::IndependentValidation {
+            let exposed:Option<String>=tx.query_row("SELECT experiment_id FROM holdout_exposures WHERE dataset_hash=?1 AND concept_hash=?2",params![key.dataset_hash,key.concept_hash],|r|r.get(0)).optional().map_err(db_err)?;
+            if exposed.is_some_and(|previous| previous != id) {
+                return Err(
+                    "final holdout concept already reserved for a different immutable experiment"
+                        .into(),
+                );
+            }
+            tx.execute("INSERT OR IGNORE INTO holdout_exposures(dataset_hash,concept_hash,experiment_id) VALUES (?1,?2,?3)",params![key.dataset_hash,key.concept_hash,id]).map_err(db_err)?;
+        }
+        tx.commit().map_err(db_err)?;
+        Ok(id)
+    }
+    pub fn claim(&mut self, id: &str, now_ms: i64, lease_ms: i64) -> Result<Claim> {
+        if !(1..=86_400_000).contains(&lease_ms) {
+            return Err("lease duration outside budget".into());
+        }
+        let expires = now_ms.checked_add(lease_ms).ok_or("lease time overflow")?;
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(db_err)?;
+        let (state, expiry, attempt): (String, Option<i64>, i64) = tx
+            .query_row(
+                "SELECT state,expires_ms,attempt FROM experiments WHERE id=?1",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .map_err(db_err)?;
+        if state != "queued" && state != "running" {
+            let result = read_result(&tx, id)?.ok_or("terminal experiment lacks result")?;
+            return Ok(Claim::Reused(result));
+        }
+        if state == "running" && expiry.is_some_and(|e| e > now_ms) {
+            return Ok(Claim::Busy);
+        }
+        let token: String = tx
+            .query_row("SELECT lower(hex(randomblob(32)))", [], |r| r.get(0))
+            .map_err(db_err)?;
+        let attempt = attempt.checked_add(1).ok_or("attempt overflow")?;
+        tx.execute(
+            "UPDATE experiments SET state='running',token=?2,expires_ms=?3,attempt=?4 WHERE id=?1",
+            params![id, token, expires, attempt],
+        )
+        .map_err(db_err)?;
+        tx.execute(
+            "INSERT INTO events(experiment_id,at_ms,action,attempt) VALUES (?1,?2,'claimed',?3)",
+            params![id, now_ms, attempt],
+        )
+        .map_err(db_err)?;
+        tx.commit().map_err(db_err)?;
+        Ok(Claim::Acquired(Lease {
+            experiment_id: id.into(),
+            token,
+            expires_ms: expires,
+            attempt,
+        }))
+    }
+    /// Returns true only for the first durable completion. Retrying the same receipt is idempotent.
+    pub fn finish(
+        &mut self,
+        lease: &Lease,
+        now_ms: i64,
+        outcome: Outcome,
+        result: &serde_json::Value,
+    ) -> Result<bool> {
+        let json = serde_json::to_string(result).map_err(|e| e.to_string())?;
+        if json.len() > 8 * 1024 * 1024 {
+            return Err("result exceeds metadata budget; use an immutable artifact".into());
+        }
+        let result_hash = hash(result)?;
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(db_err)?;
+        let (state, token, expiry, old_hash): (
+            String,
+            Option<String>,
+            Option<i64>,
+            Option<String>,
+        ) = tx
+            .query_row(
+                "SELECT state,token,expires_ms,result_hash FROM experiments WHERE id=?1",
+                [&lease.experiment_id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .map_err(db_err)?;
+        if token.as_deref() != Some(&lease.token) {
+            return Err("stale lease token".into());
+        }
+        if state == outcome.name() && old_hash.as_ref() == Some(&result_hash) {
+            return Ok(false);
+        }
+        if state != "running" || expiry.is_none_or(|e| e <= now_ms) {
+            return Err("lease expired or experiment already terminal".into());
+        }
+        tx.execute(
+            "UPDATE experiments SET state=?2,result_json=?3,result_hash=?4 WHERE id=?1",
+            params![lease.experiment_id, outcome.name(), json, result_hash],
+        )
+        .map_err(db_err)?;
+        tx.execute(
+            "INSERT INTO events(experiment_id,at_ms,action,attempt) VALUES (?1,?2,?3,?4)",
+            params![lease.experiment_id, now_ms, outcome.name(), lease.attempt],
+        )
+        .map_err(db_err)?;
+        tx.commit().map_err(db_err)?;
+        Ok(true)
+    }
+    pub fn result(&self, id: &str) -> Result<Option<StoredResult>> {
+        read_result(&self.connection, id)
+    }
+    pub fn counts(&self) -> Result<Counts> {
+        self.connection.query_row("SELECT count(*),coalesce(sum(state='completed'),0),coalesce(sum(state='running'),0),coalesce(sum(attempt),0) FROM experiments",[],|r|Ok(Counts {registered:r.get(0)?,completed:r.get(1)?,running:r.get(2)?,attempts:r.get(3)?})).map_err(db_err)
+    }
+    pub fn integrity(&self) -> Result<()> {
+        let verdict: String = self
+            .connection
+            .query_row("PRAGMA integrity_check", [], |r| r.get(0))
+            .map_err(db_err)?;
+        if verdict != "ok" {
+            return Err(format!("database integrity failure: {verdict}"));
+        }
+        let mut query = self
+            .connection
+            .prepare("SELECT id,key_json FROM experiments")
+            .map_err(db_err)?;
+        let rows = query
+            .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+            .map_err(db_err)?;
+        for row in rows {
+            let (id, json) = row.map_err(db_err)?;
+            let key: ExperimentKey = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+            if key.identity()? != id {
+                return Err("stored experiment identity corrupted".into());
+            }
+            self.result(&id)?;
+        }
+        Ok(())
+    }
+    /// SQLite online backup includes committed WAL contents. Destination must be new.
+    pub fn backup(&self, destination: &Path) -> Result<()> {
+        let guard = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(destination)
+            .map_err(|e| e.to_string())?;
+        drop(guard);
+        let mut dest = Connection::open(destination).map_err(db_err)?;
+        {
+            let backup =
+                rusqlite::backup::Backup::new(&self.connection, &mut dest).map_err(db_err)?;
+            backup
+                .run_to_completion(128, Duration::from_millis(5), None)
+                .map_err(db_err)?;
+        }
+        drop(dest);
+        Registry::open(destination)?.integrity()
+    }
+}
+fn read_result(connection: &Connection, id: &str) -> Result<Option<StoredResult>> {
+    let row:Option<(String,String,String)>=connection.query_row("SELECT state,result_json,result_hash FROM experiments WHERE id=?1 AND result_json IS NOT NULL",[id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional().map_err(db_err)?;
+    row.map(|(outcome, json, result_hash)| {
+        let result: serde_json::Value = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+        if hash(&result)? != result_hash {
+            return Err("result content hash corrupted".into());
+        }
+        Ok(StoredResult {
+            outcome,
+            result,
+            result_hash,
+        })
+    })
+    .transpose()
+}

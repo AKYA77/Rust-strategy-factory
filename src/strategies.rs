@@ -41,6 +41,22 @@ impl Rule {
                     }
                     v.sort();
                     v.dedup();
+                    if is_all {
+                        for item in &v {
+                            let opposite = match item {
+                                Rule::AboveMean { window } => {
+                                    Some(Rule::BelowMean { window: *window })
+                                }
+                                Rule::Rising { lookback } => Some(Rule::Falling {
+                                    lookback: *lookback,
+                                }),
+                                _ => None,
+                            };
+                            if opposite.is_some_and(|x| v.binary_search(&x).is_ok()) {
+                                return Err("contradictory conjunctive rule".into());
+                            }
+                        }
+                    }
                     if v.len() == 1 {
                         return Ok(v.remove(0));
                     }

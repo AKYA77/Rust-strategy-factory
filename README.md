@@ -2,7 +2,7 @@
 
 Historical strategy research and paper simulation only. **SOFTWARE_INCOMPLETE.** No qualified strategies, approved broker profiles, real-data acceptance or full research readiness are claimed.
 
-The current Rust library/CLI implements exact integer contracts, explicit synthetic profiles for eight symbols, normalized bid/ask CSV import with content hashes and quarantine checks, closed UTC candles on seven timeframes, causal SMA/EMA/RSI primitives, shared mean features and dense masks, canonical Boolean rule identities, an initial deterministic candidate grid, conservative signal-only screening and sequential market-entry tick replay. It is an implementation checkpoint, not the complete factory.
+The current Rust library/CLI implements exact integer contracts, explicit synthetic profiles for eight symbols, normalized bid/ask CSV import with content hashes and quarantine checks, closed UTC candles on seven timeframes, causal SMA/EMA/RSI primitives, shared mean features and dense masks, canonical Boolean rule identities, an initial deterministic candidate grid, conservative signal-only screening and sequential market-entry tick replay, a SQLite experiment registry with fenced leases and verified backup/restore, frozen holdout reservations, and numerical qualification/chronological fold utilities. An experimental fixed-barrier index is tested but disabled in replay. It is an implementation checkpoint, not the complete factory.
 
 ## Development
 
@@ -27,6 +27,9 @@ cargo run --locked -- inspect dataset.json
 cargo run --locked -- candles dataset.json M1
 cargo run --locked -- generate
 cargo run --locked -- evaluate dataset.json strategy.json result.json
+cargo run --locked -- experiment dataset.json strategy.json registry.sqlite
+cargo run --locked -- registry-check registry.sqlite
+cargo run --locked -- backup registry.sqlite backup.sqlite
 ```
 
 Example strategy:
@@ -40,3 +43,7 @@ Example strategy:
 Spread policy v1 anchors recorded bid and widens ask upward; neither executable side improves. Candles use a continuous UTC research calendar, publish only when the next actual event proves closure, and discard the unfinished final bucket. Signals execute strictly after their publication event, including sequence ordering for timestamp ties. This calendar is not an approved broker/DST calendar. L1 fills assume full execution; depth and queue feasibility are unknown. Only one position is open at a time. Commissions are configurable through the Rust API; orders exceeding the risk budget are rejected.
 
 See [acceptance evidence](docs/ACCEPTANCE.md), [unfinished work](docs/IMPLEMENTATION_QUEUE.md), and the authoritative [master directive](docs/MASTER_BLUEPRINT.md).
+
+`experiment` runs conservative screening and sequential verification with a durable identity that includes the executable BLAKE3 hash. Completed results are reused without a new simulation. A five-minute fenced lease protects completion; failed/rejected/inconclusive evidence is retained. There is no autonomous scheduler yet. Backup is online and checks integrity; test restores by opening the new backup with `registry-check` before using it. Holdout reservations exist through the Rust API and block overlapping registered research; they are scoped to an immutable dataset hash and do not yet protect against exposure through other corpus revisions or external tools. No qualification endpoint is provided.
+
+Benchmark: `cargo bench --locked --bench replay` runs the explicit synthetic baseline. For process resources, first compile with `cargo bench --locked --bench replay --no-run`, then pass the reported executable path and two new output paths to `python3 scripts/measure.py`. Python is development-only. See `docs/BENCHMARKS/README.md` for measurements and limits.

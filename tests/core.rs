@@ -287,3 +287,23 @@ fn replay_rejects_candle_and_signal_tampering() {
         .is_err()
     );
 }
+
+#[test]
+fn contradictory_rules_and_extreme_sizing_fail_safely() {
+    assert!(
+        Rule::All(vec![
+            Rule::AboveMean { window: 5 },
+            Rule::BelowMean { window: 5 }
+        ])
+        .canonical()
+        .is_err()
+    );
+    let p = Profile::synthetic("EURUSD").unwrap();
+    let fx = Conversion {
+        usd_num: i64::MAX,
+        quote_den: 1,
+        as_of_ms: 0,
+    };
+    assert!(contracts::size(&p, 20_000_000, i64::MAX, i64::MAX, fx).is_err());
+    assert!(contracts::size(&p, i128::MAX, 100000, 100, Conversion::usd()).is_err());
+}
