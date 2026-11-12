@@ -234,3 +234,50 @@ fn state_pressure_pauses_before_new_experiment_and_preserves_cursor() {
     drop(driver);
     std::fs::remove_dir_all(d).unwrap();
 }
+
+#[test]
+fn dataset_provenance_changes_identity_but_reimport_time_does_not() {
+    let d = dir();
+    let mut registry = Registry::open(&d.join("state.sqlite")).unwrap();
+    let (_, s) = research::candidate_at(0, 1).unwrap();
+    let a = input("EURUSD");
+    let first =
+        research::evaluate(&mut registry, &a, &s, &Default::default(), "code", 100000).unwrap();
+    let mut same = input("EURUSD");
+    same.dataset.manifest.imported_at = "later re-import of same archive".into();
+    let cached = research::evaluate(
+        &mut registry,
+        &same,
+        &s,
+        &Default::default(),
+        "code",
+        100000,
+    )
+    .unwrap();
+    assert!(cached.reused);
+    assert_eq!(first.experiment_id, cached.experiment_id);
+    same.dataset.manifest.source = "different source provenance".into();
+    let changed = research::evaluate(
+        &mut registry,
+        &same,
+        &s,
+        &Default::default(),
+        "code",
+        100000,
+    )
+    .unwrap();
+    assert!(!changed.reused);
+    assert_ne!(first.experiment_id, changed.experiment_id);
+    drop(registry);
+    std::fs::remove_dir_all(d).unwrap();
+}
+
+#[test]
+fn real_data_loop_requires_explicit_chronological_training_scope() {
+    let d = dir();
+    let path = d.join("state.sqlite");
+    let mut real = input("EURUSD");
+    real.dataset.manifest.class = data::DataClass::RealStructurallyValid;
+    assert!(Driver::open(&path, vec![real], Config::default(), "code".into()).is_err());
+    std::fs::remove_dir_all(d).unwrap();
+}

@@ -24,6 +24,7 @@ pub struct Config {
     pub max_regions: u64,
     pub lease_ms: i64,
     pub state_budget_bytes: u64,
+    pub training_window: Option<crate::validation::Interval>,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -34,6 +35,7 @@ impl Default for Config {
             max_regions: 10000,
             lease_ms: 300000,
             state_budget_bytes: 256 * 1024 * 1024,
+            training_window: None,
         }
     }
 }
@@ -44,13 +46,14 @@ pub struct Execution {
     pub outcome: String,
     pub result: serde_json::Value,
 }
-pub fn executable_revision() -> Result<String> {
-    let path = if cfg!(target_os = "linux") {
-        std::path::PathBuf::from("/proc/self/exe")
-    } else {
-        std::env::current_exe().map_err(|e| e.to_string())?
-    };
-    Ok(format!("binary-blake3:{}", data::file_hash(&path)?))
+pub fn compute_revision() -> Result<String> {
+    Ok(env!("FACTORY_COMPUTE_REVISION").into())
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Evaluation {
+    pub window: crate::validation::Interval,
+    pub stage: Stage,
+    pub protocol_hash: String,
 }
 pub fn evaluate(
     registry: &mut Registry,
@@ -59,6 +62,50 @@ pub fn evaluate(
     costs: &Costs,
     revision: &str,
     feature_cells: usize,
+) -> Result<Execution> {
+    evaluate_internal(
+        registry,
+        input,
+        strategy,
+        costs,
+        revision,
+        feature_cells,
+        None,
+    )
+}
+pub fn evaluate_window(
+    registry: &mut Registry,
+    input: &Input,
+    strategy: &Strategy,
+    costs: &Costs,
+    revision: &str,
+    feature_cells: usize,
+    evaluation: &Evaluation,
+) -> Result<Execution> {
+    evaluation.window.validate()?;
+    if evaluation.stage == Stage::CandleScreen {
+        return Err(
+            "tick evaluation requires tick verification or independent-validation stage".into(),
+        );
+    }
+    evaluate_internal(
+        registry,
+        input,
+        strategy,
+        costs,
+        revision,
+        feature_cells,
+        Some(evaluation),
+    )
+}
+fn evaluate_internal(
+    registry: &mut Registry,
+    input: &Input,
+    strategy: &Strategy,
+    costs: &Costs,
+    revision: &str,
+    feature_cells: usize,
+    evaluation: Option<&Evaluation>,
 ) -> Result<Execution> {
     let d = &input.dataset;
     d.verify()?;
@@ -69,18 +116,29 @@ pub fn evaluate(
         concept_hash: strategy.identity()?,
         instrument: d.profile.symbol.clone(),
         dataset_hash: d.manifest.content_hash.clone(),
-        start_ms: d.manifest.first_ms,
-        end_exclusive_ms: d.manifest.last_ms.checked_add(1).ok_or("range overflow")?,
+        start_ms: evaluation.map_or(d.manifest.first_ms, |e| e.window.start_ms),
+        end_exclusive_ms: evaluation.map_or_else(
+            || d.manifest.last_ms.checked_add(1).ok_or("range overflow"),
+            |e| Ok(e.window.end_exclusive_ms),
+        )?,
         signal_version: crate::SIGNAL_VERSION.into(),
         indicator_version: crate::INDICATOR_VERSION.into(),
         cost_hash: data::hash(costs)?,
         fill_policy: "full-l1-assumption-target-at-limit-preflight-v2".into(),
         profile_hash: d.manifest.profile_hash.clone(),
         engine_version: crate::ENGINE_VERSION.into(),
-        protocol_hash: data::hash(&"training-only-conservative-signals-v1")?,
+        protocol_hash: match evaluation {
+            Some(e) => e.protocol_hash.clone(),
+            None => data::hash(&"training-only-conservative-signals-v1")?,
+        },
         code_revision: revision.into(),
-        configuration_hash: data::hash(&(feature_cells, costs, data::hash(&input.conversions)?))?,
-        stage: Stage::TickVerification,
+        configuration_hash: data::hash(&(
+            feature_cells,
+            costs,
+            data::hash(&input.conversions)?,
+            data::dataset_identity(&d.manifest)?,
+        ))?,
+        stage: evaluation.map_or(Stage::TickVerification, |e| e.stage.clone()),
     };
     let id = registry.register(&key)?;
     match registry.claim(&id, chrono::Utc::now().timestamp_millis(), 300000)? {
@@ -95,18 +153,43 @@ pub fn evaluate(
             let compute = || -> Result<serde_json::Value> {
                 let c = candles::build(d, strategy.timeframe)?;
                 let mut features = Features::new(&c, feature_cells)?;
-                let screen = strategies::screen(&mut features, strategy)?;
+                let mut screen = strategies::screen(&mut features, strategy)?;
+                let mask = features.signal(&strategy.rule)?;
+                if let Some(e) = evaluation {
+                    screen.signals = c
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, c)| e.window.contains(c.available_ms) && mask.get(*i))
+                        .count();
+                    screen.requires_tick_verification = screen.signals > 0;
+                    screen.status = if screen.signals == 0 {
+                        strategies::ScreenStatus::ProvenNoSignals
+                    } else {
+                        strategies::ScreenStatus::ScreenUncertain
+                    };
+                    screen.version = "conservative-window-signals-v2".into();
+                }
                 if !screen.requires_tick_verification {
                     return Ok(
-                        serde_json::json!({"screen":screen,"tick_replay":null,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs}),
+                        serde_json::json!({"screen":screen,"tick_replay":null,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation}),
                     );
                 }
-                let mask = features.signal(&strategy.rule)?;
-                let replay =
-                    tick_engine::replay(d, &c, &mask, strategy, costs, &input.conversions)?;
+                let replay = if let Some(e) = evaluation {
+                    tick_engine::replay_window(
+                        d,
+                        &c,
+                        &mask,
+                        strategy,
+                        costs,
+                        &input.conversions,
+                        &e.window,
+                    )?
+                } else {
+                    tick_engine::replay(d, &c, &mask, strategy, costs, &input.conversions)?
+                };
                 let screen_audit = crate::screen::audit_replay(d, costs, &replay)?;
                 Ok(
-                    serde_json::json!({"screen":screen,"screen_audit":screen_audit,"tick_replay":replay,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs}),
+                    serde_json::json!({"screen":screen,"screen_audit":screen_audit,"tick_replay":replay,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation}),
                 )
             };
             let (outcome, result) = match compute() {
@@ -269,8 +352,16 @@ impl Driver {
         if total > config.max_total_events {
             return Err("loaded inputs exceed configured event budget".into());
         }
+        if let Some(window) = &config.training_window {
+            window.validate()?;
+        }
         for input in &inputs {
             input.dataset.verify()?;
+            if input.dataset.manifest.class != crate::data::DataClass::SyntheticTestOnly
+                && config.training_window.is_none()
+            {
+                return Err("real-data autonomous research requires an explicit training window to preserve unseen evidence".into());
+            }
             if input.conversions.len() != input.dataset.ticks.len() {
                 return Err("event-aligned conversions required for every input".into());
             }
@@ -286,7 +377,7 @@ impl Driver {
             .iter()
             .map(|input| {
                 data::hash(&(
-                    &input.dataset.manifest.content_hash,
+                    data::dataset_identity(&input.dataset.manifest)?,
                     &input.dataset.manifest.profile_hash,
                     &input.conversions,
                 ))
@@ -400,14 +491,30 @@ impl Driver {
         let input_index = s.cursor as usize % self.inputs.len();
         let candidate_index = s.cursor / self.inputs.len() as u64;
         let (_, strategy) = candidate_at(candidate_index, self.config.seed)?;
-        let execution = evaluate(
-            &mut self.registry,
-            &self.inputs[input_index],
-            &strategy,
-            &Costs::default(),
-            &self.revision,
-            self.config.feature_cells,
-        );
+        let execution = if let Some(window) = &self.config.training_window {
+            evaluate_window(
+                &mut self.registry,
+                &self.inputs[input_index],
+                &strategy,
+                &Costs::default(),
+                &self.revision,
+                self.config.feature_cells,
+                &Evaluation {
+                    window: window.clone(),
+                    stage: Stage::TickVerification,
+                    protocol_hash: data::hash(&("training-window-v1", window))?,
+                },
+            )
+        } else {
+            evaluate(
+                &mut self.registry,
+                &self.inputs[input_index],
+                &strategy,
+                &Costs::default(),
+                &self.revision,
+                self.config.feature_cells,
+            )
+        };
         let (id, outcome, reused, error) = match execution {
             Ok(e) => (
                 Some(e.experiment_id),

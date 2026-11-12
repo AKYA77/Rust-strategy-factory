@@ -15,3 +15,5 @@ Nine-family milestone: causal RSI/mean crosses and trends, prior channels, range
 Durable loop milestone: schema-v3 cursors/coordinator fencing, controls, fair inputs, bounded new regions, shared CLI evaluation, state-budget backpressure and conditional candle-bound audits. Sixty-four tests and standalone process smoke pass.
 
 Dashboard core: authenticated localhost Axum/embedded frontend, Argon2id initialization, bounded sessions/CSRF/origin/host/rate/body controls, persistent run controls and real trade/provenance/export views. Sixty-five Rust tests and actual Chromium desktop/mobile/restart acceptance pass. Lossless i128 JSON receipts verified.
+
+Chronological window milestone: causal warmup/flat starts/exclusive ends, protected parent-dataset evaluation, real-data training-scope guard, provenance-aware identities and compute fingerprints unaffected by embedded UI changes. Seventy-one tests pass; complete scientific workflow remains unfinished.

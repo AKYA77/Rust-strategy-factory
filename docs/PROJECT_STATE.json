@@ -28,7 +28,11 @@
     "authenticated loopback Axum dashboard with embedded assets and real persistent state",
     "Argon2id auth initialization, bounded random sessions, CSRF/origin/host/body/rate controls",
     "strategy/profile/cost/trade detail, equity chart, exact receipt export and numerical training diagnostics",
-    "lossless i128 JSON values including uncapped losses beyond 64-bit range"
+    "lossless i128 JSON values including uncapped losses beyond 64-bit range",
+    "chronological replay/evaluation windows with causal warmup and strict position/quote boundaries",
+    "real autonomous input requires explicit training scope",
+    "provenance-aware dataset identities with reimport-time reuse",
+    "compiled compute identity excluding embedded UI assets, with actual rebuild equivalence evidence"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -36,9 +40,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Complete chronological OOS/walk-forward execution and immutable scientific evidence protocols; add HTF/operators, large-data storage/imports, diagnostics, worker controls, deployment and remaining UI operations.",
+  "next_action": "Implement immutable frozen scientific protocols and actual walk-forward/OOS/final evaluation orchestration with protected exposure and uncertainty/robustness evidence; then remaining full project queue.",
   "qualified_strategies": 0,
-  "tests_passed": 65,
+  "tests_passed": 71,
   "benchmark": "docs/BENCHMARKS/2026-11-12-synthetic-replay.json",
   "browser_acceptance": "Chromium desktop/mobile against actual Rust HTTP server and SQLite; auth, CSRF/origin/host/body/rates, controls, receipts/export, restart/logout passed"
 }

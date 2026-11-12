@@ -1,0 +1,7 @@
+{
+  "check": "UI-only CSS change preserves compute identity while executable changes",
+  "passed": true,
+  "compute_revision": "compute-blake3:d7430af61000132bd8ca7a2346641c39af8454a26043fddfddb0a7c61863214b",
+  "binary_sha256_before": "e74fb1b53095dbe996c8e148222bb4456f2823daa4d187db636f5da23c983ae2",
+  "binary_sha256_with_ui_change": "df8a14d5a0f85a72beab3f4dc97ca42a46f44b525ef7d0c20f275bda13fcb3ec"
+}

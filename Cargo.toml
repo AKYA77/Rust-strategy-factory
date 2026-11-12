@@ -29,3 +29,6 @@ unsafe_code = "forbid"
 [[bench]]
 name = "replay"
 harness = false
+
+[build-dependencies]
+blake3 = "1.8"

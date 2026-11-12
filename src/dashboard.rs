@@ -264,7 +264,7 @@ async fn overview(State(app): State<Arc<App>>) -> Response {
             })
             .collect::<Result<Vec<_>>>()?;
         Ok(
-            serde_json::json!({"software_status":"SOFTWARE_INCOMPLETE","historical_readiness":"FULL_HISTORICAL_DATA_PENDING","qualification":"Independent validation/profile/coverage evidence is incomplete; no qualified strategies","counts":registry.counts()?,"runs":runs,"engine":crate::ENGINE_VERSION,"indicators":crate::INDICATOR_VERSION}),
+            serde_json::json!({"software_status":"SOFTWARE_INCOMPLETE","historical_readiness":"FULL_HISTORICAL_DATA_PENDING","qualification":"Independent validation/profile/coverage evidence is incomplete; no qualified strategies","counts":registry.counts()?,"runs":runs,"engine":crate::ENGINE_VERSION,"indicators":crate::INDICATOR_VERSION,"compute_revision":research::compute_revision()?}),
         )
     };
     match load() {
@@ -314,9 +314,14 @@ async fn detail(State(app): State<Arc<App>>, Param(id): Param<String>) -> Respon
     match registry.result(&id) {
         Ok(Some(v)) => {
             let assessment = (|| -> Result<crate::validation::Assessment> {
-                let cutoff = v.result["data_manifest"]["last_ms"]
+                let cutoff = match v.result["tick_replay"]["evaluation_window"]["end_exclusive_ms"]
                     .as_i64()
-                    .ok_or("dataset cutoff missing")?;
+                {
+                    Some(end) => end.checked_sub(1).ok_or("cutoff overflow")?,
+                    None => v.result["data_manifest"]["last_ms"]
+                        .as_i64()
+                        .ok_or("dataset cutoff missing")?,
+                };
                 let observations: Vec<crate::validation::Observation> =
                     serde_json::from_value(v.result["tick_replay"]["trades"].clone())
                         .map_err(|_| "no complete tick trade series")?;

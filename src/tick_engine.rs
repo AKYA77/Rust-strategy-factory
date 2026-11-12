@@ -187,6 +187,7 @@ pub struct Replay {
     pub unresolved: Option<OpenPosition>,
     pub pending_entry: Option<PendingEntry>,
     pub entry_receipts: Vec<EntryReceipt>,
+    pub evaluation_window: Option<crate::validation::Interval>,
 }
 fn signed_delta(side: Side, exit: i64, entry: i64) -> Result<i64> {
     exit.checked_sub(entry)
@@ -200,6 +201,38 @@ pub fn replay(
     strategy: &Strategy,
     costs: &Costs,
     conversions: &[Conversion],
+) -> Result<Replay> {
+    replay_internal(data, candles, mask, strategy, costs, conversions, None)
+}
+/// Warmup is causal and read-only. All positions start flat; no events at/after end are consumed.
+pub fn replay_window(
+    data: &Dataset,
+    candles: &[Candle],
+    mask: &Mask,
+    strategy: &Strategy,
+    costs: &Costs,
+    conversions: &[Conversion],
+    window: &crate::validation::Interval,
+) -> Result<Replay> {
+    window.validate()?;
+    replay_internal(
+        data,
+        candles,
+        mask,
+        strategy,
+        costs,
+        conversions,
+        Some(window),
+    )
+}
+fn replay_internal(
+    data: &Dataset,
+    candles: &[Candle],
+    mask: &Mask,
+    strategy: &Strategy,
+    costs: &Costs,
+    conversions: &[Conversion],
+    window: Option<&crate::validation::Interval>,
 ) -> Result<Replay> {
     data.verify()?;
     costs.validate()?;
@@ -238,6 +271,14 @@ pub fn replay(
     let mut pending: Option<PendingEntry> = None;
     let mut entry_receipts = Vec::new();
     for (event_i, t) in data.ticks.iter().enumerate() {
+        if let Some(window) = window {
+            if t.timestamp_ms >= window.end_exclusive_ms {
+                break;
+            }
+            if t.timestamp_ms < window.start_ms {
+                continue;
+            }
+        }
         let fx = conversions[event_i];
         fx.validate(p, t.timestamp_ms, costs.max_conversion_age_ms)?;
         let (bid, ask) = costs.effective(p, *t)?;
@@ -426,7 +467,8 @@ pub fn replay(
             }
             // New orders are placed after existing order processing; they cannot fill on publication.
             while candle_i < candles.len() && candles[candle_i].publication_sequence <= t.sequence {
-                let wants = mask.get(candle_i);
+                let wants = mask.get(candle_i)
+                    && window.is_none_or(|w| w.contains(candles[candle_i].available_ms));
                 candle_i += 1;
                 if !wants || pending.is_some() || position.is_some() || closed_now || filled_now {
                     continue;
@@ -527,7 +569,8 @@ pub fn replay(
         } else {
             // Market-only v1 concepts retain signal timing; sizing now includes marked entry costs.
             while candle_i < candles.len() && candles[candle_i].publication_sequence < t.sequence {
-                let wants = mask.get(candle_i);
+                let wants = mask.get(candle_i)
+                    && window.is_none_or(|w| w.contains(candles[candle_i].available_ms));
                 candle_i += 1;
                 if !wants || position.is_some() || closed_now {
                     continue;
@@ -601,5 +644,5 @@ pub fn replay(
         conversion_id: crate::data::hash(&conversions)?,
         fill_assumption: "L1 full-fill research assumption; no historical depth/queue verification; target limit at requested price; deadline cancels protective orders; USD-per-quote marks supplied explicitly".into(),
         initial_micro_usd: contracts::INITIAL_EQUITY, realized_micro_usd: balance, final_marked_micro_usd: marked,
-        maximum_drawdown_micro_usd: drawdown, trades, rejections, unresolved: position, pending_entry: pending, entry_receipts })
+        maximum_drawdown_micro_usd: drawdown, trades, rejections, unresolved: position, pending_entry: pending, entry_receipts, evaluation_window:window.cloned() })
 }

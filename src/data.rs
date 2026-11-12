@@ -73,6 +73,21 @@ pub fn hash<T: Serialize>(value: &T) -> Result<String> {
             .to_string(),
     )
 }
+/// Provenance identity excludes the time this same immutable archive was re-imported.
+pub fn dataset_identity(m: &Manifest) -> Result<String> {
+    hash(&(
+        "dataset-provenance-v1",
+        &m.source,
+        &m.archive_hash,
+        &m.content_hash,
+        &m.profile_hash,
+        &m.parser_version,
+        m.class,
+        m.first_ms,
+        m.last_ms,
+        m.events,
+    ))
+}
 pub fn file_hash(path: &Path) -> Result<String> {
     let mut file = File::open(path).map_err(|e| e.to_string())?;
     let mut h = blake3::Hasher::new();

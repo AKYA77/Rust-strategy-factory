@@ -115,7 +115,7 @@ fn research_driver(config_path: &str, database: &str) -> Result<research::Driver
         Path::new(database),
         inputs,
         config.limits,
-        research::executable_revision()?,
+        research::compute_revision()?,
     )
 }
 fn run(args: &[String]) -> Result<()> {
@@ -125,6 +125,9 @@ fn run(args: &[String]) -> Result<()> {
         .collect::<Vec<_>>()
         .as_slice()
     {
+        ["version"] => print(
+            &serde_json::json!({"package":env!("CARGO_PKG_VERSION"),"engine":rust_strategy_factory::ENGINE_VERSION,"indicators":rust_strategy_factory::INDICATOR_VERSION,"signals":rust_strategy_factory::SIGNAL_VERSION,"compute_revision":research::compute_revision()?,"software_status":"SOFTWARE_INCOMPLETE"}),
+        ),
         ["auth-init", path] => rust_strategy_factory::dashboard::initialize_auth(Path::new(path)),
         ["serve", database, auth, port] => {
             let port = port.parse::<u16>().map_err(|_| "invalid loopback port")?;
@@ -214,7 +217,7 @@ fn run(args: &[String]) -> Result<()> {
                 },
                 &s,
                 &Costs::default(),
-                &research::executable_revision()?,
+                &research::compute_revision()?,
                 4_000_000,
             )?)
         }
