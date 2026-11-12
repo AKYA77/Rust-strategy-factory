@@ -76,14 +76,22 @@ pub struct Breakdown {
     /// UTC entry hour / 6; fixed bins, not broker sessions or DST-adjusted market sessions.
     pub entry_utc_six_hour_bins: BTreeMap<u32, Bucket>,
     pub folds: Vec<FoldRisk>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub entry_regimes: BTreeMap<String, Bucket>,
     pub warnings: Vec<String>,
 }
 impl Default for Breakdown {
     fn default() -> Self {
-        Self{method:VERSION.into(),exit_years:BTreeMap::new(),entry_utc_six_hour_bins:BTreeMap::new(),folds:Vec::new(),warnings:vec!["OOS-only reset-fold receipt breakdown; no full-period coverage or qualification".into(),"UTC entry bins are not approved broker/DST sessions".into(),"Realized cash drawdown excludes intratrade marks, MFE/MAE and unresolved positions".into(),"Exact net expectancy per bucket is sum_net_micro_usd / resolved; empty buckets have no estimate".into()]}
+        Self{method:VERSION.into(),exit_years:BTreeMap::new(),entry_utc_six_hour_bins:BTreeMap::new(),folds:Vec::new(),entry_regimes:BTreeMap::new(),warnings:vec!["OOS-only reset-fold receipt breakdown; no full-period coverage or qualification".into(),"UTC entry bins are not approved broker/DST sessions".into(),"Realized cash drawdown excludes intratrade marks, MFE/MAE and unresolved positions".into(),"Exact net expectancy per bucket is sum_net_micro_usd / resolved; empty buckets have no estimate".into()]}
     }
 }
 impl Breakdown {
+    pub fn record_regime(&mut self, label: &str, net: i128) -> Result<()> {
+        let mut next = self.entry_regimes.get(label).cloned().unwrap_or_default();
+        next.add(net)?;
+        self.entry_regimes.insert(label.into(), next);
+        Ok(())
+    }
     pub fn record(&mut self, trade: &Trade, fold: &mut FoldRisk) -> Result<()> {
         if fold.last_exit_ms.is_some_and(|last| trade.entry_ms < last) {
             return Err("nonchronological or overlapping fold receipts".into());

@@ -23,6 +23,7 @@ fn main() {
         "src/uncertainty.rs",
         "src/robustness.rs",
         "src/diagnostics.rs",
+        "src/regimes.rs",
         "src/research.rs",
         "src/storage.rs",
     ] {

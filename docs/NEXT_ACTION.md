@@ -4,7 +4,7 @@ Status: SOFTWARE_INCOMPLETE. Read AGENTS.md, PROJECT_STATE.json, ACCEPTANCE.md a
 
 ## Latest milestone
 
-91 Rust application tests pass, with formatting/Clippy, release build and Chromium desktop/mobile acceptance. SQLite schema6 now atomically reserves immutable OOS intervals before evaluation. Other protocols and dataset revisions cannot register overlapping work. Exact recovery remains allowed; range-set changes fail. Multi-range failures roll back completely. An actual two-thread/two-connection race proves that reservation and outside exposure cannot both succeed. An index supports same-instrument exposure lookup. Legacy global reservations stay conservative.
+93 Rust application tests pass, with formatting/Clippy, release build and Chromium desktop/mobile acceptance. SQLite schema6 now atomically reserves immutable OOS intervals before evaluation. Other protocols and dataset revisions cannot register overlapping work. Exact recovery remains allowed; range-set changes fail. Multi-range failures roll back completely. An actual two-thread/two-connection race proves that reservation and outside exposure cannot both succeed. An index supports same-instrument exposure lookup. Legacy global reservations stay conservative.
 
 Frozen protocol execution, immutable reports/reuse, instrument-scoped and cross-dataset final protection, chronological windows, conditional Hoeffding/Bonferroni diagnostics and initial executable-stop feasibility remain tested. Reports always return INSUFFICIENT_EVIDENCE, uncertainty assumptions remain unverified, real final execution stays blocked before reservation. No qualified strategies. Earlier invalid 30-tick fixture goldens are historical/superseded (see ACCEPTANCE.md).
 
@@ -12,9 +12,11 @@ Frozen protocol v3 now binds deterministic cost stress and stop-neighborhood cas
 
 Protocol v4 now binds exact OOS exit-year/UTC entry-session breakdowns and per-fold realized cash drawdown. Net expectancy retains exact numerator/count; missing replay and unresolved positions stay explicit. Diagnostics reject receipt order errors and preserve state on overflow. Realized cash drawdown excludes intratrade marks, so it cannot stand in for full-account drawdown. Two independent arithmetic/boundary tests pass.
 
+Protocol v5 now binds fixed causal M1 regime labels. Trend and range compare the latest strictly prior closed candle with 20 preceding candles; gaps reset history and unknown warmup/gap/stale context remains counted. One bounded publication-summary classifier is shared across frozen candidates. Prefix/entry-quote invariance, ties, gap reset/recovery and expanded/downward cases pass. OOS regime counts reconcile with actual receipts. See DECISIONS/0004-causal-regime-labels.md.
+
 ## Begin next
 
-Implement causal regime robustness and broader parameter neighborhoods and dependence-aware inference with explicit assumptions and bounded reproducibility. Complete corpus-wide external exposure proofs, coverage/approval prerequisites and safe qualification transitions before unlocking real final evaluation. Current protocol execution and pooled reset-fold statistics cannot issue validated status.
+Implement broader parameter neighborhoods and dependence-aware inference, with sufficient-sample and prespecified robustness acceptance gates with explicit assumptions and bounded reproducibility. Complete corpus-wide external exposure proofs, coverage/approval prerequisites and safe qualification transitions before unlocking real final evaluation. Current protocol execution and pooled reset-fold statistics cannot issue validated status.
 
 Continue HTF/operators and bounded mutation/improvement lineage, candidate-level net candle screening, native lossless storage/source acquisition/import acceptance, diagnostics, worker pools/OS resource control, full dashboard operations, production deployment and final end-to-end acceptance. Follow the complete IMPLEMENTATION_QUEUE.md rather than stopping at this milestone.
 

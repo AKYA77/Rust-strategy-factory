@@ -165,7 +165,7 @@ pub struct ProtocolResult {
 }
 fn definition(plan: &Plan, input: &Input, revision: &str) -> Result<serde_json::Value> {
     Ok(
-        serde_json::json!({"version":"frozen-chronological-protocol-v4","breakdown_method":crate::diagnostics::VERSION,"robustness_method":crate::robustness::VERSION,"robustness_cases":plan.candidates.iter().map(|s|crate::robustness::cases(s,&plan.costs)).collect::<Result<Vec<_>>>()?,"uncertainty_method":crate::uncertainty::VERSION,"plan":plan,"dataset_hash":input.dataset.manifest.content_hash,"dataset_identity":data::dataset_identity(&input.dataset.manifest)?,"profile_hash":input.dataset.manifest.profile_hash,"conversions_hash":data::hash(&input.conversions)?,"revision":revision,"engine":crate::ENGINE_VERSION,"indicators":crate::INDICATOR_VERSION,"signals":crate::SIGNAL_VERSION}),
+        serde_json::json!({"version":"frozen-chronological-protocol-v5","regime_method":crate::regimes::VERSION,"breakdown_method":crate::diagnostics::VERSION,"robustness_method":crate::robustness::VERSION,"robustness_cases":plan.candidates.iter().map(|s|crate::robustness::cases(s,&plan.costs)).collect::<Result<Vec<_>>>()?,"uncertainty_method":crate::uncertainty::VERSION,"plan":plan,"dataset_hash":input.dataset.manifest.content_hash,"dataset_identity":data::dataset_identity(&input.dataset.manifest)?,"profile_hash":input.dataset.manifest.profile_hash,"conversions_hash":data::hash(&input.conversions)?,"revision":revision,"engine":crate::ENGINE_VERSION,"indicators":crate::INDICATOR_VERSION,"signals":crate::SIGNAL_VERSION}),
     )
 }
 /// Immutable report lookup verifies stored scientific evidence integrity.
@@ -323,6 +323,7 @@ pub fn execute(
             .map(|f| f.test.clone())
             .collect::<Vec<_>>(),
     )?;
+    let regimes = crate::regimes::Classifier::new(&input.dataset)?;
     let mut candidates = Vec::new();
     for strategy in &plan.candidates {
         let mut experiments = Vec::new();
@@ -390,6 +391,10 @@ pub fn execute(
                         let trade: crate::tick_engine::Trade =
                             serde_json::from_value(raw.clone()).map_err(|e| e.to_string())?;
                         breakdown.record(&trade, &mut fold)?;
+                        breakdown.record_regime(
+                            regimes.at(trade.entry_event, trade.entry_ms),
+                            trade.net_micro_usd,
+                        )?;
                         observations.push(Observation {
                             exit_ms: trade.exit_ms,
                             net_micro_usd: trade.net_micro_usd,

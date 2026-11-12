@@ -25,3 +25,5 @@ pub mod uncertainty;
 pub mod robustness;
 
 pub mod diagnostics;
+
+pub mod regimes;

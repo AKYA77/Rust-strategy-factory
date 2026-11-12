@@ -19,3 +19,5 @@ Frozen reports now include conditional Hoeffding/Bonferroni net-win diagnostics 
 Protocol v3 freezes and executes additional OOS-only cost stress and stop-neighborhood cases. Their reports retain exact receipts and DESCRIPTIVE_ONLY status; no final interval is probed. See [probe policy and limitations](../DECISIONS/0003-frozen-robustness-probes.md).
 
 Protocol v4 adds OOS receipt breakdowns by exit year and six-hour UTC entry bin. Per-fold cash drawdowns use realized closed-trade net P&L from a fresh $20 account. They exclude intratrade marks and unresolved positions and must not be presented as complete account drawdown. Missing replay stays explicit; empty bins have no expectancy estimate. Each bucket retains an exact net-P&L numerator and resolved-trade denominator. These UTC bins do not establish broker/DST session approval or market-regime robustness.
+
+Protocol v5 adds fixed causal entry-regime counts from strictly prior closed M1 context. Unknown warmup/gap/stale labels stay visible. These are descriptive trend/range bins, not evidence of comprehensive regime stability. See [recipe and causal tests](../DECISIONS/0004-causal-regime-labels.md).
