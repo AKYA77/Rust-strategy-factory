@@ -1,0 +1,21 @@
+{
+  "software_status": "SOFTWARE_INCOMPLETE",
+  "toolchain": "1.100.0",
+  "implemented": [
+    "integer contracts and synthetic profiles",
+    "bounded normalized CSV importer and hashes/quarantine",
+    "closed UTC research candles M1-D1",
+    "causal primitives and shared mean masks",
+    "bounded canonical rules and initial grid",
+    "conservative signal-only screening",
+    "sequential market-entry L1 replay and CLI"
+  ],
+  "external_pending": [
+    "reviewed broker profiles/calendar",
+    "representative real data",
+    "full historical data",
+    "target VPS validation"
+  ],
+  "next_action": "Harden core and add persistent experiment registry and independent qualification boundary tests; see queue.",
+  "qualified_strategies": 0
+}

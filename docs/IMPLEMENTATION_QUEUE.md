@@ -1,0 +1,62 @@
+# Implementation queue
+
+Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
+
+1. Harden foundational arithmetic/import/replay with adversarial/property tests; extend normalized importer coverage and immutable atomic artifacts.
+2. Acquire legally usable short real quote windows for all eight symbols in 2025 and 2026; retain source terms/URLs/archive hashes. No actual source has been acquired yet.
+3. Source reviewed instrument contracts, sessions/DST calendars and timestamped FX conversion semantics; keep gold-specific conventions blocked pending evidence.
+4. Add Parquet/ZSTD baseline, SoA hot storage and measured codec/source reuse audits.
+5. Expand the bounded strategy grammar to all nine families and HTF/session/regime operators; seeded mutations/crossover, cache graph, sparse bitsets and diversity.
+6. Implement real candle outcome estimates/bounds, collision ambiguity and rejection audits. Current signal-only conservative screening cannot reject performance failures.
+7. Complete order lifecycle: pending market/stop/limit orders, expirations/cancellations, supported partial fills, richer diagnostics and receipts. Test all eight instruments and conversions independently.
+8. Prototype first-hit index only after sequential reference correctness; differential-test and benchmark before enabling.
+9. SQLite WAL migrations, full experiment identity, durable dedup, leases, atomic results, crash recovery, immutable artifacts, backups and verified restore.
+10. Persistent bounded research scheduler, resource pressure handling, fairness, cancellation, adaptive region expansion and meaningful counters.
+11. Freeze chronological splits; three-month walk-forward, purge/embargo, protected one-use holdout, multiplicity safeguards, cost/neighborhood/regime robustness.
+12. Qualification boundary tests and evidence gates; eight independent diverse top-five boards. Synthetic data must never qualify.
+13. Deterministic diagnostics and bounded improvements with parent/child provenance; never use protected holdout for adaptation.
+14. Authenticated Axum API and embedded responsive dashboard using actual persisted state; browser workflows, security and exports.
+15. Reproducible installer/systemd, update/rollback, non-root resource limits, monitoring and backup/restore procedures.
+16. Full synthetic/adversarial/cross-year/real-data end-to-end acceptance, benchmarks with hardware/resource evidence, recovery and browser acceptance.
+17. Final requirement reconciliation, source/license audit, GitHub CI verification and honest handoff. Full historical data and target VPS acceptance remain external pending work.
+
+## Directive section reconciliation
+
+| Section | Status |
+|---|---|
+| 0. YOUR MISSION | Directive preserved; ongoing engineering rule |
+| 1. COMPLETELY NEW PROJECT | Directive preserved; ongoing engineering rule |
+| 2. ENGINEERING PHILOSOPHY | Directive preserved; ongoing engineering rule |
+| 3. HARDWARE AND RESOURCE REQUIREMENTS | Incomplete; consult full requirement and queue above |
+| 4. SUPPORTED INSTRUMENTS | Incomplete; consult full requirement and queue above |
+| 5. SUPPORTED TIMEFRAMES | Incomplete; consult full requirement and queue above |
+| 6. HISTORICAL DATA REQUIREMENTS | Incomplete; consult full requirement and queue above |
+| 7. FINANCIAL RESEARCH CONTRACT | Incomplete; consult full requirement and queue above |
+| 8. STRATEGY QUALIFICATION CRITERIA | Incomplete; consult full requirement and queue above |
+| 9. STRATEGY GENERATOR | Incomplete; consult full requirement and queue above |
+| 10. CANONICAL STRATEGY IDENTITIES | Incomplete; consult full requirement and queue above |
+| 11. FAST TWO-STAGE RESEARCH PIPELINE | Incomplete; consult full requirement and queue above |
+| 12. TICK FIRST-HIT ACCELERATION | Incomplete; consult full requirement and queue above |
+| 13. COMPRESSION AND DATA ENGINEERING | Incomplete; consult full requirement and queue above |
+| 14. SHARED INDICATOR AND BITSET ENGINE | Incomplete; consult full requirement and queue above |
+| 15. PERFORMANCE AND THROUGHPUT | Incomplete; consult full requirement and queue above |
+| 16. LIBRARIES AND EXISTING SOURCE CODE | Incomplete; consult full requirement and queue above |
+| 17. STATISTICAL VALIDATION | Incomplete; consult full requirement and queue above |
+| 18. STRATEGY IMPROVEMENT SYSTEM | Incomplete; consult full requirement and queue above |
+| 19. CONTINUOUS AUTONOMOUS RESEARCH | Incomplete; consult full requirement and queue above |
+| 20. TOP FIVE STRATEGIES | Incomplete; consult full requirement and queue above |
+| 21. LIGHTWEIGHT DASHBOARD | Incomplete; consult full requirement and queue above |
+| 22. DATABASE AND PERSISTENCE | Incomplete; consult full requirement and queue above |
+| 23. SECURITY | Incomplete; consult full requirement and queue above |
+| 24. TESTING AND CORRECTNESS | Incomplete; consult full requirement and queue above |
+| 25. END-TO-END ACCEPTANCE | Incomplete; consult full requirement and queue above |
+| 26. HONEST RELEASE AND DATA STATES | Incomplete; consult full requirement and queue above |
+| 27. DEPLOYMENT | Incomplete; consult full requirement and queue above |
+| 28. GITHUB AND PROJECT STRUCTURE | Incomplete; consult full requirement and queue above |
+| 29. BUILD PHASES | Incomplete; consult full requirement and queue above |
+| 30. CONTINUOUS CODEX DEVELOPMENT LOOP | Directive preserved; ongoing engineering rule |
+| 31. MINIMIZE TOKENS, CALLS AND REPETITIVE WORK | Directive preserved; ongoing engineering rule |
+| 32. PUBLICATION REQUIREMENTS | Directive preserved; ongoing engineering rule |
+| 33. MANDATORY QUALITY GATES | Incomplete; consult full requirement and queue above |
+| 34. REQUIRED FINAL DELIVERABLES | Incomplete; consult full requirement and queue above |
+| 35. START EXECUTING NOW | Directive preserved; ongoing engineering rule |

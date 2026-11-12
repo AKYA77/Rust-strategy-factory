@@ -1,0 +1,6 @@
+/target/
+/data/
+/state/
+*.sqlite*
+.env
+*.secret
