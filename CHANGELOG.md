@@ -7,3 +7,5 @@ Initial exact contracts, normalized importer, closed UTC candles, causal indicat
 Second checkpoint: SQLite WAL experiment deduplication, fenced leases, immutable completion, online backup/restore, frozen holdout reservations, numeric qualification boundaries and chronological folds. Experimental fixed-barrier index remains disabled in replay. Twenty-eight tests and a synthetic eight-instrument resource/worker benchmark passed; complete factory remains unfinished.
 
 Order checkpoint: pending entry lifecycle, expiry/cancel/restart snapshots and shared fill calculation; stream-exact importer hashes. Thirty-five tests pass. Generated pending-order/risk integration remains unfinished. Paired benchmark timings are retained without a speedup claim.
+
+Pending-entry integration: typed strategy intents, exclusive fixed-quantity reservations, pre-fill risk/margin rejection, causally ordered cancellation, receipts and cost-aware marked initial margin. Engine v2; 47 tests pass. Synthetic benchmark rerun.

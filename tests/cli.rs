@@ -60,7 +60,7 @@ fn import_inspect_evaluate_and_overwrite_protection() {
     );
     let r: Replay = serde_json::from_slice(&fs::read(&result).unwrap()).unwrap();
     assert_eq!(r.trades.len(), 1);
-    assert_eq!(r.trades[0].net_micro_usd, 1_798_200);
+    assert_eq!(r.trades[0].net_micro_usd, 1_728_900);
     let registry = dir.join("registry.sqlite");
     let backup = dir.join("backup.sqlite");
     let args = [

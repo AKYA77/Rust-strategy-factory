@@ -36,3 +36,9 @@ Source discovery is also blocked under the current network policy. HistData and 
 - Sequential replay shares the market-fill price calculation. Pending stop/limit entries are available through the library but are not yet emitted by the strategy grammar or integrated with reserved risk/margin/position accounting. No partial-liquidity model is claimed.
 - Normalized CSV archive hash now comes from the exact byte stream read by the parser, rather than reopening the input path. The CLI test independently verifies the raw hash.
 - Post-refactor benchmark receipts and three alternating pairs against frozen a5f4a13 are retained. Every batch still resolved 6,997 synthetic trades. Timing varies substantially; no consistent speed improvement or universal worker optimum is established. This is not a production performance acceptance result.
+
+## Pending strategy entry integration
+
+47 application tests, formatting and Clippy pass. Eight integration tests exercise strategy stop/limit entry fills on both sides, fixed quantity and receipts, pending/unresolved outcomes, expiry, cancellation causality, pre-fill margin rejection, and backward-compatible concept identities. Four risk tests independently check marked initial margin, largest feasible grid volume, commissions, minimum-volume feasibility and gold/JPY conventions. Market fixture accounting now correctly uses 19,210 micro-lots and $1.7289 target net P&L, replacing the earlier cash-only margin calculation. Pending false-signal cancellation is processed after existing quote eligibility, preventing hindsight cancellation.
+
+The versioned policy is documented in DECISIONS/0001-pending-entry-reservations.md. Synthetic replay benchmark rerun with source/binary/resource hashes and nonzero trades; final receipts use the v2 engine identifier. No broker approval, maintenance margin model, real data, complete scientific qualification or autonomous research readiness is claimed.

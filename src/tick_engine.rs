@@ -59,7 +59,7 @@ impl Costs {
             .ok_or("spread rounding overflow")?;
         Ok((tick.bid, ask))
     }
-    fn commission(&self, volume: i64) -> i128 {
+    pub(crate) fn commission(&self, volume: i64) -> i128 {
         (i128::from(self.commission_micro_usd_per_lot_per_fill) * i128::from(volume) + 999_999)
             / 1_000_000
     }
@@ -109,6 +109,67 @@ pub struct Rejection {
     pub reason: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingEntry {
+    pub order: crate::orders::Order,
+    pub signal_event: u64,
+    pub planned_entry: i64,
+    pub kind: crate::orders::Kind,
+    pub reservation: crate::risk::Reservation,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EntryStatus {
+    Placed,
+    Filled,
+    Expired,
+    Cancelled,
+    RiskRejected,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntryReceipt {
+    pub event: u64,
+    pub timestamp_ms: i64,
+    pub signal_event: u64,
+    pub status: EntryStatus,
+    pub kind: crate::orders::Kind,
+    pub reservation: crate::risk::Reservation,
+    pub fill: Option<crate::orders::Fill>,
+    pub reason: String,
+}
+fn receipt(
+    t: Tick,
+    pending: &PendingEntry,
+    status: EntryStatus,
+    fill: Option<crate::orders::Fill>,
+    reason: &str,
+) -> EntryReceipt {
+    EntryReceipt {
+        event: t.sequence,
+        timestamp_ms: t.timestamp_ms,
+        signal_event: pending.signal_event,
+        status,
+        kind: pending.kind,
+        reservation: pending.reservation,
+        fill,
+        reason: reason.into(),
+    }
+}
+fn protective(entry: i64, side: Side, distance: i64) -> Result<(i64, i64)> {
+    let stop = entry
+        .checked_sub(side.sign().checked_mul(distance).ok_or("stop overflow")?)
+        .ok_or("stop overflow")?;
+    let target = entry
+        .checked_add(
+            side.sign()
+                .checked_mul(distance.checked_mul(3).ok_or("target overflow")?)
+                .ok_or("target overflow")?,
+        )
+        .ok_or("target overflow")?;
+    if stop <= 0 || target <= 0 {
+        return Err("nonpositive protective level".into());
+    }
+    Ok((stop, target))
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Replay {
     pub version: String,
     pub strategy_id: String,
@@ -124,6 +185,8 @@ pub struct Replay {
     pub trades: Vec<Trade>,
     pub rejections: Vec<Rejection>,
     pub unresolved: Option<OpenPosition>,
+    pub pending_entry: Option<PendingEntry>,
+    pub entry_receipts: Vec<EntryReceipt>,
 }
 fn signed_delta(side: Side, exit: i64, entry: i64) -> Result<i64> {
     exit.checked_sub(entry)
@@ -172,6 +235,8 @@ pub fn replay(
     let mut rejections = Vec::new();
     let mut position: Option<OpenPosition> = None;
     let mut candle_i = 0;
+    let mut pending: Option<PendingEntry> = None;
+    let mut entry_receipts = Vec::new();
     for (event_i, t) in data.ticks.iter().enumerate() {
         let fx = conversions[event_i];
         fx.validate(p, t.timestamp_ms, costs.max_conversion_age_ms)?;
@@ -259,73 +324,257 @@ pub fn replay(
                 position = Some(pos);
             }
         }
-        // Signals observed at publication execute only at a strictly subsequent event.
-        while candle_i < candles.len() && candles[candle_i].publication_sequence < t.sequence {
-            let wants = mask.get(candle_i);
-            candle_i += 1;
-            if !wants || position.is_some() || closed_now {
-                continue;
-            }
-            let entry = crate::orders::market_from_effective(p, costs, bid, ask, strategy.side)?;
-            let stop = entry
-                .checked_sub(
-                    strategy
-                        .side
-                        .sign()
-                        .checked_mul(distance)
-                        .ok_or("stop overflow")?,
-                )
-                .ok_or("stop overflow")?;
-            let target = entry
-                .checked_add(
-                    strategy
-                        .side
-                        .sign()
-                        .checked_mul(distance.checked_mul(3).ok_or("target overflow")?)
-                        .ok_or("target overflow")?,
-                )
-                .ok_or("target overflow")?;
-            if entry <= 0 || stop <= 0 || target <= 0 {
-                rejections.push(Rejection {
-                    event: t.sequence,
-                    reason: "nonpositive protective level".into(),
-                });
-                continue;
-            }
-            let risk_distance = distance.checked_add(slip).ok_or("risk overflow")?;
-            match contracts::size(p, balance, entry, risk_distance, fx) {
-                Ok(volume) => {
-                    let fee = costs.commission(volume);
-                    let planned_loss = -contracts::pnl(p, -risk_distance, volume, fx)? + fee * 2;
-                    if planned_loss > balance / 10 {
-                        rejections.push(Rejection {
-                            event: t.sequence,
-                            reason: "commissions exceed risk budget".into(),
-                        });
-                        continue;
-                    }
-                    balance -= fee;
-                    position = Some(OpenPosition {
-                        entry_event: t.sequence,
-                        entry_ms: t.timestamp_ms,
-                        deadline_ms: t
-                            .timestamp_ms
-                            .checked_add(MAX_HOLD_MS)
-                            .ok_or("deadline overflow")?,
+        if let Some(plan) = &strategy.entry {
+            let (_, _, cancel_on_false) = plan.parameters();
+            let mut filled_now = false;
+            if let Some(mut intent) = pending.take() {
+                let mut preview = intent.order.clone();
+                let candidate = preview.on_quote(p, costs, *t)?;
+                if let Some(fill) = candidate {
+                    let request = crate::risk::Request {
+                        equity: balance,
+                        entry: fill.price,
+                        mark: if strategy.side == Side::Long {
+                            bid
+                        } else {
+                            ask
+                        },
                         side: strategy.side,
-                        entry,
-                        stop,
-                        target,
-                        volume_micro_lots: volume,
-                        entry_commission: fee,
-                        mfe: 0,
-                        mae: 0,
-                    });
+                        stop_with_exit_slip: distance.checked_add(slip).ok_or("risk overflow")?,
+                        conversion: fx,
+                    };
+                    let accepted = crate::risk::reserve(p, costs, request, fill.volume_micro_lots)
+                        .and_then(|r| Ok((r, protective(fill.price, strategy.side, distance)?)));
+                    match accepted {
+                        Ok((reservation, (stop, target))) => {
+                            intent.reservation = reservation;
+                            balance -= reservation.entry_fee_micro_usd;
+                            position = Some(OpenPosition {
+                                entry_event: t.sequence,
+                                entry_ms: t.timestamp_ms,
+                                deadline_ms: t
+                                    .timestamp_ms
+                                    .checked_add(MAX_HOLD_MS)
+                                    .ok_or("deadline overflow")?,
+                                side: strategy.side,
+                                entry: fill.price,
+                                stop,
+                                target,
+                                volume_micro_lots: reservation.volume,
+                                entry_commission: reservation.entry_fee_micro_usd,
+                                mfe: 0,
+                                mae: 0,
+                            });
+                            entry_receipts.push(receipt(
+                                *t,
+                                &intent,
+                                EntryStatus::Filled,
+                                Some(fill),
+                                "fixed quantity accepted by pre-fill marked-equity/risk gate",
+                            ));
+                            filled_now = true;
+                        }
+                        Err(reason) => {
+                            intent.order.cancel(t.timestamp_ms)?;
+                            entry_receipts.push(receipt(
+                                *t,
+                                &intent,
+                                EntryStatus::RiskRejected,
+                                None,
+                                &reason,
+                            ));
+                            rejections.push(Rejection {
+                                event: t.sequence,
+                                reason,
+                            });
+                        }
+                    }
+                } else if matches!(preview.state(), crate::orders::State::Expired { .. }) {
+                    entry_receipts.push(receipt(
+                        *t,
+                        &intent,
+                        EntryStatus::Expired,
+                        None,
+                        "pending entry expired before quote eligibility",
+                    ));
+                } else {
+                    intent.order = preview;
+                    pending = Some(intent);
                 }
-                Err(reason) => rejections.push(Rejection {
-                    event: t.sequence,
-                    reason,
-                }),
+            }
+            // Existing orders consume the quote first. Newly observed signals cancel only surviving intents.
+            if cancel_on_false
+                && candle_i < candles.len()
+                && candles[candle_i].publication_sequence == t.sequence
+                && !mask.get(candle_i)
+                && let Some(mut intent) = pending.take()
+            {
+                intent.order.cancel(t.timestamp_ms)?;
+                let status = if matches!(intent.order.state(), crate::orders::State::Expired { .. })
+                {
+                    EntryStatus::Expired
+                } else {
+                    EntryStatus::Cancelled
+                };
+                entry_receipts.push(receipt(
+                    *t,
+                    &intent,
+                    status,
+                    None,
+                    "closed signal invalidated pending entry",
+                ));
+            }
+            // New orders are placed after existing order processing; they cannot fill on publication.
+            while candle_i < candles.len() && candles[candle_i].publication_sequence <= t.sequence {
+                let wants = mask.get(candle_i);
+                candle_i += 1;
+                if !wants || pending.is_some() || position.is_some() || closed_now || filled_now {
+                    continue;
+                }
+                let placement = || -> Result<PendingEntry> {
+                    let (offset_ticks, ttl, _) = plan.parameters();
+                    let offset = offset_ticks
+                        .checked_mul(p.tick)
+                        .ok_or("entry offset overflow")?;
+                    let anchor = if strategy.side == Side::Long {
+                        ask
+                    } else {
+                        bid
+                    };
+                    let sign = if matches!(plan, crate::strategies::EntryPlan::StopMarket { .. }) {
+                        strategy.side.sign()
+                    } else {
+                        -strategy.side.sign()
+                    };
+                    let level = anchor
+                        .checked_add(sign.checked_mul(offset).ok_or("entry offset overflow")?)
+                        .ok_or("entry price overflow")?;
+                    let is_stop = matches!(plan, crate::strategies::EntryPlan::StopMarket { .. });
+                    let kind = if is_stop {
+                        crate::orders::Kind::StopMarket { trigger: level }
+                    } else {
+                        crate::orders::Kind::Limit { limit: level }
+                    };
+                    let entry = level
+                        .checked_add(if is_stop {
+                            strategy
+                                .side
+                                .sign()
+                                .checked_mul(slip)
+                                .ok_or("entry slippage overflow")?
+                        } else {
+                            0
+                        })
+                        .ok_or("entry price overflow")?;
+                    protective(entry, strategy.side, distance)?;
+                    let friction = ask
+                        .checked_sub(bid)
+                        .and_then(|s| s.checked_add(if is_stop { slip } else { 0 }))
+                        .ok_or("friction overflow")?;
+                    let mark = entry
+                        .checked_sub(
+                            strategy
+                                .side
+                                .sign()
+                                .checked_mul(friction)
+                                .ok_or("mark overflow")?,
+                        )
+                        .ok_or("mark overflow")?;
+                    let reservation = crate::risk::size(
+                        p,
+                        costs,
+                        crate::risk::Request {
+                            equity: balance,
+                            entry,
+                            mark,
+                            side: strategy.side,
+                            stop_with_exit_slip: distance
+                                .checked_add(slip)
+                                .ok_or("risk overflow")?,
+                            conversion: fx,
+                        },
+                    )?;
+                    let order = crate::orders::Order::submit(
+                        p,
+                        costs,
+                        strategy.side,
+                        kind,
+                        reservation.volume,
+                        *t,
+                        t.timestamp_ms
+                            .checked_add(ttl)
+                            .ok_or("entry expiry overflow")?,
+                    )?;
+                    Ok(PendingEntry {
+                        order,
+                        signal_event: t.sequence,
+                        planned_entry: entry,
+                        kind,
+                        reservation,
+                    })
+                };
+                match placement() {
+                    Ok(intent) => {
+                        entry_receipts.push(receipt(*t,&intent,EntryStatus::Placed,None,"quantity fixed at publication; one pending reservation blocks other entries"));
+                        pending = Some(intent);
+                    }
+                    Err(reason) => rejections.push(Rejection {
+                        event: t.sequence,
+                        reason,
+                    }),
+                }
+            }
+        } else {
+            // Market-only v1 concepts retain signal timing; sizing now includes marked entry costs.
+            while candle_i < candles.len() && candles[candle_i].publication_sequence < t.sequence {
+                let wants = mask.get(candle_i);
+                candle_i += 1;
+                if !wants || position.is_some() || closed_now {
+                    continue;
+                }
+                let entry =
+                    crate::orders::market_from_effective(p, costs, bid, ask, strategy.side)?;
+                let sizing = crate::risk::size(
+                    p,
+                    costs,
+                    crate::risk::Request {
+                        equity: balance,
+                        entry,
+                        mark: if strategy.side == Side::Long {
+                            bid
+                        } else {
+                            ask
+                        },
+                        side: strategy.side,
+                        stop_with_exit_slip: distance.checked_add(slip).ok_or("risk overflow")?,
+                        conversion: fx,
+                    },
+                );
+                match sizing.and_then(|r| Ok((r, protective(entry, strategy.side, distance)?))) {
+                    Ok((r, (stop, target))) => {
+                        balance -= r.entry_fee_micro_usd;
+                        position = Some(OpenPosition {
+                            entry_event: t.sequence,
+                            entry_ms: t.timestamp_ms,
+                            deadline_ms: t
+                                .timestamp_ms
+                                .checked_add(MAX_HOLD_MS)
+                                .ok_or("deadline overflow")?,
+                            side: strategy.side,
+                            entry,
+                            stop,
+                            target,
+                            volume_micro_lots: r.volume,
+                            entry_commission: r.entry_fee_micro_usd,
+                            mfe: 0,
+                            mae: 0,
+                        });
+                    }
+                    Err(reason) => rejections.push(Rejection {
+                        event: t.sequence,
+                        reason,
+                    }),
+                }
             }
         }
         marked = if let Some(pos) = &position {
@@ -347,10 +596,10 @@ pub fn replay(
         peak = peak.max(marked);
         drawdown = drawdown.max(peak - marked);
     }
-    Ok(Replay { version: "ordered-l1-v1".into(), strategy_id: strategy.identity()?, dataset_id: data.manifest.content_hash.clone(),
+    Ok(Replay { version: "ordered-l1-v2-marked-margin".into(), strategy_id: strategy.identity()?, dataset_id: data.manifest.content_hash.clone(),
         profile_id: data.manifest.profile_hash.clone(), cost_id: crate::data::hash(costs)?,
         conversion_id: crate::data::hash(&conversions)?,
         fill_assumption: "L1 full-fill research assumption; no historical depth/queue verification; target limit at requested price; deadline cancels protective orders; USD-per-quote marks supplied explicitly".into(),
         initial_micro_usd: contracts::INITIAL_EQUITY, realized_micro_usd: balance, final_marked_micro_usd: marked,
-        maximum_drawdown_micro_usd: drawdown, trades, rejections, unresolved: position })
+        maximum_drawdown_micro_usd: drawdown, trades, rejections, unresolved: position, pending_entry: pending, entry_receipts })
 }

@@ -79,15 +79,58 @@ impl Rule {
         normalize(self, 0, &mut 0)
     }
 }
+/// Relative to the publication event's effective executable entry side.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EntryPlan {
+    StopMarket {
+        offset_ticks: i64,
+        ttl_ms: i64,
+        cancel_on_signal_false: bool,
+    },
+    Limit {
+        offset_ticks: i64,
+        ttl_ms: i64,
+        cancel_on_signal_false: bool,
+    },
+}
+impl EntryPlan {
+    pub fn parameters(&self) -> (i64, i64, bool) {
+        match *self {
+            Self::StopMarket {
+                offset_ticks,
+                ttl_ms,
+                cancel_on_signal_false,
+            }
+            | Self::Limit {
+                offset_ticks,
+                ttl_ms,
+                cancel_on_signal_false,
+            } => (offset_ticks, ttl_ms, cancel_on_signal_false),
+        }
+    }
+    fn validate(&self) -> Result<()> {
+        let (offset, ttl, _) = self.parameters();
+        if !(1..=1_000_000).contains(&offset) || !(1..=crate::contracts::MAX_HOLD_MS).contains(&ttl)
+        {
+            return Err("entry offset/expiry outside grammar budget".into());
+        }
+        Ok(())
+    }
+}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Strategy {
     pub timeframe: Timeframe,
     pub side: Side,
     pub stop_ticks: i64,
     pub rule: Rule,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entry: Option<EntryPlan>,
 }
 impl Strategy {
     pub fn canonical(&self) -> Result<Self> {
+        if let Some(plan) = &self.entry {
+            plan.validate()?;
+        }
         if self.stop_ticks <= 0 || self.stop_ticks > 1_000_000 {
             return Err("stop distance out of bounds".into());
         }
@@ -178,6 +221,7 @@ pub fn generate() -> Vec<Strategy> {
                             side,
                             stop_ticks: stop,
                             rule,
+                            entry: None,
                         });
                     }
                 }

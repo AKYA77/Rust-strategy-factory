@@ -43,6 +43,7 @@ fn execute(d: &Dataset) -> usize {
     let s = Strategy {
         timeframe: Timeframe::M1,
         side: Side::Long,
+        entry: None,
         stop_ticks: 100,
         rule: Rule::AboveMean { window: 5 },
     };
@@ -112,5 +113,5 @@ fn main() {
         .collect::<Vec<_>>()
         .join("\n");
     let read = |p| std::fs::read_to_string(p).unwrap_or_else(|_| "unavailable".into());
-    println!("{}",serde_json::to_string_pretty(&json!({"class":"SYNTHETIC_TEST_ONLY","coverage":"20000 events per instrument, eight instruments; NOT genuine quote data, not full historical coverage","cache":"resident fixtures; warm process; derived candles/features rebuilt each repetition","engine":"sequential ordered-l1-v1","build":"release thin LTO, codegen-units=1","available_parallelism":std::thread::available_parallelism().unwrap().get(),"cpu":cpu,"cgroup_cpu_max":read("/sys/fs/cgroup/cpu.max"),"cgroup_memory_max":read("/sys/fs/cgroup/memory.max"),"dataset_hashes":hashes,"measurements":measurements})).unwrap());
+    println!("{}",serde_json::to_string_pretty(&json!({"class":"SYNTHETIC_TEST_ONLY","coverage":"20000 events per instrument, eight instruments; NOT genuine quote data, not full historical coverage","cache":"resident fixtures; warm process; derived candles/features rebuilt each repetition","engine":"sequential ordered-l1-v2-marked-margin","build":"release thin LTO, codegen-units=1","available_parallelism":std::thread::available_parallelism().unwrap().get(),"cpu":cpu,"cgroup_cpu_max":read("/sys/fs/cgroup/cpu.max"),"cgroup_memory_max":read("/sys/fs/cgroup/memory.max"),"dataset_hashes":hashes,"measurements":measurements})).unwrap());
 }

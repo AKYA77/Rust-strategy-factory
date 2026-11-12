@@ -133,9 +133,9 @@ fn run(args: &[String]) -> Result<()> {
                 signal_version: "closed-publication-next-event-v1".into(),
                 indicator_version: "integer-sma-v1".into(),
                 cost_hash: data::hash(&costs)?,
-                fill_policy: "full-l1-assumption-target-at-limit-v1".into(),
+                fill_policy: "full-l1-assumption-target-at-limit-preflight-v2".into(),
                 profile_hash: d.manifest.profile_hash.clone(),
-                engine_version: "ordered-l1-v1".into(),
+                engine_version: "ordered-l1-v2-marked-margin".into(),
                 protocol_hash: data::hash(&"training-only-conservative-signals-v1")?,
                 code_revision: format!(
                     "binary-blake3:{}",

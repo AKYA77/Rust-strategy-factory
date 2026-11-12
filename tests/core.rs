@@ -35,6 +35,7 @@ fn strategy(side: Side) -> Strategy {
     Strategy {
         timeframe: Timeframe::M1,
         side,
+        entry: None,
         stop_ticks: 30,
         rule: Rule::AboveMean { window: 2 },
     }
@@ -229,9 +230,9 @@ fn long_target_uses_subsequent_tied_event_and_no_limit_slippage() {
         (100090, 100060, 100180, 100180)
     );
     assert_eq!(t.reason, ExitReason::TargetLimit);
-    assert_eq!(t.volume_micro_lots, 19980);
-    assert_eq!(t.net_micro_usd, 1_798_200);
-    assert_eq!(r.realized_micro_usd, 21_798_200);
+    assert_eq!(t.volume_micro_lots, 19210);
+    assert_eq!(t.net_micro_usd, 1_728_900);
+    assert_eq!(r.realized_micro_usd, 21_728_900);
     assert!(r.unresolved.is_none());
 }
 #[test]
@@ -240,7 +241,7 @@ fn gap_stop_losses_are_not_capped_to_ten_percent() {
     let t = &r.trades[0];
     assert_eq!(t.exit, 99980);
     assert_eq!(t.reason, ExitReason::StopMarket);
-    assert_eq!(t.net_micro_usd, -2_197_800);
+    assert_eq!(t.net_micro_usd, -2_113_100);
     assert!(t.net_micro_usd < -2_000_000);
     assert_eq!(r.realized_micro_usd, 20_000_000 + t.net_micro_usd);
 }
