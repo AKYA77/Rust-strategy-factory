@@ -133,6 +133,8 @@ pub struct CandidateEvidence {
     pub pooled_oos_reset_fold_stats: DescriptiveStats,
     pub unresolved_oos_positions: usize,
     pub failed_windows: usize,
+    #[serde(default)]
+    pub uncertainty: Option<crate::uncertainty::Diagnostic>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Report {
@@ -153,7 +155,7 @@ pub struct ProtocolResult {
 }
 fn definition(plan: &Plan, input: &Input, revision: &str) -> Result<serde_json::Value> {
     Ok(
-        serde_json::json!({"version":"frozen-chronological-protocol-v1","plan":plan,"dataset_hash":input.dataset.manifest.content_hash,"dataset_identity":data::dataset_identity(&input.dataset.manifest)?,"profile_hash":input.dataset.manifest.profile_hash,"conversions_hash":data::hash(&input.conversions)?,"revision":revision,"engine":crate::ENGINE_VERSION,"indicators":crate::INDICATOR_VERSION,"signals":crate::SIGNAL_VERSION}),
+        serde_json::json!({"version":"frozen-chronological-protocol-v2","uncertainty_method":crate::uncertainty::VERSION,"plan":plan,"dataset_hash":input.dataset.manifest.content_hash,"dataset_identity":data::dataset_identity(&input.dataset.manifest)?,"profile_hash":input.dataset.manifest.profile_hash,"conversions_hash":data::hash(&input.conversions)?,"revision":revision,"engine":crate::ENGINE_VERSION,"indicators":crate::INDICATOR_VERSION,"signals":crate::SIGNAL_VERSION}),
     )
 }
 /// Immutable report lookup verifies stored scientific evidence integrity.
@@ -376,6 +378,10 @@ pub fn execute(
             pooled_oos_reset_fold_stats: DescriptiveStats::calculate(&observations)?,
             unresolved_oos_positions: unresolved,
             failed_windows: failed,
+            uncertainty: Some(crate::uncertainty::diagnose(
+                &observations,
+                plan.trial_budget,
+            )?),
         });
     }
     // Numerical/descriptive execution alone cannot certify independent research qualification.

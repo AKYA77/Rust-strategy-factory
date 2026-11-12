@@ -20,6 +20,7 @@ fn main() {
         "src/screen.rs",
         "src/validation.rs",
         "src/science.rs",
+        "src/uncertainty.rs",
         "src/research.rs",
         "src/storage.rs",
     ] {

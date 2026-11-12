@@ -121,6 +121,18 @@ fn frozen_protocol_executes_all_windows_and_reuses_an_immutable_report() {
             > 0
     );
     assert_eq!(first.report.candidates[0].failed_windows, 0);
+    let candidate = &first.report.candidates[0];
+    let uncertainty = candidate.uncertainty.as_ref().unwrap();
+    assert_eq!(
+        uncertainty.observations,
+        candidate.pooled_oos_reset_fold_stats.closed
+    );
+    assert_eq!(
+        uncertainty.net_wins,
+        candidate.pooled_oos_reset_fold_stats.wins
+    );
+    assert_eq!(uncertainty.declared_trials, 1000);
+    assert!(!uncertainty.assumptions_verified);
     let before = registry.counts().unwrap();
     drop(registry);
     let mut registry = Registry::open(&path).unwrap();

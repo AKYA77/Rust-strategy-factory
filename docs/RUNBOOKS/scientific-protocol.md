@@ -13,3 +13,5 @@ Every window starts flat with prior-only feature warmup and uses no quotes at or
 `npm run test:browser` creates a new synthetic protocol through the real CLI, verifies immutable reuse, and reads its report through the dashboard. `cargo test --locked --test science` also executes nonzero synthetic OOS trades, rejects retrospective exposure/retuning, validates calendar boundaries and detects report tampering. These tests remove their private state and do not qualify any strategy.
 
 Still required: corpus-wide exposure and coverage/approval evidence, uncertainty/multiplicity safeguards, cost/neighborhood/regime robustness, frozen full-period financial qualification and diversity ranking. Do not infer these from successful window execution.
+
+Frozen reports now include conditional Hoeffding/Bonferroni net-win diagnostics using the declared trial budget. Assumptions remain unverified; the diagnostic cannot qualify a candidate. See [method and limitations](../DECISIONS/0002-conditional-uncertainty.md).

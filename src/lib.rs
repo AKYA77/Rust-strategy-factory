@@ -19,3 +19,5 @@ pub mod dashboard;
 pub mod research;
 pub mod science;
 pub mod screen;
+
+pub mod uncertainty;
