@@ -18,7 +18,10 @@
     "shared market fill pricing and stream-exact normalized source hashes",
     "typed pending stop/limit strategy entry plans integrated into authoritative replay",
     "fixed placement reservations and pre-fill marked-margin/risk rejection receipts",
-    "cost-aware initial sizing on exact volume grid"
+    "cost-aware initial sizing on exact volume grid",
+    "nine typed family grids with causal RSI/mean/channel/volatility/session primitives",
+    "bounded shared feature and signal caches with deterministic eviction",
+    "prefix-causality and nonzero tick cohort tests for every family"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -26,8 +29,8 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Implement all nine strategy family templates with causal shared RSI, channels, volatility and session primitives; then conservative candle outcomes, scheduler, independent scientific workflow and dashboard.",
+  "next_action": "Implement conservative M1 barrier uncertainty and durable resource-bounded research scheduling; then full independent validation and authenticated dashboard.",
   "qualified_strategies": 0,
-  "tests_passed": 47,
+  "tests_passed": 53,
   "benchmark": "docs/BENCHMARKS/2026-11-12-synthetic-replay.json"
 }

@@ -1,15 +1,15 @@
 # Next action
 
-Status: SOFTWARE_INCOMPLETE. Read AGENTS.md, PROJECT_STATE.json, ACCEPTANCE.md and the complete IMPLEMENTATION_QUEUE.md. Continue implementation after every milestone; this file is a checkpoint, not completion.
+Status: SOFTWARE_INCOMPLETE. Read AGENTS.md, PROJECT_STATE.json, ACCEPTANCE.md and IMPLEMENTATION_QUEUE.md. After each verified milestone update this file, reread it, and begin the next unfinished task.
 
-## Verified milestone: pending strategy entry integration
+## Latest verified milestone
 
-47 application tests pass, plus formatting and Clippy. Typed pending stop-market/limit entry plans now execute through replay with placement-fixed quantity, exclusive reservations, pre-fill current risk/marked-margin checks, cancellation, expiry and receipts. Same-event quote processing precedes newly decided cancellations. Initial sizing now includes entry mark losses and commissions. Engine version is ordered-l1-v2-marked-margin. Legacy market concept hashes stay stable. See DECISIONS/0001-pending-entry-reservations.md.
+53 application tests pass. All nine required families have distinct bounded templates across seven timeframes and both sides. Shared primitives include integer means, Wilder RSI rounded to basis points, crosses/trends, prior-only Donchian extrema/channel edges, true-range expansion and publication-time UTC session/weekday masks. Cache eviction respects retained-cell budgets. Every family produced actual closed trades on synthetic ticks; prefix tests prove future candles do not alter earlier signals. No qualifying historical strategy is claimed.
 
-Synthetic eight-instrument benchmark rerun: 6,997 resolved trades per batch, five repetitions for each of 1/2/3/4 workers. Artifacts are BENCHMARKS/2026-11-12-reservation-final-*.json. No real-data or target-VPS speed claim.
+Previous milestone: fixed pending entry reservations and cost-aware marked initial margin integrated in replay; see DECISIONS/0001-pending-entry-reservations.md. Static index remains disabled. Source data, broker profiles and calendar approval remain pending.
 
 ## Begin next
 
-Implement all nine family templates and the shared causal primitives they require (RSI, prior Donchian/channel edges, mean crosses/trends, volatility expansion, UTC session/weekday masks). Preserve effective-concept deduplication, bounded complexity/cache budgets and legacy identities. Test prefix causality and genuinely nonzero cohorts. Then implement conservative candle outcomes/uncertainty, a bounded durable scheduler, complete independent validation and the authenticated dashboard. Reinspect the full queue rather than stopping at this next milestone.
+Build conservative candle barrier/outcome uncertainty without guessing SL/TP ordering or enabling unjustified rejection. Build an actual resource-bounded durable research loop with pause/resume/stop, expiring coordinator/experiment leases, exact result reuse, restart-safe region/candidate cursors, fair input rotation and honest stage counters. Continue from there to full scientific workflow and authenticated persistent-state dashboard. Also reconcile the complete queue: HTF confirmation, richer operators, source/native storage/compression, diagnostics, deployment and end-to-end acceptance remain unfinished.
 
-External requirements remain: representative real quotes, reviewed broker/calendar profiles, full historical data and target VPS validation. Running network policy still excludes drafted provider/API domains, so hosted CI and source terms remain unverified. No qualified strategies, autonomous scheduler or web service exists yet. No process continues research after this session unless a real scheduler is implemented and started.
+Running cloud network policy still has no custom API/provider domains despite draft additions. Hosted CI, source terms and representative real quotes remain unverified. No autonomous process is currently running and no dashboard exists. Do not claim full software completion or new-task restoration.

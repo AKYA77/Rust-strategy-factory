@@ -106,3 +106,40 @@ impl Mask {
         })
     }
 }
+
+/// Prior-window extrema. Current values never enter their own breakout reference.
+pub type OptionalSeries = Vec<Option<i64>>;
+pub fn prior_extrema(
+    high: &[i64],
+    low: &[i64],
+    window: usize,
+) -> Result<(OptionalSeries, OptionalSeries)> {
+    if high.len() != low.len() || !(1..=100_000).contains(&window) {
+        return Err("invalid envelope inputs".into());
+    }
+    let mut maxima = std::collections::VecDeque::<usize>::new();
+    let mut minima = std::collections::VecDeque::<usize>::new();
+    let mut upper = vec![None; high.len()];
+    let mut lower = vec![None; low.len()];
+    for i in 0..high.len() {
+        while maxima.front().is_some_and(|j| *j + window < i) {
+            maxima.pop_front();
+        }
+        while minima.front().is_some_and(|j| *j + window < i) {
+            minima.pop_front();
+        }
+        if i >= window {
+            upper[i] = maxima.front().map(|j| high[*j]);
+            lower[i] = minima.front().map(|j| low[*j]);
+        }
+        while maxima.back().is_some_and(|j| high[*j] <= high[i]) {
+            maxima.pop_back();
+        }
+        while minima.back().is_some_and(|j| low[*j] >= low[i]) {
+            minima.pop_back();
+        }
+        maxima.push_back(i);
+        minima.push_back(i);
+    }
+    Ok((upper, lower))
+}

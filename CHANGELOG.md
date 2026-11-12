@@ -9,3 +9,5 @@ Second checkpoint: SQLite WAL experiment deduplication, fenced leases, immutable
 Order checkpoint: pending entry lifecycle, expiry/cancel/restart snapshots and shared fill calculation; stream-exact importer hashes. Thirty-five tests pass. Generated pending-order/risk integration remains unfinished. Paired benchmark timings are retained without a speedup claim.
 
 Pending-entry integration: typed strategy intents, exclusive fixed-quantity reservations, pre-fill risk/margin rejection, causally ordered cancellation, receipts and cost-aware marked initial margin. Engine v2; 47 tests pass. Synthetic benchmark rerun.
+
+Nine-family milestone: causal RSI/mean crosses and trends, prior channels, range expansion, UTC sessions and bounded cache eviction. Fifty-three tests and release build pass; every family has nonzero synthetic tick trades.

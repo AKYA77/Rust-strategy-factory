@@ -6,14 +6,59 @@ use crate::{
     indicators::{Mask, sma},
 };
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Rule {
-    AboveMean { window: usize },
-    BelowMean { window: usize },
-    Rising { lookback: usize },
-    Falling { lookback: usize },
+    AboveMean {
+        window: usize,
+    },
+    BelowMean {
+        window: usize,
+    },
+    Rising {
+        lookback: usize,
+    },
+    Falling {
+        lookback: usize,
+    },
+    MeanTrend {
+        fast: usize,
+        slow: usize,
+        above: bool,
+    },
+    CrossMean {
+        window: usize,
+        above: bool,
+    },
+    RsiThreshold {
+        window: usize,
+        basis_points: u16,
+        above: bool,
+    },
+    RsiCross {
+        window: usize,
+        basis_points: u16,
+        above: bool,
+    },
+    Donchian {
+        window: usize,
+        above: bool,
+    },
+    ChannelEdge {
+        window: usize,
+        basis_points: u16,
+        upper: bool,
+    },
+    RangeExpansion {
+        window: usize,
+        multiple_bps: u32,
+    },
+    UtcSession {
+        start_hour: u8,
+        end_hour: u8,
+        weekdays: u8,
+    },
     All(Vec<Rule>),
     Any(Vec<Rule>),
 }
@@ -71,6 +116,62 @@ impl Rule {
                 Rule::Rising { lookback } | Rule::Falling { lookback } => {
                     if !(1..=100_000).contains(lookback) {
                         return Err("invalid momentum lookback".into());
+                    }
+                    Ok(rule.clone())
+                }
+                Rule::MeanTrend { fast, slow, .. } => {
+                    if *fast < 2 || slow <= fast || *slow > 100_000 {
+                        return Err("invalid mean trend windows".into());
+                    }
+                    Ok(rule.clone())
+                }
+                Rule::CrossMean { window, .. } | Rule::Donchian { window, .. } => {
+                    if !(2..=100_000).contains(window) {
+                        return Err("invalid prior lookback".into());
+                    }
+                    Ok(rule.clone())
+                }
+                Rule::RsiThreshold {
+                    window,
+                    basis_points,
+                    ..
+                }
+                | Rule::RsiCross {
+                    window,
+                    basis_points,
+                    ..
+                }
+                | Rule::ChannelEdge {
+                    window,
+                    basis_points,
+                    ..
+                } => {
+                    if !(2..=100_000).contains(window) || *basis_points > 10000 {
+                        return Err("invalid indicator window/threshold".into());
+                    }
+                    Ok(rule.clone())
+                }
+                Rule::RangeExpansion {
+                    window,
+                    multiple_bps,
+                } => {
+                    if !(2..=100_000).contains(window) || !(1..=100000).contains(multiple_bps) {
+                        return Err("invalid volatility rule".into());
+                    }
+                    Ok(rule.clone())
+                }
+                Rule::UtcSession {
+                    start_hour,
+                    end_hour,
+                    weekdays,
+                } => {
+                    if *start_hour >= 24
+                        || *end_hour > 24
+                        || start_hour == end_hour
+                        || *weekdays == 0
+                        || *weekdays > 127
+                    {
+                        return Err("invalid UTC session mask".into());
                     }
                     Ok(rule.clone())
                 }
@@ -143,85 +244,451 @@ impl Strategy {
         hash(&("strategy-v1", self.canonical()?))
     }
 }
-/// A batch shares all SMA computations. Budget counts retained feature cells.
-pub struct Features {
-    close: Vec<i64>,
-    means: BTreeMap<usize, Vec<Option<i64>>>,
-    max_cells: usize,
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum Feature {
+    Mean(usize),
+    Rsi(usize),
+    PriorHigh(usize),
+    PriorLow(usize),
+    TrueRange,
+    PriorRangeMean(usize),
 }
-impl Features {
-    pub fn new(candles: &[Candle], max_cells: usize) -> Result<Self> {
+/// Caches share indicator arrays across an entire candidate batch. Limits count retained cells.
+pub struct Features<'a> {
+    candles: &'a [Candle],
+    close: Vec<i64>,
+    cache: BTreeMap<Feature, Vec<Option<i64>>>,
+    signals: BTreeMap<Rule, Mask>,
+    max_cells: usize,
+    pub cache_hits: usize,
+    pub feature_builds: usize,
+}
+impl<'a> Features<'a> {
+    pub fn new(candles: &'a [Candle], max_cells: usize) -> Result<Self> {
+        if candles.iter().any(|c| {
+            c.bid.low <= 0
+                || c.bid.low > c.bid.open
+                || c.bid.low > c.bid.close
+                || c.bid.high < c.bid.open
+                || c.bid.high < c.bid.close
+        }) {
+            return Err("invalid signal candle OHLC".into());
+        }
         if candles.len() > max_cells {
             return Err("feature budget exceeded".into());
         }
         Ok(Self {
+            candles,
             close: candles.iter().map(|c| c.bid.close).collect(),
-            means: BTreeMap::new(),
+            cache: BTreeMap::new(),
+            signals: BTreeMap::new(),
             max_cells,
+            cache_hits: 0,
+            feature_builds: 0,
         })
     }
+    fn can_retain(&self, additional: usize) -> bool {
+        (1 + self.cache.len() + self.signals.len() + additional).saturating_mul(self.close.len())
+            <= self.max_cells
+    }
+    fn ensure(&mut self, key: Feature) -> Result<()> {
+        if self.cache.contains_key(&key) {
+            self.cache_hits += 1;
+            return Ok(());
+        }
+        if !self.can_retain(1) {
+            return Err("shared feature budget exceeded".into());
+        }
+        let values = match key {
+            Feature::Mean(w) => sma(&self.close, w)?,
+            Feature::Rsi(w) => crate::indicators::rsi(&self.close, w)?
+                .into_iter()
+                .map(|v| v.map(|v| (v * 100.0).round() as i64))
+                .collect(),
+            Feature::PriorHigh(w) | Feature::PriorLow(w) => {
+                let high: Vec<_> = self.candles.iter().map(|c| c.bid.high).collect();
+                let low: Vec<_> = self.candles.iter().map(|c| c.bid.low).collect();
+                let (upper, lower) = crate::indicators::prior_extrema(&high, &low, w)?;
+                if matches!(key, Feature::PriorHigh(_)) {
+                    upper
+                } else {
+                    lower
+                }
+            }
+            Feature::TrueRange => self
+                .candles
+                .iter()
+                .enumerate()
+                .map(|(i, c)| {
+                    let mut tr = c.bid.high - c.bid.low;
+                    if i > 0 {
+                        tr = tr
+                            .max((c.bid.high - self.close[i - 1]).abs())
+                            .max((c.bid.low - self.close[i - 1]).abs());
+                    }
+                    Some(tr)
+                })
+                .collect(),
+            Feature::PriorRangeMean(w) => {
+                self.ensure(Feature::TrueRange)?;
+                if !self.can_retain(1) {
+                    return Err("shared feature budget exceeded".into());
+                }
+                let tr: Vec<_> = self.cache[&Feature::TrueRange]
+                    .iter()
+                    .map(|v| v.unwrap())
+                    .collect();
+                let current = sma(&tr, w)?;
+                (0..current.len())
+                    .map(|i| if i == 0 { None } else { current[i - 1] })
+                    .collect()
+            }
+        };
+        self.cache.insert(key, values);
+        self.feature_builds += 1;
+        Ok(())
+    }
     pub fn signal(&mut self, rule: &Rule) -> Result<Mask> {
-        self.evaluate(&rule.canonical()?)
+        let canonical = rule.canonical()?;
+        if !self.signals.contains_key(&canonical) {
+            fn collect(rule: &Rule, out: &mut BTreeSet<Feature>) {
+                match rule {
+                    Rule::AboveMean { window }
+                    | Rule::BelowMean { window }
+                    | Rule::CrossMean { window, .. } => {
+                        out.insert(Feature::Mean(*window));
+                    }
+                    Rule::MeanTrend { fast, slow, .. } => {
+                        out.insert(Feature::Mean(*fast));
+                        out.insert(Feature::Mean(*slow));
+                    }
+                    Rule::RsiThreshold { window, .. } | Rule::RsiCross { window, .. } => {
+                        out.insert(Feature::Rsi(*window));
+                    }
+                    Rule::Donchian { window, above } => {
+                        out.insert(if *above {
+                            Feature::PriorHigh(*window)
+                        } else {
+                            Feature::PriorLow(*window)
+                        });
+                    }
+                    Rule::ChannelEdge { window, .. } => {
+                        out.insert(Feature::PriorHigh(*window));
+                        out.insert(Feature::PriorLow(*window));
+                    }
+                    Rule::RangeExpansion { window, .. } => {
+                        out.insert(Feature::TrueRange);
+                        out.insert(Feature::PriorRangeMean(*window));
+                    }
+                    Rule::All(v) | Rule::Any(v) => {
+                        for r in v {
+                            collect(r, out);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            let mut required = BTreeSet::new();
+            collect(&canonical, &mut required);
+            if (1 + required.len()).saturating_mul(self.close.len()) > self.max_cells {
+                return Err("rule requires more feature cells than budget".into());
+            }
+            let missing = required
+                .iter()
+                .filter(|k| !self.cache.contains_key(*k))
+                .count();
+            if !self.can_retain(missing) {
+                self.signals.clear();
+            }
+            while !self.can_retain(missing) {
+                let victim = self
+                    .cache
+                    .keys()
+                    .find(|k| !required.contains(*k))
+                    .cloned()
+                    .ok_or("feature budget exhausted")?;
+                self.cache.remove(&victim);
+            }
+            for key in required {
+                self.ensure(key)?;
+            }
+        }
+        self.evaluate(&canonical)
     }
     fn evaluate(&mut self, rule: &Rule) -> Result<Mask> {
-        match rule {
+        if let Some(mask) = self.signals.get(rule) {
+            self.cache_hits += 1;
+            return Ok(mask.clone());
+        }
+        let result = match rule {
             Rule::AboveMean { window } | Rule::BelowMean { window } => {
-                if !self.means.contains_key(window) {
-                    if (self.means.len() + 2).saturating_mul(self.close.len()) > self.max_cells {
-                        return Err("shared feature budget exceeded".into());
-                    }
-                    self.means.insert(*window, sma(&self.close, *window)?);
-                }
+                self.ensure(Feature::Mean(*window))?;
                 let above = matches!(rule, Rule::AboveMean { .. });
-                Ok(Mask::from_bools(
+                Mask::from_bools(
                     self.close
                         .iter()
-                        .zip(&self.means[window])
-                        .map(|(v, avg)| avg.is_some_and(|a| if above { *v > a } else { *v < a })),
-                ))
+                        .zip(&self.cache[&Feature::Mean(*window)])
+                        .map(|(v, a)| a.is_some_and(|a| if above { *v > a } else { *v < a })),
+                )
             }
             Rule::Rising { lookback } | Rule::Falling { lookback } => {
                 let rising = matches!(rule, Rule::Rising { .. });
-                Ok(Mask::from_bools(self.close.iter().enumerate().map(
-                    |(i, v)| {
-                        i >= *lookback
-                            && if rising {
-                                *v > self.close[i - lookback]
-                            } else {
-                                *v < self.close[i - lookback]
-                            }
-                    },
-                )))
+                Mask::from_bools(self.close.iter().enumerate().map(|(i, v)| {
+                    i >= *lookback
+                        && if rising {
+                            *v > self.close[i - lookback]
+                        } else {
+                            *v < self.close[i - lookback]
+                        }
+                }))
             }
-            Rule::All(v) | Rule::Any(v) => {
-                let mut acc = self.evaluate(&v[0])?;
-                for r in &v[1..] {
+            Rule::MeanTrend { fast, slow, above } => {
+                self.ensure(Feature::Mean(*fast))?;
+                self.ensure(Feature::Mean(*slow))?;
+                Mask::from_bools(
+                    self.cache[&Feature::Mean(*fast)]
+                        .iter()
+                        .zip(&self.cache[&Feature::Mean(*slow)])
+                        .map(
+                            |(a, b)| matches!((a,b),(Some(a),Some(b)) if if *above {a>b}else{a<b}),
+                        ),
+                )
+            }
+            Rule::CrossMean { window, above } => {
+                self.ensure(Feature::Mean(*window))?;
+                let avg = &self.cache[&Feature::Mean(*window)];
+                Mask::from_bools((0..self.close.len()).map(|i| i>0 && matches!((avg[i-1],avg[i]),(Some(prev),Some(now)) if if *above {self.close[i-1]<=prev && self.close[i]>now}else{self.close[i-1]>=prev && self.close[i]<now})))
+            }
+            Rule::RsiThreshold {
+                window,
+                basis_points,
+                above,
+            }
+            | Rule::RsiCross {
+                window,
+                basis_points,
+                above,
+            } => {
+                self.ensure(Feature::Rsi(*window))?;
+                let values = &self.cache[&Feature::Rsi(*window)];
+                let threshold = i64::from(*basis_points);
+                let cross = matches!(rule, Rule::RsiCross { .. });
+                Mask::from_bools((0..values.len()).map(|i| {
+                    values[i].is_some_and(|v| if *above { v > threshold } else { v < threshold })
+                        && (!cross
+                            || i > 0
+                                && values[i - 1].is_some_and(|v| {
+                                    if *above {
+                                        v <= threshold
+                                    } else {
+                                        v >= threshold
+                                    }
+                                }))
+                }))
+            }
+            Rule::Donchian { window, above } => {
+                let key = if *above {
+                    Feature::PriorHigh(*window)
+                } else {
+                    Feature::PriorLow(*window)
+                };
+                self.ensure(key.clone())?;
+                Mask::from_bools(
+                    self.close
+                        .iter()
+                        .zip(&self.cache[&key])
+                        .map(|(v, a)| a.is_some_and(|a| if *above { *v > a } else { *v < a })),
+                )
+            }
+            Rule::ChannelEdge {
+                window,
+                basis_points,
+                upper,
+            } => {
+                self.ensure(Feature::PriorHigh(*window))?;
+                self.ensure(Feature::PriorLow(*window))?;
+                let high = &self.cache[&Feature::PriorHigh(*window)];
+                let low = &self.cache[&Feature::PriorLow(*window)];
+                Mask::from_bools((0..self.close.len()).map(|i|matches!((high[i],low[i]),(Some(h),Some(l)) if h>l && self.close[i]>=l && self.close[i]<=h && if *upper {i128::from(h-self.close[i])*10000<=i128::from(h-l)*i128::from(*basis_points)}else{i128::from(self.close[i]-l)*10000<=i128::from(h-l)*i128::from(*basis_points)})))
+            }
+            Rule::RangeExpansion {
+                window,
+                multiple_bps,
+            } => {
+                self.ensure(Feature::TrueRange)?;
+                self.ensure(Feature::PriorRangeMean(*window))?;
+                Mask::from_bools(self.cache[&Feature::TrueRange].iter().zip(&self.cache[&Feature::PriorRangeMean(*window)]).map(|(now,prev)|matches!((now,prev),(Some(a),Some(b)) if *b>0 && i128::from(*a)*10000>=i128::from(*b)*i128::from(*multiple_bps))))
+            }
+            Rule::UtcSession {
+                start_hour,
+                end_hour,
+                weekdays,
+            } => {
+                use chrono::{Datelike, Timelike};
+                Mask::from_bools(self.candles.iter().map(|c| {
+                    chrono::DateTime::from_timestamp_millis(c.available_ms).is_some_and(|t| {
+                        let hour = t.hour() as u8;
+                        let session = if start_hour < end_hour {
+                            hour >= *start_hour && hour < *end_hour
+                        } else {
+                            hour >= *start_hour || hour < *end_hour
+                        };
+                        session && weekdays & (1 << t.weekday().num_days_from_monday()) != 0
+                    })
+                }))
+            }
+            Rule::All(rules) | Rule::Any(rules) => {
+                let mut acc = self.evaluate(&rules[0])?;
+                for r in &rules[1..] {
                     acc = acc.combine(&self.evaluate(r)?, matches!(rule, Rule::All(_)))?;
                 }
-                Ok(acc)
+                acc
             }
+        };
+        if self.can_retain(1) {
+            self.signals.insert(rule.clone(), result.clone());
         }
+        Ok(result)
     }
 }
-/// Deterministic initial trend/momentum/mean-reversion grid. Other mandatory families pending.
-pub fn generate() -> Vec<Strategy> {
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum Family {
+    MeanReversion,
+    Momentum,
+    Breakout,
+    TrendFollowing,
+    Reversal,
+    RangeTrading,
+    Volatility,
+    Session,
+    Confluence,
+}
+impl Family {
+    pub const ALL: [Self; 9] = [
+        Self::MeanReversion,
+        Self::Momentum,
+        Self::Breakout,
+        Self::TrendFollowing,
+        Self::Reversal,
+        Self::RangeTrading,
+        Self::Volatility,
+        Self::Session,
+        Self::Confluence,
+    ];
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Candidate {
+    pub family: Family,
+    pub strategy: Strategy,
+}
+/// Family metadata is not part of effective concept identity. Templates are bounded typed rules.
+pub fn family_templates() -> Vec<Candidate> {
     let mut out = Vec::new();
-    for tf in Timeframe::ALL {
+    for timeframe in Timeframe::ALL {
         for side in [Side::Long, Side::Short] {
-            for window in [5, 10, 20, 50] {
-                for stop in [10, 30, 100] {
-                    for rule in [
-                        Rule::AboveMean { window },
-                        Rule::BelowMean { window },
-                        Rule::Rising { lookback: window },
-                        Rule::Falling { lookback: window },
-                    ] {
-                        out.push(Strategy {
-                            timeframe: tf,
-                            side,
-                            stop_ticks: stop,
-                            rule,
-                            entry: None,
+            let long = side == Side::Long;
+            for window in [5, 10, 20] {
+                for stop_ticks in [30, 100] {
+                    for family in Family::ALL {
+                        let rule = match family {
+                            Family::MeanReversion => Rule::All(vec![
+                                if long {
+                                    Rule::BelowMean { window }
+                                } else {
+                                    Rule::AboveMean { window }
+                                },
+                                Rule::RsiThreshold {
+                                    window,
+                                    basis_points: if long { 3500 } else { 6500 },
+                                    above: !long,
+                                },
+                            ]),
+                            Family::Momentum => Rule::All(vec![
+                                if long {
+                                    Rule::Rising { lookback: window }
+                                } else {
+                                    Rule::Falling { lookback: window }
+                                },
+                                Rule::RsiThreshold {
+                                    window,
+                                    basis_points: if long { 5500 } else { 4500 },
+                                    above: long,
+                                },
+                            ]),
+                            Family::Breakout => Rule::Donchian {
+                                window,
+                                above: long,
+                            },
+                            Family::TrendFollowing => Rule::All(vec![
+                                Rule::MeanTrend {
+                                    fast: window,
+                                    slow: window * 3,
+                                    above: long,
+                                },
+                                if long {
+                                    Rule::AboveMean { window }
+                                } else {
+                                    Rule::BelowMean { window }
+                                },
+                            ]),
+                            Family::Reversal => Rule::RsiCross {
+                                window,
+                                basis_points: if long { 3000 } else { 7000 },
+                                above: long,
+                            },
+                            Family::RangeTrading => Rule::ChannelEdge {
+                                window,
+                                basis_points: 2000,
+                                upper: !long,
+                            },
+                            Family::Volatility => Rule::All(vec![
+                                Rule::RangeExpansion {
+                                    window,
+                                    multiple_bps: 15000,
+                                },
+                                if long {
+                                    Rule::Rising { lookback: 1 }
+                                } else {
+                                    Rule::Falling { lookback: 1 }
+                                },
+                            ]),
+                            Family::Session => Rule::All(vec![
+                                Rule::UtcSession {
+                                    start_hour: 7,
+                                    end_hour: 17,
+                                    weekdays: 31,
+                                },
+                                Rule::CrossMean {
+                                    window,
+                                    above: long,
+                                },
+                            ]),
+                            Family::Confluence => Rule::All(vec![
+                                Rule::MeanTrend {
+                                    fast: window,
+                                    slow: window * 2,
+                                    above: long,
+                                },
+                                Rule::Donchian {
+                                    window,
+                                    above: long,
+                                },
+                                Rule::RsiThreshold {
+                                    window,
+                                    basis_points: 5000,
+                                    above: long,
+                                },
+                            ]),
+                        };
+                        out.push(Candidate {
+                            family,
+                            strategy: Strategy {
+                                timeframe,
+                                side,
+                                stop_ticks,
+                                rule,
+                                entry: None,
+                            },
                         });
                     }
                 }
@@ -229,6 +696,9 @@ pub fn generate() -> Vec<Strategy> {
         }
     }
     out
+}
+pub fn generate() -> Vec<Strategy> {
+    family_templates().into_iter().map(|c| c.strategy).collect()
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ScreenStatus {

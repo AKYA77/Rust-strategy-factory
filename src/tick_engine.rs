@@ -596,7 +596,7 @@ pub fn replay(
         peak = peak.max(marked);
         drawdown = drawdown.max(peak - marked);
     }
-    Ok(Replay { version: "ordered-l1-v2-marked-margin".into(), strategy_id: strategy.identity()?, dataset_id: data.manifest.content_hash.clone(),
+    Ok(Replay { version: crate::ENGINE_VERSION.into(), strategy_id: strategy.identity()?, dataset_id: data.manifest.content_hash.clone(),
         profile_id: data.manifest.profile_hash.clone(), cost_id: crate::data::hash(costs)?,
         conversion_id: crate::data::hash(&conversions)?,
         fill_assumption: "L1 full-fill research assumption; no historical depth/queue verification; target limit at requested price; deadline cancels protective orders; USD-per-quote marks supplied explicitly".into(),
