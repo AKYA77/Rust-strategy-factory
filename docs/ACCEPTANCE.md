@@ -4,7 +4,7 @@ Status: **SOFTWARE_INCOMPLETE**. This is a foundational checkpoint, not final ac
 
 2026-11-12, cloud Linux x86_64, Rust/Cargo 1.100.0:
 
-- `scripts/check.sh`: formatting, Clippy all targets with warnings denied, and 28 integration tests passed (14 core, one CLI workflow, seven persistence/holdout, one index differential and five validation-boundary tests). No tests were ignored or disabled.
+- `scripts/check.sh`: formatting, Clippy all targets with warnings denied, and 35 integration tests passed (14 core, one CLI workflow, seven order lifecycle, seven persistence/holdout, one index differential and five validation-boundary tests). No tests were ignored or disabled.
 - `cargo build --locked --release`: passed.
 - Existing GitHub read access: `git ls-remote origin HEAD` passed for AKYA77/Rust-strategy-factory.
 - Toolchain smoke: temporary library compiled, one generated unit test passed, formatting and Clippy passed. This is environment evidence, not application acceptance.
@@ -28,3 +28,11 @@ GitHub publication/CI evidence is recorded in commit history and the final sessi
 All current tests pass. Initial lint and a miscounted test-fixture streak were corrected, then rerun; no assertion was disabled. The first benchmark wrapper incorrectly included earlier build resources through cumulative child usage; it was replaced with per-child wait4 accounting and the benchmark rerun. Only the corrected measurements are retained.
 
 Source discovery is also blocked under the current network policy. HistData and Dukascopy information pages were not retrieved (403); no licensing or availability conclusion is claimed. Provider domains were saved as draft additions for later source/terms review. See DATA_MANIFESTS.md for precise probes and pending actions.
+
+## Order lifecycle checkpoint
+
+- `scripts/check.sh`: 35 integration tests passed, formatting passed, Clippy all targets with warnings denied passed. No ignored/disabled tests.
+- Market, stop-market and limit entry order lifecycle implements immutable submitted contracts, subsequent-event eligibility, adverse market/stop slippage, executable-side triggers, non-slipped observed-quote limit eligibility, cancellation, quote-free expiry, conflicting event rejection and serializable restart snapshots. Seven focused tests passed.
+- Sequential replay shares the market-fill price calculation. Pending stop/limit entries are available through the library but are not yet emitted by the strategy grammar or integrated with reserved risk/margin/position accounting. No partial-liquidity model is claimed.
+- Normalized CSV archive hash now comes from the exact byte stream read by the parser, rather than reopening the input path. The CLI test independently verifies the raw hash.
+- Post-refactor benchmark receipts and three alternating pairs against frozen a5f4a13 are retained. Every batch still resolved 6,997 synthetic trades. Timing varies substantially; no consistent speed improvement or universal worker optimum is established. This is not a production performance acceptance result.

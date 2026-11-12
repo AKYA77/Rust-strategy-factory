@@ -13,7 +13,9 @@
     "immutable result hashes and online verified backup/restore",
     "per-dataset frozen holdout reservations and one-experiment exposure constraints",
     "numeric qualification boundary checks and chronological three-month folds",
-    "experimental disabled fixed-barrier index with seeded differential checks"
+    "experimental disabled fixed-barrier index with seeded differential checks",
+    "pending entry market/stop-market/limit order library with cancellation, expiry and restart snapshots",
+    "shared market fill pricing and stream-exact normalized source hashes"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -21,8 +23,8 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Finish exact execution order lifecycle and conversion/profile provenance; expand strategy grammar and candle outcome screening, then durable scheduler. See IMPLEMENTATION_QUEUE.md.",
+  "next_action": "Integrate pending entry order intents into typed strategy grammar and authoritative replay with reservation-aware sizing, cancellation, expiry and full accounting receipts. Then remaining strategy families, conservative candle bounds, scheduler, scientific validation and dashboard.",
   "qualified_strategies": 0,
-  "tests_passed": 28,
+  "tests_passed": 35,
   "benchmark": "docs/BENCHMARKS/2026-11-12-synthetic-replay.json"
 }

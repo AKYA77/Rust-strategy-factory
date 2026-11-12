@@ -1,0 +1,12 @@
+{
+  "exit_code": 0,
+  "source_inputs_sha256": "d66c9b1a2e838a3a024323d0cd11cd1089f6cc4a983f54235a224737ad139005",
+  "executable_sha256": "938166448b1703f919ef9b8ccd82164ca2bd3076c71bd425fb47742233ec9983",
+  "wall_seconds_whole_benchmark": 2.2022950690000016,
+  "user_cpu_seconds": 3.376597,
+  "system_cpu_seconds": 0.053653,
+  "peak_rss_kib_linux": 21760,
+  "filesystem_input_blocks": 0,
+  "filesystem_output_blocks": 8,
+  "limitations": "Synthetic warm resident fixture baseline. CPU/RSS/I/O cover the whole benchmark process, not individual worker trials. No decode/compression measured. Source hash covers Cargo manifests, src and benches."
+}

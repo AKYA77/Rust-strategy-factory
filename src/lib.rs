@@ -6,6 +6,7 @@ pub mod strategies;
 pub mod tick_engine;
 
 pub type Result<T> = std::result::Result<T, String>;
+pub mod orders;
 pub mod storage;
 pub mod tick_index;
 pub mod validation;

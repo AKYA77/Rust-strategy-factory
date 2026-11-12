@@ -1,0 +1,767 @@
+{
+  "purpose": "Alternating three paired runs of frozen a5f4a13 baseline and final order-fill refactor; no performance optimization claimed",
+  "runs": [
+    {
+      "pair": 0,
+      "variant": "baseline",
+      "report": {
+        "available_parallelism": 4,
+        "build": "release thin LTO, codegen-units=1",
+        "cache": "resident fixtures; warm process; derived candles/features rebuilt each repetition",
+        "cgroup_cpu_max": "400000 100000\n",
+        "cgroup_memory_max": "34359738368\n",
+        "class": "SYNTHETIC_TEST_ONLY",
+        "coverage": "20000 events per instrument, eight instruments; NOT genuine quote data, not full historical coverage",
+        "cpu": "model name\t: INTEL(R) XEON(R) PLATINUM 8573C\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 arat avx512vbmi umip waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid cldemote movdiri movdir64b fsrm serialize tsxldtrk avx512_fp16 arch_capabilities",
+        "dataset_hashes": [
+          [
+            "EURUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "GBPUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "USDJPY",
+            "44e42dddb51ec4cb363f635c55d508292913cd449c9c754590da77fb140eff8d"
+          ],
+          [
+            "USDCHF",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "USDCAD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "AUDUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "NZDUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "XAUUSD",
+            "f3100585b3b718b3e8e242d509011cf9a7979957affec4aa1b38694130bf6101"
+          ]
+        ],
+        "engine": "sequential ordered-l1-v1",
+        "measurements": [
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.06660578700000001,
+            "median_seconds": 0.102198233,
+            "repetitions": 5,
+            "replays_per_second_median": 78.27923991601695,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.086330167,
+              0.096532225,
+              0.102198233,
+              0.1045038,
+              0.152935954
+            ],
+            "workers": 1
+          },
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.05476916500000001,
+            "median_seconds": 0.109217512,
+            "repetitions": 5,
+            "replays_per_second_median": 73.24832669691286,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.065059182,
+              0.101249155,
+              0.109217512,
+              0.114130254,
+              0.119828347
+            ],
+            "workers": 2
+          },
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.03020109,
+            "median_seconds": 0.085773875,
+            "repetitions": 5,
+            "replays_per_second_median": 93.26849230024877,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.062559943,
+              0.073288067,
+              0.085773875,
+              0.091476691,
+              0.092761033
+            ],
+            "workers": 3
+          },
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.022745799999999997,
+            "median_seconds": 0.115157937,
+            "repetitions": 5,
+            "replays_per_second_median": 69.4698099706319,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.111038402,
+              0.111761728,
+              0.115157937,
+              0.120291842,
+              0.133784202
+            ],
+            "workers": 4
+          }
+        ]
+      },
+      "resources": {
+        "exit_code": 0,
+        "source_inputs_sha256": "8ac6a0ed032d9f1bf0fcae347aecf3af3a526603efe685b49ca3e3390b65ea31",
+        "executable_sha256": "408fadf29a174b9d6660c260389446e8e03639788012a698a29a27634536633b",
+        "wall_seconds_whole_benchmark": 2.1681554500000857,
+        "user_cpu_seconds": 3.073325,
+        "system_cpu_seconds": 0.216835,
+        "peak_rss_kib_linux": 21496,
+        "filesystem_input_blocks": 0,
+        "filesystem_output_blocks": 8,
+        "limitations": "Synthetic warm resident fixture baseline. CPU/RSS/I/O cover the whole benchmark process, not individual worker trials. No decode/compression measured. Source hash covers Cargo manifests, src and benches."
+      }
+    },
+    {
+      "pair": 0,
+      "variant": "orders",
+      "report": {
+        "available_parallelism": 4,
+        "build": "release thin LTO, codegen-units=1",
+        "cache": "resident fixtures; warm process; derived candles/features rebuilt each repetition",
+        "cgroup_cpu_max": "400000 100000\n",
+        "cgroup_memory_max": "34359738368\n",
+        "class": "SYNTHETIC_TEST_ONLY",
+        "coverage": "20000 events per instrument, eight instruments; NOT genuine quote data, not full historical coverage",
+        "cpu": "model name\t: INTEL(R) XEON(R) PLATINUM 8573C\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 arat avx512vbmi umip waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid cldemote movdiri movdir64b fsrm serialize tsxldtrk avx512_fp16 arch_capabilities",
+        "dataset_hashes": [
+          [
+            "EURUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "GBPUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "USDJPY",
+            "44e42dddb51ec4cb363f635c55d508292913cd449c9c754590da77fb140eff8d"
+          ],
+          [
+            "USDCHF",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "USDCAD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "AUDUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "NZDUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "XAUUSD",
+            "f3100585b3b718b3e8e242d509011cf9a7979957affec4aa1b38694130bf6101"
+          ]
+        ],
+        "engine": "sequential ordered-l1-v1",
+        "measurements": [
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.081208909,
+            "median_seconds": 0.083782226,
+            "repetitions": 5,
+            "replays_per_second_median": 95.48564632312348,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.07922989,
+              0.079590179,
+              0.083782226,
+              0.086246613,
+              0.160438799
+            ],
+            "workers": 1
+          },
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.11967504699999999,
+            "median_seconds": 0.119403593,
+            "repetitions": 5,
+            "replays_per_second_median": 66.99965887961177,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.069803256,
+              0.071478171,
+              0.119403593,
+              0.168992866,
+              0.189478303
+            ],
+            "workers": 2
+          },
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.06735341,
+            "median_seconds": 0.077548348,
+            "repetitions": 5,
+            "replays_per_second_median": 103.16144968039809,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.060269542,
+              0.06743813,
+              0.077548348,
+              0.087068113,
+              0.127622952
+            ],
+            "workers": 3
+          },
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.06764587600000001,
+            "median_seconds": 0.119151267,
+            "repetitions": 5,
+            "replays_per_second_median": 67.1415436983981,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.06435349,
+              0.114204334,
+              0.119151267,
+              0.129261933,
+              0.131999366
+            ],
+            "workers": 4
+          }
+        ]
+      },
+      "resources": {
+        "exit_code": 0,
+        "source_inputs_sha256": "d4006705e1559bd4f423d5e09ca936dad8e6fd64ef52e81aefaebaeddfc6aea5",
+        "executable_sha256": "4aa796ffa156a34ef3edfd4c4a59d6e77eb12083bc9e3090d24b96db85ffc3a2",
+        "wall_seconds_whole_benchmark": 2.1152702120000413,
+        "user_cpu_seconds": 3.88728,
+        "system_cpu_seconds": 0.08413,
+        "peak_rss_kib_linux": 21624,
+        "filesystem_input_blocks": 0,
+        "filesystem_output_blocks": 8,
+        "limitations": "Synthetic warm resident fixture baseline. CPU/RSS/I/O cover the whole benchmark process, not individual worker trials. No decode/compression measured. Source hash covers Cargo manifests, src and benches."
+      }
+    },
+    {
+      "pair": 1,
+      "variant": "orders",
+      "report": {
+        "available_parallelism": 4,
+        "build": "release thin LTO, codegen-units=1",
+        "cache": "resident fixtures; warm process; derived candles/features rebuilt each repetition",
+        "cgroup_cpu_max": "400000 100000\n",
+        "cgroup_memory_max": "34359738368\n",
+        "class": "SYNTHETIC_TEST_ONLY",
+        "coverage": "20000 events per instrument, eight instruments; NOT genuine quote data, not full historical coverage",
+        "cpu": "model name\t: INTEL(R) XEON(R) PLATINUM 8573C\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 arat avx512vbmi umip waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid cldemote movdiri movdir64b fsrm serialize tsxldtrk avx512_fp16 arch_capabilities",
+        "dataset_hashes": [
+          [
+            "EURUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "GBPUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "USDJPY",
+            "44e42dddb51ec4cb363f635c55d508292913cd449c9c754590da77fb140eff8d"
+          ],
+          [
+            "USDCHF",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "USDCAD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "AUDUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "NZDUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "XAUUSD",
+            "f3100585b3b718b3e8e242d509011cf9a7979957affec4aa1b38694130bf6101"
+          ]
+        ],
+        "engine": "sequential ordered-l1-v1",
+        "measurements": [
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.09243199899999999,
+            "median_seconds": 0.084033204,
+            "repetitions": 5,
+            "replays_per_second_median": 95.20046385474008,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.083033672,
+              0.08330146,
+              0.084033204,
+              0.171358772,
+              0.175465671
+            ],
+            "workers": 1
+          },
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.133113296,
+            "median_seconds": 0.12039469,
+            "repetitions": 5,
+            "replays_per_second_median": 66.44811328473041,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.069617574,
+              0.070685972,
+              0.12039469,
+              0.189500562,
+              0.20273087
+            ],
+            "workers": 2
+          },
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.09153085500000001,
+            "median_seconds": 0.089749723,
+            "repetitions": 5,
+            "replays_per_second_median": 89.13676535803904,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.068695932,
+              0.083738655,
+              0.089749723,
+              0.137355751,
+              0.160226787
+            ],
+            "workers": 3
+          },
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.030809776999999997,
+            "median_seconds": 0.109590724,
+            "repetitions": 5,
+            "replays_per_second_median": 72.99887899271475,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.10405145,
+              0.105012081,
+              0.109590724,
+              0.127618912,
+              0.134861227
+            ],
+            "workers": 4
+          }
+        ]
+      },
+      "resources": {
+        "exit_code": 0,
+        "source_inputs_sha256": "d4006705e1559bd4f423d5e09ca936dad8e6fd64ef52e81aefaebaeddfc6aea5",
+        "executable_sha256": "4aa796ffa156a34ef3edfd4c4a59d6e77eb12083bc9e3090d24b96db85ffc3a2",
+        "wall_seconds_whole_benchmark": 2.3948955780001597,
+        "user_cpu_seconds": 4.2946729999999995,
+        "system_cpu_seconds": 0.074983,
+        "peak_rss_kib_linux": 21628,
+        "filesystem_input_blocks": 0,
+        "filesystem_output_blocks": 8,
+        "limitations": "Synthetic warm resident fixture baseline. CPU/RSS/I/O cover the whole benchmark process, not individual worker trials. No decode/compression measured. Source hash covers Cargo manifests, src and benches."
+      }
+    },
+    {
+      "pair": 1,
+      "variant": "baseline",
+      "report": {
+        "available_parallelism": 4,
+        "build": "release thin LTO, codegen-units=1",
+        "cache": "resident fixtures; warm process; derived candles/features rebuilt each repetition",
+        "cgroup_cpu_max": "400000 100000\n",
+        "cgroup_memory_max": "34359738368\n",
+        "class": "SYNTHETIC_TEST_ONLY",
+        "coverage": "20000 events per instrument, eight instruments; NOT genuine quote data, not full historical coverage",
+        "cpu": "model name\t: INTEL(R) XEON(R) PLATINUM 8573C\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 arat avx512vbmi umip waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid cldemote movdiri movdir64b fsrm serialize tsxldtrk avx512_fp16 arch_capabilities",
+        "dataset_hashes": [
+          [
+            "EURUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "GBPUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "USDJPY",
+            "44e42dddb51ec4cb363f635c55d508292913cd449c9c754590da77fb140eff8d"
+          ],
+          [
+            "USDCHF",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "USDCAD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "AUDUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "NZDUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "XAUUSD",
+            "f3100585b3b718b3e8e242d509011cf9a7979957affec4aa1b38694130bf6101"
+          ]
+        ],
+        "engine": "sequential ordered-l1-v1",
+        "measurements": [
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.08570897000000001,
+            "median_seconds": 0.126724107,
+            "repetitions": 5,
+            "replays_per_second_median": 63.12926710937486,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.079038179,
+              0.083437336,
+              0.126724107,
+              0.156279346,
+              0.164747149
+            ],
+            "workers": 1
+          },
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.042379428,
+            "median_seconds": 0.072181594,
+            "repetitions": 5,
+            "replays_per_second_median": 110.83157847691753,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.068541319,
+              0.071990011,
+              0.072181594,
+              0.105925605,
+              0.110920747
+            ],
+            "workers": 2
+          },
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.084314272,
+            "median_seconds": 0.090122777,
+            "repetitions": 5,
+            "replays_per_second_median": 88.76779285218875,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.050037523,
+              0.057248827,
+              0.090122777,
+              0.094454328,
+              0.134351795
+            ],
+            "workers": 3
+          },
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.0040062770000000025,
+            "median_seconds": 0.114680849,
+            "repetitions": 5,
+            "replays_per_second_median": 69.75881387135527,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.111708642,
+              0.112869295,
+              0.114680849,
+              0.115582525,
+              0.115714919
+            ],
+            "workers": 4
+          }
+        ]
+      },
+      "resources": {
+        "exit_code": 0,
+        "source_inputs_sha256": "8ac6a0ed032d9f1bf0fcae347aecf3af3a526603efe685b49ca3e3390b65ea31",
+        "executable_sha256": "408fadf29a174b9d6660c260389446e8e03639788012a698a29a27634536633b",
+        "wall_seconds_whole_benchmark": 2.0648441349999302,
+        "user_cpu_seconds": 3.480739,
+        "system_cpu_seconds": 0.082416,
+        "peak_rss_kib_linux": 21400,
+        "filesystem_input_blocks": 0,
+        "filesystem_output_blocks": 8,
+        "limitations": "Synthetic warm resident fixture baseline. CPU/RSS/I/O cover the whole benchmark process, not individual worker trials. No decode/compression measured. Source hash covers Cargo manifests, src and benches."
+      }
+    },
+    {
+      "pair": 2,
+      "variant": "baseline",
+      "report": {
+        "available_parallelism": 4,
+        "build": "release thin LTO, codegen-units=1",
+        "cache": "resident fixtures; warm process; derived candles/features rebuilt each repetition",
+        "cgroup_cpu_max": "400000 100000\n",
+        "cgroup_memory_max": "34359738368\n",
+        "class": "SYNTHETIC_TEST_ONLY",
+        "coverage": "20000 events per instrument, eight instruments; NOT genuine quote data, not full historical coverage",
+        "cpu": "model name\t: INTEL(R) XEON(R) PLATINUM 8573C\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 arat avx512vbmi umip waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid cldemote movdiri movdir64b fsrm serialize tsxldtrk avx512_fp16 arch_capabilities",
+        "dataset_hashes": [
+          [
+            "EURUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "GBPUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "USDJPY",
+            "44e42dddb51ec4cb363f635c55d508292913cd449c9c754590da77fb140eff8d"
+          ],
+          [
+            "USDCHF",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "USDCAD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "AUDUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "NZDUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "XAUUSD",
+            "f3100585b3b718b3e8e242d509011cf9a7979957affec4aa1b38694130bf6101"
+          ]
+        ],
+        "engine": "sequential ordered-l1-v1",
+        "measurements": [
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.06826704,
+            "median_seconds": 0.114654991,
+            "repetitions": 5,
+            "replays_per_second_median": 69.77454649139521,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.08539584,
+              0.09651758,
+              0.114654991,
+              0.118611805,
+              0.15366288
+            ],
+            "workers": 1
+          },
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.039092841,
+            "median_seconds": 0.079523654,
+            "repetitions": 5,
+            "replays_per_second_median": 100.59899913552765,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.069080037,
+              0.069297115,
+              0.079523654,
+              0.100962388,
+              0.108172878
+            ],
+            "workers": 2
+          },
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.027834864000000008,
+            "median_seconds": 0.062911953,
+            "repetitions": 5,
+            "replays_per_second_median": 127.16184474514722,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.047743139,
+              0.052468735,
+              0.062911953,
+              0.065192963,
+              0.075578003
+            ],
+            "workers": 3
+          },
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.069534031,
+            "median_seconds": 0.093756414,
+            "repetitions": 5,
+            "replays_per_second_median": 85.3274955673966,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.047872861,
+              0.056496029,
+              0.093756414,
+              0.110606554,
+              0.117406892
+            ],
+            "workers": 4
+          }
+        ]
+      },
+      "resources": {
+        "exit_code": 0,
+        "source_inputs_sha256": "8ac6a0ed032d9f1bf0fcae347aecf3af3a526603efe685b49ca3e3390b65ea31",
+        "executable_sha256": "408fadf29a174b9d6660c260389446e8e03639788012a698a29a27634536633b",
+        "wall_seconds_whole_benchmark": 1.7845651830000406,
+        "user_cpu_seconds": 2.902971,
+        "system_cpu_seconds": 0.052731,
+        "peak_rss_kib_linux": 21528,
+        "filesystem_input_blocks": 0,
+        "filesystem_output_blocks": 8,
+        "limitations": "Synthetic warm resident fixture baseline. CPU/RSS/I/O cover the whole benchmark process, not individual worker trials. No decode/compression measured. Source hash covers Cargo manifests, src and benches."
+      }
+    },
+    {
+      "pair": 2,
+      "variant": "orders",
+      "report": {
+        "available_parallelism": 4,
+        "build": "release thin LTO, codegen-units=1",
+        "cache": "resident fixtures; warm process; derived candles/features rebuilt each repetition",
+        "cgroup_cpu_max": "400000 100000\n",
+        "cgroup_memory_max": "34359738368\n",
+        "class": "SYNTHETIC_TEST_ONLY",
+        "coverage": "20000 events per instrument, eight instruments; NOT genuine quote data, not full historical coverage",
+        "cpu": "model name\t: INTEL(R) XEON(R) PLATINUM 8573C\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 arat avx512vbmi umip waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid cldemote movdiri movdir64b fsrm serialize tsxldtrk avx512_fp16 arch_capabilities",
+        "dataset_hashes": [
+          [
+            "EURUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "GBPUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "USDJPY",
+            "44e42dddb51ec4cb363f635c55d508292913cd449c9c754590da77fb140eff8d"
+          ],
+          [
+            "USDCHF",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "USDCAD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "AUDUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "NZDUSD",
+            "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+          ],
+          [
+            "XAUUSD",
+            "f3100585b3b718b3e8e242d509011cf9a7979957affec4aa1b38694130bf6101"
+          ]
+        ],
+        "engine": "sequential ordered-l1-v1",
+        "measurements": [
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.09477199699999998,
+            "median_seconds": 0.083248018,
+            "repetitions": 5,
+            "replays_per_second_median": 96.09838398795273,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.077811213,
+              0.079383365,
+              0.083248018,
+              0.086745283,
+              0.17258321
+            ],
+            "workers": 1
+          },
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.041013207999999995,
+            "median_seconds": 0.101112504,
+            "repetitions": 5,
+            "replays_per_second_median": 79.11978918057454,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.068259282,
+              0.081728224,
+              0.101112504,
+              0.107054455,
+              0.10927249
+            ],
+            "workers": 2
+          },
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.040493425,
+            "median_seconds": 0.053893712,
+            "repetitions": 5,
+            "replays_per_second_median": 148.44032268551106,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.04847872,
+              0.053868208,
+              0.053893712,
+              0.082943796,
+              0.088972145
+            ],
+            "workers": 3
+          },
+          {
+            "completed_synthetic_replays_per_repetition": 8,
+            "dispersion_max_minus_min": 0.017597589999999996,
+            "median_seconds": 0.066007902,
+            "repetitions": 5,
+            "replays_per_second_median": 121.19761055274869,
+            "trades_per_repetition": 6997,
+            "wall_seconds": [
+              0.057845774,
+              0.061157468,
+              0.066007902,
+              0.066327045,
+              0.075443364
+            ],
+            "workers": 4
+          }
+        ]
+      },
+      "resources": {
+        "exit_code": 0,
+        "source_inputs_sha256": "d4006705e1559bd4f423d5e09ca936dad8e6fd64ef52e81aefaebaeddfc6aea5",
+        "executable_sha256": "4aa796ffa156a34ef3edfd4c4a59d6e77eb12083bc9e3090d24b96db85ffc3a2",
+        "wall_seconds_whole_benchmark": 1.6624272080000537,
+        "user_cpu_seconds": 2.528555,
+        "system_cpu_seconds": 0.045575,
+        "peak_rss_kib_linux": 21628,
+        "filesystem_input_blocks": 0,
+        "filesystem_output_blocks": 8,
+        "limitations": "Synthetic warm resident fixture baseline. CPU/RSS/I/O cover the whole benchmark process, not individual worker trials. No decode/compression measured. Source hash covers Cargo manifests, src and benches."
+      }
+    }
+  ]
+}

@@ -1,0 +1,111 @@
+{
+  "available_parallelism": 4,
+  "build": "release thin LTO, codegen-units=1",
+  "cache": "resident fixtures; warm process; derived candles/features rebuilt each repetition",
+  "cgroup_cpu_max": "400000 100000\n",
+  "cgroup_memory_max": "34359738368\n",
+  "class": "SYNTHETIC_TEST_ONLY",
+  "coverage": "20000 events per instrument, eight instruments; NOT genuine quote data, not full historical coverage",
+  "cpu": "model name\t: INTEL(R) XEON(R) PLATINUM 8573C\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 arat avx512vbmi umip waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid cldemote movdiri movdir64b fsrm serialize tsxldtrk avx512_fp16 arch_capabilities",
+  "dataset_hashes": [
+    [
+      "EURUSD",
+      "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+    ],
+    [
+      "GBPUSD",
+      "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+    ],
+    [
+      "USDJPY",
+      "44e42dddb51ec4cb363f635c55d508292913cd449c9c754590da77fb140eff8d"
+    ],
+    [
+      "USDCHF",
+      "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+    ],
+    [
+      "USDCAD",
+      "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+    ],
+    [
+      "AUDUSD",
+      "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+    ],
+    [
+      "NZDUSD",
+      "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+    ],
+    [
+      "XAUUSD",
+      "f3100585b3b718b3e8e242d509011cf9a7979957affec4aa1b38694130bf6101"
+    ]
+  ],
+  "engine": "sequential ordered-l1-v1",
+  "measurements": [
+    {
+      "completed_synthetic_replays_per_repetition": 8,
+      "dispersion_max_minus_min": 0.11029261600000001,
+      "median_seconds": 0.17506276,
+      "repetitions": 5,
+      "replays_per_second_median": 45.69789714271613,
+      "trades_per_repetition": 6997,
+      "wall_seconds": [
+        0.082867527,
+        0.1720928,
+        0.17506276,
+        0.180015077,
+        0.193160143
+      ],
+      "workers": 1
+    },
+    {
+      "completed_synthetic_replays_per_repetition": 8,
+      "dispersion_max_minus_min": 0.055365763000000005,
+      "median_seconds": 0.074580737,
+      "repetitions": 5,
+      "replays_per_second_median": 107.2663038982841,
+      "trades_per_repetition": 6997,
+      "wall_seconds": [
+        0.041945774,
+        0.05659936,
+        0.074580737,
+        0.094934813,
+        0.097311537
+      ],
+      "workers": 2
+    },
+    {
+      "completed_synthetic_replays_per_repetition": 8,
+      "dispersion_max_minus_min": 0.134380938,
+      "median_seconds": 0.068000997,
+      "repetitions": 5,
+      "replays_per_second_median": 117.64533393532452,
+      "trades_per_repetition": 6997,
+      "wall_seconds": [
+        0.041428887,
+        0.065063327,
+        0.068000997,
+        0.11642961,
+        0.175809825
+      ],
+      "workers": 3
+    },
+    {
+      "completed_synthetic_replays_per_repetition": 8,
+      "dispersion_max_minus_min": 0.008971510000000002,
+      "median_seconds": 0.107542716,
+      "repetitions": 5,
+      "replays_per_second_median": 74.38904555841792,
+      "trades_per_repetition": 6997,
+      "wall_seconds": [
+        0.102225081,
+        0.10749335,
+        0.107542716,
+        0.107549129,
+        0.111196591
+      ],
+      "workers": 4
+    }
+  ]
+}

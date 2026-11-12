@@ -5,3 +5,5 @@
 Initial exact contracts, normalized importer, closed UTC candles, causal indicators, canonical rules/shared masks, sequential market-entry replay and CLI. Fourteen application tests and release compilation verified on synthetic fixtures. Full factory implementation remains incomplete.
 
 Second checkpoint: SQLite WAL experiment deduplication, fenced leases, immutable completion, online backup/restore, frozen holdout reservations, numeric qualification boundaries and chronological folds. Experimental fixed-barrier index remains disabled in replay. Twenty-eight tests and a synthetic eight-instrument resource/worker benchmark passed; complete factory remains unfinished.
+
+Order checkpoint: pending entry lifecycle, expiry/cancel/restart snapshots and shared fill calculation; stream-exact importer hashes. Thirty-five tests pass. Generated pending-order/risk integration remains unfinished. Paired benchmark timings are retained without a speedup claim.

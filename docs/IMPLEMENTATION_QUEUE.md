@@ -8,7 +8,7 @@ Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 4. Add Parquet/ZSTD baseline, SoA hot storage and measured codec/source reuse audits.
 5. Expand the bounded strategy grammar to all nine families and HTF/session/regime operators; seeded mutations/crossover, cache graph, sparse bitsets and diversity.
 6. Implement real candle outcome estimates/bounds, collision ambiguity and rejection audits. Current signal-only conservative screening cannot reject performance failures.
-7. Complete order lifecycle: pending market/stop/limit orders, expirations/cancellations, supported partial fills, richer diagnostics and receipts. Test all eight instruments and conversions independently.
+7. Pending market/stop-market/limit lifecycle, cancellation, expiry and restart snapshots are now implemented/tested in the library. Integrate typed pending entry intents into strategy replay with placement/fill sizing semantics, risk/margin reservations and complete position receipts. Support partial fills only with a justified explicit model; L1 quotes alone do not establish depth. Test all eight instruments and conversions independently.
 8. Prototype first-hit index only after sequential reference correctness; differential-test and benchmark before enabling.
 9. SQLite WAL migrations/schema-v2, experiment keys, fenced leases, immutable result hashes, atomic file publication and online verified backup are implemented/tested. Remaining: writer backpressure, large-artifact lifecycle, supervised crash injection, retention quotas and production restore/runbooks.
 10. Persistent bounded research scheduler, resource pressure handling, fairness, cancellation, adaptive region expansion and meaningful counters.

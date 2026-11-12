@@ -206,13 +206,17 @@ pub fn replay(
                 let exit = if reason == ExitReason::TargetLimit {
                     pos.target
                 } else {
-                    mark.checked_sub(
-                        pos.side
-                            .sign()
-                            .checked_mul(slip)
-                            .ok_or("slippage overflow")?,
-                    )
-                    .ok_or("fill overflow")?
+                    crate::orders::market_from_effective(
+                        p,
+                        costs,
+                        bid,
+                        ask,
+                        if pos.side == Side::Long {
+                            Side::Short
+                        } else {
+                            Side::Long
+                        },
+                    )?
                 };
                 if exit <= 0 {
                     return Err("nonpositive exit under cost model".into());
@@ -262,12 +266,7 @@ pub fn replay(
             if !wants || position.is_some() || closed_now {
                 continue;
             }
-            let entry = if strategy.side == Side::Long {
-                ask.checked_add(slip)
-            } else {
-                bid.checked_sub(slip)
-            }
-            .ok_or("entry overflow")?;
+            let entry = crate::orders::market_from_effective(p, costs, bid, ask, strategy.side)?;
             let stop = entry
                 .checked_sub(
                     strategy

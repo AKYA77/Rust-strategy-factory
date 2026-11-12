@@ -38,6 +38,10 @@ fn import_inspect_evaluate_and_overwrite_protection() {
     );
     let d: Dataset = serde_json::from_slice(&fs::read(&dataset).unwrap()).unwrap();
     d.verify().unwrap();
+    assert_eq!(
+        d.manifest.archive_hash,
+        blake3::hash(&fs::read(&csv).unwrap()).to_hex().to_string()
+    );
     assert!(
         invoke(&["inspect", dataset.to_str().unwrap()])
             .status

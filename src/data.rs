@@ -86,6 +86,20 @@ pub fn file_hash(path: &Path) -> Result<String> {
     }
     Ok(h.finalize().to_hex().to_string())
 }
+// Hash the exact byte stream consumed by the parser, never reopen a mutable input path.
+struct HashedRead<R> {
+    inner: R,
+    hasher: blake3::Hasher,
+    bytes: u64,
+}
+impl<R: Read> Read for HashedRead<R> {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        let n = self.inner.read(buffer)?;
+        self.hasher.update(&buffer[..n]);
+        self.bytes += n as u64;
+        Ok(n)
+    }
+}
 /// Strict normalized CSV importer. Never sorts, deletes duplicates, repairs or infers missing quotes.
 /// REAL_STRUCTURALLY_VALID is the maximum automatically assigned real-data status.
 pub fn import_csv(
@@ -106,7 +120,11 @@ pub fn import_csv(
     }
     let mut reader = csv::ReaderBuilder::new()
         .trim(csv::Trim::None)
-        .from_reader(BufReader::new(file.take(max_bytes.saturating_add(1))));
+        .from_reader(HashedRead {
+            inner: BufReader::new(file.take(max_bytes.saturating_add(1))),
+            hasher: blake3::Hasher::new(),
+            bytes: 0,
+        });
     if reader
         .headers()
         .map_err(|e| e.to_string())?
@@ -129,7 +147,17 @@ pub fn import_csv(
             ask: p.price(&r.ask)?,
         });
     }
-    dataset(p, ticks, source, file_hash(path)?, synthetic)
+    let stream = reader.into_inner();
+    if stream.bytes > max_bytes {
+        return Err("source grew beyond byte budget during import".into());
+    }
+    dataset(
+        p,
+        ticks,
+        source,
+        stream.hasher.finalize().to_hex().to_string(),
+        synthetic,
+    )
 }
 pub fn dataset(
     p: Profile,
