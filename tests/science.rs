@@ -206,6 +206,49 @@ fn retrospective_oos_exposure_is_rejected_before_final_reservation() {
     std::fs::remove_dir_all(dir).unwrap();
 }
 #[test]
+fn revised_quote_history_cannot_hide_prior_out_of_sample_exposure() {
+    let dir = dir();
+    let mut registry = Registry::open(&dir.join("state.sqlite")).unwrap();
+    let original = input();
+    let p = plan();
+    research::evaluate_window(
+        &mut registry,
+        &original,
+        &p.candidates[0],
+        &p.costs,
+        "fixed-code",
+        100000,
+        &Evaluation {
+            window: p.folds[0].test.clone(),
+            stage: Stage::TickVerification,
+            protocol_hash: "earlier-exploration".into(),
+        },
+    )
+    .unwrap();
+    let mut revised = input();
+    revised.dataset.ticks[0].bid -= 1;
+    revised.dataset.manifest.content_hash = data::hash(&revised.dataset.ticks).unwrap();
+    revised.dataset.manifest.archive_hash = "revised-archive".into();
+    revised.dataset.verify().unwrap();
+    assert_ne!(
+        original.dataset.manifest.content_hash,
+        revised.dataset.manifest.content_hash
+    );
+    let error = science::execute(
+        &mut registry,
+        &revised,
+        &p,
+        "fixed-code",
+        &science::Budget::default(),
+    )
+    .unwrap_err();
+    assert!(error.contains("already exposed"));
+    assert_eq!(registry.counts().unwrap().registered, 1);
+    drop(registry);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn bad_calendar_fold_embargo_selection_and_overlap_fail_structural_validation() {
     let mut p = plan();
     p.folds[0].test.end_exclusive_ms -= 1;

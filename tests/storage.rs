@@ -260,3 +260,76 @@ fn final_holdout_cannot_be_reserved_after_training_exposure() {
     drop(registry);
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn dataset_aliases_cannot_bypass_protection_or_retroactively_claim_independence() {
+    use rust_strategy_factory::validation::Interval;
+    let dir = directory();
+    let path = dir.join("state.sqlite");
+    let mut registry = Registry::open(&path).unwrap();
+    let k = key();
+    let period = Interval {
+        start_ms: 0,
+        end_exclusive_ms: 1000,
+    };
+    registry
+        .reserve_instrument_holdout(
+            &k.dataset_hash,
+            &k.instrument,
+            &period,
+            &k.protocol_hash,
+            std::slice::from_ref(&k.concept_hash),
+        )
+        .unwrap();
+    let mut alias = k.clone();
+    alias.dataset_hash = "revised-history".into();
+    assert!(
+        registry
+            .register(&alias)
+            .unwrap_err()
+            .contains("alias/revision")
+    );
+    alias.stage = Stage::IndependentValidation;
+    assert!(registry.register(&alias).is_err());
+    assert!(
+        registry
+            .reserve_instrument_holdout(
+                &alias.dataset_hash,
+                &alias.instrument,
+                &period,
+                "another-protocol",
+                &["child".into()]
+            )
+            .is_err()
+    );
+    // Other symbols are separate; adjacent exclusive intervals do not touch.
+    alias.stage = Stage::TickVerification;
+    alias.instrument = "GBPUSD".into();
+    registry.register(&alias).unwrap();
+    alias.instrument = "EURUSD".into();
+    alias.start_ms = 1000;
+    alias.end_exclusive_ms = 2000;
+    registry.register(&alias).unwrap();
+    assert!(
+        registry
+            .reserve_instrument_holdout(
+                "another-content-hash",
+                "EURUSD",
+                &Interval {
+                    start_ms: 1500,
+                    end_exclusive_ms: 2500
+                },
+                "later",
+                &["child".into()]
+            )
+            .is_err()
+    );
+    drop(registry);
+    let mut registry = Registry::open(&path).unwrap();
+    alias.start_ms = 1;
+    assert!(registry.register(&alias).is_err());
+    assert_eq!(registry.counts().unwrap().registered, 2);
+    registry.integrity().unwrap();
+    drop(registry);
+    std::fs::remove_dir_all(dir).unwrap();
+}

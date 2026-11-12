@@ -245,17 +245,13 @@ pub fn execute(
         let mut q = registry
             .connection
             .prepare(
-                "SELECT key_json FROM experiments WHERE json_extract(key_json,'$.dataset_hash')=?1 AND json_extract(key_json,'$.instrument')=?2",
+                "SELECT key_json FROM experiments WHERE json_extract(key_json,'$.instrument')=?1",
             )
             .map_err(|e| e.to_string())?;
         let rows = q
-            .query_map(
-                params![
-                    input.dataset.manifest.content_hash,
-                    input.dataset.profile.symbol
-                ],
-                |r| r.get::<_, String>(0),
-            )
+            .query_map(params![input.dataset.profile.symbol], |r| {
+                r.get::<_, String>(0)
+            })
             .map_err(|e| e.to_string())?;
         for row in rows {
             let key: ExperimentKey = serde_json::from_str(&row.map_err(|e| e.to_string())?)

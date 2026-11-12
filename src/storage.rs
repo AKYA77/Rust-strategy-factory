@@ -229,9 +229,11 @@ impl Registry {
             return Err("holdout definition is already immutable".into());
         }
         {
-            let mut query=tx.prepare("SELECT key_json FROM experiments WHERE json_extract(key_json,'$.dataset_hash')=?1").map_err(db_err)?;
+            let mut query = tx
+                .prepare("SELECT key_json FROM experiments")
+                .map_err(db_err)?;
             let rows = query
-                .query_map([dataset_hash], |r| r.get::<_, String>(0))
+                .query_map([], |r| r.get::<_, String>(0))
                 .map_err(db_err)?;
             for row in rows {
                 let key: ExperimentKey =
@@ -241,6 +243,13 @@ impl Registry {
                     return Err("holdout already exposed to registered research".into());
                 }
             }
+        }
+        let conflicting: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM holdouts WHERE start_ms<?2 AND end_ms>?1 UNION ALL SELECT 1 FROM instrument_holdouts WHERE start_ms<?2 AND end_ms>?1)",
+            params![period.start_ms,period.end_exclusive_ms],|r|r.get(0)
+        ).map_err(db_err)?;
+        if conflicting {
+            return Err("legacy global reservation overlaps another protected interval".into());
         }
         tx.execute("INSERT INTO holdouts(dataset_hash,start_ms,end_ms,protocol_hash,selected_json) VALUES (?1,?2,?3,?4,?5)",params![dataset_hash,period.start_ms,period.end_exclusive_ms,protocol_hash,serde_json::to_string(&selection).map_err(|e|e.to_string())?]).map_err(db_err)?;
         tx.commit().map_err(db_err)
@@ -295,9 +304,9 @@ impl Registry {
             return Err("instrument holdout definition is already immutable".into());
         }
         {
-            let mut q=tx.prepare("SELECT key_json FROM experiments WHERE json_extract(key_json,'$.dataset_hash')=?1 AND json_extract(key_json,'$.instrument')=?2").map_err(db_err)?;
+            let mut q=tx.prepare("SELECT key_json FROM experiments WHERE json_extract(key_json,'$.instrument')=?1").map_err(db_err)?;
             let rows = q
-                .query_map(params![dataset_hash, instrument], |r| r.get::<_, String>(0))
+                .query_map([instrument], |r| r.get::<_, String>(0))
                 .map_err(db_err)?;
             for row in rows {
                 let key: ExperimentKey =
@@ -307,6 +316,15 @@ impl Registry {
                     return Err("instrument holdout already exposed to registered research".into());
                 }
             }
+        }
+        let conflicting: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM instrument_holdouts WHERE instrument=?1 AND start_ms<?3 AND end_ms>?2 UNION ALL SELECT 1 FROM holdouts WHERE start_ms<?3 AND end_ms>?2)",
+            params![instrument, period.start_ms, period.end_exclusive_ms], |r| r.get(0)
+        ).map_err(db_err)?;
+        if conflicting {
+            return Err(
+                "protected interval already reserved through another dataset/revision".into(),
+            );
         }
         tx.execute("INSERT INTO instrument_holdouts(dataset_hash,instrument,start_ms,end_ms,protocol_hash,selected_json) VALUES (?1,?2,?3,?4,?5,?6)",params![dataset_hash,instrument,period.start_ms,period.end_exclusive_ms,protocol_hash,json]).map_err(db_err)?;
         tx.commit().map_err(db_err)
@@ -318,6 +336,17 @@ impl Registry {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(db_err)?;
+        // A different archive, adjusted quote history or parser revision cannot bypass
+        // existing protected time. Legacy global reservations conservatively cover every symbol.
+        let alias_overlap: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM instrument_holdouts WHERE instrument=?1 AND dataset_hash<>?2 AND start_ms<?4 AND end_ms>?3 UNION ALL SELECT 1 FROM holdouts WHERE dataset_hash<>?2 AND start_ms<?4 AND end_ms>?3)",
+            params![key.instrument,key.dataset_hash,key.start_ms,key.end_exclusive_ms], |r| r.get(0)
+        ).map_err(db_err)?;
+        if alias_overlap {
+            return Err(
+                "protected interval cannot be exposed through a dataset alias/revision".into(),
+            );
+        }
         let reservation:Option<(i64,i64,String,String,bool)>=tx.query_row("SELECT start_ms,end_ms,protocol_hash,selected_json,0 FROM holdouts WHERE dataset_hash=?1 UNION ALL SELECT start_ms,end_ms,protocol_hash,selected_json,1 FROM instrument_holdouts WHERE dataset_hash=?1 AND instrument=?2",params![key.dataset_hash,key.instrument],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?))).optional().map_err(db_err)?;
         let instrument_scoped = reservation.as_ref().is_some_and(|r| r.4);
         if let Some((start, end, protocol, selected_json, _)) = reservation {
