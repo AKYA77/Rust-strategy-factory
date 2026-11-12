@@ -39,7 +39,8 @@
     "initial protective-stop executable-distance feasibility with regressions; engine v4",
     "frozen conditional OOS win-rate uncertainty with declared-trial Bonferroni adjustment and explicit unverified assumptions",
     "cross-dataset registered exposure/holdout protection by instrument and overlapping time, including revised quote histories",
-    "transactional immutable OOS interval reservations across protocols and dataset aliases, with concurrent race and rollback tests"
+    "transactional immutable OOS interval reservations across protocols and dataset aliases, with concurrent race and rollback tests",
+    "preregistered OOS sequential cost stress and bounded stop-neighborhood probes with immutable identities and trial-budget accounting"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -47,9 +48,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Implement preregistered cost/neighborhood/regime robustness evidence and dependence-aware inference; continue full queue.",
+  "next_action": "Implement regime/session robustness, dependence-aware inference and approval/coverage qualification prerequisites; continue full implementation queue.",
   "qualified_strategies": 0,
-  "tests_passed": 87,
+  "tests_passed": 89,
   "benchmark": "docs/BENCHMARKS/2026-11-12-synthetic-replay.json",
   "browser_acceptance": "Chromium desktop/mobile against actual Rust HTTP server and SQLite; auth, CSRF/origin/host/body/rates, controls, receipts/export, restart/logout passed"
 }

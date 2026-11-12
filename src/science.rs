@@ -41,6 +41,12 @@ impl Plan {
             .iter()
             .map(|s| Ok((s.identity()?, s.canonical()?)))
             .collect::<Result<Vec<_>>>()?;
+        let required_trials = candidates.iter().try_fold(0u64, |n, (_, strategy)| {
+            Ok::<_, String>(n + 1 + crate::robustness::cases(strategy, &self.costs)?.len() as u64)
+        })?;
+        if self.trial_budget < required_trials {
+            return Err("trial budget omits frozen robustness cases".into());
+        }
         candidates.sort_by(|a, b| a.0.cmp(&b.0));
         if candidates.windows(2).any(|w| w[0].0 == w[1].0) {
             return Err("duplicate frozen concept".into());
@@ -103,7 +109,7 @@ pub struct DescriptiveStats {
     pub sum_net_micro_usd: i128,
 }
 impl DescriptiveStats {
-    fn calculate(observations: &[Observation]) -> Result<Self> {
+    pub(crate) fn calculate(observations: &[Observation]) -> Result<Self> {
         let mut stats = Self::default();
         let mut streak = 0;
         for observation in observations {
@@ -133,8 +139,10 @@ pub struct CandidateEvidence {
     pub pooled_oos_reset_fold_stats: DescriptiveStats,
     pub unresolved_oos_positions: usize,
     pub failed_windows: usize,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uncertainty: Option<crate::uncertainty::Diagnostic>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub robustness: Vec<crate::robustness::EvidenceSet>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Report {
@@ -155,7 +163,7 @@ pub struct ProtocolResult {
 }
 fn definition(plan: &Plan, input: &Input, revision: &str) -> Result<serde_json::Value> {
     Ok(
-        serde_json::json!({"version":"frozen-chronological-protocol-v2","uncertainty_method":crate::uncertainty::VERSION,"plan":plan,"dataset_hash":input.dataset.manifest.content_hash,"dataset_identity":data::dataset_identity(&input.dataset.manifest)?,"profile_hash":input.dataset.manifest.profile_hash,"conversions_hash":data::hash(&input.conversions)?,"revision":revision,"engine":crate::ENGINE_VERSION,"indicators":crate::INDICATOR_VERSION,"signals":crate::SIGNAL_VERSION}),
+        serde_json::json!({"version":"frozen-chronological-protocol-v3","robustness_method":crate::robustness::VERSION,"robustness_cases":plan.candidates.iter().map(|s|crate::robustness::cases(s,&plan.costs)).collect::<Result<Vec<_>>>()?,"uncertainty_method":crate::uncertainty::VERSION,"plan":plan,"dataset_hash":input.dataset.manifest.content_hash,"dataset_identity":data::dataset_identity(&input.dataset.manifest)?,"profile_hash":input.dataset.manifest.profile_hash,"conversions_hash":data::hash(&input.conversions)?,"revision":revision,"engine":crate::ENGINE_VERSION,"indicators":crate::INDICATOR_VERSION,"signals":crate::SIGNAL_VERSION}),
     )
 }
 /// Immutable report lookup verifies stored scientific evidence integrity.
@@ -240,6 +248,13 @@ pub fn execute(
         .iter()
         .map(|s| s.identity())
         .collect::<Result<Vec<_>>>()?;
+    let mut allowed = Vec::new();
+    for candidate in &plan.candidates {
+        allowed.push((candidate.identity()?, data::hash(&plan.costs)?));
+        for case in crate::robustness::cases(candidate, &plan.costs)? {
+            allowed.push((case.strategy.identity()?, data::hash(&case.costs)?));
+        }
+    }
     // Prevent a retrospective OOS claim. Same-plan resumed tasks must match the frozen setup.
     {
         let mut q = registry
@@ -265,9 +280,8 @@ pub fn execute(
             if exposed
                 && (previous_definition.is_none()
                     || key.protocol_hash != id
-                    || !ids.contains(&key.concept_hash)
+                    || !allowed.contains(&(key.concept_hash.clone(), key.cost_hash.clone()))
                     || key.code_revision != revision
-                    || key.cost_hash != data::hash(&plan.costs)?
                     || key.profile_hash != input.dataset.manifest.profile_hash)
             {
                 return Err(
@@ -384,6 +398,9 @@ pub fn execute(
             pooled_oos_reset_fold_stats: DescriptiveStats::calculate(&observations)?,
             unresolved_oos_positions: unresolved,
             failed_windows: failed,
+            robustness: crate::robustness::execute(
+                registry, input, strategy, &plan, &id, revision, budget,
+            )?,
             uncertainty: Some(crate::uncertainty::diagnose(
                 &observations,
                 plan.trial_budget,
@@ -392,7 +409,7 @@ pub fn execute(
     }
     // Numerical/descriptive execution alone cannot certify independent research qualification.
     let report=Report {protocol_id:id.clone(),dataset_hash:input.dataset.manifest.content_hash.clone(),dataset_identity:data::dataset_identity(&input.dataset.manifest)?,compute_revision:revision.into(),status:"INSUFFICIENT_EVIDENCE".into(),data_class:input.dataset.manifest.class,trial_budget:plan.trial_budget,candidates,
-        missing_requirements:vec!["corpus-wide source-revision/alias exposure proof".into(),"approved full-history/profile/calendar evidence".into(),"multiple-testing uncertainty, cost sensitivity, parameter-neighborhood and regime validation".into(),"frozen full-period financial qualification and diversity ranking".into()]};
+        missing_requirements:vec!["corpus-wide source-revision/alias exposure proof".into(),"approved full-history/profile/calendar evidence".into(),"dependence-aware uncertainty, regime validation and prespecified robustness acceptance gates".into(),"frozen full-period financial qualification and diversity ranking".into()]};
     let json = serde_json::to_string(&report).map_err(|e| e.to_string())?;
     if json.len() > 8 * 1024 * 1024 {
         return Err("scientific report exceeds metadata budget".into());

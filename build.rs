@@ -21,6 +21,7 @@ fn main() {
         "src/validation.rs",
         "src/science.rs",
         "src/uncertainty.rs",
+        "src/robustness.rs",
         "src/research.rs",
         "src/storage.rs",
     ] {

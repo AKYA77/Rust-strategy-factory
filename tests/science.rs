@@ -121,6 +121,32 @@ fn frozen_protocol_executes_all_windows_and_reuses_an_immutable_report() {
             > 0
     );
     assert_eq!(first.report.candidates[0].failed_windows, 0);
+    assert_eq!(first.report.candidates[0].robustness.len(), 3);
+    for probe in &first.report.candidates[0].robustness {
+        assert_eq!(probe.experiments.len(), 2);
+        assert_eq!(probe.status, "DESCRIPTIVE_ONLY");
+        assert_eq!(probe.failed_windows, 0);
+        assert!(probe.pooled_reset_fold_stats.closed > 0);
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        for experiment in &probe.experiments {
+            let json: String = conn
+                .query_row(
+                    "SELECT key_json FROM experiments WHERE id=?1",
+                    [&experiment.experiment_id],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            let key: rust_strategy_factory::storage::ExperimentKey =
+                serde_json::from_str(&json).unwrap();
+            assert_eq!(key.stage, Stage::TickVerification);
+            assert_eq!(key.concept_hash, probe.concept_id);
+            assert_eq!(key.cost_hash, probe.cost_hash);
+            assert_eq!(key.protocol_hash, first.report.protocol_id);
+            assert!(p.folds.iter().any(|fold| fold.test.start_ms == key.start_ms
+                && fold.test.end_exclusive_ms == key.end_exclusive_ms));
+            assert!(key.end_exclusive_ms < p.holdout.start_ms);
+        }
+    }
     let candidate = &first.report.candidates[0];
     let uncertainty = candidate.uncertainty.as_ref().unwrap();
     assert_eq!(
@@ -265,6 +291,9 @@ fn bad_calendar_fold_embargo_selection_and_overlap_fail_structural_validation() 
     let mut p = plan();
     p.trial_budget = 0;
     assert!(p.canonical().is_err());
+    let mut p = plan();
+    p.trial_budget = 3;
+    assert!(p.canonical().unwrap_err().contains("robustness"));
 }
 #[test]
 fn report_tampering_is_detected_and_equal_reservations_are_idempotent() {
@@ -294,6 +323,25 @@ fn report_tampering_is_detected_and_equal_reservations_are_idempotent() {
         )
         .unwrap();
     let conn = rusqlite::Connection::open(&path).unwrap();
+    // Historical reports omit fields added later; their exact typed hash must remain readable.
+    let mut legacy = result.report.clone();
+    for candidate in &mut legacy.candidates {
+        candidate.uncertainty = None;
+        candidate.robustness.clear();
+    }
+    let json = serde_json::to_string(&legacy).unwrap();
+    assert!(!json.contains("\"uncertainty\":"));
+    assert!(!json.contains("\"robustness\":"));
+    conn.execute(
+        "UPDATE scientific_protocols SET report_json=?1,report_hash=?2",
+        rusqlite::params![json, data::hash(&legacy).unwrap()],
+    )
+    .unwrap();
+    assert!(
+        science::read_report(&registry, &result.report.protocol_id)
+            .unwrap()
+            .is_some()
+    );
     conn.execute("UPDATE scientific_protocols SET report_json='{}'", [])
         .unwrap();
     assert!(science::read_report(&registry, &result.report.protocol_id).is_err());
@@ -332,7 +380,7 @@ fn identical_numeric_histories_on_different_instruments_have_independent_holdout
     let eur = science::execute(&mut registry, &a, &p, "code", &budget).unwrap();
     let gbp = science::execute(&mut registry, &b, &p, "code", &budget).unwrap();
     assert_ne!(eur.report.protocol_id, gbp.report.protocol_id);
-    assert_eq!(registry.counts().unwrap().registered, 12);
+    assert_eq!(registry.counts().unwrap().registered, 24);
     registry.integrity().unwrap();
     drop(registry);
     std::fs::remove_dir_all(dir).unwrap();
