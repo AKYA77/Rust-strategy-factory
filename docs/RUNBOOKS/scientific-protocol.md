@@ -17,3 +17,5 @@ Still required: corpus-wide exposure and coverage/approval evidence, uncertainty
 Frozen reports now include conditional Hoeffding/Bonferroni net-win diagnostics using the declared trial budget. Assumptions remain unverified; the diagnostic cannot qualify a candidate. See [method and limitations](../DECISIONS/0002-conditional-uncertainty.md).
 
 Protocol v3 freezes and executes additional OOS-only cost stress and stop-neighborhood cases. Their reports retain exact receipts and DESCRIPTIVE_ONLY status; no final interval is probed. See [probe policy and limitations](../DECISIONS/0003-frozen-robustness-probes.md).
+
+Protocol v4 adds OOS receipt breakdowns by exit year and six-hour UTC entry bin. Per-fold cash drawdowns use realized closed-trade net P&L from a fresh $20 account. They exclude intratrade marks and unresolved positions and must not be presented as complete account drawdown. Missing replay stays explicit; empty bins have no expectancy estimate. Each bucket retains an exact net-P&L numerator and resolved-trade denominator. These UTC bins do not establish broker/DST session approval or market-regime robustness.

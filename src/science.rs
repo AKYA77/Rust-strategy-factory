@@ -143,6 +143,8 @@ pub struct CandidateEvidence {
     pub uncertainty: Option<crate::uncertainty::Diagnostic>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub robustness: Vec<crate::robustness::EvidenceSet>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub breakdown: Option<crate::diagnostics::Breakdown>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Report {
@@ -163,7 +165,7 @@ pub struct ProtocolResult {
 }
 fn definition(plan: &Plan, input: &Input, revision: &str) -> Result<serde_json::Value> {
     Ok(
-        serde_json::json!({"version":"frozen-chronological-protocol-v3","robustness_method":crate::robustness::VERSION,"robustness_cases":plan.candidates.iter().map(|s|crate::robustness::cases(s,&plan.costs)).collect::<Result<Vec<_>>>()?,"uncertainty_method":crate::uncertainty::VERSION,"plan":plan,"dataset_hash":input.dataset.manifest.content_hash,"dataset_identity":data::dataset_identity(&input.dataset.manifest)?,"profile_hash":input.dataset.manifest.profile_hash,"conversions_hash":data::hash(&input.conversions)?,"revision":revision,"engine":crate::ENGINE_VERSION,"indicators":crate::INDICATOR_VERSION,"signals":crate::SIGNAL_VERSION}),
+        serde_json::json!({"version":"frozen-chronological-protocol-v4","breakdown_method":crate::diagnostics::VERSION,"robustness_method":crate::robustness::VERSION,"robustness_cases":plan.candidates.iter().map(|s|crate::robustness::cases(s,&plan.costs)).collect::<Result<Vec<_>>>()?,"uncertainty_method":crate::uncertainty::VERSION,"plan":plan,"dataset_hash":input.dataset.manifest.content_hash,"dataset_identity":data::dataset_identity(&input.dataset.manifest)?,"profile_hash":input.dataset.manifest.profile_hash,"conversions_hash":data::hash(&input.conversions)?,"revision":revision,"engine":crate::ENGINE_VERSION,"indicators":crate::INDICATOR_VERSION,"signals":crate::SIGNAL_VERSION}),
     )
 }
 /// Immutable report lookup verifies stored scientific evidence integrity.
@@ -325,6 +327,7 @@ pub fn execute(
     for strategy in &plan.candidates {
         let mut experiments = Vec::new();
         let mut observations = Vec::new();
+        let mut breakdown = crate::diagnostics::Breakdown::default();
         let mut unresolved = 0;
         let mut failed = 0;
         let mut windows = vec![(
@@ -371,19 +374,29 @@ pub fn execute(
             if result.outcome == "failed" {
                 failed += 1;
             }
-            if is_oos && let Some(trades) = result.result["tick_replay"]["trades"].as_array() {
-                if observations.len().saturating_add(trades.len()) > 1_000_000 {
-                    return Err(
-                        "protocol observation budget exceeded; committed evidence retained".into(),
-                    );
+            if is_oos {
+                let mut fold = crate::diagnostics::FoldRisk::new(phase.clone());
+                if let Some(trades) = result.result["tick_replay"]["trades"].as_array() {
+                    if observations.len().saturating_add(trades.len()) > 1_000_000 {
+                        return Err(
+                            "protocol observation budget exceeded; committed evidence retained"
+                                .into(),
+                        );
+                    }
+                    fold.replay_present = true;
+                    fold.unresolved = !result.result["tick_replay"]["unresolved"].is_null();
+                    unresolved += usize::from(fold.unresolved);
+                    for raw in trades {
+                        let trade: crate::tick_engine::Trade =
+                            serde_json::from_value(raw.clone()).map_err(|e| e.to_string())?;
+                        breakdown.record(&trade, &mut fold)?;
+                        observations.push(Observation {
+                            exit_ms: trade.exit_ms,
+                            net_micro_usd: trade.net_micro_usd,
+                        });
+                    }
                 }
-                observations.extend(
-                    serde_json::from_value::<Vec<Observation>>(serde_json::Value::Array(
-                        trades.clone(),
-                    ))
-                    .map_err(|e| e.to_string())?,
-                );
-                unresolved += usize::from(!result.result["tick_replay"]["unresolved"].is_null());
+                breakdown.folds.push(fold);
             }
             experiments.push(Evidence {
                 phase,
@@ -398,6 +411,7 @@ pub fn execute(
             pooled_oos_reset_fold_stats: DescriptiveStats::calculate(&observations)?,
             unresolved_oos_positions: unresolved,
             failed_windows: failed,
+            breakdown: Some(breakdown),
             robustness: crate::robustness::execute(
                 registry, input, strategy, &plan, &id, revision, budget,
             )?,

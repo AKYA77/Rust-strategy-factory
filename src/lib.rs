@@ -23,3 +23,5 @@ pub mod screen;
 pub mod uncertainty;
 
 pub mod robustness;
+
+pub mod diagnostics;

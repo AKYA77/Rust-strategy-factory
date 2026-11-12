@@ -148,6 +148,24 @@ fn frozen_protocol_executes_all_windows_and_reuses_an_immutable_report() {
         }
     }
     let candidate = &first.report.candidates[0];
+    let breakdown = candidate.breakdown.as_ref().unwrap();
+    assert_eq!(breakdown.folds.len(), 2);
+    assert_eq!(
+        breakdown
+            .exit_years
+            .values()
+            .map(|b| b.resolved)
+            .sum::<usize>(),
+        candidate.pooled_oos_reset_fold_stats.closed
+    );
+    assert_eq!(
+        breakdown
+            .entry_utc_six_hour_bins
+            .values()
+            .map(|b| b.sum_net_micro_usd)
+            .sum::<i128>(),
+        candidate.pooled_oos_reset_fold_stats.sum_net_micro_usd
+    );
     let uncertainty = candidate.uncertainty.as_ref().unwrap();
     assert_eq!(
         uncertainty.observations,
@@ -327,6 +345,7 @@ fn report_tampering_is_detected_and_equal_reservations_are_idempotent() {
     let mut legacy = result.report.clone();
     for candidate in &mut legacy.candidates {
         candidate.uncertainty = None;
+        candidate.breakdown = None;
         candidate.robustness.clear();
     }
     let json = serde_json::to_string(&legacy).unwrap();
