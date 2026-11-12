@@ -10,3 +10,11 @@ jobs:
       - name: Install pinned toolchain
         run: rustup show
       - run: sh scripts/check.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: cargo build --locked
+      - run: npm run test:browser

@@ -15,5 +15,6 @@ pub mod validation;
 pub const ENGINE_VERSION: &str = "ordered-l1-v2-marked-margin";
 pub const INDICATOR_VERSION: &str = "causal-primitives-v2-rsi-bps";
 pub const SIGNAL_VERSION: &str = "closed-publication-next-event-v1";
+pub mod dashboard;
 pub mod research;
 pub mod screen;

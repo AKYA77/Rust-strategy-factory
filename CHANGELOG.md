@@ -13,3 +13,5 @@ Pending-entry integration: typed strategy intents, exclusive fixed-quantity rese
 Nine-family milestone: causal RSI/mean crosses and trends, prior channels, range expansion, UTC sessions and bounded cache eviction. Fifty-three tests and release build pass; every family has nonzero synthetic tick trades.
 
 Durable loop milestone: schema-v3 cursors/coordinator fencing, controls, fair inputs, bounded new regions, shared CLI evaluation, state-budget backpressure and conditional candle-bound audits. Sixty-four tests and standalone process smoke pass.
+
+Dashboard core: authenticated localhost Axum/embedded frontend, Argon2id initialization, bounded sessions/CSRF/origin/host/rate/body controls, persistent run controls and real trade/provenance/export views. Sixty-five Rust tests and actual Chromium desktop/mobile/restart acceptance pass. Lossless i128 JSON receipts verified.

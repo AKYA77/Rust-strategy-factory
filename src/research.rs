@@ -98,7 +98,7 @@ pub fn evaluate(
                 let screen = strategies::screen(&mut features, strategy)?;
                 if !screen.requires_tick_verification {
                     return Ok(
-                        serde_json::json!({"screen":screen,"tick_replay":null,"strategy":strategy,"data_manifest":d.manifest}),
+                        serde_json::json!({"screen":screen,"tick_replay":null,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs}),
                     );
                 }
                 let mask = features.signal(&strategy.rule)?;
@@ -106,7 +106,7 @@ pub fn evaluate(
                     tick_engine::replay(d, &c, &mask, strategy, costs, &input.conversions)?;
                 let screen_audit = crate::screen::audit_replay(d, costs, &replay)?;
                 Ok(
-                    serde_json::json!({"screen":screen,"screen_audit":screen_audit,"tick_replay":replay,"strategy":strategy,"data_manifest":d.manifest}),
+                    serde_json::json!({"screen":screen,"screen_audit":screen_audit,"tick_replay":replay,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs}),
                 )
             };
             let (outcome, result) = match compute() {

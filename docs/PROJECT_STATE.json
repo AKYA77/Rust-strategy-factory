@@ -24,7 +24,11 @@
     "prefix-causality and nonzero tick cohort tests for every family",
     "standalone Rust research loop with durable fair cursors, expanding regions and fenced coordinator leases",
     "pause/resume/stop controls, exact cached-result recovery and state-budget backpressure",
-    "conditional M1 barrier sets with bid/ask floor correlation bounds and persisted tick receipt audits"
+    "conditional M1 barrier sets with bid/ask floor correlation bounds and persisted tick receipt audits",
+    "authenticated loopback Axum dashboard with embedded assets and real persistent state",
+    "Argon2id auth initialization, bounded random sessions, CSRF/origin/host/body/rate controls",
+    "strategy/profile/cost/trade detail, equity chart, exact receipt export and numerical training diagnostics",
+    "lossless i128 JSON values including uncapped losses beyond 64-bit range"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -32,8 +36,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Implement authenticated local dashboard against persisted research/experiment state, then complete independent scientific workflow, data/native storage and production reliability.",
+  "next_action": "Complete chronological OOS/walk-forward execution and immutable scientific evidence protocols; add HTF/operators, large-data storage/imports, diagnostics, worker controls, deployment and remaining UI operations.",
   "qualified_strategies": 0,
-  "tests_passed": 64,
-  "benchmark": "docs/BENCHMARKS/2026-11-12-synthetic-replay.json"
+  "tests_passed": 65,
+  "benchmark": "docs/BENCHMARKS/2026-11-12-synthetic-replay.json",
+  "browser_acceptance": "Chromium desktop/mobile against actual Rust HTTP server and SQLite; auth, CSRF/origin/host/body/rates, controls, receipts/export, restart/logout passed"
 }

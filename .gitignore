@@ -4,3 +4,4 @@
 *.sqlite*
 .env
 *.secret
+/node_modules/

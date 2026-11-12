@@ -308,3 +308,17 @@ fn contradictory_rules_and_extreme_sizing_fail_safely() {
     assert!(contracts::size(&p, 20_000_000, i64::MAX, i64::MAX, fx).is_err());
     assert!(contracts::size(&p, i128::MAX, 100000, 100, Conversion::usd()).is_err());
 }
+
+#[test]
+fn uncapped_extreme_losses_remain_exact_in_public_json_receipts() {
+    let r = run(
+        &sample(9_000_000_000_000_000_000, 9_000_000_000_000_000_020, 121000),
+        Side::Short,
+    );
+    assert!(r.realized_micro_usd < i128::from(i64::MIN));
+    let value = serde_json::to_value(&r).unwrap();
+    assert_eq!(
+        serde_json::from_value::<i128>(value["realized_micro_usd"].clone()).unwrap(),
+        r.realized_micro_usd
+    );
+}

@@ -15,7 +15,7 @@ Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 11. Frozen per-dataset holdout reservations and three-month fold utilities exist; the complete scientific workflow is unfinished. Implement immutable corpus-wide split/exposure provenance; three-month walk-forward, purge/embargo, protected one-use holdout, multiplicity safeguards, cost/neighborhood/regime robustness.
 12. Qualification boundary tests and evidence gates; eight independent diverse top-five boards. Synthetic data must never qualify.
 13. Deterministic diagnostics and bounded improvements with parent/child provenance; never use protected holdout for adaptation.
-14. Authenticated Axum API and embedded responsive dashboard using actual persisted state; browser workflows, security and exports.
+14. Authenticated loopback Axum/embedded dashboard core now works and passes actual desktop/mobile browser tests: controls, results, trades/equity, profiles/costs/provenance, numeric diagnostics and exports. Remaining: full pagination, imports/approval/refresh, backups/restores, worker management, richer charts, complete validation/ranking UI and HTTPS/public-mode support.
 15. Reproducible installer/systemd, update/rollback, non-root resource limits, monitoring and backup/restore procedures.
 16. Full synthetic/adversarial/cross-year/real-data end-to-end acceptance, benchmarks with hardware/resource evidence, recovery and browser acceptance.
 17. Final requirement reconciliation, source/license audit, GitHub CI verification and honest handoff. Full historical data and target VPS acceptance remain external pending work.
