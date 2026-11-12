@@ -118,7 +118,7 @@ impl Registry {
         let version: i64 = connection
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .map_err(db_err)?;
-        if version > 5 {
+        if version > 6 {
             return Err("database schema newer than supported".into());
         }
         if version == 0 {
@@ -189,7 +189,88 @@ impl Registry {
                 FOREIGN KEY(dataset_hash,instrument) REFERENCES instrument_holdouts(dataset_hash,instrument)
             );PRAGMA user_version=5;").map_err(db_err)?;
         }
+        if version < 6 {
+            let tx = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(db_err)?;
+            tx.execute_batch("CREATE TABLE IF NOT EXISTS protocol_ranges (
+                instrument TEXT NOT NULL, start_ms INTEGER NOT NULL, end_ms INTEGER NOT NULL,
+                dataset_hash TEXT NOT NULL, protocol_hash TEXT NOT NULL,
+                CHECK(start_ms<end_ms), PRIMARY KEY(instrument,start_ms,end_ms)
+            );CREATE INDEX IF NOT EXISTS experiment_instrument ON experiments(json_extract(key_json,'$.instrument'));
+            PRAGMA user_version=6;").map_err(db_err)?;
+            tx.commit().map_err(db_err)?;
+        }
         Ok(Self { connection })
+    }
+    /// Atomically reserve OOS time across dataset aliases before any competing registration.
+    /// No unlock API: retries may recover only the exact same dataset/protocol/ranges.
+    pub fn reserve_protocol_ranges(
+        &mut self,
+        dataset: &str,
+        instrument: &str,
+        protocol: &str,
+        ranges: &[crate::validation::Interval],
+    ) -> Result<()> {
+        if dataset.is_empty()
+            || protocol.is_empty()
+            || !SYMBOLS.contains(&instrument)
+            || ranges.is_empty()
+            || ranges.len() > 16
+        {
+            return Err("invalid protected OOS definition".into());
+        }
+        for (i, range) in ranges.iter().enumerate() {
+            range.validate()?;
+            if ranges[..i]
+                .iter()
+                .any(|r| r.start_ms < range.end_exclusive_ms && r.end_exclusive_ms > range.start_ms)
+            {
+                return Err("overlapping protected OOS ranges".into());
+            }
+        }
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(db_err)?;
+        let existing: i64 = tx
+            .query_row(
+                "SELECT COUNT(*) FROM protocol_ranges WHERE protocol_hash=?1",
+                [protocol],
+                |r| r.get(0),
+            )
+            .map_err(db_err)?;
+        if existing > 0 {
+            if existing as usize != ranges.len() {
+                return Err("immutable OOS range set changed".into());
+            }
+            for range in ranges {
+                let exact: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM protocol_ranges WHERE protocol_hash=?1 AND dataset_hash=?2 AND instrument=?3 AND start_ms=?4 AND end_ms=?5)",params![protocol,dataset,instrument,range.start_ms,range.end_exclusive_ms],|r|r.get(0)).map_err(db_err)?;
+                if !exact {
+                    return Err("immutable OOS range set changed".into());
+                }
+            }
+        }
+        for range in ranges {
+            let conflict: bool = tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM protocol_ranges WHERE instrument=?1 AND start_ms<?3 AND end_ms>?2 AND NOT(start_ms=?2 AND end_ms=?3 AND dataset_hash=?4 AND protocol_hash=?5)
+                UNION ALL SELECT 1 FROM instrument_holdouts WHERE instrument=?1 AND start_ms<?3 AND end_ms>?2
+                UNION ALL SELECT 1 FROM holdouts WHERE start_ms<?3 AND end_ms>?2)",
+                params![instrument,range.start_ms,range.end_exclusive_ms,dataset,protocol],|r|r.get(0)
+            ).map_err(db_err)?;
+            if conflict {
+                return Err("OOS interval conflicts with an immutable protected range".into());
+            }
+            let exposed: bool = tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM experiments WHERE json_extract(key_json,'$.instrument')=?1 AND json_extract(key_json,'$.start_ms')<?3 AND json_extract(key_json,'$.end_exclusive_ms')>?2 AND (json_extract(key_json,'$.dataset_hash')<>?4 OR json_extract(key_json,'$.protocol_hash')<>?5))",
+                params![instrument,range.start_ms,range.end_exclusive_ms,dataset,protocol],|r|r.get(0)
+            ).map_err(db_err)?;
+            if exposed {
+                return Err("OOS interval already exposed outside its frozen protocol".into());
+            }
+            tx.execute("INSERT OR IGNORE INTO protocol_ranges(instrument,start_ms,end_ms,dataset_hash,protocol_hash) VALUES (?1,?2,?3,?4,?5)",params![instrument,range.start_ms,range.end_exclusive_ms,dataset,protocol]).map_err(db_err)?;
+        }
+        tx.commit().map_err(db_err)
     }
     /// Freeze a final holdout and selected concepts before any recorded experiment touches it.
     /// One reservation per immutable dataset; there is deliberately no reset/unlock API.
@@ -245,7 +326,7 @@ impl Registry {
             }
         }
         let conflicting: bool = tx.query_row(
-            "SELECT EXISTS(SELECT 1 FROM holdouts WHERE start_ms<?2 AND end_ms>?1 UNION ALL SELECT 1 FROM instrument_holdouts WHERE start_ms<?2 AND end_ms>?1)",
+            "SELECT EXISTS(SELECT 1 FROM holdouts WHERE start_ms<?2 AND end_ms>?1 UNION ALL SELECT 1 FROM instrument_holdouts WHERE start_ms<?2 AND end_ms>?1 UNION ALL SELECT 1 FROM protocol_ranges WHERE start_ms<?2 AND end_ms>?1)",
             params![period.start_ms,period.end_exclusive_ms],|r|r.get(0)
         ).map_err(db_err)?;
         if conflicting {
@@ -318,7 +399,7 @@ impl Registry {
             }
         }
         let conflicting: bool = tx.query_row(
-            "SELECT EXISTS(SELECT 1 FROM instrument_holdouts WHERE instrument=?1 AND start_ms<?3 AND end_ms>?2 UNION ALL SELECT 1 FROM holdouts WHERE start_ms<?3 AND end_ms>?2)",
+            "SELECT EXISTS(SELECT 1 FROM instrument_holdouts WHERE instrument=?1 AND start_ms<?3 AND end_ms>?2 UNION ALL SELECT 1 FROM holdouts WHERE start_ms<?3 AND end_ms>?2 UNION ALL SELECT 1 FROM protocol_ranges WHERE instrument=?1 AND start_ms<?3 AND end_ms>?2)",
             params![instrument, period.start_ms, period.end_exclusive_ms], |r| r.get(0)
         ).map_err(db_err)?;
         if conflicting {
@@ -336,6 +417,15 @@ impl Registry {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(db_err)?;
+        let outside_protocol: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM protocol_ranges WHERE instrument=?1 AND start_ms<?4 AND end_ms>?3 AND (dataset_hash<>?2 OR protocol_hash<>?5))",
+            params![key.instrument,key.dataset_hash,key.start_ms,key.end_exclusive_ms,key.protocol_hash],|r|r.get(0)
+        ).map_err(db_err)?;
+        if outside_protocol {
+            return Err(
+                "protected OOS time cannot feed another protocol or dataset revision".into(),
+            );
+        }
         // A different archive, adjusted quote history or parser revision cannot bypass
         // existing protected time. Legacy global reservations conservatively cover every symbol.
         let alias_overlap: bool = tx.query_row(

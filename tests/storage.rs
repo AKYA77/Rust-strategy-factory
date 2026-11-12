@@ -333,3 +333,165 @@ fn dataset_aliases_cannot_bypass_protection_or_retroactively_claim_independence(
     drop(registry);
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn protected_oos_registration_and_reservation_are_exclusive_and_durable() {
+    use rust_strategy_factory::validation::Interval;
+    let dir = directory();
+    let path = dir.join("state.sqlite");
+    let mut a = Registry::open(&path).unwrap();
+    let mut b = Registry::open(&path).unwrap();
+    let k = key();
+    let range = Interval {
+        start_ms: 0,
+        end_exclusive_ms: 1000,
+    };
+    a.reserve_protocol_ranges(
+        &k.dataset_hash,
+        &k.instrument,
+        &k.protocol_hash,
+        std::slice::from_ref(&range),
+    )
+    .unwrap();
+    assert!(
+        a.reserve_protocol_ranges(
+            &k.dataset_hash,
+            &k.instrument,
+            &k.protocol_hash,
+            &[
+                range.clone(),
+                Interval {
+                    start_ms: 2000,
+                    end_exclusive_ms: 3000
+                }
+            ]
+        )
+        .is_err()
+    );
+    a.register(&k).unwrap();
+    let mut outsider = k.clone();
+    outsider.protocol_hash = "other-study".into();
+    assert!(b.register(&outsider).is_err());
+    assert!(
+        b.reserve_protocol_ranges(
+            &k.dataset_hash,
+            &k.instrument,
+            "other-study",
+            std::slice::from_ref(&range)
+        )
+        .is_err()
+    );
+    outsider.protocol_hash = k.protocol_hash.clone();
+    outsider.dataset_hash = "alias".into();
+    assert!(b.register(&outsider).is_err());
+    outsider.instrument = "GBPUSD".into();
+    b.register(&outsider).unwrap();
+    assert!(
+        b.reserve_instrument_holdout(
+            "alias",
+            "EURUSD",
+            &range,
+            "other-study",
+            &["concept".into()]
+        )
+        .is_err()
+    );
+    assert!(
+        b.reserve_holdout("alias", &range, "other-study", &["concept".into()])
+            .is_err()
+    );
+    drop(a);
+    drop(b);
+    let mut a = Registry::open(&path).unwrap();
+    a.reserve_protocol_ranges(
+        &k.dataset_hash,
+        &k.instrument,
+        &k.protocol_hash,
+        std::slice::from_ref(&range),
+    )
+    .unwrap();
+    outsider.instrument = "EURUSD".into();
+    assert!(a.register(&outsider).is_err());
+    a.integrity().unwrap();
+    drop(a);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn multi_range_reservation_rolls_back_when_a_later_range_is_exposed() {
+    use rust_strategy_factory::validation::Interval;
+    let dir = directory();
+    let path = dir.join("state.sqlite");
+    let mut a = Registry::open(&path).unwrap();
+    let mut exposed = key();
+    exposed.start_ms = 2000;
+    exposed.end_exclusive_ms = 3000;
+    a.register(&exposed).unwrap();
+    let ranges = [
+        Interval {
+            start_ms: 0,
+            end_exclusive_ms: 1000,
+        },
+        Interval {
+            start_ms: 2000,
+            end_exclusive_ms: 3000,
+        },
+    ];
+    assert!(
+        a.reserve_protocol_ranges("alias", "EURUSD", "new-study", &ranges)
+            .is_err()
+    );
+    // First range must not have survived a partial transaction.
+    a.register(&key()).unwrap();
+    let connection = rusqlite::Connection::open(&path).unwrap();
+    let count: i64 = connection
+        .query_row("SELECT COUNT(*) FROM protocol_ranges", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(count, 0);
+    drop(connection);
+    drop(a);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn concurrent_oos_reservation_and_outside_registration_cannot_both_succeed() {
+    use rust_strategy_factory::validation::Interval;
+    use std::sync::{Arc, Barrier};
+    let dir = directory();
+    let path = dir.join("state.sqlite");
+    drop(Registry::open(&path).unwrap());
+    let ready = Arc::new(Barrier::new(2));
+    let (reserved, registered) = std::thread::scope(|scope| {
+        let first_path = path.clone();
+        let first_ready = ready.clone();
+        let first = scope.spawn(move || {
+            let mut registry = Registry::open(&first_path).unwrap();
+            first_ready.wait();
+            registry
+                .reserve_protocol_ranges(
+                    "quotes",
+                    "EURUSD",
+                    "frozen-study",
+                    &[Interval {
+                        start_ms: 0,
+                        end_exclusive_ms: 1000,
+                    }],
+                )
+                .is_ok()
+        });
+        let second_path = path.clone();
+        let second_ready = ready.clone();
+        let second = scope.spawn(move || {
+            let mut registry = Registry::open(&second_path).unwrap();
+            second_ready.wait();
+            registry.register(&key()).is_ok()
+        });
+        (first.join().unwrap(), second.join().unwrap())
+    });
+    assert_ne!(reserved, registered);
+    let registry = Registry::open(&path).unwrap();
+    assert_eq!(registry.counts().unwrap().registered, i64::from(registered));
+    registry.integrity().unwrap();
+    drop(registry);
+    std::fs::remove_dir_all(dir).unwrap();
+}

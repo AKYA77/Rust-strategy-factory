@@ -297,6 +297,16 @@ pub fn execute(
     if stored != json {
         return Err("immutable scientific definition mismatch".into());
     }
+    registry.reserve_protocol_ranges(
+        &input.dataset.manifest.content_hash,
+        &input.dataset.profile.symbol,
+        &id,
+        &plan
+            .folds
+            .iter()
+            .map(|f| f.test.clone())
+            .collect::<Vec<_>>(),
+    )?;
     let mut candidates = Vec::new();
     for strategy in &plan.candidates {
         let mut experiments = Vec::new();
