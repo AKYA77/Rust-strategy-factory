@@ -32,7 +32,11 @@
     "chronological replay/evaluation windows with causal warmup and strict position/quote boundaries",
     "real autonomous input requires explicit training scope",
     "provenance-aware dataset identities with reimport-time reuse",
-    "compiled compute identity excluding embedded UI assets, with actual rebuild equivalence evidence"
+    "compiled compute identity excluding embedded UI assets, with actual rebuild equivalence evidence",
+    "immutable frozen chronological protocol execution with prior-training/OOS/final window receipts and restart reuse",
+    "instrument-scoped holdout protections for identical numeric histories on different markets",
+    "authenticated protocol evidence API and browser view",
+    "initial protective-stop executable-distance feasibility with regressions; engine v4"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -40,9 +44,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Implement immutable frozen scientific protocols and actual walk-forward/OOS/final evaluation orchestration with protected exposure and uncertainty/robustness evidence; then remaining full project queue.",
+  "next_action": "Implement statistical uncertainty/multiplicity and robustness evidence, corpus-wide exposure provenance and prerequisite-gated real final execution; then continue full implementation queue.",
   "qualified_strategies": 0,
-  "tests_passed": 71,
+  "tests_passed": 79,
   "benchmark": "docs/BENCHMARKS/2026-11-12-synthetic-replay.json",
   "browser_acceptance": "Chromium desktop/mobile against actual Rust HTTP server and SQLite; auth, CSRF/origin/host/body/rates, controls, receipts/export, restart/logout passed"
 }

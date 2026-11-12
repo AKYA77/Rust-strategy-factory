@@ -118,7 +118,7 @@ impl Registry {
         let version: i64 = connection
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .map_err(db_err)?;
-        if version > 3 {
+        if version > 5 {
             return Err("database schema newer than supported".into());
         }
         if version == 0 {
@@ -172,6 +172,23 @@ impl Registry {
             ); PRAGMA user_version=3;").map_err(db_err)?;
             tx.commit().map_err(db_err)?;
         }
+        if version < 4 {
+            connection.execute_batch("CREATE TABLE IF NOT EXISTS scientific_protocols (
+                id TEXT PRIMARY KEY, definition_json TEXT NOT NULL, definition_hash TEXT NOT NULL,
+                report_json TEXT, report_hash TEXT,
+                CHECK ((report_json IS NULL AND report_hash IS NULL) OR (report_json IS NOT NULL AND report_hash IS NOT NULL))
+            ); PRAGMA user_version=4;").map_err(db_err)?;
+        }
+        if version < 5 {
+            connection.execute_batch("CREATE TABLE IF NOT EXISTS instrument_holdouts (
+                dataset_hash TEXT NOT NULL, instrument TEXT NOT NULL, start_ms INTEGER NOT NULL,end_ms INTEGER NOT NULL,
+                protocol_hash TEXT NOT NULL,selected_json TEXT NOT NULL,PRIMARY KEY(dataset_hash,instrument)
+            );CREATE TABLE IF NOT EXISTS instrument_holdout_exposures (
+                dataset_hash TEXT NOT NULL,instrument TEXT NOT NULL,concept_hash TEXT NOT NULL,experiment_id TEXT NOT NULL REFERENCES experiments(id),
+                PRIMARY KEY(dataset_hash,instrument,concept_hash),UNIQUE(experiment_id),
+                FOREIGN KEY(dataset_hash,instrument) REFERENCES instrument_holdouts(dataset_hash,instrument)
+            );PRAGMA user_version=5;").map_err(db_err)?;
+        }
         Ok(Self { connection })
     }
     /// Freeze a final holdout and selected concepts before any recorded experiment touches it.
@@ -199,6 +216,18 @@ impl Registry {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(db_err)?;
+        let existing:Option<(i64,i64,String,String)>=tx.query_row("SELECT start_ms,end_ms,protocol_hash,selected_json FROM holdouts WHERE dataset_hash=?1",[dataset_hash],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).optional().map_err(db_err)?;
+        if let Some((start, end, protocol, json)) = existing {
+            let stored: Vec<String> = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+            if start == period.start_ms
+                && end == period.end_exclusive_ms
+                && protocol == protocol_hash
+                && stored == selection
+            {
+                return Ok(());
+            }
+            return Err("holdout definition is already immutable".into());
+        }
         {
             let mut query=tx.prepare("SELECT key_json FROM experiments WHERE json_extract(key_json,'$.dataset_hash')=?1").map_err(db_err)?;
             let rows = query
@@ -216,6 +245,72 @@ impl Registry {
         tx.execute("INSERT INTO holdouts(dataset_hash,start_ms,end_ms,protocol_hash,selected_json) VALUES (?1,?2,?3,?4,?5)",params![dataset_hash,period.start_ms,period.end_exclusive_ms,protocol_hash,serde_json::to_string(&selection).map_err(|e|e.to_string())?]).map_err(db_err)?;
         tx.commit().map_err(db_err)
     }
+    /// Instrument scope separates distinct markets even when their numeric fixture arrays match.
+    /// Legacy unscoped reservations remain conservative global protection and cannot be weakened.
+    pub fn reserve_instrument_holdout(
+        &mut self,
+        dataset_hash: &str,
+        instrument: &str,
+        period: &crate::validation::Interval,
+        protocol_hash: &str,
+        selected: &[String],
+    ) -> Result<()> {
+        period.validate()?;
+        let mut selection = selected.to_vec();
+        selection.sort();
+        selection.dedup();
+        if dataset_hash.is_empty()
+            || !SYMBOLS.contains(&instrument)
+            || protocol_hash.is_empty()
+            || selection.is_empty()
+            || selection.len() > 100
+            || selection.iter().any(|s| s.is_empty() || s.len() > 256)
+        {
+            return Err("invalid instrument holdout selection".into());
+        }
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(db_err)?;
+        let legacy: bool = tx
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM holdouts WHERE dataset_hash=?1)",
+                [dataset_hash],
+                |r| r.get(0),
+            )
+            .map_err(db_err)?;
+        if legacy {
+            return Err("legacy global holdout reservation cannot be narrowed".into());
+        }
+        let previous:Option<(i64,i64,String,String)>=tx.query_row("SELECT start_ms,end_ms,protocol_hash,selected_json FROM instrument_holdouts WHERE dataset_hash=?1 AND instrument=?2",params![dataset_hash,instrument],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).optional().map_err(db_err)?;
+        let json = serde_json::to_string(&selection).map_err(|e| e.to_string())?;
+        if let Some((start, end, protocol, stored)) = previous {
+            if start == period.start_ms
+                && end == period.end_exclusive_ms
+                && protocol == protocol_hash
+                && stored == json
+            {
+                return Ok(());
+            }
+            return Err("instrument holdout definition is already immutable".into());
+        }
+        {
+            let mut q=tx.prepare("SELECT key_json FROM experiments WHERE json_extract(key_json,'$.dataset_hash')=?1 AND json_extract(key_json,'$.instrument')=?2").map_err(db_err)?;
+            let rows = q
+                .query_map(params![dataset_hash, instrument], |r| r.get::<_, String>(0))
+                .map_err(db_err)?;
+            for row in rows {
+                let key: ExperimentKey =
+                    serde_json::from_str(&row.map_err(db_err)?).map_err(|e| e.to_string())?;
+                if key.start_ms < period.end_exclusive_ms && key.end_exclusive_ms > period.start_ms
+                {
+                    return Err("instrument holdout already exposed to registered research".into());
+                }
+            }
+        }
+        tx.execute("INSERT INTO instrument_holdouts(dataset_hash,instrument,start_ms,end_ms,protocol_hash,selected_json) VALUES (?1,?2,?3,?4,?5,?6)",params![dataset_hash,instrument,period.start_ms,period.end_exclusive_ms,protocol_hash,json]).map_err(db_err)?;
+        tx.commit().map_err(db_err)
+    }
     pub fn register(&mut self, key: &ExperimentKey) -> Result<String> {
         let id = key.identity()?;
         let json = serde_json::to_string(key).map_err(|e| e.to_string())?;
@@ -223,8 +318,9 @@ impl Registry {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(db_err)?;
-        let reservation:Option<(i64,i64,String,String)>=tx.query_row("SELECT start_ms,end_ms,protocol_hash,selected_json FROM holdouts WHERE dataset_hash=?1",[&key.dataset_hash],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).optional().map_err(db_err)?;
-        if let Some((start, end, protocol, selected_json)) = reservation {
+        let reservation:Option<(i64,i64,String,String,bool)>=tx.query_row("SELECT start_ms,end_ms,protocol_hash,selected_json,0 FROM holdouts WHERE dataset_hash=?1 UNION ALL SELECT start_ms,end_ms,protocol_hash,selected_json,1 FROM instrument_holdouts WHERE dataset_hash=?1 AND instrument=?2",params![key.dataset_hash,key.instrument],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?))).optional().map_err(db_err)?;
+        let instrument_scoped = reservation.as_ref().is_some_and(|r| r.4);
+        if let Some((start, end, protocol, selected_json, _)) = reservation {
             let touches = key.start_ms < end && key.end_exclusive_ms > start;
             if key.stage == Stage::IndependentValidation {
                 let selected: Vec<String> =
@@ -260,14 +356,22 @@ impl Registry {
             return Err("experiment identity collision".into());
         }
         if key.stage == Stage::IndependentValidation {
-            let exposed:Option<String>=tx.query_row("SELECT experiment_id FROM holdout_exposures WHERE dataset_hash=?1 AND concept_hash=?2",params![key.dataset_hash,key.concept_hash],|r|r.get(0)).optional().map_err(db_err)?;
+            let exposed: Option<String> = if instrument_scoped {
+                tx.query_row("SELECT experiment_id FROM instrument_holdout_exposures WHERE dataset_hash=?1 AND instrument=?2 AND concept_hash=?3",params![key.dataset_hash,key.instrument,key.concept_hash],|r|r.get(0)).optional().map_err(db_err)?
+            } else {
+                tx.query_row("SELECT experiment_id FROM holdout_exposures WHERE dataset_hash=?1 AND concept_hash=?2",params![key.dataset_hash,key.concept_hash],|r|r.get(0)).optional().map_err(db_err)?
+            };
             if exposed.is_some_and(|previous| previous != id) {
                 return Err(
                     "final holdout concept already reserved for a different immutable experiment"
                         .into(),
                 );
             }
-            tx.execute("INSERT OR IGNORE INTO holdout_exposures(dataset_hash,concept_hash,experiment_id) VALUES (?1,?2,?3)",params![key.dataset_hash,key.concept_hash,id]).map_err(db_err)?;
+            if instrument_scoped {
+                tx.execute("INSERT OR IGNORE INTO instrument_holdout_exposures(dataset_hash,instrument,concept_hash,experiment_id) VALUES (?1,?2,?3,?4)",params![key.dataset_hash,key.instrument,key.concept_hash,id]).map_err(db_err)?;
+            } else {
+                tx.execute("INSERT OR IGNORE INTO holdout_exposures(dataset_hash,concept_hash,experiment_id) VALUES (?1,?2,?3)",params![key.dataset_hash,key.concept_hash,id]).map_err(db_err)?;
+            }
         }
         tx.commit().map_err(db_err)?;
         Ok(id)
@@ -396,6 +500,28 @@ impl Registry {
                 return Err("stored experiment identity corrupted".into());
             }
             self.result(&id)?;
+        }
+        let mut protocols = self
+            .connection
+            .prepare("SELECT id,definition_json,definition_hash FROM scientific_protocols")
+            .map_err(db_err)?;
+        let rows = protocols
+            .query_map([], |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                ))
+            })
+            .map_err(db_err)?;
+        for row in rows {
+            let (id, json, expected) = row.map_err(db_err)?;
+            let definition: serde_json::Value =
+                serde_json::from_str(&json).map_err(|e| e.to_string())?;
+            if hash(&definition)? != expected || expected != id {
+                return Err("scientific definition integrity mismatch".into());
+            }
+            crate::science::read_report(self, &id)?;
         }
         Ok(())
     }

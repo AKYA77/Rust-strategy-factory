@@ -50,7 +50,7 @@ fn open(path: &std::path::Path) -> Driver {
         path,
         vec![input("EURUSD"), input("GBPUSD")],
         Config {
-            seed: 1,
+            seed: 10,
             ..Config::default()
         },
         "fixed-test-revision".into(),
@@ -111,7 +111,7 @@ fn completed_experiment_before_cursor_commit_is_reused_without_new_simulation() 
     let d = dir();
     let path = d.join("state.sqlite");
     let mut driver = open(&path);
-    let (_, s) = research::candidate_at(0, 1).unwrap();
+    let (_, s) = research::candidate_at(0, 10).unwrap();
     let completed = research::evaluate(
         &mut driver.registry,
         &input("EURUSD"),
@@ -239,7 +239,7 @@ fn state_pressure_pauses_before_new_experiment_and_preserves_cursor() {
 fn dataset_provenance_changes_identity_but_reimport_time_does_not() {
     let d = dir();
     let mut registry = Registry::open(&d.join("state.sqlite")).unwrap();
-    let (_, s) = research::candidate_at(0, 1).unwrap();
+    let (_, s) = research::candidate_at(0, 10).unwrap();
     let a = input("EURUSD");
     let first =
         research::evaluate(&mut registry, &a, &s, &Default::default(), "code", 100000).unwrap();

@@ -9,7 +9,7 @@ fn import_inspect_evaluate_and_overwrite_protection() {
     let dataset = dir.join("dataset.json");
     let strategy = dir.join("strategy.json");
     let result = dir.join("result.json");
-    fs::write(&csv,"timestamp_ms,sequence,bid,ask\n0,0,1.00000,1.00010\n60000,1,1.00020,1.00030\n120000,2,1.00040,1.00050\n120000,3,1.00050,1.00060\n121000,4,1.00200,1.00210\n").unwrap();
+    fs::write(&csv,"timestamp_ms,sequence,bid,ask\n0,0,1.00000,1.00010\n60000,1,1.00020,1.00030\n120000,2,1.00040,1.00050\n120000,3,1.00050,1.00060\n121000,4,1.00300,1.00310\n").unwrap();
     fs::write(
         &profile,
         serde_json::to_vec(&Profile::synthetic("EURUSD").unwrap()).unwrap(),
@@ -17,7 +17,7 @@ fn import_inspect_evaluate_and_overwrite_protection() {
     .unwrap();
     fs::write(
         &strategy,
-        r#"{"timeframe":"M1","side":"Long","stop_ticks":30,"rule":{"AboveMean":{"window":2}}}"#,
+        r#"{"timeframe":"M1","side":"Long","stop_ticks":50,"rule":{"AboveMean":{"window":2}}}"#,
     )
     .unwrap();
     let binary = env!("CARGO_BIN_EXE_rust-strategy-factory");
@@ -60,7 +60,7 @@ fn import_inspect_evaluate_and_overwrite_protection() {
     );
     let r: Replay = serde_json::from_slice(&fs::read(&result).unwrap()).unwrap();
     assert_eq!(r.trades.len(), 1);
-    assert_eq!(r.trades[0].net_micro_usd, 1_728_900);
+    assert_eq!(r.trades[0].net_micro_usd, 2_881_500);
     let registry = dir.join("registry.sqlite");
     let backup = dir.join("backup.sqlite");
     let args = [

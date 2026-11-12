@@ -124,7 +124,7 @@ fn evaluate_internal(
         signal_version: crate::SIGNAL_VERSION.into(),
         indicator_version: crate::INDICATOR_VERSION.into(),
         cost_hash: data::hash(costs)?,
-        fill_policy: "full-l1-assumption-target-at-limit-preflight-v2".into(),
+        fill_policy: "full-l1-assumption-target-at-limit-preflight-v3".into(),
         profile_hash: d.manifest.profile_hash.clone(),
         engine_version: crate::ENGINE_VERSION.into(),
         protocol_hash: match evaluation {
@@ -321,6 +321,31 @@ pub fn control(registry: &Registry, id: &str, state: &str) -> Result<()> {
     }
     Ok(())
 }
+/// Soft file/WAL backpressure with headroom for one bounded publication; evidence is never deleted.
+pub fn check_state_budget(registry: &Registry, max_bytes: u64) -> Result<()> {
+    if !(32 * 1024 * 1024..=8 * 1024 * 1024 * 1024).contains(&max_bytes) {
+        return Err("invalid state file budget".into());
+    }
+    let path = registry
+        .connection
+        .path()
+        .filter(|s| !s.is_empty())
+        .ok_or("durable evidence requires a file-backed registry")?;
+    let mut bytes = 0_u64;
+    for suffix in ["", "-wal", "-shm"] {
+        let mut file = std::ffi::OsString::from(path);
+        file.push(suffix);
+        match std::fs::metadata(std::path::PathBuf::from(file)) {
+            Ok(m) => bytes = bytes.checked_add(m.len()).ok_or("state byte overflow")?,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    if bytes.saturating_add(16 * 1024 * 1024) > max_bytes {
+        return Err("state file budget requires operator action".into());
+    }
+    Ok(())
+}
 pub struct Driver {
     pub registry: Registry,
     pub id: String,
@@ -328,7 +353,6 @@ pub struct Driver {
     config: Config,
     revision: String,
     token: Option<String>,
-    database_path: std::path::PathBuf,
 }
 impl Driver {
     pub fn open(path: &Path, inputs: Vec<Input>, config: Config, revision: String) -> Result<Self> {
@@ -413,7 +437,6 @@ impl Driver {
             config,
             revision,
             token: None,
-            database_path: path.to_path_buf(),
         })
     }
     pub fn acquire(&mut self, now: i64) -> Result<()> {
@@ -463,26 +486,10 @@ impl Driver {
         if s.state != "running" {
             return Ok(false);
         }
-        let mut state_bytes = 0_u64;
-        for suffix in ["", "-wal", "-shm"] {
-            let mut path = self.database_path.as_os_str().to_os_string();
-            path.push(suffix);
-            match std::fs::metadata(std::path::PathBuf::from(path)) {
-                Ok(metadata) => {
-                    state_bytes = state_bytes
-                        .checked_add(metadata.len())
-                        .ok_or("state byte count overflow")?
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                Err(e) => return Err(e.to_string()),
-            }
-        }
-        // Reserve headroom for one bounded result and WAL publication. Never delete evidence.
-        if state_bytes.saturating_add(16 * 1024 * 1024) > self.config.state_budget_bytes {
-            self.registry.connection.execute("UPDATE research_runs SET state='paused',active=0,last_error='state file budget requires operator action' WHERE id=?1 AND token=?2",params![self.id,token]).map_err(|e|e.to_string())?;
+        if let Err(error) = check_state_budget(&self.registry, self.config.state_budget_bytes) {
+            self.registry.connection.execute("UPDATE research_runs SET state='paused',active=0,last_error=?3 WHERE id=?1 AND token=?2",params![self.id,token,error]).map_err(|e|e.to_string())?;
             return Ok(false);
         }
-
         if s.cursor >= limit {
             control(&self.registry, &self.id, "stopped")?;
             return Ok(false);

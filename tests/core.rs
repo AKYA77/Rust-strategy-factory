@@ -36,7 +36,7 @@ fn strategy(side: Side) -> Strategy {
         timeframe: Timeframe::M1,
         side,
         entry: None,
-        stop_ticks: 30,
+        stop_ticks: 50,
         rule: Rule::AboveMean { window: 2 },
     }
 }
@@ -114,7 +114,7 @@ fn conversion_never_uses_future_or_stale_quotes() {
 }
 #[test]
 fn quarantine_preserves_bad_events_and_timestamp_ties() {
-    let d = sample(100200, 100210, 121000);
+    let d = sample(100300, 100310, 121000);
     assert_eq!(d.manifest.timestamp_ties, 1);
     d.verify().unwrap();
     let mut ticks = d.ticks.clone();
@@ -137,7 +137,7 @@ fn quarantine_preserves_bad_events_and_timestamp_ties() {
 }
 #[test]
 fn candles_are_closed_causal_and_never_fill_gaps() {
-    let d = sample(100200, 100210, 121000);
+    let d = sample(100300, 100310, 121000);
     let c = candles::build(&d, Timeframe::M1).unwrap();
     assert_eq!(c.len(), 2);
     assert_eq!(c[0].bid.close, 100000);
@@ -196,7 +196,7 @@ fn canonical_identity_and_bounded_shared_features() {
     let identities: std::collections::BTreeSet<_> =
         grid.iter().map(|s| s.identity().unwrap()).collect();
     assert_eq!(grid.len(), identities.len());
-    let c = candles::build(&sample(100200, 100210, 121000), Timeframe::M1).unwrap();
+    let c = candles::build(&sample(100300, 100310, 121000), Timeframe::M1).unwrap();
     assert!(Features::new(&c, 1).is_err());
     let mut f = Features::new(&c, 2).unwrap();
     assert!(f.signal(&Rule::AboveMean { window: 2 }).is_err());
@@ -221,18 +221,18 @@ fn spread_floor_never_improves_prices_and_wider_spread_remains() {
 }
 #[test]
 fn long_target_uses_subsequent_tied_event_and_no_limit_slippage() {
-    let r = run(&sample(100200, 100210, 121000), Side::Long);
+    let r = run(&sample(100300, 100310, 121000), Side::Long);
     assert_eq!(r.trades.len(), 1);
     let t = &r.trades[0];
     assert_eq!((t.entry_event, t.exit_event), (3, 4));
     assert_eq!(
         (t.entry, t.stop, t.target, t.exit),
-        (100090, 100060, 100180, 100180)
+        (100090, 100040, 100240, 100240)
     );
     assert_eq!(t.reason, ExitReason::TargetLimit);
     assert_eq!(t.volume_micro_lots, 19210);
-    assert_eq!(t.net_micro_usd, 1_728_900);
-    assert_eq!(r.realized_micro_usd, 21_728_900);
+    assert_eq!(t.net_micro_usd, 2_881_500);
+    assert_eq!(r.realized_micro_usd, 22_881_500);
     assert!(r.unresolved.is_none());
 }
 #[test]
@@ -247,11 +247,11 @@ fn gap_stop_losses_are_not_capped_to_ten_percent() {
 }
 #[test]
 fn short_uses_ask_for_exit_and_adverse_sell_slippage() {
-    let r = run(&sample(99900, 99930, 121000), Side::Short);
+    let r = run(&sample(99800, 99830, 121000), Side::Short);
     let t = &r.trades[0];
     assert_eq!(
         (t.entry, t.stop, t.target, t.exit),
-        (100030, 100060, 99940, 99940)
+        (100030, 100080, 99880, 99880)
     );
     assert_eq!(t.reason, ExitReason::TargetLimit);
     let r = run(&sample(100100, 100150, 121000), Side::Short);
@@ -263,15 +263,15 @@ fn deadline_requires_a_real_subsequent_event_and_unresolved_stays_open() {
     assert!(r.unresolved.is_some());
     assert!(r.trades.is_empty());
     let r = run(
-        &sample(100200, 100210, 120000 + contracts::MAX_HOLD_MS),
+        &sample(100300, 100310, 120000 + contracts::MAX_HOLD_MS),
         Side::Long,
     );
     assert_eq!(r.trades[0].reason, ExitReason::DeadlineMarket);
-    assert_eq!(r.trades[0].exit, 100180);
+    assert_eq!(r.trades[0].exit, 100280);
 }
 #[test]
 fn replay_rejects_candle_and_signal_tampering() {
-    let d = sample(100200, 100210, 121000);
+    let d = sample(100300, 100310, 121000);
     let s = strategy(Side::Long);
     let mut c = candles::build(&d, s.timeframe).unwrap();
     let m = Features::new(&c, 100).unwrap().signal(&s.rule).unwrap();
@@ -320,5 +320,31 @@ fn uncapped_extreme_losses_remain_exact_in_public_json_receipts() {
     assert_eq!(
         serde_json::from_value::<i128>(value["realized_micro_usd"].clone()).unwrap(),
         r.realized_micro_usd
+    );
+}
+
+#[test]
+fn an_already_crossed_initial_stop_cannot_later_be_counted_as_a_target() {
+    let d = sample(100300, 100310, 121000);
+    let mut s = strategy(Side::Long);
+    s.stop_ticks = 30;
+    let c = candles::build(&d, s.timeframe).unwrap();
+    let mask = Features::new(&c, 1000).unwrap().signal(&s.rule).unwrap();
+    let r = tick_engine::replay(
+        &d,
+        &c,
+        &mask,
+        &s,
+        &Costs::default(),
+        &vec![Conversion::usd(); d.ticks.len()],
+    )
+    .unwrap();
+    assert!(r.trades.is_empty());
+    assert!(r.unresolved.is_none());
+    assert_eq!(r.realized_micro_usd, 20_000_000);
+    assert!(
+        r.rejections
+            .iter()
+            .any(|r| r.reason.contains("protective stop"))
     );
 }

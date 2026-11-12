@@ -29,7 +29,7 @@ impl Default for Costs {
     }
 }
 impl Costs {
-    fn validate(&self) -> Result<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         if self.version != "bid-anchored-floor-v1"
             || self.spread_floor_pips < 2
             || self.slippage_pips < 2

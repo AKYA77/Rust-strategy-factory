@@ -37,8 +37,8 @@ fn input(extra: bool) -> Input {
         Tick {
             timestamp_ms: 121000,
             sequence: 4,
-            bid: 100200,
-            ask: 100210,
+            bid: 100300,
+            ask: 100310,
         },
     ];
     if extra {
@@ -66,7 +66,7 @@ fn strategy() -> Strategy {
     Strategy {
         timeframe: Timeframe::M1,
         side: Side::Long,
-        stop_ticks: 30,
+        stop_ticks: 50,
         rule: Rule::AboveMean { window: 2 },
         entry: None,
     }

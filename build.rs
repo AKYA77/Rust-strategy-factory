@@ -19,6 +19,7 @@ fn main() {
         "src/tick_engine.rs",
         "src/screen.rs",
         "src/validation.rs",
+        "src/science.rs",
         "src/research.rs",
         "src/storage.rs",
     ] {

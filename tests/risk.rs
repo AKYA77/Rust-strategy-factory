@@ -9,7 +9,7 @@ fn request() -> Request {
         entry: 100090,
         mark: 100050,
         side: Side::Long,
-        stop_with_exit_slip: 50,
+        stop_with_exit_slip: 70,
         conversion: Conversion::usd(),
     }
 }
@@ -65,4 +65,17 @@ fn gold_and_jpy_margin_use_distinct_contract_scales_and_conversion() {
     };
     assert_eq!(risk::margin(&jpy, 150000, 10000, fx).unwrap(), 10_000_000);
     assert!(risk::margin(&jpy, 150000, 10000, Conversion { quote_den: 0, ..fx }).is_err());
+}
+
+#[test]
+fn protective_distance_is_measured_from_executable_mark_including_minimum_grid() {
+    let p = Profile::synthetic("EURUSD").unwrap();
+    let mut r = request();
+    r.stop_with_exit_slip = 60;
+    assert!(risk::reserve(&p, &Costs::default(), r, 1000).is_err());
+    r.stop_with_exit_slip = 61;
+    assert!(risk::reserve(&p, &Costs::default(), r, 1000).is_ok());
+    let mut stricter = p;
+    stricter.min_stop_ticks = 11;
+    assert!(risk::reserve(&stricter, &Costs::default(), r, 1000).is_err());
 }

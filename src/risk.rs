@@ -47,6 +47,7 @@ pub struct Request {
 }
 pub fn reserve(p: &Profile, costs: &Costs, r: Request, volume: i64) -> Result<Reservation> {
     p.validate()?;
+    costs.validate()?;
     if r.equity <= 0
         || r.entry <= 0
         || r.mark <= 0
@@ -65,6 +66,29 @@ pub fn reserve(p: &Profile, costs: &Costs, r: Request, volume: i64) -> Result<Re
         .ok_or("mark overflow")?;
     if delta > 0 {
         return Err("initial executable mark cannot create a favorable entry profit".into());
+    }
+    let raw_stop = r
+        .stop_with_exit_slip
+        .checked_sub(
+            costs
+                .slippage_pips
+                .checked_mul(p.pip)
+                .ok_or("slippage overflow")?,
+        )
+        .ok_or("stop distance overflow")?;
+    let minimum = p
+        .min_stop_ticks
+        .max(1)
+        .checked_mul(p.tick)
+        .ok_or("minimum stop distance overflow")?;
+    let from_executable = raw_stop
+        .checked_add(delta)
+        .ok_or("protective distance overflow")?;
+    if from_executable < minimum {
+        return Err(
+            "initial protective stop is crossed or violates executable-side minimum distance"
+                .into(),
+        );
     }
     let fee = costs.commission(volume);
     let loss = contracts::pnl(p, -r.stop_with_exit_slip, volume, r.conversion)?
@@ -90,6 +114,8 @@ pub fn reserve(p: &Profile, costs: &Costs, r: Request, volume: i64) -> Result<Re
 }
 /// Monotone integer search accounts for fee rounding, post-fill equity and volume steps.
 pub fn size(p: &Profile, costs: &Costs, r: Request) -> Result<Reservation> {
+    costs.validate()?;
+    reserve(p, costs, r, p.min_micro_lots)?;
     let upper = contracts::size(p, r.equity, r.entry, r.stop_with_exit_slip, r.conversion)?;
     let (mut low, mut high) = (
         p.min_micro_lots / p.step_micro_lots - 1,

@@ -31,7 +31,7 @@ fn run(tail: Vec<Tick>, side: Side, entry: EntryPlan) -> tick_engine::Replay {
     let s = Strategy {
         timeframe: Timeframe::M1,
         side,
-        stop_ticks: 30,
+        stop_ticks: 50,
         rule: Rule::AboveMean { window: 2 },
         entry: Some(entry),
     };
@@ -64,7 +64,7 @@ fn limit() -> EntryPlan {
 #[test]
 fn long_pending_stop_reserves_at_publication_then_trades_with_3r_accounting() {
     let r = run(
-        vec![t(120000, 3, 100070, 100080), t(121000, 4, 100250, 100260)],
+        vec![t(120000, 3, 100070, 100080), t(121000, 4, 100350, 100360)],
         Side::Long,
         stop(),
     );
@@ -78,7 +78,7 @@ fn long_pending_stop_reserves_at_publication_then_trades_with_3r_accounting() {
             trade.target,
             trade.exit
         ),
-        (3, 100110, 100080, 100200, 100200)
+        (3, 100110, 100060, 100260, 100260)
     );
     assert_eq!(trade.reason, ExitReason::TargetLimit);
     let statuses: Vec<_> = r.entry_receipts.iter().map(|r| r.status.clone()).collect();
@@ -100,7 +100,7 @@ fn pending_limit_uses_observed_quote_without_entry_slippage() {
     );
     assert_eq!(r.trades.len(), 1);
     assert_eq!(r.trades[0].entry, 100020);
-    assert_eq!(r.trades[0].exit, 100110);
+    assert_eq!(r.trades[0].exit, 100170);
     assert_eq!(r.trades[0].reason, ExitReason::TargetLimit);
 }
 #[test]
@@ -112,14 +112,14 @@ fn short_stop_and_limit_use_bid_entry_ask_exit() {
     );
     assert_eq!(
         (r.trades[0].entry, r.trades[0].target, r.trades[0].exit),
-        (99990, 99900, 99900)
+        (99990, 99840, 99840)
     );
     let r = run(
         vec![t(120001, 3, 100080, 100090), t(120002, 4, 99800, 99810)],
         Side::Short,
         limit(),
     );
-    assert_eq!((r.trades[0].entry, r.trades[0].exit), (100080, 99990));
+    assert_eq!((r.trades[0].entry, r.trades[0].exit), (100080, 99930));
 }
 #[test]
 fn no_quote_does_not_fill_and_deadline_precedes_trigger() {

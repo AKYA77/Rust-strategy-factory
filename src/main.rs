@@ -69,7 +69,7 @@ struct InputFile {
     dataset: String,
     conversions: Option<String>,
 }
-fn research_driver(config_path: &str, database: &str) -> Result<research::Driver> {
+fn research_inputs(config_path: &str) -> Result<(Vec<research::Input>, research::Config)> {
     let config: ResearchFile = read_json(config_path)?;
     if config.inputs.is_empty() || config.inputs.len() > 8 {
         return Err("one to eight input datasets required".into());
@@ -111,10 +111,14 @@ fn research_driver(config_path: &str, database: &str) -> Result<research::Driver
             conversions,
         });
     }
+    Ok((inputs, config.limits))
+}
+fn research_driver(config_path: &str, database: &str) -> Result<research::Driver> {
+    let (inputs, limits) = research_inputs(config_path)?;
     research::Driver::open(
         Path::new(database),
         inputs,
-        config.limits,
+        limits,
         research::compute_revision()?,
     )
 }
@@ -125,6 +129,36 @@ fn run(args: &[String]) -> Result<()> {
         .collect::<Vec<_>>()
         .as_slice()
     {
+        ["validate-protocol", inputs, plan, database] => {
+            let (inputs, limits) = research_inputs(inputs)?;
+            if inputs.len() != 1 {
+                return Err(
+                    "each scientific protocol requires exactly one instrument dataset".into(),
+                );
+            }
+            let plan: rust_strategy_factory::science::Plan = read_json(plan)?;
+            let mut registry = Registry::open(Path::new(database))?;
+            print(&rust_strategy_factory::science::execute(
+                &mut registry,
+                &inputs[0],
+                &plan,
+                &research::compute_revision()?,
+                &rust_strategy_factory::science::Budget {
+                    feature_cells: limits.feature_cells,
+                    state_bytes: limits.state_budget_bytes,
+                },
+            )?)
+        }
+        ["protocol-report", database, id] => {
+            if !Path::new(database).is_file() {
+                return Err("registry does not exist".into());
+            }
+            let registry = Registry::open(Path::new(database))?;
+            print(
+                &rust_strategy_factory::science::read_report(&registry, id)?
+                    .ok_or("scientific report not completed")?,
+            )
+        }
         ["version"] => print(
             &serde_json::json!({"package":env!("CARGO_PKG_VERSION"),"engine":rust_strategy_factory::ENGINE_VERSION,"indicators":rust_strategy_factory::INDICATOR_VERSION,"signals":rust_strategy_factory::SIGNAL_VERSION,"compute_revision":research::compute_revision()?,"software_status":"SOFTWARE_INCOMPLETE"}),
         ),
@@ -294,7 +328,7 @@ fn run(args: &[String]) -> Result<()> {
         }
         [] | ["--help"] | ["help"] => {
             println!(
-                "Rust Strategy Factory — historical research only; SOFTWARE_INCOMPLETE\n\nauth-init <new-auth.json> (password from stdin)\nserve <registry.sqlite> <auth.json> <port>\nprofiles\nfixture <symbol> <new-dataset.json>\ngenerate\nimport <normalized.csv> <profile.json> <source-url-or-description> <new-dataset.json> <real|synthetic>\ninspect <dataset.json>\ncandles <dataset.json> <M1|M5|M15|M30|H1|H4|D1>\nevaluate <dataset.json> <strategy.json> <new-result.json>\nexperiment <dataset.json> <strategy.json> <registry.sqlite>\nregistry-check <registry.sqlite>\nbackup <registry.sqlite> <new-backup.sqlite>\nresearch <config.json> <registry.sqlite> [max-steps]\nresearch-status <registry.sqlite> <run-id>\nresearch-control <registry.sqlite> <run-id> <running|paused|stopped>\n\nSynthetic profiles do not establish broker feasibility. No strategy qualification is implemented."
+                "Rust Strategy Factory — historical research only; SOFTWARE_INCOMPLETE\n\nvalidate-protocol <input-config.json> <plan.json> <registry.sqlite>\nprotocol-report <registry.sqlite> <protocol-id>\nauth-init <new-auth.json> (password from stdin)\nserve <registry.sqlite> <auth.json> <port>\nprofiles\nfixture <symbol> <new-dataset.json>\ngenerate\nimport <normalized.csv> <profile.json> <source-url-or-description> <new-dataset.json> <real|synthetic>\ninspect <dataset.json>\ncandles <dataset.json> <M1|M5|M15|M30|H1|H4|D1>\nevaluate <dataset.json> <strategy.json> <new-result.json>\nexperiment <dataset.json> <strategy.json> <registry.sqlite>\nregistry-check <registry.sqlite>\nbackup <registry.sqlite> <new-backup.sqlite>\nresearch <config.json> <registry.sqlite> [max-steps]\nresearch-status <registry.sqlite> <run-id>\nresearch-control <registry.sqlite> <run-id> <running|paused|stopped>\n\nSynthetic profiles do not establish broker feasibility. No strategy qualification is implemented."
             );
             Ok(())
         }

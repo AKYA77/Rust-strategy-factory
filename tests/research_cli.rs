@@ -46,7 +46,7 @@ fn independent_rust_process_runs_pauses_resumes_and_stops_at_durable_checkpoints
     )
     .unwrap();
     fs::write(&dataset, serde_json::to_vec(&data).unwrap()).unwrap();
-    fs::write(&config,serde_json::to_vec(&serde_json::json!({"limits":{"seed":1,"lease_ms":5000,"max_regions":10000,"feature_cells":100000},"inputs":[{"dataset":"data.json"}]})).unwrap()).unwrap();
+    fs::write(&config,serde_json::to_vec(&serde_json::json!({"limits":{"seed":10,"lease_ms":5000,"max_regions":10000,"feature_cells":100000},"inputs":[{"dataset":"data.json"}]})).unwrap()).unwrap();
     let binary = env!("CARGO_BIN_EXE_rust-strategy-factory");
     let child = Command::new(binary)
         .args(["research", config.to_str().unwrap(), db.to_str().unwrap()])

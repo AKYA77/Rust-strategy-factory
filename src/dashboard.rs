@@ -314,6 +314,9 @@ async fn detail(State(app): State<Arc<App>>, Param(id): Param<String>) -> Respon
     match registry.result(&id) {
         Ok(Some(v)) => {
             let assessment = (|| -> Result<crate::validation::Assessment> {
+                if v.result["tick_replay"]["version"].as_str() != Some(crate::ENGINE_VERSION) {
+                    return Err("engine version requires fresh verification".into());
+                }
                 let cutoff = match v.result["tick_replay"]["evaluation_window"]["end_exclusive_ms"]
                     .as_i64()
                 {
@@ -338,6 +341,38 @@ async fn detail(State(app): State<Arc<App>>, Param(id): Param<String>) -> Respon
         Err(_) => api_error(
             StatusCode::INTERNAL_SERVER_ERROR,
             "result integrity check failed",
+        ),
+    }
+}
+async fn protocols(State(app): State<Arc<App>>) -> Response {
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    let load = || -> Result<Vec<serde_json::Value>> {
+        let mut query=registry.connection.prepare("SELECT id,report_json IS NOT NULL FROM scientific_protocols ORDER BY rowid DESC LIMIT 100").map_err(|e|e.to_string())?;
+        query.query_map([],|r|Ok(serde_json::json!({"id":r.get::<_,String>(0)?,"report_ready":r.get::<_,bool>(1)?}))).map_err(|e|e.to_string())?.map(|r|r.map_err(|e|e.to_string())).collect()
+    };
+    match load() {
+        Ok(v) => Json(v).into_response(),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "unable to read protocol records",
+        ),
+    }
+}
+async fn protocol_detail(State(app): State<Arc<App>>, Param(id): Param<String>) -> Response {
+    if id.len() != 64 || !id.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid protocol identity");
+    }
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match crate::science::read_report(&registry, &id) {
+        Ok(Some(r)) => Json(r).into_response(),
+        Ok(None) => api_error(StatusCode::NOT_FOUND, "protocol report is not complete"),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "scientific report integrity failure",
         ),
     }
 }
@@ -426,6 +461,8 @@ pub async fn serve(database: &Path, auth_path: &Path, port: u16) -> Result<()> {
         .route("/api/logout", post(logout))
         .route("/api/overview", get(overview))
         .route("/api/experiments", get(experiments))
+        .route("/api/protocols", get(protocols))
+        .route("/api/protocols/{id}", get(protocol_detail))
         .route("/api/experiments/{id}", get(detail))
         .route("/api/runs/{id}/control", post(control))
         .layer(DefaultBodyLimit::max(8192))
