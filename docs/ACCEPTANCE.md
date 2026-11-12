@@ -98,3 +98,7 @@ Protocol results always remain INSUFFICIENT_EVIDENCE. Fold accounts reset indepe
 ## Fixed causal regime bins
 
 93 Rust tests pass with formatting/Clippy, release build and Chromium acceptance. Frozen protocol v5 includes a fixed prior-21-closed-M1 trend/range recipe. One bounded streaming publication-summary classifier is shared across candidates. Strict entry-event exclusion and unknown warmup/gap/stale labels prevent hindsight or gap repair. Two tests verify prefix/entry-quote invariance, ties, stale context, gap reset/recovery and expanded/downward labels. Actual OOS regime counts reconcile with pooled receipts. These bins remain descriptive, with comprehensive regimes, sufficient independent samples, prespecified acceptance and approved calendars/coverage unfinished. No qualification claim.
+
+## Initial external source review
+
+Selected manifests/licenses/implementation files from Tickforge, Wickra and LZ4 Flex were actually retrieved at exact Git revisions. File hashes and sizes are retained in SOURCE_REVIEW/2026-11-12-initial.json; SOURCE_REUSE_MATRIX.md records concrete semantic/dependency observations and deferred decisions. No source implementation copied, runtime dependency added, upstream benchmark adopted or real-data performance claim made. The remaining requested frameworks/codecs are explicitly unreviewed. The unchanged application still passes all 93 Rust tests and required formatting/Clippy; its last release/browser acceptance passed at the causal-regime milestone.

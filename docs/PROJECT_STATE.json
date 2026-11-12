@@ -42,7 +42,8 @@
     "transactional immutable OOS interval reservations across protocols and dataset aliases, with concurrent race and rollback tests",
     "preregistered OOS sequential cost stress and bounded stop-neighborhood probes with immutable identities and trial-budget accounting",
     "exact OOS exit-year and UTC entry-session breakdowns with reset-fold realized cash drawdown and overflow-safe diagnostic updates",
-    "fixed prior-only closed-M1 trend/range regime bins with gap/warmup/stale labels, shared publication summaries and prefix invariance"
+    "fixed prior-only closed-M1 trend/range regime bins with gap/warmup/stale labels, shared publication summaries and prefix invariance",
+    "revision-pinned selected-source/license review for Tickforge, Wickra and LZ4 Flex with reproducible file hash receipts; no copied code or dependency adoption"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",

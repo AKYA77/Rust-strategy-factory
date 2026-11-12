@@ -1,0 +1,148 @@
+{
+  "date": "2026-11-12",
+  "scope": "Selected manifest/license/implementation review; not a whole-project security audit or performance evaluation",
+  "projects": [
+    {
+      "repository": "https://github.com/PSeitz/lz4_flex",
+      "revision": "0c027fd21e7e3545c5b409f11699ac0c6a680111",
+      "tracked_file_count": 65,
+      "reviewed_files": [
+        {
+          "path": "Cargo.toml",
+          "bytes": 2039,
+          "sha256": "1ffa2af9d8ee8bf7649677a43f900cf24d21b99a9908217e889c16220263e730",
+          "git_blob_id": "bd37fcf769a9ad1caf7ffb2b63b8e42a0ee5cd8a",
+          "url": "https://github.com/PSeitz/lz4_flex/blob/0c027fd21e7e3545c5b409f11699ac0c6a680111/Cargo.toml"
+        },
+        {
+          "path": "LICENSE",
+          "bytes": 1079,
+          "sha256": "0982c33390159842ecce8e9d6ce2e5e39961fe0e0ffbb2eec39c9ba46db6db10",
+          "git_blob_id": "0037a72c88ca37e45accec2a6fedb3e566adbbcc",
+          "url": "https://github.com/PSeitz/lz4_flex/blob/0c027fd21e7e3545c5b409f11699ac0c6a680111/LICENSE"
+        },
+        {
+          "path": "README.md",
+          "bytes": 5757,
+          "sha256": "4c120037041b2f48f3d9144f361c487c9e9bec276a7c19c24806d1f1efad9162",
+          "git_blob_id": "d74cdff584b2f814b6bad58852b55ec8b1aec1dc",
+          "url": "https://github.com/PSeitz/lz4_flex/blob/0c027fd21e7e3545c5b409f11699ac0c6a680111/README.md"
+        },
+        {
+          "path": "src/block/decompress_safe.rs",
+          "bytes": 18508,
+          "sha256": "facc4a7effe7d234e1ce0179423a25668ad048afe7af7961a83cb9c19baa703e",
+          "git_blob_id": "7c7835120f32f29dcd8be699f8ccd8c029bd137e",
+          "url": "https://github.com/PSeitz/lz4_flex/blob/0c027fd21e7e3545c5b409f11699ac0c6a680111/src/block/decompress_safe.rs"
+        },
+        {
+          "path": "src/lib.rs",
+          "bytes": 5390,
+          "sha256": "cfc6db6cf6dfecb2366e0d92f9e9748e61b855d0c08e87989771c638d9036553",
+          "git_blob_id": "82536ffde7b192b120598bd57aa20c28c0c00a9f",
+          "url": "https://github.com/PSeitz/lz4_flex/blob/0c027fd21e7e3545c5b409f11699ac0c6a680111/src/lib.rs"
+        }
+      ],
+      "code_copied": false,
+      "dependency_added": false,
+      "measurements_performed": false
+    },
+    {
+      "repository": "https://github.com/wickra-lib/wickra",
+      "revision": "306682227863d4af961116bb11f5c2d6c886f0d1",
+      "tracked_file_count": 2696,
+      "reviewed_files": [
+        {
+          "path": "Cargo.toml",
+          "bytes": 2552,
+          "sha256": "54b1221cba89270aa0fd08c047e7d1948efbf8b8a56262149999800d80b4b9e1",
+          "git_blob_id": "5d5e9af493bf76a860830cd6721c039cdd8f567e",
+          "url": "https://github.com/wickra-lib/wickra/blob/306682227863d4af961116bb11f5c2d6c886f0d1/Cargo.toml"
+        },
+        {
+          "path": "LICENSE-MIT",
+          "bytes": 1094,
+          "sha256": "3f4fc9646acaa2bd3d02ea361d215f21362631179541f4aca51ffedcdfb94616",
+          "git_blob_id": "ab12f88eca783ed4c9cfb7ac1062c31bdd916ff5",
+          "url": "https://github.com/wickra-lib/wickra/blob/306682227863d4af961116bb11f5c2d6c886f0d1/LICENSE-MIT"
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "bytes": 11367,
+          "sha256": "ad30b9831d715f2d1cf6bed4a481c20ccc7f41c5ba21255192301383e69f892f",
+          "git_blob_id": "83e0646f9163220b71d7cd5f956d2543eee3a309",
+          "url": "https://github.com/wickra-lib/wickra/blob/306682227863d4af961116bb11f5c2d6c886f0d1/LICENSE-APACHE"
+        },
+        {
+          "path": "crates/wickra-core/Cargo.toml",
+          "bytes": 889,
+          "sha256": "89054e5b1cc7d90fd69c441b12c86e6b0adb99668d9c4cfa1a51b5a7cb5f2687",
+          "git_blob_id": "60d5a5eef5f39005f98dbe1bfb72c6fbeab998a0",
+          "url": "https://github.com/wickra-lib/wickra/blob/306682227863d4af961116bb11f5c2d6c886f0d1/crates/wickra-core/Cargo.toml"
+        },
+        {
+          "path": "crates/wickra/Cargo.toml",
+          "bytes": 1578,
+          "sha256": "481f0fad6a7d5fdc57597702a7982b894848abfa90dc5e087c41fe5f8a570e18",
+          "git_blob_id": "4671d410b411e3d604a93a3daf413a85a4491714",
+          "url": "https://github.com/wickra-lib/wickra/blob/306682227863d4af961116bb11f5c2d6c886f0d1/crates/wickra/Cargo.toml"
+        },
+        {
+          "path": "crates/wickra-core/src/indicators/rsi.rs",
+          "bytes": 24358,
+          "sha256": "57f1ab5b6c713825171e045b6411fdc158e46f74bf7e14f2b6dc02f7d91bc713",
+          "git_blob_id": "fed4eb9636de42ef1a153d00248fc0011b0f8fa1",
+          "url": "https://github.com/wickra-lib/wickra/blob/306682227863d4af961116bb11f5c2d6c886f0d1/crates/wickra-core/src/indicators/rsi.rs"
+        },
+        {
+          "path": "crates/wickra-core/src/indicators/ema.rs",
+          "bytes": 22978,
+          "sha256": "5b01c96b5ccb671b222091369b1828a2c0c4cf1f64817dcc1a8f274961459635",
+          "git_blob_id": "b72454ef643dc39fe713647c5b1e8eb4914be7e0",
+          "url": "https://github.com/wickra-lib/wickra/blob/306682227863d4af961116bb11f5c2d6c886f0d1/crates/wickra-core/src/indicators/ema.rs"
+        }
+      ],
+      "code_copied": false,
+      "dependency_added": false,
+      "measurements_performed": false
+    },
+    {
+      "repository": "https://github.com/KE-NETIZEN-OOPS/tickforge",
+      "revision": "550b539c92294cd32dd852d0b332c35f01e1228f",
+      "tracked_file_count": 17,
+      "reviewed_files": [
+        {
+          "path": "Cargo.toml",
+          "bytes": 589,
+          "sha256": "f13628c7bf697c1626ddabd9be1385a84d3c6b189b54d1a4fe7e3f79b7582e17",
+          "git_blob_id": "a8f3c28ddb30ed49726556de759c433c7fbb63fe",
+          "url": "https://github.com/KE-NETIZEN-OOPS/tickforge/blob/550b539c92294cd32dd852d0b332c35f01e1228f/Cargo.toml"
+        },
+        {
+          "path": "LICENSE",
+          "bytes": 1067,
+          "sha256": "0920b395d0e710bdc1c89811d6084c5e784cf3c7194516df85bd1ec53bb6d16a",
+          "git_blob_id": "2b25b032ddb04c58b0a3ab498edd85ea0b36dcce",
+          "url": "https://github.com/KE-NETIZEN-OOPS/tickforge/blob/550b539c92294cd32dd852d0b332c35f01e1228f/LICENSE"
+        },
+        {
+          "path": "src/engine.rs",
+          "bytes": 8717,
+          "sha256": "73280a37cae1304c29f3987f8b0a6993dba0f29845834c62d805200eb9b2eb19",
+          "git_blob_id": "06fdb54efd09c9b922c289822f8c1320417aafe1",
+          "url": "https://github.com/KE-NETIZEN-OOPS/tickforge/blob/550b539c92294cd32dd852d0b332c35f01e1228f/src/engine.rs"
+        },
+        {
+          "path": "src/costs.rs",
+          "bytes": 3939,
+          "sha256": "05cf37161656f7ef0b17d45d1d67e124155171d5da6ad8a5364e0ef916d1b4a9",
+          "git_blob_id": "3d51dda5b13eab148b572924a5fbc994ff312239",
+          "url": "https://github.com/KE-NETIZEN-OOPS/tickforge/blob/550b539c92294cd32dd852d0b332c35f01e1228f/src/costs.rs"
+        }
+      ],
+      "code_copied": false,
+      "dependency_added": false,
+      "measurements_performed": false
+    }
+  ]
+}
