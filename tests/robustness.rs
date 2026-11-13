@@ -68,3 +68,20 @@ fn probes_obey_stop_domain_and_reject_unrepresentable_cost_stress() {
         .is_err()
     );
 }
+
+#[test]
+fn strategy_probes_preserve_costs_at_stress_ceiling() {
+    let costs = Costs {
+        slippage_pips: 10_000,
+        ..Default::default()
+    };
+    let cases = robustness::strategy_cases(&strategy(100), &costs).unwrap();
+    assert!(!cases.is_empty());
+    for case in cases {
+        assert_eq!(case.costs.slippage_pips, 10_000);
+        assert_ne!(
+            case.strategy.identity().unwrap(),
+            strategy(100).identity().unwrap()
+        );
+    }
+}

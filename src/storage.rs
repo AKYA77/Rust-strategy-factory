@@ -118,7 +118,7 @@ impl Registry {
         let version: i64 = connection
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .map_err(db_err)?;
-        if version > 6 {
+        if version > 7 {
             return Err("database schema newer than supported".into());
         }
         if version == 0 {
@@ -199,6 +199,19 @@ impl Registry {
                 CHECK(start_ms<end_ms), PRIMARY KEY(instrument,start_ms,end_ms)
             );CREATE INDEX IF NOT EXISTS experiment_instrument ON experiments(json_extract(key_json,'$.instrument'));
             PRAGMA user_version=6;").map_err(db_err)?;
+            tx.commit().map_err(db_err)?;
+        }
+        if version < 7 {
+            let tx = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(db_err)?;
+            tx.execute_batch(
+                "CREATE TABLE IF NOT EXISTS training_diagnoses (
+                id TEXT PRIMARY KEY, parent_id TEXT NOT NULL REFERENCES experiments(id),
+                report_json TEXT NOT NULL, report_hash TEXT NOT NULL
+            ); PRAGMA user_version=7;",
+            )
+            .map_err(db_err)?;
             tx.commit().map_err(db_err)?;
         }
         Ok(Self { connection })
@@ -591,6 +604,23 @@ impl Registry {
         tx.commit().map_err(db_err)?;
         Ok(true)
     }
+    pub fn experiment_key(&self, id: &str) -> Result<Option<ExperimentKey>> {
+        let json: Option<String> = self
+            .connection
+            .query_row("SELECT key_json FROM experiments WHERE id=?1", [id], |r| {
+                r.get(0)
+            })
+            .optional()
+            .map_err(db_err)?;
+        json.map(|json| {
+            let key: ExperimentKey = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+            if key.identity()? != id {
+                return Err("stored experiment identity corrupted".into());
+            }
+            Ok(key)
+        })
+        .transpose()
+    }
     pub fn result(&self, id: &str) -> Result<Option<StoredResult>> {
         read_result(&self.connection, id)
     }
@@ -641,6 +671,16 @@ impl Registry {
                 return Err("scientific definition integrity mismatch".into());
             }
             crate::science::read_report(self, &id)?;
+        }
+        let mut query = self
+            .connection
+            .prepare("SELECT id FROM training_diagnoses")
+            .map_err(db_err)?;
+        let ids = query
+            .query_map([], |r| r.get::<_, String>(0))
+            .map_err(db_err)?;
+        for id in ids {
+            crate::improvement::read_report(self, &id.map_err(db_err)?)?;
         }
         Ok(())
     }

@@ -1,0 +1,11 @@
+# Training diagnostics and proposals
+
+`diagnose <registry.sqlite> <training-experiment-id>` writes an immutable deterministic report. `diagnosis-report <registry.sqlite> <diagnosis-id>` reads and verifies it. Both require an existing registry. Schema7 migrates older registries transactionally; online backup and registry integrity include diagnosis evidence.
+
+Only explicitly tagged standalone training or the durable loop's exact training-window protocol is accepted, under current engine/indicator/signal versions. The generic tick-verification stage alone is insufficient: scientific OOS uses that stage too. Scientific protocols, including their prior-training receipts, and independent/final evaluation receipts cannot feed adaptation. Existing registered protected-range safeguards remain mandatory for any later child execution.
+
+Reports bind the parent experiment key, immutable parent result hash, diagnostic build identity, seed and bounded options. Recorded no-signals, losses, rejected entries, absent closed trades and unresolved outcomes are factual diagnostics. Failure and unresolved evidence produce no child proposals. Legacy failed receipts may contain only an error; no missing strategy or outcome is inferred. Profitable completed training can receive bounded neighborhood review without any improvement claim.
+
+Strategy-only stop/ATR/rule probes keep the parent's side, timeframe and entry policy. Costs, profiles, risk fractions and payoff rules are not relaxed. A seed-hash ordering and canonical concept deduplication select up to eight proposals by default, with an API ceiling of sixteen. Cost stress is excluded. Proposals carry operator, concept and immutable edge identities; the report binds their parent, seed and build. Their status is UNEVALUATED. They neither create experiments nor increment simulation counts. Exact retries/restart reuse a report; concurrent writers deduplicate publication.
+
+This is proposal persistence, not the completed adaptive research loop. Automatic child scheduling/replay, comparable parent/child evaluation under one build and conversion context, bounded queue integration, richer failure diagnosis and evaluation lineage remain pending. No diagnostic report can qualify a strategy. Real data approvals, independent inference, coverage and final acceptance remain separate prerequisites.

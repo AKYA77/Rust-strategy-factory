@@ -122,6 +122,29 @@ fn import_inspect_evaluate_and_overwrite_protection() {
     let second: serde_json::Value = serde_json::from_slice(&second.stdout).unwrap();
     assert_eq!(second["reused"], true);
     assert_eq!(first["experiment_id"], second["experiment_id"]);
+    let diagnosis = invoke(&[
+        "diagnose",
+        registry.to_str().unwrap(),
+        first["experiment_id"].as_str().unwrap(),
+    ]);
+    assert!(
+        diagnosis.status.success(),
+        "{}",
+        String::from_utf8_lossy(&diagnosis.stderr)
+    );
+    let diagnosis: serde_json::Value = serde_json::from_slice(&diagnosis.stdout).unwrap();
+    assert_eq!(diagnosis["reused"], false);
+    assert_eq!(diagnosis["report"]["status"], "TRAINING_ONLY_UNEVALUATED");
+    let receipt = invoke(&[
+        "diagnosis-report",
+        registry.to_str().unwrap(),
+        diagnosis["report"]["id"].as_str().unwrap(),
+    ]);
+    assert!(receipt.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&receipt.stdout).unwrap(),
+        diagnosis["report"]
+    );
     let counts = invoke(&["registry-check", registry.to_str().unwrap()]);
     assert!(counts.status.success());
     let counts: serde_json::Value = serde_json::from_slice(&counts.stdout).unwrap();

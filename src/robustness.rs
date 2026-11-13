@@ -35,6 +35,14 @@ pub fn cases(strategy: &Strategy, costs: &Costs) -> Result<Vec<Case>> {
         strategy: strategy.clone(),
         costs: adverse,
     }];
+    cases.extend(strategy_cases(&strategy, costs)?);
+    Ok(cases)
+}
+/// Strategy-only probes preserve execution costs, including at the cost-domain ceiling.
+pub fn strategy_cases(strategy: &Strategy, costs: &Costs) -> Result<Vec<Case>> {
+    let strategy = strategy.canonical()?;
+    costs.validate()?;
+    let mut cases = Vec::new();
     let step = (strategy.stop_ticks / 10).max(1);
     for (name, stop) in [
         ("stop-minus-ten-percent", strategy.stop_ticks - step),

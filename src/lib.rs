@@ -33,3 +33,5 @@ pub mod native;
 pub mod neighborhood;
 
 pub mod stops;
+
+pub mod improvement;

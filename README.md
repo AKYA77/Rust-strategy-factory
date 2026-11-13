@@ -25,6 +25,8 @@ Node and Chromium are development dependencies only. The production dashboard is
 
 Native `.rsf` storage supports lossless packing/unpacking and the same dataset identities; see [native storage](docs/RUNBOOKS/native-storage.md). This is an uncompressed interchange baseline; full-history streaming and codec selection remain unfinished.
 
+Training-only deterministic diagnostics persist bounded unevaluated child proposals; see [training improvement](docs/RUNBOOKS/training-improvement.md). Scientific/OOS/final receipts cannot authorize adaptation. Child replay and autonomous queue integration remain unfinished.
+
 Start with [research loop operations](docs/RUNBOOKS/research-loop.md), [frozen protocol execution](docs/RUNBOOKS/scientific-protocol.md), and [dashboard operations](docs/RUNBOOKS/dashboard.md). `fixture` creates explicitly synthetic software-test data; `profiles` prints arbitrary test contracts. Neither establishes broker feasibility. Real autonomous research requires an explicit training interval.
 
 ```sh

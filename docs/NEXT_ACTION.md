@@ -4,7 +4,7 @@ Status: SOFTWARE_INCOMPLETE. Read AGENTS.md, PROJECT_STATE.json, ACCEPTANCE.md a
 
 ## Latest milestone
 
-121 Rust tests, formatting/Clippy, release build and Chromium desktop/mobile acceptance pass. UI integer precision regression is fixed and verified against actual Rust/SQLite/Chromium. A CLI-created uncapped-loss receipt reproduced unsafe generic diagnostic rounding before the fix; guarded text and byte-identical exact raw export now pass. Currency formatting uses integer division through positive/negative safe boundaries, avoiding floating division rounding. Debug/release executable hashes changed but both compute/version identities stayed identical; see VERIFICATION/ui-integer-display-identity.json. Initial table/chart/export guards remain in place.
+126 Rust tests, formatting/Clippy, debug/release builds and Chromium desktop/mobile acceptance pass. Schema7 persists immutable training-only diagnostic reports and bounded UNEVALUATED child proposals. Reports bind parent key/result hash, diagnostic build, operator/reason/seed and canonical identities; no experiment counters increase. Explicit training protocol authorization refuses scientific/OOS/final receipts despite their shared tick stage. Actual loss, no-signals, failed/unresolved evidence, concurrent publication, restart/backup and tamper detection are tested. See RUNBOOKS/training-improvement.md. Proposals are not executed or qualified.
 
 Packed prefix and current synthetic/component benchmark receipts remain verified; see BENCHMARKS/README.md. Component timings are not research throughput or whole-engine A/B evidence.
 
@@ -22,7 +22,7 @@ Previous verified foundations include chronological replay, initial executable-s
 
 ## Begin next
 
-Implement deterministic training-only failure diagnostics and bounded child proposals with immutable parent/child reasons, operator/seed/identities and restart-safe deduplication. Never adapt from OOS/protected-final evidence. Use explicit training authorization rather than trusting the generic tick-verification stage, since scientific OOS jobs also use that stage. Enforce registered protected ranges for every child evaluation. Continue dependence-aware inference, sufficient-sample/prespecified robustness acceptance and independent approval/coverage prerequisites before unlocking real final evaluation. Current protocols and pooled reset-fold statistics cannot issue validated status.
+Execute bounded child training reviews from immutable proposals, with exact parent/child dataset, profile, costs, conversions and window comparability. Rerun the parent under the same build as children, retain permanent evaluation edges and restart-safe cached results, and enforce registered protected ranges for every evaluation. Integrate bounded queue scheduling later; no OOS/protected-final adaptation. Continue dependence-aware inference, sufficient-sample/prespecified robustness acceptance and independent approval/coverage prerequisites before unlocking real final evaluation. Current protocols and pooled reset-fold statistics cannot issue validated status.
 
 Continue bounded mutation/improvement lineage, candidate-level net candle screening, Parquet/ZSTD and measured codec/native streaming work, source acquisition/import acceptance, worker pools/OS resource control, full dashboard operations, production deployment and final end-to-end acceptance. Follow the entire IMPLEMENTATION_QUEUE.md.
 
