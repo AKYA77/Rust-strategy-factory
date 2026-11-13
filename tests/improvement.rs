@@ -614,3 +614,111 @@ fn automatic_improvement_limits_and_build_identity_are_enforced() {
     );
     std::fs::remove_dir_all(d).unwrap();
 }
+
+#[test]
+fn incremental_review_yields_after_each_missing_experiment_and_matches_full_report() {
+    use rust_strategy_factory::training_review;
+    let d = dir();
+    let path = d.join("state.sqlite");
+    let mut r = Registry::open(&path).unwrap();
+    let parent = evaluate(&mut r, &strategy(), 100300);
+    let diagnosis = improvement::diagnose(
+        &mut r,
+        &parent.experiment_id,
+        &Options {
+            max_children: 3,
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .report;
+    let mut before = r.counts().unwrap().attempts;
+    for _ in 0..4 {
+        assert!(
+            training_review::advance(
+                &mut r,
+                &input(100300),
+                &diagnosis.id,
+                10000,
+                256 * 1024 * 1024
+            )
+            .unwrap()
+            .is_none()
+        );
+        assert_eq!(r.counts().unwrap().attempts, before + 1);
+        before += 1;
+        r.integrity().unwrap();
+        drop(r);
+        r = Registry::open(&path).unwrap();
+    }
+    let incremental = training_review::advance(
+        &mut r,
+        &input(100300),
+        &diagnosis.id,
+        10000,
+        256 * 1024 * 1024,
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(r.counts().unwrap().attempts, before);
+    assert!(!incremental.reused);
+    let complete = training_review::execute(
+        &mut r,
+        &input(100300),
+        &diagnosis.id,
+        10000,
+        256 * 1024 * 1024,
+    )
+    .unwrap();
+    assert!(complete.reused);
+    assert_eq!(
+        data::hash(&incremental.report).unwrap(),
+        data::hash(&complete.report).unwrap()
+    );
+    drop(r);
+    std::fs::remove_dir_all(d).unwrap();
+}
+#[test]
+fn worker_pause_and_restart_between_children_preserve_progress_and_counters() {
+    let d = dir();
+    let path = d.join("state.sqlite");
+    let mut driver = queued_driver(&path, 2, 256 * 1024 * 1024);
+    driver.acquire(0).unwrap();
+    assert!(driver.step(1).unwrap());
+    assert_eq!(driver.registry.counts().unwrap().attempts, 1);
+    assert!(driver.step(2).unwrap());
+    assert_eq!(driver.registry.counts().unwrap().attempts, 2);
+    let status = research::status(&driver.registry, &driver.id, 3).unwrap();
+    assert_eq!(status.cursor, 1);
+    assert_eq!(status.improvements.queued, 1);
+    assert_eq!(status.improvements.completed, 0);
+    let jobs = research::improvement_jobs(&driver.registry, &driver.id).unwrap();
+    assert!(jobs[0].diagnosis_id.is_some());
+    assert!(jobs[0].review_id.is_none());
+    research::control(&driver.registry, &driver.id, "paused").unwrap();
+    assert!(!driver.step(4).unwrap());
+    assert_eq!(driver.registry.counts().unwrap().attempts, 2);
+    drop(driver);
+    let mut driver = queued_driver(&path, 2, 256 * 1024 * 1024);
+    driver.acquire(5).unwrap();
+    research::control(&driver.registry, &driver.id, "running").unwrap();
+    assert!(driver.step(6).unwrap());
+    assert_eq!(driver.registry.counts().unwrap().attempts, 3);
+    assert_eq!(
+        research::status(&driver.registry, &driver.id, 7)
+            .unwrap()
+            .improvements
+            .queued,
+        1
+    );
+    assert!(driver.step(8).unwrap());
+    assert_eq!(driver.registry.counts().unwrap().attempts, 3);
+    let status = research::status(&driver.registry, &driver.id, 9).unwrap();
+    assert_eq!(status.cursor, 1);
+    assert_eq!(status.improvements.completed, 1);
+    assert_eq!(status.improvements.child_receipt_links, 2);
+    assert_eq!(status.rejected, 1);
+    driver.registry.integrity().unwrap();
+    drop(driver);
+    std::fs::remove_dir_all(d).unwrap();
+}

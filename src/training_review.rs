@@ -154,6 +154,7 @@ pub fn read_report(registry: &Registry, id: &str) -> Result<Option<Report>> {
     })
     .transpose()
 }
+/// Explicit bounded review; finishes all missing experiments before returning.
 pub fn execute(
     registry: &mut Registry,
     input: &Input,
@@ -161,6 +162,41 @@ pub fn execute(
     feature_cells: usize,
     state_budget_bytes: u64,
 ) -> Result<Execution> {
+    run(
+        registry,
+        input,
+        diagnosis_id,
+        feature_cells,
+        state_budget_bytes,
+        false,
+    )?
+    .ok_or("complete review unexpectedly yielded".into())
+}
+/// Performs at most one missing experiment. None means committed progress; retry to finish.
+pub fn advance(
+    registry: &mut Registry,
+    input: &Input,
+    diagnosis_id: &str,
+    feature_cells: usize,
+    state_budget_bytes: u64,
+) -> Result<Option<Execution>> {
+    run(
+        registry,
+        input,
+        diagnosis_id,
+        feature_cells,
+        state_budget_bytes,
+        true,
+    )
+}
+fn run(
+    registry: &mut Registry,
+    input: &Input,
+    diagnosis_id: &str,
+    feature_cells: usize,
+    state_budget_bytes: u64,
+    incremental: bool,
+) -> Result<Option<Execution>> {
     if feature_cells == 0 || feature_cells > 4_000_000 || input.dataset.ticks.len() > 2_000_000 {
         return Err("training review input/feature budget exceeded".into());
     }
@@ -199,10 +235,10 @@ pub fn execute(
     let revision = research::compute_revision()?;
     let id = identity(diagnosis_id, &revision, feature_cells, VERSION)?;
     if let Some(report) = read_report(registry, &id)? {
-        return Ok(Execution {
+        return Ok(Some(Execution {
             reused: true,
             report,
-        });
+        }));
     }
     let window = Interval {
         start_ms: key.start_ms,
@@ -236,15 +272,29 @@ pub fn execute(
         };
         evidence(registry, &execution.experiment_id)
     };
+    let missing = |registry: &Registry, strategy: &Strategy| -> Result<bool> {
+        let mut expected = key.clone();
+        expected.code_revision = revision.clone();
+        expected.concept_hash = strategy.identity()?;
+        Ok(registry.result(&expected.identity()?)?.is_none())
+    };
+    let new_baseline = missing(registry, &strategy)?;
     let baseline = evaluate(registry, &strategy)?;
+    if incremental && new_baseline {
+        return Ok(None);
+    }
     let mut children = Vec::new();
     for proposal in &source.proposals {
+        let new_child = missing(registry, &proposal.strategy)?;
         let result = evaluate(registry, &proposal.strategy)?;
         children.push(Child {
             proposal_edge_id: proposal.edge_id.clone(),
             net_delta_micro_usd: delta(&result, &baseline)?,
             evidence: result,
         });
+        if incremental && new_child {
+            return Ok(None);
+        }
     }
     let report = Report {
         id,
@@ -266,8 +316,8 @@ pub fn execute(
     if data::hash(&stored)? != data::hash(&report)? {
         return Err("conflicting immutable training review".into());
     }
-    Ok(Execution {
+    Ok(Some(Execution {
         reused: inserted == 0,
         report: stored,
-    })
+    }))
 }

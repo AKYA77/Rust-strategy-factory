@@ -696,7 +696,7 @@ impl Driver {
         job: (i64, usize, String),
     ) -> Result<bool> {
         let token = self.token.as_ref().ok_or("coordinator lease required")?;
-        let execution = (|| -> Result<(String, Option<String>)> {
+        let execution = (|| -> Result<(String, Option<String>, bool)> {
             let input = self
                 .inputs
                 .get(job.1)
@@ -711,26 +711,25 @@ impl Driver {
                 },
             )?
             .report;
-            let review = if diagnosis.proposals.is_empty() {
-                None
+            let (review, complete) = if diagnosis.proposals.is_empty() {
+                (None, true)
             } else {
-                Some(
-                    crate::training_review::execute(
-                        &mut self.registry,
-                        input,
-                        &diagnosis.id,
-                        self.config.feature_cells,
-                        self.config.state_budget_bytes,
-                    )?
-                    .report
-                    .id,
-                )
+                match crate::training_review::advance(
+                    &mut self.registry,
+                    input,
+                    &diagnosis.id,
+                    self.config.feature_cells,
+                    self.config.state_budget_bytes,
+                )? {
+                    Some(execution) => (Some(execution.report.id), true),
+                    None => (None, false),
+                }
             };
-            Ok((diagnosis.id, review))
+            Ok((diagnosis.id, review, complete))
         })();
-        let (diagnosis, review, error) = match execution {
-            Ok((d, r)) => (Some(d), r, None),
-            Err(e) => (None, None, Some(e)),
+        let (diagnosis, review, complete, error) = match execution {
+            Ok((d, r, c)) => (Some(d), r, c, None),
+            Err(e) => (None, None, false, Some(e)),
         };
         let pressure = error.is_some()
             && check_state_budget(&self.registry, self.config.state_budget_bytes).is_err();
@@ -751,7 +750,7 @@ impl Driver {
                 "improvement completion fenced; committed evidence retained for recovery".into(),
             );
         }
-        let n=tx.execute("UPDATE improvement_jobs SET state=?3,diagnosis_id=?4,review_id=?5,error=?6 WHERE run_id=?1 AND parent_cursor=?2 AND state='queued'",params![self.id,job.0,if pressure {"queued"} else if error.is_some() {"failed"} else {"completed"},diagnosis,review,error]).map_err(|e|e.to_string())?;
+        let n=tx.execute("UPDATE improvement_jobs SET state=?3,diagnosis_id=?4,review_id=?5,error=?6 WHERE run_id=?1 AND parent_cursor=?2 AND state='queued'",params![self.id,job.0,if pressure {"queued"} else if error.is_some() {"failed"} else if complete {"completed"} else {"queued"},diagnosis,review,error]).map_err(|e|e.to_string())?;
         if n != 1 {
             return Err("improvement job already completed".into());
         }
