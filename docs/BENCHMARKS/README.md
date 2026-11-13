@@ -27,3 +27,22 @@ The intermediate `orders` and `orders-final` receipts are retained as measured i
 | 4 | 0.114681 | 0.109591 |
 
 Results vary substantially and differ by worker count; they establish neither a consistent speedup nor a universal worker setting. No optimization is enabled on this evidence. Stable sustained/cold-I/O and real-data comparisons remain mandatory before performance acceptance.
+
+## Engine v6 packed-prefix and sequential baseline
+
+Current receipts: [component timings](v6-prefix-component.json), [component resources](v6-prefix-component-resources.json), [sequential timings](v6-sequential-synthetic.json), [sequential resources](v6-sequential-synthetic-resources.json). Exit codes are zero. Both binaries report the same compiled compute revision; source fingerprint/per-file digests were independently verified against the measured working tree. The checkout was dirty at measurement; the per-file manifest, not the base Git SHA alone, identifies the exact code. Resource wrapper v2 now includes build/toolchain inputs, compiler/CPU/features, cgroup limits and its own hash.
+
+Component only: equal resident masks, 999,983 relevant bits, five alternating repetitions of 25 comparisons. Median per-call scalar validation was 2.688380 ms; packed validation was 0.002947 ms. Allocation/generation is excluded from operation timers. This is bit-mask validation, **not candidate screens, market replays or research throughput**, and establishes no whole-factory speedup.
+
+The separate sequential benchmark executes eight 20,000-event synthetic histories per repetition, rebuilding derived candles/features. Fixed100 stops exercise the actual engine/risk/accounting path; ATR support is present but these timings do not benchmark ATR policies. Every batch resolved 6,997 synthetic trades. Five repetitions per worker count:
+
+| Workers | Median batch seconds | Max-minus-min seconds | Resolved trades/batch |
+|---|---:|---:|---:|
+| 1 | 0.102943 | 0.043004 | 6997 |
+| 2 | 0.057072 | 0.024256 | 6997 |
+| 3 | 0.048434 | 0.004141 | 6997 |
+| 4 | 0.039235 | 0.004182 | 6997 |
+
+Whole sequential child: 1.329842 s wall, 2.280543 s user CPU, 0.040079 s system CPU, peak RSS 21696 KiB. These are process totals across trials, not per-worker memory. The machine reports Xeon Platinum 8573C, four-vCPU quota and 32 GiB cgroup memory cap. This short warm fixture favored four workers; it neither sets a production default nor validates the target eight-GB VPS. There is no before/after whole-engine A/B claim, real-data/full-history performance, cold I/O or codec measurement. Repeated fixtures are not new research discoveries or qualified strategies.
+
+Build `cargo bench --locked --bench replay --bench mask_prefix --no-run`; measure each reported executable separately with new output paths using scripts/measure.py. Compilation is excluded by wait4 child accounting. Archive existing receipts rather than overwriting them.

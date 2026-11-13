@@ -4,7 +4,9 @@ Status: SOFTWARE_INCOMPLETE. Read AGENTS.md, PROJECT_STATE.json, ACCEPTANCE.md a
 
 ## Latest milestone
 
-119 Rust tests, formatting/Clippy, release build and Chromium desktop/mobile acceptance pass. Engine v6/indicator v4 implements typed outward ATR stops. Closed-candle integer ATR, grid/floor rounding and explicit warmup/budget rejection feed exact risk sizing. Pending reservations store and freeze raw distance/quantity; later volatility cannot reprice them. Six ATR tests verify independent math/market/pending fixtures, future invariance, legacy/strict JSON, generator and policy probes. Additional protocol and risk-grid tests pass. Protocol v7 freezes ATR policy variants/trial budgets; Chromium submits ATR/MACD/higher confirmation. Fixed-stop regressions remain enabled. See DECISIONS/0008-atr-initial-stops.md.
+121 Rust tests, formatting/Clippy, release build and Chromium desktop/mobile acceptance pass. Packed-word prefix validation now preserves every relevant bit, backing/padding checks and exact exclusive-end scope. Two tests cover 2400 seeded oracle queries plus exact word/partial/empty/malformed boundaries. Current engine-v6 component and sequential benchmarks completed with zero exit codes and verified source/compute/per-file/binary/resource identities. Every sequential synthetic batch resolved 6997 trades; warm medians for 1/2/3/4 workers were 0.102943/0.057072/0.048434/0.039235 seconds. Component timings are not research throughput, and there is no whole-engine A/B or real/full-history claim. See BENCHMARKS/README.md and v6 JSON receipts.
+
+Typed outward ATR initial stops and frozen distance/quantity receipts remain verified under engine v6/indicator v4/protocol v7; see DECISIONS/0008-atr-initial-stops.md.
 
 Causal feature prefix isolation and mask representation validation remain verified; see DECISIONS/0007-feature-evaluation-scopes.md.
 
@@ -18,7 +20,7 @@ Previous verified foundations include chronological replay, initial executable-s
 
 ## Begin next
 
-Replace the causal verifier's per-bit scan with proven packed-word prefix comparison, preserving representation checks and every relevant bit. Add seeded boundary/partial-word differential tests, then measure the current sequential synthetic baseline with truthful engine/source/binary/resource receipts. Do not claim real/full-history throughput or universal worker optimum. Continue dependence-aware inference, sufficient-sample/prespecified robustness acceptance and independent approval/coverage prerequisites before unlocking real final evaluation. Current protocols and pooled reset-fold statistics cannot issue validated status.
+Fix generic dashboard JSON diagnostics so unsafe JS integers are never silently displayed rounded. Trade money/chart guards and raw exports exist, but the generic assessment JSON renderer still uses parsed Number values. Add an actual extreme-loss CLI/browser fixture, verify guarded display and exact raw export, and keep UI changes outside compute identity. Continue dependence-aware inference, sufficient-sample/prespecified robustness acceptance and independent approval/coverage prerequisites before unlocking real final evaluation. Current protocols and pooled reset-fold statistics cannot issue validated status.
 
 Continue bounded mutation/improvement lineage, candidate-level net candle screening, Parquet/ZSTD and measured codec/native streaming work, source acquisition/import acceptance, worker pools/OS resource control, full dashboard operations, production deployment and final end-to-end acceptance. Follow the entire IMPLEMENTATION_QUEUE.md.
 

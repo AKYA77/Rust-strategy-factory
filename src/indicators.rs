@@ -106,6 +106,19 @@ impl Mask {
         }
         Ok(())
     }
+    pub fn matches_prefix(&self, other: &Self, count: usize) -> Result<bool> {
+        self.validate()?;
+        other.validate()?;
+        if count > self.len || count > other.len {
+            return Err("signal prefix exceeds mask length".into());
+        }
+        let words = count / 64;
+        if self.words[..words] != other.words[..words] {
+            return Ok(false);
+        }
+        let bits = count % 64;
+        Ok(bits == 0 || (self.words[words] ^ other.words[words]) & ((1_u64 << bits) - 1) == 0)
+    }
     pub fn count(&self) -> usize {
         self.words.iter().map(|w| w.count_ones() as usize).sum()
     }

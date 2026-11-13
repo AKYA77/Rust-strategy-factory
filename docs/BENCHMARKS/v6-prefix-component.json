@@ -1,0 +1,83 @@
+{
+  "bits_per_mask": 1000000,
+  "cache": "warm resident independent cloned packed masks; allocation/generation excluded from operation timing",
+  "class": "COMPONENT_MICROBENCHMARK_NOT_RESEARCH_THROUGHPUT",
+  "compute_revision": "compute-blake3:9d9988a7d50ff7d67d289b660552eddae9ac318aaac3f74ab7ed40a047ddbec7",
+  "engine": "ordered-l1-v6-frozen-atr-stops",
+  "input_hash": "a0c264289dea4e9a0aad8953bffd49d18446dac52ce0832ef029ebd2dde43024",
+  "limitations": "This validates bit masks only. It is not a candidate screen, market replay, full-history result, codec or claim of end-to-end research improvement.",
+  "measurements": [
+    {
+      "algorithm": "scalar",
+      "elapsed_ns": 65372340,
+      "iterations": 25,
+      "matched": 25,
+      "repetition": 0
+    },
+    {
+      "algorithm": "packed",
+      "elapsed_ns": 73674,
+      "iterations": 25,
+      "matched": 25,
+      "repetition": 0
+    },
+    {
+      "algorithm": "packed",
+      "elapsed_ns": 115126,
+      "iterations": 25,
+      "matched": 25,
+      "repetition": 1
+    },
+    {
+      "algorithm": "scalar",
+      "elapsed_ns": 68273966,
+      "iterations": 25,
+      "matched": 25,
+      "repetition": 1
+    },
+    {
+      "algorithm": "scalar",
+      "elapsed_ns": 63700975,
+      "iterations": 25,
+      "matched": 25,
+      "repetition": 2
+    },
+    {
+      "algorithm": "packed",
+      "elapsed_ns": 73402,
+      "iterations": 25,
+      "matched": 25,
+      "repetition": 2
+    },
+    {
+      "algorithm": "packed",
+      "elapsed_ns": 73071,
+      "iterations": 25,
+      "matched": 25,
+      "repetition": 3
+    },
+    {
+      "algorithm": "scalar",
+      "elapsed_ns": 68945925,
+      "iterations": 25,
+      "matched": 25,
+      "repetition": 3
+    },
+    {
+      "algorithm": "scalar",
+      "elapsed_ns": 67209503,
+      "iterations": 25,
+      "matched": 25,
+      "repetition": 4
+    },
+    {
+      "algorithm": "packed",
+      "elapsed_ns": 148676,
+      "iterations": 25,
+      "matched": 25,
+      "repetition": 4
+    }
+  ],
+  "operation": "equal-mask prefix validation with a partial final word",
+  "prefix_bits": 999983
+}

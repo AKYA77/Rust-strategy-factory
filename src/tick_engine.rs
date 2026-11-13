@@ -256,7 +256,7 @@ fn replay_internal(
         strategy.timeframe,
     )?;
     let expected = features.signal(&strategy.rule)?;
-    if mask.len() != candles.len() || (0..visible).any(|i| mask.get(i) != expected.get(i)) {
+    if mask.len() != candles.len() || !mask.matches_prefix(&expected, visible)? {
         return Err("signals inconsistent with frozen strategy".into());
     }
     let distances = crate::stops::prepare(&strategy, p, &candles[..visible])?;

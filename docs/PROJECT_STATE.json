@@ -54,7 +54,9 @@
     "serialized mask backing/padding validation and truthful compiled benchmark engine metadata",
     "typed outward integer Wilder ATR initial stops with causal grid rounding, explicit warmup/budget rejection and constant legacy fixed-stop preparation",
     "frozen protective distance in risk reservation receipts, unchanged pending quantity/distance through volatility changes and pre-fill validation",
-    "ATR autonomous/protocol/browser integration and frozen policy-parameter probes with trial accounting; strict strategy fields and risk price grids"
+    "ATR autonomous/protocol/browser integration and frozen policy-parameter probes with trial accounting; strict strategy fields and risk price grids",
+    "validated packed-word causal mask prefix comparison with 2400 seeded oracle queries and exact boundary/malformed tests",
+    "current engine-v6 synthetic sequential/component measurements with source manifests, binary/compiler/CPU/cgroup/resource receipts and distinct workload classes"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -62,9 +64,11 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Optimize proven mask-prefix verification and measure the current sequential baseline; then diagnostics/improvement lineage, evidence acceptance and remaining full queue.",
+  "next_action": "Fix unsafe-integer generic dashboard diagnostic rendering with actual extreme-loss/browser export regression, then improvement lineage, resource/qualification and remaining full queue.",
   "qualified_strategies": 0,
-  "tests_passed": 119,
-  "benchmark": "docs/BENCHMARKS/2026-11-12-synthetic-replay.json",
-  "browser_acceptance": "Chromium desktop/mobile against actual Rust HTTP server and SQLite; auth, CSRF/origin/host/body/rates, controls, receipts/export, restart/logout passed"
+  "tests_passed": 121,
+  "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
+  "browser_acceptance": "Chromium desktop/mobile against actual Rust HTTP server and SQLite; auth, CSRF/origin/host/body/rates, controls, receipts/export, restart/logout passed",
+  "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
+  "component_benchmark": "docs/BENCHMARKS/v6-prefix-component.json"
 }
