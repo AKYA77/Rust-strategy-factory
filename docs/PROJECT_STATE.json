@@ -82,7 +82,8 @@
     "Experimental complete indexed market-entry replay for scoped literal-USD integral-cash grids, exact ordered equity/drawdown/MFE/MAE and actual fills/fees/gaps/deadlines, strict sequential fallback and shared authoritative input validation;512 seeded whole-replay comparisons plus range/deadline/full-u64 oracles; measured shared engine only, no factory promotion",
     "Exact decimal-string projection/display for first500 trade event IDs, safe legacy numeric fallback and actual full-u64 desktop/mobile raw-export regression; unchanged financial/version compute identity",
     "Explicit training-only indexed batch/API policy with versioned full cache/review context, lazy post-authorization index setup, mandatory independent sequential full-replay audits, durable disagreement blocking and atomic publication refusal; protected-science/autonomous refusal, proof-audit reference independence, comparable review basis and actual CLI/browser/export evidence",
-    "Compatible schema-v9 partial covering index for proof/indexed contradiction health checks; preserved history/marker semantics and measured metadata-only lookup scaling, not factory throughput"
+    "Compatible schema-v9 partial covering index for proof/indexed contradiction health checks; preserved history/marker semantics and measured metadata-only lookup scaling, not factory throughput",
+    "Authenticated read-only registry audit failure monitoring with separate proof/indexed blocked states, explicit no-marker limitations and actual desktop/mobile/service-restart acceptance"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -90,11 +91,11 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Keep indexed policy experimental; implement aggregate reference-audit monitoring and checkpoint-aware lifecycle, then continue resumable import/catalog/coverage and scientific/operations scope.",
+  "next_action": "Keep indexed policy experimental; continue aggregate audit coverage and checkpoint-aware lifecycle, then resumable import/catalog/coverage and scientific/operations scope.",
   "qualified_strategies": 0,
   "tests_passed": 189,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
-  "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks",
+  "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks; persisted proof/indexed failure monitoring, restart and read-only API",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
   "component_benchmark": "docs/BENCHMARKS/v6-prefix-component.json",
   "generation_component_benchmark": "docs/BENCHMARKS/structural-generation-v1.json",

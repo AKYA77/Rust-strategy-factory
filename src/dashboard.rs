@@ -242,6 +242,16 @@ async fn logout(State(app): State<Arc<App>>, headers: HeaderMap) -> Response {
     );
     r
 }
+// Only persistent failure markers: absence does not certify audit coverage or correctness.
+fn audit_health(registry: &Registry) -> Result<serde_json::Value> {
+    let (proof, indexed): (bool, bool) = registry.connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM events WHERE action='proof-audit-contradiction-v1'), EXISTS(SELECT 1 FROM events WHERE action='indexed-audit-contradiction-v1')",
+        [], |row| Ok((row.get(0)?, row.get(1)?)),
+    ).map_err(|e| e.to_string())?;
+    Ok(
+        serde_json::json!({"proof_blocked":proof,"indexed_blocked":indexed,"scope":"registry-local persisted failure markers; absence does not establish audit coverage or qualification"}),
+    )
+}
 async fn overview(State(app): State<Arc<App>>) -> Response {
     let Ok(registry) = app.registry.lock() else {
         return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
@@ -264,7 +274,7 @@ async fn overview(State(app): State<Arc<App>>) -> Response {
             })
             .collect::<Result<Vec<_>>>()?;
         Ok(
-            serde_json::json!({"software_status":"SOFTWARE_INCOMPLETE","historical_readiness":"FULL_HISTORICAL_DATA_PENDING","qualification":"Independent validation/profile/coverage evidence is incomplete; no qualified strategies","counts":registry.counts()?,"runs":runs,"engine":crate::ENGINE_VERSION,"indicators":crate::INDICATOR_VERSION,"compute_revision":research::compute_revision()?}),
+            serde_json::json!({"software_status":"SOFTWARE_INCOMPLETE","historical_readiness":"FULL_HISTORICAL_DATA_PENDING","qualification":"Independent validation/profile/coverage evidence is incomplete; no qualified strategies","audit_health":audit_health(&registry)?,"counts":registry.counts()?,"runs":runs,"engine":crate::ENGINE_VERSION,"indicators":crate::INDICATOR_VERSION,"compute_revision":research::compute_revision()?}),
         )
     };
     match load() {

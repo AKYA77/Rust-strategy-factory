@@ -46,3 +46,5 @@ Fresh baseline:151 Rust tests, formatting and Clippy passed. Hosted [run43434456
 Fresh source-info requests to both Dukascopy and HistData returned HTTP403. No terms or quote content was acquired, no licensing conclusion drawn and no further same-state retry is planned. Small legally usable2025/2026 eight-instrument samples remain an external access/source-review dependency; complete backfill is explicitly deferred to the VPS. Work on independent software continues.
 
 Metadata health follow-up: compatible partial covering index and upgrade/marker integrity test now pass; audit-health-v1 measures metadata lookup only. Aggregate audit UI, lifecycle, production startup/write pressure and full-factory acceptance remain open.
+
+Failure monitoring follow-up: authenticated registry-local proof/indexed blocked status now has actual desktop/mobile/restart and read-only acceptance. Aggregate audited-result coverage and false-negative statistics remain open; marker absence is not coverage.
