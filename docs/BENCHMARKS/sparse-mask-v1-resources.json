@@ -1,0 +1,198 @@
+{
+  "exit_code": 0,
+  "recorded_at_utc": "2026-11-13T17:10:56.182807+00:00",
+  "source_fingerprint_version": 2,
+  "source_manifest": [
+    {
+      "path": "Cargo.lock",
+      "sha256": "d6a244857aabf550ea6850c8428bed5a8b36e2b50509a31e7b6e25ba465d156f"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "a35a3aa7ce3cc73662968b0d24dbbc227ed41558d90d5c21d5590f3c282baf73"
+    },
+    {
+      "path": "benches/candidate_screen.rs",
+      "sha256": "2a712200dc4f8c40ff84c3b5c2bb7f52899418cafe0ae3e5a99c677b78c0a786"
+    },
+    {
+      "path": "benches/compressed.rs",
+      "sha256": "0b288a2e70fc3a90107efe918c887b91e9a924443f07e2b76dabe2b8fb0b83b3"
+    },
+    {
+      "path": "benches/exploration.rs",
+      "sha256": "6161971b8a5ef5fd7cb8cae5ff783cb2c03eff40e1c0f16708e59f170e724132"
+    },
+    {
+      "path": "benches/mask_prefix.rs",
+      "sha256": "b5f595ad8d299941a6d8822ef41df8b6a150aaa7c9b733158186ce108afc71d9"
+    },
+    {
+      "path": "benches/replay.rs",
+      "sha256": "89d83308cd0449a643fbe075be3321aa6d2fe8fc9df5ee91a8ed6802cb50dd72"
+    },
+    {
+      "path": "benches/sparse_mask.rs",
+      "sha256": "80c38f9d349047abec904a9b91a335cc8365371d2d631fb2e5c850c7fbfdf132"
+    },
+    {
+      "path": "benches/storage_pipeline.rs",
+      "sha256": "97211507ad7e2234a5293929f55913426d4c91d2a656bc4636edd548d9eb6fc9"
+    },
+    {
+      "path": "build.rs",
+      "sha256": "710c731e8c55a42b7eaf1654fd753ef4054a89a1676d7ef27a47c5f87ddf3858"
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "sha256": "6b1cf8341d9a08d76c6deb1e9df90a0b208d0ef0d00ee05e0173e9cd4f0f425d"
+    },
+    {
+      "path": "src/candidate_screen.rs",
+      "sha256": "78e1c584dab3820a15042515e105b8af07e407b2f6e869698882e892479b4154"
+    },
+    {
+      "path": "src/candles.rs",
+      "sha256": "65a1c8743ddbf52b26418a0fc56aa261bbbdc56299e8aee805f320f7c1d25519"
+    },
+    {
+      "path": "src/compressed.rs",
+      "sha256": "f40cb7055ba513d0d1ed4dc6294b5606278409b27bc19a424c1ca4ae3f998a19"
+    },
+    {
+      "path": "src/contracts.rs",
+      "sha256": "fa758839f646f724f9d1dba79fdfab59cfb785e073b50c7415671dfad07e919a"
+    },
+    {
+      "path": "src/dashboard.rs",
+      "sha256": "bf1c6e8339b38ea94fe4592f46de057e96eddd4014ecd8ffae15d0370b4b24da"
+    },
+    {
+      "path": "src/data.rs",
+      "sha256": "d45098609bec90737e3e8052ac76e6e84febb0e6a50175a0031db4da914d894f"
+    },
+    {
+      "path": "src/diagnostics.rs",
+      "sha256": "b7f88560d541044d2a1df4b506d6f33a66df2001273c2cab96c6a2b7675dbbda"
+    },
+    {
+      "path": "src/exploration.rs",
+      "sha256": "136060adc7f88bb1463586c5537764e235eb427f616671a33873c7cbdd66d99a"
+    },
+    {
+      "path": "src/improvement.rs",
+      "sha256": "4b9661cae06649309bec25ebfbd1200872ede99874bffa9632ce12b3ce95c3c7"
+    },
+    {
+      "path": "src/indicators.rs",
+      "sha256": "976328ff05106e322dc577616c99fe354f4210a67e7048515f04f7bc0c5ee7bf"
+    },
+    {
+      "path": "src/lib.rs",
+      "sha256": "c7a3ecf11c7752acd169b8defcb83ff11e10f9358c4380d235f76c9dabf04f6b"
+    },
+    {
+      "path": "src/main.rs",
+      "sha256": "36860e196c54dd55e59912113d361adf08d24da4ae7fc5c25710db95d6a454e1"
+    },
+    {
+      "path": "src/native.rs",
+      "sha256": "5cef0810c9efb08f3dfcca58e14ced8756237dc538277651dd0dc3ffe2ce5a2c"
+    },
+    {
+      "path": "src/neighborhood.rs",
+      "sha256": "573763ee2fd9152f834d21342cd1e133fe71bbc8c86950631c011050aac8553e"
+    },
+    {
+      "path": "src/orders.rs",
+      "sha256": "c4ac379cba45b4a36a9b8ce57211a38da5311600140c5f8176a01506360ee11b"
+    },
+    {
+      "path": "src/parquet_guard.rs",
+      "sha256": "2a161530c621cc2dab2a0d83ad32d478c24d9a6f4ec2fcd157662a8bb07df50f"
+    },
+    {
+      "path": "src/parquet_store.rs",
+      "sha256": "39ea78a24eeb74a00b1e36ec857334da2d2f54a7c113fdb3fe5e78a5db8edcea"
+    },
+    {
+      "path": "src/regimes.rs",
+      "sha256": "6c313c2e38829ba1d6444264fe11fcdd0f93a70f6f1040ffdf1dc2b89060f5ae"
+    },
+    {
+      "path": "src/research.rs",
+      "sha256": "6feb21a1e5aacc1e4b019156e57d047d7eb1a9cb99177fb81228aa15ab24148f"
+    },
+    {
+      "path": "src/risk.rs",
+      "sha256": "d45a12bb784a823ee86793bae920bd5dc7a0b6eab5ecf483332eb180a116a8d1"
+    },
+    {
+      "path": "src/robustness.rs",
+      "sha256": "41fc84d9f8df97d801b7ee31a250e10883183c8e74fc877de8061da2adde82f7"
+    },
+    {
+      "path": "src/science.rs",
+      "sha256": "5e81fd45377c431852118dfb7bb308f38cded57db90bf640da8a54e121f0f0d1"
+    },
+    {
+      "path": "src/screen.rs",
+      "sha256": "fe54e8de406fbe2d8aff39cea72e16ed3aab7da4647e027fb5855f820a09aae1"
+    },
+    {
+      "path": "src/stops.rs",
+      "sha256": "c6ea9066fa4132732b32925a30f0cca8db28c933d11e7461966c53419a06e17b"
+    },
+    {
+      "path": "src/storage.rs",
+      "sha256": "05c9b860f0c0d5027768fc2f712b455af64ba04f3e3ae25cdc64d966675cc8d4"
+    },
+    {
+      "path": "src/strategies.rs",
+      "sha256": "d1998792971eb6bb451f3f304f8c162f758f5ab3eae326bfbf67cabe3efaafee"
+    },
+    {
+      "path": "src/tick_engine.rs",
+      "sha256": "214f63b11cbccffffefe2a2c7fe60d43bf6957ec418ed18540c5c75d2ab2ed9f"
+    },
+    {
+      "path": "src/tick_index.rs",
+      "sha256": "4d06d187c2d625dcb1aaf4e022ebea6d6517f4a269cb29a67e1a3f6a16562cd3"
+    },
+    {
+      "path": "src/training_diagnostics.rs",
+      "sha256": "ae2478fa304cc0e3a3522172aad8c6a2a24b473a887783d6ad99adf02c1e2c21"
+    },
+    {
+      "path": "src/training_review.rs",
+      "sha256": "3cce5e2ad5e97699cb6d2df8d40e8c7d62e0b81a0f4afbfb47076aa654237518"
+    },
+    {
+      "path": "src/uncertainty.rs",
+      "sha256": "13104823df04a04d03048b1071c98ff49afa8703b35713ffc76f8cd4d7a0caf9"
+    },
+    {
+      "path": "src/validation.rs",
+      "sha256": "ffe2fedebdb7bbceb42d10299fed149cb3b355ce3a4efb34d97478446dc04f33"
+    }
+  ],
+  "git_base_revision": "d7b2b665fe37ae9793d809a378f1a56ca3bdf438",
+  "source_dirty_at_measurement": true,
+  "measurement_script_sha256": "355f5dbe5a8a52c195b0314bf5f327916e8f080d3d4e8b4463dfb0555a732541",
+  "rustc_vv_probe": "rustc 1.100.0 (0ef1bc386 2026-11-09)\nbinary: rustc\ncommit-hash: 0ef1bc386059596dada8fb65b50425aab2ea637a\ncommit-date: 2026-11-09\nhost: x86_64-unknown-linux-gnu\nrelease: 1.100.0\nLLVM version: 23.1.5",
+  "cpu_model": "INTEL(R) XEON(R) PLATINUM 8573C",
+  "cpu_features": "fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 arat avx512vbmi umip waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid cldemote movdiri movdir64b fsrm serialize tsxldtrk avx512_fp16 arch_capabilities",
+  "affinity_cpu_count": 5,
+  "cgroup_cpu_max": "400000 100000",
+  "cgroup_memory_max": "34359738368",
+  "host_mem_available": "MemAvailable:   33836276 kB",
+  "source_inputs_sha256": "d97cf0ff90f8f0c12954d97364284104ddb169fc480287d3e74368e13e889f6d",
+  "executable_sha256": "3d4fa2820f758ebeda75ba3edc372c950b5579f94a4e691500467bd9f55a2d24",
+  "wall_seconds_whole_benchmark": 0.5031837199967413,
+  "user_cpu_seconds": 0.5025229999999999,
+  "system_cpu_seconds": 0.0,
+  "peak_rss_kib_linux": 10496,
+  "filesystem_input_blocks": 0,
+  "filesystem_output_blocks": 24,
+  "limitations": "Read the benchmark result class: component masks and synthetic replays are different workloads. CPU/RSS/I/O cover this entire child process, excluding compilation, not individual trials. The child report defines which storage/decoding/replay operations were measured; this wrapper supplies no real/full-history acceptance. Source fingerprint v2 covers build.rs, toolchain, Cargo manifests, src and benches; per-file digests are authoritative when the checkout is dirty. The rustc probe describes this measurement environment; compiled compute identity is in the result."
+}

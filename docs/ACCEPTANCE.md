@@ -264,3 +264,11 @@ Hosted run43449021150 independently reports Success for exact candidate-screen S
 Policy validation precedes experiment registration; existing frozen scientific APIs retain their conservative default. No execution skipping or full scientific acceptance is implied. No new performance claim is made; prior benchmark receipts remain pinned to their measured code. Safe proof-only rejection semantics, actual calibrated rejected-candidate audits, shared sparse batches and full indexed-accounting equivalence remain unfinished.
 
 Hosted run43449859402 independently reports Success for exact proof SHAe7697211c91fc0798bbd7c1878863787269fd98a; runtime-policy hosted verification follows publication.
+
+## Sparse causal mask traversal and actual model equivalence
+
+170 Rust tests, formatting/Clippy all targets, debug/release builds and browser/install/recovery acceptance pass.1100 independent seeded Boolean-array cases cover active-index iteration over word boundaries/densities, bounded prefixes and malformed backing/padding refusal. The M1 model now traverses active packed indices within the visible causal prefix without allocating an expanded index vector.
+
+Source-pinned `sparse-mask-v1` component receipts cover empty/sparse/dense/full warm1,000,003-bit masks with20 traversals and5 rotated repetitions. Exact count/sum equality holds. Median scalar/packed ms respectively18.622711/0.134500,18.545653/0.140786,17.045482/7.167833,17.275486/15.093971. This isolated traversal result is not candidate throughput. Actual `candidate-screen-v2-sparse` repeats all48 candidates over five batches: every complete estimate/audit/replay fingerprint exactly equals v1, including10053 actual trades/batch, unsupported/partial counts and shadow decisions. Median model97.723496ms/ticks177.640556ms does not establish an end-to-end speedup against the separately measured older process. Both children exit0/RSS10496KiB; source hashes verified. No financial/scientific gate changes. Shared feature batches, proof-based safe execution skipping and complete indexed accounting remain unfinished.
+
+Hosted run43469467056 independently reports Success for exact runtime-policy SHAd7b2b665fe37ae9793d809a378f1a56ca3bdf438. New sparse hosted verification follows publication.

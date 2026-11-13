@@ -147,8 +147,9 @@ pub fn estimate(
         .ok_or("estimate slippage overflow")?;
     let mut equity = contracts::INITIAL_EQUITY;
     let mut busy_through: Option<u64> = None;
-    for (i, signal) in primary[..visible].iter().enumerate() {
-        if !mask.get(i) || window.is_some_and(|w| !w.contains(signal.available_ms)) {
+    for i in mask.set_indices_prefix(visible)? {
+        let signal = &primary[i];
+        if window.is_some_and(|w| !w.contains(signal.available_ms)) {
             continue;
         }
         let entry_i = data

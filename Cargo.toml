@@ -55,3 +55,7 @@ harness = false
 [[bench]]
 name = "candidate_screen"
 harness = false
+
+[[bench]]
+name = "sparse_mask"
+harness = false

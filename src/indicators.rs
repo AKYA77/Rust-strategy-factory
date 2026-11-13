@@ -122,6 +122,37 @@ impl Mask {
     pub fn count(&self) -> usize {
         self.words.iter().map(|w| w.count_ones() as usize).sum()
     }
+    /// Ascending active indices without allocating an expanded signal vector.
+    /// Validate serialized backing/padding before exposing word-level traversal.
+    pub fn set_indices(&self) -> Result<impl Iterator<Item = usize> + '_> {
+        self.set_indices_prefix(self.len)
+    }
+    /// Restrict traversal to a causal prefix, including a partial final word.
+    pub fn set_indices_prefix(&self, count: usize) -> Result<impl Iterator<Item = usize> + '_> {
+        self.validate()?;
+        if count > self.len {
+            return Err("sparse prefix exceeds mask length".into());
+        }
+        let words = count.div_ceil(64);
+        let tail = count % 64;
+        Ok(self.words[..words]
+            .iter()
+            .enumerate()
+            .flat_map(move |(word, &bits)| {
+                let mut remaining = bits;
+                if word + 1 == words && tail != 0 {
+                    remaining &= (1_u64 << tail) - 1;
+                }
+                std::iter::from_fn(move || {
+                    if remaining == 0 {
+                        return None;
+                    }
+                    let bit = remaining.trailing_zeros() as usize;
+                    remaining &= remaining - 1;
+                    Some(word * 64 + bit)
+                })
+            }))
+    }
     pub fn get(&self, i: usize) -> bool {
         i < self.len
             && self
