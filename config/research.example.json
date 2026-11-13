@@ -5,7 +5,19 @@
     "max_total_events": 500000,
     "max_regions": 10000,
     "lease_ms": 300000,
-    "state_budget_bytes": 268435456
+    "state_budget_bytes": 268435456,
+    "shadow_policy": {
+      "version": "m1-shadow-promotion-v1",
+      "threshold_bps": 5000,
+      "minimum_closed_trades": 20,
+      "promote_uncertain": true,
+      "audit_sample_bps": 1000,
+      "seed": 42
+    }
   },
-  "inputs": [{"dataset": "../state/fixture.json"}]
+  "inputs": [
+    {
+      "dataset": "../state/fixture.json"
+    }
+  ]
 }

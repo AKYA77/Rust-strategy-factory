@@ -58,6 +58,99 @@ fn open(path: &std::path::Path) -> Driver {
     .unwrap()
 }
 #[test]
+fn configured_shadow_policy_separates_cache_identity_and_survives_driver_restart() {
+    use research::EvaluationOptions;
+    let d = dir();
+    let path = d.join("state.sqlite");
+    let policy = rust_strategy_factory::candidate_screen::ShadowPolicy {
+        threshold_bps: 7000,
+        seed: 19,
+        ..Default::default()
+    };
+    let config = Config {
+        seed: 10,
+        shadow_policy: Some(policy.clone()),
+        ..Default::default()
+    };
+    let mut driver = Driver::open(
+        &path,
+        vec![input("EURUSD")],
+        config.clone(),
+        "fixed-test-revision".into(),
+    )
+    .unwrap();
+    driver.acquire(0).unwrap();
+    driver.step(1).unwrap();
+    let (_, s) = research::candidate_at(0, 10).unwrap();
+    let configured = research::evaluate_configured(
+        &mut driver.registry,
+        &input("EURUSD"),
+        &s,
+        &Default::default(),
+        "fixed-test-revision",
+        EvaluationOptions {
+            feature_cells: 1_000_000,
+            evaluation: None,
+            shadow_policy: Some(&policy),
+        },
+    )
+    .unwrap();
+    assert!(configured.reused);
+    assert_eq!(configured.result["shadow_policy"]["threshold_bps"], 7000);
+    assert_eq!(
+        configured.result["candidate_screen_audit"]["shadow_decision"]["policy"]["seed"],
+        19
+    );
+    let default = research::evaluate(
+        &mut driver.registry,
+        &input("EURUSD"),
+        &s,
+        &Default::default(),
+        "fixed-test-revision",
+        1_000_000,
+    )
+    .unwrap();
+    assert_ne!(configured.experiment_id, default.experiment_id);
+    assert_eq!(
+        configured.result["tick_replay"],
+        default.result["tick_replay"]
+    );
+    let changed = rust_strategy_factory::candidate_screen::ShadowPolicy { seed: 20, ..policy };
+    let changed = research::evaluate_configured(
+        &mut driver.registry,
+        &input("EURUSD"),
+        &s,
+        &Default::default(),
+        "fixed-test-revision",
+        EvaluationOptions {
+            feature_cells: 1_000_000,
+            evaluation: None,
+            shadow_policy: Some(&changed),
+        },
+    )
+    .unwrap();
+    assert_ne!(configured.experiment_id, changed.experiment_id);
+    driver.release().unwrap();
+    let id = driver.id.clone();
+    drop(driver);
+    let restarted = Driver::open(
+        &path,
+        vec![input("EURUSD")],
+        config,
+        "fixed-test-revision".into(),
+    )
+    .unwrap();
+    assert_eq!(restarted.id, id);
+    assert_eq!(
+        research::status(&restarted.registry, &id, 2)
+            .unwrap()
+            .cursor,
+        1
+    );
+    drop(restarted);
+    std::fs::remove_dir_all(d).unwrap();
+}
+#[test]
 fn pause_resume_stop_and_cursor_survive_restart() {
     let d = dir();
     let path = d.join("state.sqlite");

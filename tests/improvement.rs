@@ -74,6 +74,85 @@ fn evaluate(r: &mut Registry, s: &Strategy, last: i64) -> research::Execution {
     .unwrap()
 }
 #[test]
+fn comparable_children_preserve_explicit_shadow_policy_identity() {
+    let d = dir();
+    let mut r = Registry::open(&d.join("state.sqlite")).unwrap();
+    let input = input(100900);
+    let revision = research::compute_revision().unwrap();
+    let policy = rust_strategy_factory::candidate_screen::ShadowPolicy {
+        threshold_bps: 7000,
+        seed: 19,
+        ..Default::default()
+    };
+    let parent = research::evaluate_configured(
+        &mut r,
+        &input,
+        &strategy(),
+        &Costs::default(),
+        &revision,
+        research::EvaluationOptions {
+            feature_cells: 10000,
+            evaluation: None,
+            shadow_policy: Some(&policy),
+        },
+    )
+    .unwrap();
+    let diagnosis = improvement::diagnose(
+        &mut r,
+        &parent.experiment_id,
+        &Options {
+            max_children: 1,
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .report;
+    assert_eq!(diagnosis.proposals.len(), 1);
+    let report = rust_strategy_factory::training_review::execute(
+        &mut r,
+        &input,
+        &diagnosis.id,
+        10000,
+        256 * 1024 * 1024,
+    )
+    .unwrap()
+    .report;
+    assert_eq!(report.baseline.experiment_id, parent.experiment_id);
+    for evidence in
+        std::iter::once(&report.baseline).chain(report.children.iter().map(|c| &c.evidence))
+    {
+        let result = r.result(&evidence.experiment_id).unwrap().unwrap();
+        assert_eq!(
+            result.result["shadow_policy"],
+            serde_json::to_value(&policy).unwrap()
+        );
+        assert_eq!(
+            r.experiment_key(&evidence.experiment_id)
+                .unwrap()
+                .unwrap()
+                .configuration_hash,
+            diagnosis.parent_key.configuration_hash
+        );
+    }
+    assert!(
+        rust_strategy_factory::training_review::execute(
+            &mut r,
+            &input,
+            &diagnosis.id,
+            9999,
+            256 * 1024 * 1024
+        )
+        .is_err()
+    );
+    assert!(
+        rust_strategy_factory::training_review::read_report(&r, &report.id)
+            .unwrap()
+            .is_some()
+    );
+    drop(r);
+    std::fs::remove_dir_all(d).unwrap();
+}
+#[test]
 fn real_loss_proposals_are_bounded_immutable_and_survive_backup() {
     let d = dir();
     let path = d.join("state.sqlite");

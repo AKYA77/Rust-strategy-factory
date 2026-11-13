@@ -214,18 +214,17 @@ fn run(
         serde_json::from_value(parent.result["strategy"].clone()).map_err(|e| e.to_string())?;
     let costs: Costs =
         serde_json::from_value(parent.result["cost_profile"].clone()).map_err(|e| e.to_string())?;
+    let shadow_policy: Option<crate::candidate_screen::ShadowPolicy> =
+        serde_json::from_value(parent.result["shadow_policy"].clone())
+            .map_err(|e| e.to_string())?;
     if input.conversions.len() != input.dataset.ticks.len()
         || input.dataset.manifest.content_hash != key.dataset_hash
         || input.dataset.manifest.profile_hash != key.profile_hash
         || input.dataset.profile.symbol != key.instrument
         || data::hash(&costs)? != key.cost_hash
         || strategy.identity()? != key.concept_hash
-        || data::hash(&(
-            feature_cells,
-            &costs,
-            data::hash(&input.conversions)?,
-            data::dataset_identity(&input.dataset.manifest)?,
-        ))? != key.configuration_hash
+        || research::configuration_hash(input, &costs, feature_cells, shadow_policy.as_ref())?
+            != key.configuration_hash
     {
         return Err("review requires exact parent data, profile, provenance, costs, conversions and feature configuration".into());
     }
@@ -253,23 +252,23 @@ fn run(
     }
     let evaluate = |registry: &mut Registry, strategy: &Strategy| -> Result<Evidence> {
         research::check_state_budget(registry, state_budget_bytes)?;
-        let execution = if whole {
-            research::evaluate(registry, input, strategy, &costs, &revision, feature_cells)?
-        } else {
-            research::evaluate_window(
-                registry,
-                input,
-                strategy,
-                &costs,
-                &revision,
+        let evaluation = (!whole).then(|| Evaluation {
+            window: window.clone(),
+            stage: key.stage.clone(),
+            protocol_hash: key.protocol_hash.clone(),
+        });
+        let execution = research::evaluate_configured(
+            registry,
+            input,
+            strategy,
+            &costs,
+            &revision,
+            research::EvaluationOptions {
                 feature_cells,
-                &Evaluation {
-                    window: window.clone(),
-                    stage: key.stage.clone(),
-                    protocol_hash: key.protocol_hash.clone(),
-                },
-            )?
-        };
+                evaluation: evaluation.as_ref(),
+                shadow_policy: shadow_policy.as_ref(),
+            },
+        )?;
         evidence(registry, &execution.experiment_id)
     };
     let missing = |registry: &Registry, strategy: &Strategy| -> Result<bool> {

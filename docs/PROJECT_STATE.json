@@ -74,7 +74,8 @@
     "bounded single-frame ZSTD/native wrapper with exact native restoration, original dataset identities, caps/checksums/window/trailing-frame/structural refusal, compressed CLI/research/protocol reuse, reviewed pinned source and installed notice verification",
     "bounded Parquet/ZSTD exact integer/provenance cold storage, allocation/schema/page preflight, full-u64 roundtrip and actual CLI/research/protocol reuse; same-corpus synthetic storage/current-pipeline equality/IO/resource comparison",
     "Bounded hypothetical USD market-entry M1 cash estimates with exact risk/fees/net-win accounting, explicit collision/gap/deadline/unsupported/partial uncertainty, conservative persisted shadow policy, configurable library-level deterministic audit selection and actual tick-disagreement receipts; no execution skipping",
-    "Exact fixed-market-stop infeasibility proofs bound to canonical strategy/profile/cost identities, independently reverified and persisted only with actual replay contradiction checks;96 all-profile/direction/cost/spread oracle cases, no execution skip"
+    "Exact fixed-market-stop infeasibility proofs bound to canonical strategy/profile/cost identities, independently reverified and persisted only with actual replay contradiction checks;96 all-profile/direction/cost/spread oracle cases, no execution skip",
+    "Runtime optional versioned shadow policy with full campaign/experiment cache identity, immutable selected-policy receipts and context-exact comparable baseline/child replay; omitted-policy legacy hash formula preserved"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -84,7 +85,7 @@
   ],
   "next_action": "Bind selectable screening execution policy into complete experiment/review identities; add safe candidate failure proofs and calibrated rejected-candidate tick audits, batched/shared sparse screens and measured full-accounting indexed replay equivalence. Current M1 model is shadow-only.",
   "qualified_strategies": 0,
-  "tests_passed": 166,
+  "tests_passed": 168,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile against actual Rust/SQLite/native input: auth/control/export/restart, >100-history paging and filter/race, actual immutable training lineage/review and exact extreme-loss training exports",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
@@ -93,10 +94,10 @@
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43449021150,
-    "sha": "624ef0031bd6b9db351f17e6db3d78d9217c580d",
+    "run_id": 43449859402,
+    "sha": "e7697211c91fc0798bbd7c1878863787269fd98a",
     "conclusion": "success",
-    "verification": "Exact public commit/success summary retrieved; proof milestone hosted result pending publication"
+    "verification": "Exact public commit/success summary retrieved; runtime-policy milestone hosted result pending publication"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
   "vps_acceptance": "VPS_PERFORMANCE_PENDING",

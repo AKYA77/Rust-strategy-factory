@@ -27,6 +27,8 @@ pub struct Config {
     pub training_window: Option<crate::validation::Interval>,
     #[serde(skip_serializing_if = "zero_children")]
     pub improvement_children: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shadow_policy: Option<crate::candidate_screen::ShadowPolicy>,
 }
 fn zero_children(n: &usize) -> bool {
     *n == 0
@@ -42,6 +44,7 @@ impl Default for Config {
             state_budget_bytes: 256 * 1024 * 1024,
             training_window: None,
             improvement_children: 0,
+            shadow_policy: None,
         }
     }
 }
@@ -61,6 +64,11 @@ pub struct Evaluation {
     pub stage: Stage,
     pub protocol_hash: String,
 }
+pub struct EvaluationOptions<'a> {
+    pub feature_cells: usize,
+    pub evaluation: Option<&'a Evaluation>,
+    pub shadow_policy: Option<&'a crate::candidate_screen::ShadowPolicy>,
+}
 pub fn evaluate(
     registry: &mut Registry,
     input: &Input,
@@ -69,14 +77,17 @@ pub fn evaluate(
     revision: &str,
     feature_cells: usize,
 ) -> Result<Execution> {
-    evaluate_internal(
+    evaluate_configured(
         registry,
         input,
         strategy,
         costs,
         revision,
-        feature_cells,
-        None,
+        EvaluationOptions {
+            feature_cells,
+            evaluation: None,
+            shadow_policy: None,
+        },
     )
 }
 pub fn evaluate_window(
@@ -88,31 +99,64 @@ pub fn evaluate_window(
     feature_cells: usize,
     evaluation: &Evaluation,
 ) -> Result<Execution> {
-    evaluation.window.validate()?;
-    if evaluation.stage == Stage::CandleScreen {
-        return Err(
-            "tick evaluation requires tick verification or independent-validation stage".into(),
-        );
-    }
-    evaluate_internal(
+    evaluate_configured(
         registry,
         input,
         strategy,
         costs,
         revision,
-        feature_cells,
-        Some(evaluation),
+        EvaluationOptions {
+            feature_cells,
+            evaluation: Some(evaluation),
+            shadow_policy: None,
+        },
     )
 }
-fn evaluate_internal(
+pub(crate) fn configuration_hash(
+    input: &Input,
+    costs: &Costs,
+    feature_cells: usize,
+    shadow_policy: Option<&crate::candidate_screen::ShadowPolicy>,
+) -> Result<String> {
+    let original = data::hash(&(
+        feature_cells,
+        costs,
+        data::hash(&input.conversions)?,
+        data::dataset_identity(&input.dataset.manifest)?,
+    ))?;
+    match shadow_policy {
+        None => Ok(original),
+        Some(policy) => {
+            policy.validate()?;
+            data::hash(&("shadow-policy-context-v1", original, policy))
+        }
+    }
+}
+/// Explicit shadow policy affects identity and diagnostic decisions, never replay eligibility.
+pub fn evaluate_configured(
     registry: &mut Registry,
     input: &Input,
     strategy: &Strategy,
     costs: &Costs,
     revision: &str,
-    feature_cells: usize,
-    evaluation: Option<&Evaluation>,
+    options: EvaluationOptions<'_>,
 ) -> Result<Execution> {
+    let EvaluationOptions {
+        feature_cells,
+        evaluation,
+        shadow_policy,
+    } = options;
+    if let Some(e) = evaluation {
+        e.window.validate()?;
+        if e.stage == Stage::CandleScreen {
+            return Err(
+                "tick evaluation requires tick verification or independent-validation stage".into(),
+            );
+        }
+    }
+    if let Some(policy) = shadow_policy {
+        policy.validate()?;
+    }
     let d = &input.dataset;
     d.verify()?;
     if input.conversions.len() != d.ticks.len() {
@@ -138,12 +182,7 @@ fn evaluate_internal(
             None => data::hash(&"training-only-conservative-signals-v1")?,
         },
         code_revision: revision.into(),
-        configuration_hash: data::hash(&(
-            feature_cells,
-            costs,
-            data::hash(&input.conversions)?,
-            data::dataset_identity(&d.manifest)?,
-        ))?,
+        configuration_hash: configuration_hash(input, costs, feature_cells, shadow_policy)?,
         stage: evaluation.map_or(Stage::TickVerification, |e| e.stage.clone()),
     };
     let id = registry.register(&key)?;
@@ -184,7 +223,7 @@ fn evaluate_internal(
                 }
                 if !screen.requires_tick_verification {
                     return Ok(
-                        serde_json::json!({"screen":screen,"tick_replay":null,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation}),
+                        serde_json::json!({"screen":screen,"tick_replay":null,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation,"shadow_policy":shadow_policy}),
                     );
                 }
                 // Diagnostic-only: failure/uncertainty must never suppress authoritative replay.
@@ -224,14 +263,14 @@ fn evaluate_internal(
                         &estimate,
                         &replay,
                         &id,
-                        &Default::default(),
+                        shadow_policy.unwrap_or(&Default::default()),
                     )?,
                     Err(error) => serde_json::json!({"version":crate::candidate_screen::VERSION,
                         "status":"unavailable", "error":error, "promotes_to_tick":true,
                         "candidate_rejected":false,"qualification_evidence":false}),
                 };
                 Ok(
-                    serde_json::json!({"screen":screen,"screen_audit":screen_audit,"market_stop_proof":market_stop_proof,"candidate_screen_audit":candidate_screen_audit,"tick_replay":replay,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation}),
+                    serde_json::json!({"screen":screen,"screen_audit":screen_audit,"market_stop_proof":market_stop_proof,"candidate_screen_audit":candidate_screen_audit,"tick_replay":replay,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation,"shadow_policy":shadow_policy}),
                 )
             };
             let (outcome, result) = match compute() {
@@ -529,6 +568,9 @@ impl Driver {
         if total > config.max_total_events {
             return Err("loaded inputs exceed configured event budget".into());
         }
+        if let Some(policy) = &config.shadow_policy {
+            policy.validate()?;
+        }
         if let Some(window) = &config.training_window {
             window.validate()?;
         }
@@ -655,30 +697,30 @@ impl Driver {
         let input_index = s.cursor as usize % self.inputs.len();
         let candidate_index = s.cursor / self.inputs.len() as u64;
         let (_, strategy) = candidate_at(candidate_index, self.config.seed)?;
-        let execution = if let Some(window) = &self.config.training_window {
-            evaluate_window(
-                &mut self.registry,
-                &self.inputs[input_index],
-                &strategy,
-                &Costs::default(),
-                &self.revision,
-                self.config.feature_cells,
-                &Evaluation {
+        let evaluation = self
+            .config
+            .training_window
+            .as_ref()
+            .map(|window| -> Result<Evaluation> {
+                Ok(Evaluation {
                     window: window.clone(),
                     stage: Stage::TickVerification,
                     protocol_hash: data::hash(&("training-window-v1", window))?,
-                },
-            )
-        } else {
-            evaluate(
-                &mut self.registry,
-                &self.inputs[input_index],
-                &strategy,
-                &Costs::default(),
-                &self.revision,
-                self.config.feature_cells,
-            )
-        };
+                })
+            })
+            .transpose()?;
+        let execution = evaluate_configured(
+            &mut self.registry,
+            &self.inputs[input_index],
+            &strategy,
+            &Costs::default(),
+            &self.revision,
+            EvaluationOptions {
+                feature_cells: self.config.feature_cells,
+                evaluation: evaluation.as_ref(),
+                shadow_policy: self.config.shadow_policy.as_ref(),
+            },
+        );
         let (id, outcome, reused, error) = match execution {
             Ok(e) => (
                 Some(e.experiment_id),
