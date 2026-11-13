@@ -108,10 +108,10 @@
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43523080065,
-    "sha": "f7ce2bd6d281781546f146dacfa1eb6aef5e1895",
+    "run_id": 43525418612,
+    "sha": "478ea5162f5aae9898d2d5eb02f3569af8d0062e",
     "conclusion": "success",
-    "verification": "Exact public commit/success summary retrieved; catalog dashboard follow-up hosted verification follows publication"
+    "verification": "Exact public commit/success summary retrieved for latest implementation; subsequent documentation-only reconciliation CI is separate"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
   "vps_acceptance": "VPS_PERFORMANCE_PENDING",
@@ -127,5 +127,6 @@
   "indexed_factory_benchmark": "docs/BENCHMARKS/indexed-factory-v1.json",
   "indexed_factory_performance_status": "INCONCLUSIVE; lower synthetic median but3/5 paired regressions; no default/autonomous promotion",
   "audit_health_component_benchmark": "docs/BENCHMARKS/audit-health-v1.json",
-  "import_cost_benchmark": "docs/BENCHMARKS/import-job-v1.json"
+  "import_cost_benchmark": "docs/BENCHMARKS/import-job-v1.json",
+  "dependency_archive_inventory": "docs/SOURCE_REVIEW/2026-11-13-linux-lock-check.json"
 }
