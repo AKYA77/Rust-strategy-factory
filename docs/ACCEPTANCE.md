@@ -136,3 +136,9 @@ Engine v6/indicator v4 and protocol v7 bind the new policy. Browser setup submit
 ## Packed causal mask prefix and current synthetic baseline
 
 121 Rust tests pass with formatting/Clippy, release build and actual Chromium acceptance. Two prefix tests cover 2400 seeded independent Boolean-oracle queries and exact full-word/partial/empty/malformed boundaries. The engine now checks packed words without weakening representation or relevant-bit checks. Both benchmark children exited zero; source/per-file and compiled compute identities reconcile. See BENCHMARKS/README.md and v6 component/sequential/raw resource receipts. Every sequential synthetic batch resolved 6997 trades. Component median 2.688380 ms scalar versus 0.002947 ms packed measures masks only; no end-to-end A/B, real/full-history speed or universal worker setting is claimed. Default production scheduling remains one worker.
+
+## Browser diagnostic integer precision
+
+The unchanged 121 Rust tests, formatting/Clippy and both builds pass. Chromium now imports/executes an actual synthetic extreme-gap short loss beyond signed64/safe-JS range through the CLI, reads its persisted numeric assessment, guards trade/chart/generic JSON display and downloads exactly the original HTTP receipt. The regression failed on the old generic JSON renderer, then passed after the fix. Currency formatting now uses BigInt quotient/remainder, including exact positive/negative Number.MAX_SAFE_INTEGER boundary checks. Initial precision acceptance covered table/chart/raw export; generic diagnostic JSON now has explicit coverage too.
+
+The actual debug and release executable hashes changed while every compute/version field stayed identical. See VERIFICATION/ui-integer-display-identity.json for hashes and red/green evidence. UI changes did not alter financial math or invalidate compute identity; no new simulation throughput, real performance or qualification claim follows.

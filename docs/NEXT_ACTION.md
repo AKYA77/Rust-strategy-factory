@@ -4,7 +4,9 @@ Status: SOFTWARE_INCOMPLETE. Read AGENTS.md, PROJECT_STATE.json, ACCEPTANCE.md a
 
 ## Latest milestone
 
-121 Rust tests, formatting/Clippy, release build and Chromium desktop/mobile acceptance pass. Packed-word prefix validation now preserves every relevant bit, backing/padding checks and exact exclusive-end scope. Two tests cover 2400 seeded oracle queries plus exact word/partial/empty/malformed boundaries. Current engine-v6 component and sequential benchmarks completed with zero exit codes and verified source/compute/per-file/binary/resource identities. Every sequential synthetic batch resolved 6997 trades; warm medians for 1/2/3/4 workers were 0.102943/0.057072/0.048434/0.039235 seconds. Component timings are not research throughput, and there is no whole-engine A/B or real/full-history claim. See BENCHMARKS/README.md and v6 JSON receipts.
+121 Rust tests, formatting/Clippy, release build and Chromium desktop/mobile acceptance pass. UI integer precision regression is fixed and verified against actual Rust/SQLite/Chromium. A CLI-created uncapped-loss receipt reproduced unsafe generic diagnostic rounding before the fix; guarded text and byte-identical exact raw export now pass. Currency formatting uses integer division through positive/negative safe boundaries, avoiding floating division rounding. Debug/release executable hashes changed but both compute/version identities stayed identical; see VERIFICATION/ui-integer-display-identity.json. Initial table/chart/export guards remain in place.
+
+Packed prefix and current synthetic/component benchmark receipts remain verified; see BENCHMARKS/README.md. Component timings are not research throughput or whole-engine A/B evidence.
 
 Typed outward ATR initial stops and frozen distance/quantity receipts remain verified under engine v6/indicator v4/protocol v7; see DECISIONS/0008-atr-initial-stops.md.
 
@@ -20,7 +22,7 @@ Previous verified foundations include chronological replay, initial executable-s
 
 ## Begin next
 
-Fix generic dashboard JSON diagnostics so unsafe JS integers are never silently displayed rounded. Trade money/chart guards and raw exports exist, but the generic assessment JSON renderer still uses parsed Number values. Add an actual extreme-loss CLI/browser fixture, verify guarded display and exact raw export, and keep UI changes outside compute identity. Continue dependence-aware inference, sufficient-sample/prespecified robustness acceptance and independent approval/coverage prerequisites before unlocking real final evaluation. Current protocols and pooled reset-fold statistics cannot issue validated status.
+Implement deterministic training-only failure diagnostics and bounded child proposals with immutable parent/child reasons, operator/seed/identities and restart-safe deduplication. Never adapt from OOS/protected-final evidence. Use explicit training authorization rather than trusting the generic tick-verification stage, since scientific OOS jobs also use that stage. Enforce registered protected ranges for every child evaluation. Continue dependence-aware inference, sufficient-sample/prespecified robustness acceptance and independent approval/coverage prerequisites before unlocking real final evaluation. Current protocols and pooled reset-fold statistics cannot issue validated status.
 
 Continue bounded mutation/improvement lineage, candidate-level net candle screening, Parquet/ZSTD and measured codec/native streaming work, source acquisition/import acceptance, worker pools/OS resource control, full dashboard operations, production deployment and final end-to-end acceptance. Follow the entire IMPLEMENTATION_QUEUE.md.
 

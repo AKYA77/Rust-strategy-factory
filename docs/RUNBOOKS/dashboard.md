@@ -28,3 +28,5 @@ npm run test:browser
 ```
 
 In the cloud sandbox use `npm --cache /workspace/.npm-cache ci --ignore-scripts`. Tests use an installed Chromium when available; otherwise install the pinned Playwright Chromium with its supported installer. Node is required only for development tests. The test starts actual Rust processes, builds synthetic persisted results, checks desktop/mobile workflows and server restart, then stops its own processes. Ignored screenshots are written to `state/browser/`. No public preview is created.
+
+Generic diagnostic JSON guards parsed integers outside the exact display range and directs users to the raw receipt. Currency formatting inside the safe range uses integer quotient/remainder, including negative values; raw receipt downloads preserve the original HTTP bytes. Actual extreme-loss/browser and safe-boundary regressions cover these paths.

@@ -56,7 +56,8 @@
     "frozen protective distance in risk reservation receipts, unchanged pending quantity/distance through volatility changes and pre-fill validation",
     "ATR autonomous/protocol/browser integration and frozen policy-parameter probes with trial accounting; strict strategy fields and risk price grids",
     "validated packed-word causal mask prefix comparison with 2400 seeded oracle queries and exact boundary/malformed tests",
-    "current engine-v6 synthetic sequential/component measurements with source manifests, binary/compiler/CPU/cgroup/resource receipts and distinct workload classes"
+    "current engine-v6 synthetic sequential/component measurements with source manifests, binary/compiler/CPU/cgroup/resource receipts and distinct workload classes",
+    "generic diagnostic unsafe-integer guards, exact integer currency formatting through safe numeric boundaries and actual extreme-loss raw-export browser regression"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -64,11 +65,11 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Fix unsafe-integer generic dashboard diagnostic rendering with actual extreme-loss/browser export regression, then improvement lineage, resource/qualification and remaining full queue.",
+  "next_action": "Implement training-only deterministic failure diagnostics and bounded improvement lineage; then remaining scientific, resource, storage, dashboard and deployment queue.",
   "qualified_strategies": 0,
   "tests_passed": 121,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
-  "browser_acceptance": "Chromium desktop/mobile against actual Rust HTTP server and SQLite; auth, CSRF/origin/host/body/rates, controls, receipts/export, restart/logout passed",
+  "browser_acceptance": "Chromium desktop/mobile against real Rust/SQLite/native input and ATR/MACD/higher protocol; auth/control/export/restart plus actual extreme-loss diagnostic guards, exact positive/negative safe-boundary currency and byte-identical raw download passed",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
   "component_benchmark": "docs/BENCHMARKS/v6-prefix-component.json"
 }

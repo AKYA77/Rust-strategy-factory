@@ -1,0 +1,67 @@
+{
+  "class": "SOFTWARE_UI_IDENTITY_VERIFICATION",
+  "scope": "Functional JS integer-display change; all Rust math inputs unchanged. Browser regression reproduced generic rounding before the fix and passed afterward.",
+  "before": {
+    "debug": {
+      "sha256": "51a695dcd625fc4f48215a6ce71291525f243386eaec4fbfff85ede8a52dac4c",
+      "version": {
+        "compute_revision": "compute-blake3:1cd3212b46386fe9e47c884bf7ae78214a1fd5e146e49ce55ff0887cb5a0de69",
+        "engine": "ordered-l1-v6-frozen-atr-stops",
+        "indicators": "causal-primitives-v4-outward-atr",
+        "package": "0.1.0",
+        "signals": "closed-publication-next-event-v3-scoped-features",
+        "software_status": "SOFTWARE_INCOMPLETE"
+      }
+    },
+    "release": {
+      "sha256": "ae0b55453434b407a756111021de9f2d4c0bb76542160bf5155fc798b0c46a8d",
+      "version": {
+        "compute_revision": "compute-blake3:9d9988a7d50ff7d67d289b660552eddae9ac318aaac3f74ab7ed40a047ddbec7",
+        "engine": "ordered-l1-v6-frozen-atr-stops",
+        "indicators": "causal-primitives-v4-outward-atr",
+        "package": "0.1.0",
+        "signals": "closed-publication-next-event-v3-scoped-features",
+        "software_status": "SOFTWARE_INCOMPLETE"
+      }
+    }
+  },
+  "after": {
+    "debug": {
+      "sha256": "b6f9acf4bf031cda45606b24705a70e05aef5320c35b80224a94dc017e404a11",
+      "version": {
+        "compute_revision": "compute-blake3:1cd3212b46386fe9e47c884bf7ae78214a1fd5e146e49ce55ff0887cb5a0de69",
+        "engine": "ordered-l1-v6-frozen-atr-stops",
+        "indicators": "causal-primitives-v4-outward-atr",
+        "package": "0.1.0",
+        "signals": "closed-publication-next-event-v3-scoped-features",
+        "software_status": "SOFTWARE_INCOMPLETE"
+      }
+    },
+    "release": {
+      "sha256": "0eed3daa97e2763e0c7d1857957561e53b2fd7c2ed4c4bc8bf976c6d1571137c",
+      "version": {
+        "compute_revision": "compute-blake3:9d9988a7d50ff7d67d289b660552eddae9ac318aaac3f74ab7ed40a047ddbec7",
+        "engine": "ordered-l1-v6-frozen-atr-stops",
+        "indicators": "causal-primitives-v4-outward-atr",
+        "package": "0.1.0",
+        "signals": "closed-publication-next-event-v3-scoped-features",
+        "software_status": "SOFTWARE_INCOMPLETE"
+      }
+    }
+  },
+  "compute_identity_unchanged": true,
+  "executable_bytes_changed": true,
+  "ui_source_sha256": "4a50686253e2153f0f1d145b4c432585effc40225d067cd7360cc39e06ec4d53",
+  "browser_test_sha256": "f9bb9e95b6ab1239b586dc1dae43945a53451811dd64e8bd62b07eed84730a40",
+  "checks": [
+    "actual CLI-created extreme uncapped-loss receipt beyond safe integer range",
+    "generic diagnostic placeholder instead of rounded Number",
+    "exact raw download identical to HTTP response",
+    "safe positive/negative boundary currency formatting with integer division",
+    "desktop/mobile/auth/restart/control/protocol acceptance"
+  ],
+  "limitations": "Synthetic software fixtures only; no source approval, qualification or new performance/simulation claim.",
+  "expected_failure_confirmed": true,
+  "red_log_sha256": "1ec8979c07ea372537ee3a25a9ddeec574f02a25e459700084fa027157d16e7f",
+  "green_log_sha256": "a9800728d4a8e4e8b5630e451cc226d40e6c7f7aca50a6dc43d976e1443c11cc"
+}
