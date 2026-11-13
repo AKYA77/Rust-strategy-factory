@@ -20,43 +20,27 @@ Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 16. Full synthetic/adversarial/cross-year/real-data end-to-end acceptance, benchmarks with hardware/resource evidence, recovery and browser acceptance.
 17. Final requirement reconciliation, source/license audit, GitHub CI verification and honest handoff. Full historical data and target VPS acceptance remain external pending work.
 
-## Directive section reconciliation
+## Requirement-to-evidence reconciliation (2026-11-13, ea0c6cc)
 
-| Section | Status |
-|---|---|
-| 0. YOUR MISSION | Directive preserved; ongoing engineering rule |
-| 1. COMPLETELY NEW PROJECT | Directive preserved; ongoing engineering rule |
-| 2. ENGINEERING PHILOSOPHY | Directive preserved; ongoing engineering rule |
-| 3. HARDWARE AND RESOURCE REQUIREMENTS | Incomplete; consult full requirement and queue above |
-| 4. SUPPORTED INSTRUMENTS | Incomplete; consult full requirement and queue above |
-| 5. SUPPORTED TIMEFRAMES | Incomplete; consult full requirement and queue above |
-| 6. HISTORICAL DATA REQUIREMENTS | Incomplete; consult full requirement and queue above |
-| 7. FINANCIAL RESEARCH CONTRACT | Incomplete; consult full requirement and queue above |
-| 8. STRATEGY QUALIFICATION CRITERIA | Incomplete; consult full requirement and queue above |
-| 9. STRATEGY GENERATOR | Incomplete; consult full requirement and queue above |
-| 10. CANONICAL STRATEGY IDENTITIES | Incomplete; consult full requirement and queue above |
-| 11. FAST TWO-STAGE RESEARCH PIPELINE | Incomplete; consult full requirement and queue above |
-| 12. TICK FIRST-HIT ACCELERATION | Incomplete; consult full requirement and queue above |
-| 13. COMPRESSION AND DATA ENGINEERING | Incomplete; consult full requirement and queue above |
-| 14. SHARED INDICATOR AND BITSET ENGINE | Incomplete; consult full requirement and queue above |
-| 15. PERFORMANCE AND THROUGHPUT | Incomplete; consult full requirement and queue above |
-| 16. LIBRARIES AND EXISTING SOURCE CODE | Incomplete; consult full requirement and queue above |
-| 17. STATISTICAL VALIDATION | Incomplete; consult full requirement and queue above |
-| 18. STRATEGY IMPROVEMENT SYSTEM | Incomplete; consult full requirement and queue above |
-| 19. CONTINUOUS AUTONOMOUS RESEARCH | Incomplete; consult full requirement and queue above |
-| 20. TOP FIVE STRATEGIES | Incomplete; consult full requirement and queue above |
-| 21. LIGHTWEIGHT DASHBOARD | Incomplete; consult full requirement and queue above |
-| 22. DATABASE AND PERSISTENCE | Incomplete; consult full requirement and queue above |
-| 23. SECURITY | Incomplete; consult full requirement and queue above |
-| 24. TESTING AND CORRECTNESS | Incomplete; consult full requirement and queue above |
-| 25. END-TO-END ACCEPTANCE | Incomplete; consult full requirement and queue above |
-| 26. HONEST RELEASE AND DATA STATES | Incomplete; consult full requirement and queue above |
-| 27. DEPLOYMENT | Incomplete; consult full requirement and queue above |
-| 28. GITHUB AND PROJECT STRUCTURE | Incomplete; consult full requirement and queue above |
-| 29. BUILD PHASES | Incomplete; consult full requirement and queue above |
-| 30. CONTINUOUS CODEX DEVELOPMENT LOOP | Directive preserved; ongoing engineering rule |
-| 31. MINIMIZE TOKENS, CALLS AND REPETITIVE WORK | Directive preserved; ongoing engineering rule |
-| 32. PUBLICATION REQUIREMENTS | Directive preserved; ongoing engineering rule |
-| 33. MANDATORY QUALITY GATES | Incomplete; consult full requirement and queue above |
-| 34. REQUIRED FINAL DELIVERABLES | Incomplete; consult full requirement and queue above |
-| 35. START EXECUTING NOW | Directive preserved; ongoing engineering rule |
+Fresh baseline:151 Rust tests, formatting and Clippy passed. Hosted [run43434456007](https://github.com/AKYA77/Rust-strategy-factory/actions/runs/43434456007) reports Success for the exact ea0c6cca4634b4ba791d0a8343cc9b8476b1d3c3 SHA; its public summary was retrieved directly. Historical failed API probes remain historical. Existing browser/operations acceptance is covered by that workflow and committed receipts; new changes must rerun affected paths. Source existence alone does not close a requirement.
+
+| Blueprint scope | Implemented evidence | Remaining acceptance / classification |
+|---|---|---|
+| Exact contracts/execution (§4,7) | `src/contracts.rs`, `src/risk.rs`, `src/orders.rs`, `src/tick_engine.rs`; `tests/core.rs`, `tests/risk.rs`, `tests/orders.rs`, `tests/pending_replay.rs`, `tests/atr.rs` include independent nonzero accounting, all-eight sizing and adverse boundaries | Fixture-verified core; approved broker/calendar/conversion provenance and justified liquidity evidence external pending; broader execution acceptance partial |
+| Data/import/QA (§6) | `src/data.rs::import_csv`, content/provenance identities, quarantine/order checks; `tests/cli.rs`, `tests/core.rs`, `tests/native.rs`, `tests/compressed.rs` | Partial software: resumable import/acquisition, missing ranges, revision/catalog/approval/coverage management; representative real samples absent |
+| Candles/causality (§5,14) | `src/candles.rs`, `src/indicators.rs`, `src/strategies.rs`; `tests/operators.rs`, `tests/higher_timeframe.rs`, `tests/windows.rs`, `tests/atr.rs` | Seven UTC timeframes and prior publication fixture-verified; approved broker/DST/session interpretation external pending; full-history incremental streaming partial |
+| Generation/dedup (§9,10) | `src/strategies.rs`, `src/neighborhood.rs`, `src/exploration.rs`, `src/research.rs::candidate_at`; `tests/families.rs`, `tests/neighborhood.rs`, `tests/exploration.rs`, `tests/storage.rs` | Partial: behavioral novelty/diversity and controlled recursive search/coverage reporting; no discovery-quality conclusion from canonical uniqueness |
+| M1 candidate screening (§11) | `src/screen.rs` conditional fixed-position sets and receipt audit; `src/research.rs::evaluate_internal` rejects only proven zero signals; `tests/screen.rs` seeded bound containment | Missing integrated candidate net estimates/bounds, policy/promotion, rejected-candidate audits/false-negative monitoring, batching and sparse masks; current bounds are not full candidate acceptance |
+| Tick acceleration (§12) | `src/tick_index.rs::Index::first_hit`; `tests/tick_index.rs`2000 seeded fixed-barrier queries | Disabled, incomplete: no full replay path, MFE/MAE/FX/accounting equivalence or representative full-engine A/B; sequential remains authoritative |
+| Storage/codecs (§13) | `src/native.rs`, `src/compressed.rs`; `tests/native.rs`, `tests/compressed.rs`, `tests/cli.rs`; `docs/BENCHMARKS/zstd-native-v1*.json` | Partial: bounded reconstructed in-memory baseline only; Parquet, indexed blocks, direct hot arrays/streaming/mmap and comparable cold/warm/full-pipeline corpus measurements missing |
+| Persistence/recovery (§22) | `src/storage.rs`, `src/training_review.rs`; `tests/storage.rs`, `tests/research.rs`, `tests/improvement.rs`; `scripts/check-operations.py` | Fixture-verified leases/hash/online backup core; writer queue, large immutable artifacts, retention/quotas, supervised crash/disk-full and production restore acceptance partial |
+| Scheduler/resources (§3,19) | `src/research.rs::Driver`, `src/main.rs::checkpoint_shutdown`; `tests/research.rs`, `tests/research_cli.rs`, `tests/improvement.rs` | Partial: one worker/one queued improvement, no measured pool/adaptive count/supervisor/hard resource controller; declared systemd caps are not target enforcement evidence |
+| Training diagnosis/improvement (§18) | `src/improvement.rs`, `src/training_diagnostics.rs`, `src/exploration.rs`, `src/training_review.rs`; `tests/improvement.rs`, `tests/training_diagnostics.rs`, actual browser lineage/export | Partial: bounded immutable descriptive lineage works; richer causal diagnoses, recursive budgets/acceptance and behavioral diversity remain; protected evidence cannot authorize adaptation |
+| Science (§17) | `src/science.rs`, `src/robustness.rs`, `src/uncertainty.rs`, `src/diagnostics.rs`, `src/regimes.rs`; `tests/science.rs`, `tests/uncertainty.rs`, `tests/robustness.rs`, `tests/storage.rs` | Partial: immutable chronological folds/reservations and descriptive probes work; real execution deliberately blocked; dependence-aware inference, prespecified acceptance, evidence completeness and continuous full-period accounting missing |
+| Qualification/ranking (§8,20) | `src/validation.rs` numeric gates; `tests/validation.rs`; dashboard honestly empty | Missing software: immutable independent qualification decisions, evidence/approval gates and diverse ranked leader history; real activation additionally requires approved actual evidence; synthetic must never qualify |
+| Dashboard (§21) | `src/dashboard.rs`, `web/`; `scripts/browser-check.cjs` actual service/SQLite auth, controls, history, lineage, precise exports/mobile | Partial: trade/run/protocol pagination, data/catalog approvals/imports, backup/restore UI, worker/config management, qualified ranking, resource/performance/operational panels and authorized HTTPS mode |
+| Operations/security (§23,27) | `scripts/operate.py`, `deploy/*.service`, `scripts/check-operations.py`, dashboard guard/Argon2/session/CSRF/body/rate tests, safe-Rust application lint | Partial: full dependency/security/license audit, realistic sustained RSS/CPU, disk-full/SIGKILL/reboot/cutover drills, monitoring/retention and target deployment; repository is public per owner, visibility unchanged |
+| Performance (§15) | `benches/`, `scripts/measure.py`, versioned source/resource receipts under `docs/BENCHMARKS/` | Current measured synthetic component/sequential workloads only; complete candidate screening/indexed/full-pipeline/cold-I/O/validation/multiworker comparisons and representative real evidence missing |
+| Integrated readiness (§24–26,33–34) | CLI/browser/restart/backup fixtures and the exact hosted baseline workflow pass | SOFTWARE_INCOMPLETE due to substantial software gaps above. Full historical research and target-VPS production are separate pending acceptance states; lack of two full years alone does not define software incompleteness |
+
+Fresh source-info requests to both Dukascopy and HistData returned HTTP403. No terms or quote content was acquired, no licensing conclusion drawn and no further same-state retry is planned. Small legally usable2025/2026 eight-instrument samples remain an external access/source-review dependency; complete backfill is explicitly deferred to the VPS. Work on independent software continues.

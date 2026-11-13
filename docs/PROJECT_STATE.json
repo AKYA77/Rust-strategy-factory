@@ -88,5 +88,14 @@
   "component_benchmark": "docs/BENCHMARKS/v6-prefix-component.json",
   "generation_component_benchmark": "docs/BENCHMARKS/structural-generation-v1.json",
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
-  "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json"
+  "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
+  "hosted_ci": {
+    "run_id": 43434456007,
+    "sha": "ea0c6cca4634b4ba791d0a8343cc9b8476b1d3c3",
+    "conclusion": "success",
+    "verification": "github.com summary fetched; exact commit/success markers observed; logs not read"
+  },
+  "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
+  "vps_acceptance": "VPS_PERFORMANCE_PENDING",
+  "repository_visibility": "public per owner; unchanged"
 }
