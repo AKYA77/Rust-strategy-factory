@@ -122,6 +122,38 @@ fn import_inspect_evaluate_and_overwrite_protection() {
     let second: serde_json::Value = serde_json::from_slice(&second.stdout).unwrap();
     assert_eq!(second["reused"], true);
     assert_eq!(first["experiment_id"], second["experiment_id"]);
+    let compressed = dir.join("dataset.rsfz");
+    let decompressed = dir.join("decompressed.rsf");
+    assert!(
+        invoke(&[
+            "compress-native",
+            native.to_str().unwrap(),
+            compressed.to_str().unwrap()
+        ])
+        .status
+        .success()
+    );
+    assert!(
+        invoke(&[
+            "decompress-native",
+            compressed.to_str().unwrap(),
+            decompressed.to_str().unwrap()
+        ])
+        .status
+        .success()
+    );
+    assert_eq!(fs::read(&native).unwrap(), fs::read(&decompressed).unwrap());
+    let compressed_result = invoke(&[
+        "experiment",
+        compressed.to_str().unwrap(),
+        strategy.to_str().unwrap(),
+        registry.to_str().unwrap(),
+    ]);
+    assert!(compressed_result.status.success());
+    let compressed_result: serde_json::Value =
+        serde_json::from_slice(&compressed_result.stdout).unwrap();
+    assert_eq!(compressed_result["reused"], true);
+    assert_eq!(compressed_result["experiment_id"], first["experiment_id"]);
     let diagnosis = invoke(&[
         "diagnose",
         registry.to_str().unwrap(),
@@ -151,7 +183,7 @@ fn import_inspect_evaluate_and_overwrite_protection() {
     assert_eq!(counts["completed"], 1);
     assert_eq!(counts["attempts"], 1);
     let review_config = dir.join("review-input.json");
-    fs::write(&review_config,serde_json::to_vec(&serde_json::json!({"inputs":[{"dataset":native.file_name().unwrap().to_str().unwrap()}],"limits":{"feature_cells":4_000_000}})).unwrap()).unwrap();
+    fs::write(&review_config,serde_json::to_vec(&serde_json::json!({"inputs":[{"dataset":compressed.file_name().unwrap().to_str().unwrap()}],"limits":{"feature_cells":4_000_000}})).unwrap()).unwrap();
     let review = invoke(&[
         "review-training",
         review_config.to_str().unwrap(),

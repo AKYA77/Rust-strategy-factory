@@ -12,6 +12,7 @@ fn main() {
         "src/contracts.rs",
         "src/data.rs",
         "src/native.rs",
+        "src/compressed.rs",
         "src/candles.rs",
         "src/indicators.rs",
         "src/strategies.rs",

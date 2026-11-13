@@ -7,6 +7,7 @@ license = "MIT"
 description = "Deterministic historical strategy research; no live trading"
 
 [dependencies]
+zstd = { version = "=0.13.3", default-features = false }
 axum = "0.8"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "sync"] }
 argon2 = "0.5"
@@ -39,4 +40,8 @@ harness = false
 
 [[bench]]
 name = "exploration"
+harness = false
+
+[[bench]]
+name = "compressed"
 harness = false

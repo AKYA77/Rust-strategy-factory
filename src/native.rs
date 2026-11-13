@@ -13,6 +13,7 @@ use std::{
 const MAGIC: &[u8; 8] = b"RSFNAT01";
 const MAX_EVENTS: usize = 2_000_000;
 const MAX_META: usize = 1024 * 1024;
+pub(crate) const MAX_BYTES: u64 = 52 + MAX_META as u64 + MAX_EVENTS as u64 * 32;
 const CHUNK: usize = 8192;
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -95,7 +96,10 @@ pub fn write(path: &Path, dataset: &Dataset) -> Result<()> {
 pub fn read(path: &Path) -> Result<Dataset> {
     let file = File::open(path).map_err(io)?;
     let length = file.metadata().map_err(io)?.len();
-    let mut reader = BufReader::new(file);
+    decode(BufReader::new(file), length)
+}
+/// Decode the exact verified byte sequence, shared by bounded compressed storage.
+pub(crate) fn decode(mut reader: impl Read, length: u64) -> Result<Dataset> {
     let mut h = [0u8; 20];
     reader.read_exact(&mut h).map_err(io)?;
     if &h[..8] != MAGIC {

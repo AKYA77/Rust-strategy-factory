@@ -1,0 +1,55 @@
+{
+  "class": "SYNTHETIC_CODEC_COMPONENT_NOT_RESEARCH_THROUGHPUT",
+  "codec": "zstd0.13.3 level3/window23 native wrapper v1",
+  "compute_revision": "compute-blake3:2f1ee4ed41d5850453a4d136245d1a82b0c055eda502d0e9506468482384b754",
+  "dataset_hash": "2e3e7f4a8b03f2695a88c6863243fd77ceb2383a7c3c72812a7302a51f07ca27",
+  "events": 20000,
+  "limitations": "Warm local files, validation/allocation and encode/restore atomic publication included in timers; fixture generation excluded. No cold-I/O, Parquet comparison, full-history streaming or real market data; no selected production codec or end-to-end replay speed claim.",
+  "measurements": [
+    {
+      "compressed_bytes": 76648,
+      "decode_validate_ns": 2968584,
+      "encode_validate_publish_ns": 8821295,
+      "native_bytes": 640965,
+      "native_decode_validate_ns": 3316922,
+      "repetition": 0,
+      "restore_validate_publish_ns": 6661441
+    },
+    {
+      "compressed_bytes": 76648,
+      "decode_validate_ns": 5606064,
+      "encode_validate_publish_ns": 4978380,
+      "native_bytes": 640965,
+      "native_decode_validate_ns": 2327147,
+      "repetition": 1,
+      "restore_validate_publish_ns": 15408650
+    },
+    {
+      "compressed_bytes": 76648,
+      "decode_validate_ns": 5411766,
+      "encode_validate_publish_ns": 9005974,
+      "native_bytes": 640965,
+      "native_decode_validate_ns": 4577806,
+      "repetition": 2,
+      "restore_validate_publish_ns": 16201262
+    },
+    {
+      "compressed_bytes": 76648,
+      "decode_validate_ns": 2626842,
+      "encode_validate_publish_ns": 6771314,
+      "native_bytes": 640965,
+      "native_decode_validate_ns": 7521883,
+      "repetition": 3,
+      "restore_validate_publish_ns": 5970795
+    },
+    {
+      "compressed_bytes": 76648,
+      "decode_validate_ns": 2555539,
+      "encode_validate_publish_ns": 4758598,
+      "native_bytes": 640965,
+      "native_decode_validate_ns": 2083767,
+      "repetition": 4,
+      "restore_validate_publish_ns": 5921743
+    }
+  ]
+}

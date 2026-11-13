@@ -70,7 +70,8 @@
     "authenticated bounded cursor experiment-history pages with server-side symbol filters, full-i64 string cursors, legacy API compatibility and >100-record responsive/race/concurrent-insert browser coverage",
     "Python3.11+ content-addressed local install/update/rollback with verified activation, staged native backup/new-path offline restore, refusal/preservation acceptance and statically verified non-root systemd resource-limit templates",
     "graceful Unix SIGINT/SIGTERM research checkpoint exits with coordinator lease release and preserved running/paused state; four process signal/state combinations restart immediately",
-    "authenticated paginated immutable training diagnosis/review lineage, verified raw detail/export, tamper refusal and desktop/mobile extreme-integer evidence display with fixed detail-hash overflow"
+    "authenticated paginated immutable training diagnosis/review lineage, verified raw detail/export, tamper refusal and desktop/mobile extreme-integer evidence display with fixed detail-hash overflow",
+    "bounded single-frame ZSTD/native wrapper with exact native restoration, original dataset identities, caps/checksums/window/trailing-frame/structural refusal, compressed CLI/research/protocol reuse, reviewed pinned source and installed notice verification"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -78,13 +79,14 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Review codec source/licenses and add bounded lossless ZSTD/native baseline with exact identity/replay equivalence and measurements; compare Parquet and continue full queue.",
+  "next_action": "Comparable bounded Parquet/ZSTD baseline and same-corpus cold/warm native/RSFZ comparison; full-history streaming, approved source/profile evidence and complete queue remain pending.",
   "qualified_strategies": 0,
-  "tests_passed": 148,
+  "tests_passed": 151,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile against actual Rust/SQLite/native input: auth/control/export/restart, >100-history paging and filter/race, actual immutable training lineage/review and exact extreme-loss training exports",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
   "component_benchmark": "docs/BENCHMARKS/v6-prefix-component.json",
   "generation_component_benchmark": "docs/BENCHMARKS/structural-generation-v1.json",
-  "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun"
+  "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
+  "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json"
 }

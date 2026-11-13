@@ -13,6 +13,8 @@ cargo build --locked
 python3 scripts/check-operations.py
 ```
 
+Distribute `docs/THIRD_PARTY_NOTICES/zstd.txt` with the installer; new releases copy and verify the added codec stack notices. Historical format1 release manifests remain readable. This is not a completed audit of every pre-existing dependency.
+
 The operations acceptance uses real release/debug binaries in disposable directories, including a path with spaces. It checks content-addressed installation, repeat install, upgrade/rollback, checksum tampering, preservation, actual synthetic experiment/diagnosis state, verified backup/new-path restore, no-overwrite and invalid/sidecar refusal. It also validates populated user-unit copies with systemd-analyze when present. It never starts systemd or deploys a host. The alternate debug build is an installation-test artifact, not a production recommendation; a profile change changes compute identity.
 
 Choose an absolute non-root installation directory owned by the non-root service account. For the supplied user-unit templates use the default layout:
@@ -23,7 +25,7 @@ python3 scripts/operate.py --prefix "$factory_prefix" install target/release/rus
 python3 scripts/operate.py --prefix "$factory_prefix" status
 ```
 
-`install` copies the provided binary into `releases/<sha256>/`, verifies its copied checksum and structured `version` output, records the manifest, and atomically switches `current`. It records the previous release for rollback, preserves config/state/backups and serializes operations with an advisory lock. Existing unrelated activation files or symlink release contents are refused. Installation neither downloads binaries nor establishes their upstream authenticity: build from the selected reviewed source with normal Cargo checksum/TLS verification. A content hash identifies an artifact; it is not a signature or proof of reproducible bytes across toolchains/hosts.
+`install` copies the provided binary into `releases/<sha256>/`, verifies its copied checksum and structured `version` output, records the manifest and bundled third-party notice checksum (format2), and atomically switches `current`. It records the previous release for rollback, preserves config/state/backups and serializes operations with an advisory lock. Existing unrelated activation files or symlink release contents are refused. Installation neither downloads binaries nor establishes their upstream authenticity: build from the selected reviewed source with normal Cargo checksum/TLS verification. A content hash identifies an artifact; it is not a signature or proof of reproducible bytes across toolchains/hosts.
 
 New directories/files use a restrictive umask; the executable remains executable. Existing local configuration is never overwritten by the installer. Source artifacts, lockfiles and the original checkout are retained. No service is installed or started automatically.
 

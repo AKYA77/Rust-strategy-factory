@@ -74,8 +74,12 @@ def verify(prefix, release):
     if (prefix / 'releases').is_symlink() or base.is_symlink() or binary.is_symlink() or manifest.is_symlink():
         raise ValueError('refusing symlink release contents')
     metadata = json.loads(manifest.read_text())
-    if not isinstance(metadata, dict) or metadata.get('format') != 1 or metadata.get('sha256') != release or digest(binary) != release:
+    if not isinstance(metadata, dict) or metadata.get('format') not in [1, 2] or metadata.get('sha256') != release or digest(binary) != release:
         raise ValueError('installed binary checksum mismatch')
+    if metadata['format'] == 2:
+        notices = base / 'THIRD_PARTY_NOTICES.txt'
+        if notices.is_symlink() or digest(notices) != metadata.get('notices_sha256'):
+            raise ValueError('installed third-party notices checksum mismatch')
     if json.loads(run(binary, 'version')) != metadata['version']:
         raise ValueError('installed binary version manifest mismatch')
     return binary, metadata
@@ -123,7 +127,12 @@ def install(prefix, source):
             version = json.loads(run(binary, 'version'))
             if not isinstance(version, dict) or not isinstance(version.get('compute_revision'), str) or not isinstance(version.get('engine'), str):
                 raise ValueError('unsupported binary version response')
-            metadata = {'format': 1, 'sha256': release, 'version': version}
+            notices = Path(__file__).resolve().parent.parent / 'docs/THIRD_PARTY_NOTICES/zstd.txt'
+            shutil.copyfile(notices, staging / 'THIRD_PARTY_NOTICES.txt')
+            metadata = {'format': 2, 'sha256': release, 'version': version,
+                        'notices_sha256': digest(staging / 'THIRD_PARTY_NOTICES.txt')}
+            with (staging / 'THIRD_PARTY_NOTICES.txt').open('rb') as stream:
+                os.fsync(stream.fileno())
             with (staging / 'manifest.json').open('x') as stream:
                 json.dump(metadata, stream, indent=2)
                 stream.write('\n')

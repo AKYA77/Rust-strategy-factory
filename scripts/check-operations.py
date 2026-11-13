@@ -36,6 +36,13 @@ with tempfile.TemporaryDirectory(prefix='factory-operations-') as directory:
         return json.loads(result.stdout) if success else result
     first = operate('install', args.release)['release']
     assert first == digest(args.release)
+    notices = prefix / 'releases' / first / 'THIRD_PARTY_NOTICES.txt'
+    assert notices.read_bytes() == (root / 'docs/THIRD_PARTY_NOTICES/zstd.txt').read_bytes()
+    saved_notices = notices.read_bytes()
+    notices.write_bytes(saved_notices + b'tamper')
+    operate('status', success=False)
+    notices.write_bytes(saved_notices)
+    assert operate('status')['release'] == first
     assert operate('install', args.release)['release'] == first
     assert operate('status')['previous'] is None
     sentinel = prefix / 'config/operator-notes.txt'
