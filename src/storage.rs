@@ -241,6 +241,11 @@ impl Registry {
             PRAGMA user_version=9;").map_err(db_err)?;
             tx.commit().map_err(db_err)?;
         }
+        // Additive lookup optimization: no table/row-format or version change.
+        // Older v9 readers/writers remain compatible and SQLite maintains it.
+        connection
+            .execute_batch("CREATE INDEX IF NOT EXISTS event_action_lookup ON events(action) WHERE action='proof-audit-contradiction-v1' OR action='indexed-audit-contradiction-v1';")
+            .map_err(db_err)?;
         Ok(Self { connection })
     }
     /// Atomically reserve OOS time across dataset aliases before any competing registration.

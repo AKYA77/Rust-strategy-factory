@@ -50,6 +50,86 @@ fn identities_include_scientific_versions_and_stage() {
     x.end_exclusive_ms = 0;
     assert!(x.identity().is_err());
 }
+
+#[test]
+fn compatible_event_lookup_upgrade_preserves_history_and_marker_semantics() {
+    let dir = directory();
+    let path = dir.join("state.sqlite");
+    let mut registry = Registry::open(&path).unwrap();
+    let id = registry.register(&key()).unwrap();
+    drop(registry);
+    let mut c = rusqlite::Connection::open(&path).unwrap();
+    c.execute_batch("DROP INDEX event_action_lookup;").unwrap();
+    {
+        let tx = c.transaction().unwrap();
+        {
+            let mut insert=tx.prepare("INSERT INTO events(experiment_id,at_ms,action,attempt) VALUES (?1,0,'SYNTHETIC_METADATA_FIXTURE',0)").unwrap();
+            for _ in 0..50000 {
+                insert.execute([&id]).unwrap();
+            }
+        }
+        tx.commit().unwrap();
+    }
+    let before: i64 = c
+        .query_row("SELECT count(*) FROM events", [], |r| r.get(0))
+        .unwrap();
+    let version: i64 = c
+        .query_row("PRAGMA user_version", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(version, 9);
+    drop(c);
+    let registry = Registry::open(&path).unwrap();
+    registry.integrity().unwrap();
+    drop(registry);
+    let c = rusqlite::Connection::open(&path).unwrap();
+    assert_eq!(
+        c.query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
+            .unwrap(),
+        version
+    );
+    assert_eq!(
+        c.query_row("SELECT count(*) FROM events", [], |r| r.get::<_, i64>(0))
+            .unwrap(),
+        before
+    );
+    let definition: String = c
+        .query_row(
+            "SELECT sql FROM sqlite_schema WHERE name='event_action_lookup'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(definition.contains(
+        "WHERE action='proof-audit-contradiction-v1' OR action='indexed-audit-contradiction-v1'"
+    ));
+    for action in [
+        "proof-audit-contradiction-v1",
+        "indexed-audit-contradiction-v1",
+    ] {
+        let sql = "SELECT EXISTS(SELECT 1 FROM events WHERE action=?1)";
+        assert!(!c.query_row(sql, [action], |r| r.get::<_, bool>(0)).unwrap());
+        let plan = c
+            .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
+            .unwrap()
+            .query_map([action], |r| r.get::<_, String>(3))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .join(" ");
+        assert!(plan.contains("COVERING INDEX event_action_lookup"));
+        c.execute(
+            "INSERT INTO events(experiment_id,at_ms,action,attempt) VALUES (?1,0,?2,0)",
+            rusqlite::params![id, action],
+        )
+        .unwrap();
+        assert!(c.query_row(sql, [action], |r| r.get::<_, bool>(0)).unwrap());
+    }
+    drop(c);
+    let reopened = Registry::open(&path).unwrap();
+    reopened.integrity().unwrap();
+    drop(reopened);
+    std::fs::remove_dir_all(dir).unwrap();
+}
 #[test]
 fn expired_worker_is_fenced_and_duplicate_finish_is_idempotent() {
     let dir = directory();

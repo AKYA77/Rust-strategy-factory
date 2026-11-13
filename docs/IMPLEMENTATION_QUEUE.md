@@ -44,3 +44,5 @@ Fresh baseline:151 Rust tests, formatting and Clippy passed. Hosted [run43434456
 | Integrated readiness (§24–26,33–34) | CLI/browser/restart/backup fixtures and the exact hosted baseline workflow pass | SOFTWARE_INCOMPLETE due to substantial software gaps above. Full historical research and target-VPS production are separate pending acceptance states; lack of two full years alone does not define software incompleteness |
 
 Fresh source-info requests to both Dukascopy and HistData returned HTTP403. No terms or quote content was acquired, no licensing conclusion drawn and no further same-state retry is planned. Small legally usable2025/2026 eight-instrument samples remain an external access/source-review dependency; complete backfill is explicitly deferred to the VPS. Work on independent software continues.
+
+Metadata health follow-up: compatible partial covering index and upgrade/marker integrity test now pass; audit-health-v1 measures metadata lookup only. Aggregate audit UI, lifecycle, production startup/write pressure and full-factory acceptance remain open.

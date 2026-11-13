@@ -75,3 +75,7 @@ harness = false
 [[bench]]
 name = "indexed_factory"
 harness = false
+
+[[bench]]
+name = "audit_health"
+harness = false
