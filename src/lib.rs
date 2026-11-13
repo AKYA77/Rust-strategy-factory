@@ -14,7 +14,7 @@ pub mod validation;
 
 pub const ENGINE_VERSION: &str = "ordered-l1-v4-protective-feasibility";
 pub const INDICATOR_VERSION: &str = "causal-primitives-v2-rsi-bps";
-pub const SIGNAL_VERSION: &str = "closed-publication-next-event-v1";
+pub const SIGNAL_VERSION: &str = "closed-publication-next-event-v2-htf";
 pub mod dashboard;
 pub mod research;
 pub mod science;

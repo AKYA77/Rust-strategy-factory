@@ -45,7 +45,9 @@
     "fixed prior-only closed-M1 trend/range regime bins with gap/warmup/stale labels, shared publication summaries and prefix invariance",
     "revision-pinned selected-source/license review for Tickforge, Wickra and LZ4 Flex with reproducible file hash receipts; no copied code or dependency adoption",
     "bounded lossless native uncompressed SoA artifact format with immutable publication, exact stream checksums, CLI/research loading and JSON-equivalent receipt reuse",
-    "bounded canonical single-scalar rule parameter probes frozen before OOS with actual replay identities and declared-trial accounting"
+    "bounded canonical single-scalar rule parameter probes frozen before OOS with actual replay identities and declared-trial accounting",
+    "typed closed higher-timeframe confirmations with strict hierarchy, causal publication joins, authoritative replay mask verification and bounded context caches",
+    "autonomous higher-confirmation regions and valid complex-graph verification allowance with nonzero replay regressions"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -53,9 +55,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Implement higher-timeframe confirmations and additional operators, dependence-aware inference and prespecified evidence acceptance; continue full implementation queue.",
+  "next_action": "Implement MACD/Bollinger operators and typed ATR stop policy, then dependence-aware/prespecified evidence gates and remaining full queue.",
   "qualified_strategies": 0,
-  "tests_passed": 99,
+  "tests_passed": 105,
   "benchmark": "docs/BENCHMARKS/2026-11-12-synthetic-replay.json",
   "browser_acceptance": "Chromium desktop/mobile against actual Rust HTTP server and SQLite; auth, CSRF/origin/host/body/rates, controls, receipts/export, restart/logout passed"
 }

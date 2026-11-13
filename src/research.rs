@@ -152,7 +152,8 @@ fn evaluate_internal(
         Claim::Acquired(lease) => {
             let compute = || -> Result<serde_json::Value> {
                 let c = candles::build(d, strategy.timeframe)?;
-                let mut features = Features::new(&c, feature_cells)?;
+                let mut features =
+                    Features::with_context(&c, feature_cells, d, strategy.timeframe)?;
                 let mut screen = strategies::screen(&mut features, strategy)?;
                 let mask = features.signal(&strategy.rule)?;
                 if let Some(e) = evaluation {
@@ -261,6 +262,7 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
                 *fast += shift;
                 *slow += shift;
             }
+            Rule::HigherTimeframe { rule, .. } => mutate(rule, shift),
             Rule::All(v) | Rule::Any(v) => {
                 for r in v {
                     mutate(r, shift);
@@ -270,6 +272,27 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
         }
     }
     mutate(&mut s.rule, shift);
+    if region % 5 == 4 {
+        let frame = crate::candles::Timeframe::ALL
+            .iter()
+            .position(|tf| *tf == s.timeframe)
+            .and_then(|i| crate::candles::Timeframe::ALL.get(i + 1))
+            .copied();
+        if let Some(timeframe) = frame {
+            let condition = if s.side == crate::contracts::Side::Long {
+                Rule::AboveMean { window: 20 }
+            } else {
+                Rule::BelowMean { window: 20 }
+            };
+            s.rule = Rule::All(vec![
+                s.rule,
+                Rule::HigherTimeframe {
+                    timeframe,
+                    rule: Box::new(condition),
+                },
+            ]);
+        }
+    }
     s.stop_ticks += (region / 300) as i64 * 200;
     s.entry = match region % 3 {
         0 => None,

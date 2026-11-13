@@ -245,7 +245,12 @@ fn replay_internal(
     if candles != crate::candles::build(data, strategy.timeframe)? {
         return Err("candles inconsistent with dataset/timeframe".into());
     }
-    let mut features = crate::strategies::Features::new(candles, candles.len().saturating_mul(34))?;
+    let mut features = crate::strategies::Features::with_context(
+        candles,
+        candles.len().saturating_mul(128),
+        data,
+        strategy.timeframe,
+    )?;
     if *mask != features.signal(&strategy.rule)? {
         return Err("signals inconsistent with frozen strategy".into());
     }

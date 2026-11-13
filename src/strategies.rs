@@ -61,8 +61,29 @@ pub enum Rule {
     },
     All(Vec<Rule>),
     Any(Vec<Rule>),
+    HigherTimeframe {
+        timeframe: Timeframe,
+        rule: Box<Rule>,
+    },
 }
 impl Rule {
+    fn validate_timeframes(&self, base: Timeframe) -> Result<()> {
+        match self {
+            Rule::HigherTimeframe { timeframe, rule } => {
+                if timeframe.millis() <= base.millis() {
+                    return Err("confirmation timeframe must strictly increase".into());
+                }
+                rule.validate_timeframes(*timeframe)
+            }
+            Rule::All(rules) | Rule::Any(rules) => {
+                for rule in rules {
+                    rule.validate_timeframes(base)?;
+                }
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
     pub fn canonical(&self) -> Result<Self> {
         fn normalize(rule: &Rule, depth: usize, nodes: &mut usize) -> Result<Rule> {
             *nodes += 1;
@@ -70,6 +91,10 @@ impl Rule {
                 return Err("rule complexity exceeds budget".into());
             }
             match rule {
+                Rule::HigherTimeframe { timeframe, rule } => Ok(Rule::HigherTimeframe {
+                    timeframe: *timeframe,
+                    rule: Box::new(normalize(rule, depth + 1, nodes)?),
+                }),
                 Rule::All(items) | Rule::Any(items) => {
                     if items.is_empty() || items.len() > 8 {
                         return Err("Boolean arity out of bounds".into());
@@ -235,8 +260,10 @@ impl Strategy {
         if self.stop_ticks <= 0 || self.stop_ticks > 1_000_000 {
             return Err("stop distance out of bounds".into());
         }
+        let rule = self.rule.canonical()?;
+        rule.validate_timeframes(self.timeframe)?;
         Ok(Self {
-            rule: self.rule.canonical()?,
+            rule,
             ..self.clone()
         })
     }
@@ -256,6 +283,7 @@ enum Feature {
 /// Caches share indicator arrays across an entire candidate batch. Limits count retained cells.
 pub struct Features<'a> {
     candles: &'a [Candle],
+    context: Option<(&'a crate::data::Dataset, Timeframe)>,
     close: Vec<i64>,
     cache: BTreeMap<Feature, Vec<Option<i64>>>,
     signals: BTreeMap<Rule, Mask>,
@@ -279,6 +307,7 @@ impl<'a> Features<'a> {
         }
         Ok(Self {
             candles,
+            context: None,
             close: candles.iter().map(|c| c.bid.close).collect(),
             cache: BTreeMap::new(),
             signals: BTreeMap::new(),
@@ -286,6 +315,16 @@ impl<'a> Features<'a> {
             cache_hits: 0,
             feature_builds: 0,
         })
+    }
+    pub fn with_context(
+        candles: &'a [Candle],
+        max_cells: usize,
+        data: &'a crate::data::Dataset,
+        timeframe: Timeframe,
+    ) -> Result<Self> {
+        let mut features = Self::new(candles, max_cells)?;
+        features.context = Some((data, timeframe));
+        Ok(features)
     }
     fn can_retain(&self, additional: usize) -> bool {
         (1 + self.cache.len() + self.signals.len() + additional).saturating_mul(self.close.len())
@@ -421,6 +460,27 @@ impl<'a> Features<'a> {
             return Ok(mask.clone());
         }
         let result = match rule {
+            Rule::HigherTimeframe { timeframe, rule } => {
+                let (data, base) = self
+                    .context
+                    .ok_or("higher-timeframe signals require dataset context")?;
+                if timeframe.millis() <= base.millis() {
+                    return Err("confirmation timeframe must strictly increase".into());
+                }
+                let used =
+                    (1 + self.cache.len() + self.signals.len()).saturating_mul(self.close.len());
+                let remaining = self.max_cells.saturating_sub(used);
+                let higher = crate::candles::build(data, *timeframe)?;
+                let mut features = Features::with_context(&higher, remaining, data, *timeframe)?;
+                let mask = features.signal(rule)?;
+                Mask::from_bools(self.candles.iter().map(|c| {
+                    let n = higher.partition_point(|h| {
+                        (h.available_ms, h.publication_sequence)
+                            <= (c.available_ms, c.publication_sequence)
+                    });
+                    n.checked_sub(1).is_some_and(|i| mask.get(i))
+                }))
+            }
             Rule::AboveMean { window } | Rule::BelowMean { window } => {
                 self.ensure(Feature::Mean(*window))?;
                 let above = matches!(rule, Rule::AboveMean { .. });

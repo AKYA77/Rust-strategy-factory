@@ -330,7 +330,7 @@ fn run(args: &[String]) -> Result<()> {
             }
             let s: Strategy = read_json(strategy_path)?;
             let c = candles::build(&d, s.timeframe)?;
-            let mut f = Features::new(&c, 4_000_000)?;
+            let mut f = Features::with_context(&c, 4_000_000, &d, s.timeframe)?;
             let mask = f.signal(&s.rule)?;
             let result = tick_engine::replay(
                 &d,

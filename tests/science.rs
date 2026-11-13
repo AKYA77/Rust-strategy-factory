@@ -444,3 +444,37 @@ fn incomplete_protocol_cannot_spend_real_protected_final_data() {
     drop(registry);
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn frozen_protocol_replays_actual_higher_timeframe_candidates() {
+    let dir = dir();
+    let mut registry = Registry::open(&dir.join("state.sqlite")).unwrap();
+    let input = input();
+    let mut plan = plan();
+    plan.candidates[0].rule = Rule::All(vec![
+        Rule::Rising { lookback: 1 },
+        Rule::HigherTimeframe {
+            timeframe: Timeframe::M5,
+            rule: Box::new(Rule::Rising { lookback: 1 }),
+        },
+    ]);
+    let result = science::execute(
+        &mut registry,
+        &input,
+        &plan,
+        "higher-context-version",
+        &science::Budget::default(),
+    )
+    .unwrap();
+    assert_eq!(result.report.status, "INSUFFICIENT_EVIDENCE");
+    assert!(
+        result.report.candidates[0]
+            .pooled_oos_reset_fold_stats
+            .closed
+            > 0
+    );
+    assert_eq!(result.report.candidates[0].failed_windows, 0);
+    registry.integrity().unwrap();
+    drop(registry);
+    std::fs::remove_dir_all(dir).unwrap();
+}
