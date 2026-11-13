@@ -786,6 +786,14 @@ fn rejected_parent_gets_declared_floor_probe_with_exact_child_tick_accounting() 
     s.stop_ticks = 30;
     let parent = evaluate(&mut r, &s, 99800);
     assert_eq!(
+        parent.result["market_stop_proof"]["version"],
+        "fixed-market-stop-infeasible-v1"
+    );
+    assert_eq!(
+        parent.result["market_stop_proof"]["required_stop_price_units"],
+        41
+    );
+    assert_eq!(
         parent.result["tick_replay"]["trades"]
             .as_array()
             .unwrap()

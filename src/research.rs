@@ -210,6 +210,15 @@ fn evaluate_internal(
                     tick_engine::replay(d, &c, &mask, strategy, costs, &input.conversions)?
                 };
                 let screen_audit = crate::screen::audit_replay(d, costs, &replay)?;
+                let market_stop_proof =
+                    crate::screen::market_stop_proof(&d.profile, costs, strategy)?;
+                if market_stop_proof.is_some()
+                    && (!replay.trades.is_empty()
+                        || replay.unresolved.is_some()
+                        || replay.pending_entry.is_some())
+                {
+                    return Err("market-stop proof excluded an authoritative entry; screening must remain disabled".into());
+                }
                 let candidate_screen_audit = match candle_estimate {
                     Ok(estimate) => crate::candidate_screen::compare(
                         &estimate,
@@ -222,7 +231,7 @@ fn evaluate_internal(
                         "candidate_rejected":false,"qualification_evidence":false}),
                 };
                 Ok(
-                    serde_json::json!({"screen":screen,"screen_audit":screen_audit,"candidate_screen_audit":candidate_screen_audit,"tick_replay":replay,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation}),
+                    serde_json::json!({"screen":screen,"screen_audit":screen_audit,"market_stop_proof":market_stop_proof,"candidate_screen_audit":candidate_screen_audit,"tick_replay":replay,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation}),
                 )
             };
             let (outcome, result) = match compute() {

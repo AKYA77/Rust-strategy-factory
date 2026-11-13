@@ -30,6 +30,78 @@ pub struct Position {
     pub target: i64,
     pub deadline_ms: i64,
 }
+
+/// Quote/equity-independent necessary-condition failure, not an observed order rejection.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MarketStopProof {
+    pub version: String,
+    pub strategy_hash: String,
+    pub profile_hash: String,
+    pub cost_hash: String,
+    pub fixed_stop_price_units: i64,
+    pub minimum_executable_distance: i64,
+    pub minimum_entry_friction: i64,
+    pub required_stop_price_units: i64,
+}
+/// Long entry >= bid+floor+slip and short entry <= ask-floor-slip.
+/// Therefore signed(mark-entry) <= -(floor+slip) for either side.
+/// risk::reserve requires raw_stop + signed(mark-entry) >= profile minimum;
+/// raw_stop < minimum+floor+slip proves impossibility at every quote/equity.
+/// ATR and pending entries have different distances/execution and cannot use this proof.
+pub fn market_stop_proof(
+    p: &Profile,
+    costs: &Costs,
+    strategy: &crate::strategies::Strategy,
+) -> Result<Option<MarketStopProof>> {
+    p.validate()?;
+    costs.validate()?;
+    let strategy = strategy.canonical()?;
+    if strategy.entry.is_some() || strategy.stop_policy.is_some() {
+        return Ok(None);
+    }
+    let crate::stops::Prepared::Fixed(distance) = crate::stops::prepare(&strategy, p, &[])? else {
+        return Err("fixed stop proof received adaptive distance".into());
+    };
+    let minimum = p
+        .min_stop_ticks
+        .max(1)
+        .checked_mul(p.tick)
+        .ok_or("proof minimum overflow")?;
+    let friction = costs
+        .spread_floor_pips
+        .checked_add(costs.slippage_pips)
+        .and_then(|v| v.checked_mul(p.pip))
+        .ok_or("proof friction overflow")?;
+    let required = minimum
+        .checked_add(friction)
+        .ok_or("proof required stop overflow")?;
+    if distance >= required {
+        return Ok(None);
+    }
+    Ok(Some(MarketStopProof {
+        version: "fixed-market-stop-infeasible-v1".into(),
+        strategy_hash: strategy.identity()?,
+        profile_hash: crate::data::hash(p)?,
+        cost_hash: crate::data::hash(costs)?,
+        fixed_stop_price_units: distance,
+        minimum_executable_distance: minimum,
+        minimum_entry_friction: friction,
+        required_stop_price_units: required,
+    }))
+}
+
+pub fn verify_market_stop_proof(
+    proof: &MarketStopProof,
+    p: &Profile,
+    costs: &Costs,
+    strategy: &crate::strategies::Strategy,
+) -> Result<()> {
+    if market_stop_proof(p, costs, strategy)?.as_ref() != Some(proof) {
+        return Err("market stop infeasibility proof/context mismatch".into());
+    }
+    Ok(())
+}
 pub fn barrier_bounds(p: &Profile, costs: &Costs, c: &Candle, pos: Position) -> Result<Bounds> {
     p.validate()?;
     if pos.entry_ms >= pos.deadline_ms
