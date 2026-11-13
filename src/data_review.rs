@@ -51,6 +51,11 @@ pub struct Report {
     pub state: State,
     pub limitations: String,
 }
+#[derive(Debug, Serialize)]
+pub struct Page {
+    pub reports: Vec<Report>,
+    pub next_cursor: Option<String>,
+}
 const LIMIT: &str = "Reviewer identity and decisions are supplied assertions, not authenticated independent authority. Evidence is retained and hash-bound to one observed receipt. No data class, source/profile/calendar approval, historical completeness or research eligibility is granted; synthetic data cannot qualify.";
 fn hex(s: &str) -> bool {
     s.len() == 64

@@ -521,6 +521,9 @@ impl Catalog {
         if create {
             c.execute_batch("CREATE TABLE IF NOT EXISTS catalog_reviews(id TEXT PRIMARY KEY CHECK(length(id)=64),body BLOB NOT NULL CHECK(typeof(body)='blob' AND length(body)<=2097152),hash TEXT NOT NULL CHECK(length(hash)=64));CREATE TRIGGER IF NOT EXISTS reviews_no_update BEFORE UPDATE ON catalog_reviews BEGIN SELECT RAISE(ABORT,'reviews immutable');END;CREATE TRIGGER IF NOT EXISTS reviews_no_delete BEFORE DELETE ON catalog_reviews BEGIN SELECT RAISE(ABORT,'reviews immutable');END;").map_err(db)?;
         }
+        if create {
+            c.execute_batch("CREATE INDEX IF NOT EXISTS reviews_scope ON catalog_reviews(json_extract(CAST(body AS TEXT),'$.request.catalog_identity'),id)").map_err(db)?;
+        }
         Ok(Self { connection: c })
     }
     pub fn record_review(
@@ -555,6 +558,47 @@ impl Catalog {
         .map_err(db)?;
         tx.commit().map_err(db)?;
         Ok(report)
+    }
+    pub fn reviews(
+        &self,
+        identity: &str,
+        after: Option<&str>,
+        limit: usize,
+    ) -> Result<crate::data_review::Page> {
+        if !hex(identity) || after.is_some_and(|s| !hex(s)) || limit == 0 || limit > 25 {
+            return Err("invalid review history scope/cursor/limit".into());
+        }
+        get(&self.connection, identity)?.ok_or("review catalog receipt missing")?;
+        let exists:bool=self.connection.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='catalog_reviews')",[],|r|r.get(0)).map_err(db)?;
+        if !exists {
+            return Ok(crate::data_review::Page {
+                reports: Vec::new(),
+                next_cursor: None,
+            });
+        }
+        let mut q=self.connection.prepare("SELECT id FROM catalog_reviews WHERE json_extract(CAST(body AS TEXT),'$.request.catalog_identity')=?1 AND id>?2 ORDER BY id LIMIT ?3").map_err(db)?;
+        let mut reports = Vec::new();
+        for id in q
+            .query_map(
+                params![identity, after.unwrap_or(""), (limit + 1) as i64],
+                |r| r.get::<_, String>(0),
+            )
+            .map_err(db)?
+        {
+            let id = id.map_err(db)?;
+            reports.push(read_review(&self.connection, &id)?.ok_or("review disappeared")?);
+        }
+        let more = reports.len() > limit;
+        reports.truncate(limit);
+        let next_cursor = if more {
+            reports.last().map(|r| r.hash.clone())
+        } else {
+            None
+        };
+        Ok(crate::data_review::Page {
+            reports,
+            next_cursor,
+        })
     }
     pub fn review(&self, id: &str) -> Result<Option<crate::data_review::Report>> {
         if !hex(id) {

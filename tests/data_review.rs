@@ -153,3 +153,53 @@ fn legacy_catalog_upgrade_and_actual_cli_review_roundtrip() {
     assert_eq!(read.hash, report.hash);
     assert_eq!(read.state, State::Incomplete);
 }
+#[test]
+fn scoped_history_has_stable_cursors_validated_reports_and_indexed_lookup() {
+    let f = Fixture::new("history");
+    let path = f.0.join("catalog.sqlite");
+    let mut c = Catalog::open(&path).unwrap();
+    let mut r = request(&mut c);
+    let scope = r.catalog_identity.clone();
+    let mut ids = Vec::new();
+    for i in 0..6 {
+        r.reviewer = format!("fixture reviewer{i}");
+        ids.push(c.record_review(r.clone()).unwrap().hash);
+    }
+    ids.sort();
+    let first = c.reviews(&scope, None, 2).unwrap();
+    assert_eq!(
+        first
+            .reports
+            .iter()
+            .map(|r| r.hash.clone())
+            .collect::<Vec<_>>(),
+        ids[..2]
+    );
+    let cursor = first.next_cursor.unwrap();
+    r.reviewer = "fixture append".into();
+    ids.push(c.record_review(r).unwrap().hash);
+    ids.sort();
+    let rest = c.reviews(&scope, Some(&cursor), 25).unwrap();
+    assert_eq!(
+        rest.reports
+            .iter()
+            .map(|r| r.hash.clone())
+            .collect::<Vec<_>>(),
+        ids.into_iter().filter(|s| s > &cursor).collect::<Vec<_>>()
+    );
+    assert!(rest.next_cursor.is_none());
+    assert!(c.reviews(&scope, None, 0).is_err());
+    assert!(c.reviews(&scope, None, 26).is_err());
+    assert!(c.reviews(&scope, Some("invalid"), 1).is_err());
+    assert!(c.reviews(&"f".repeat(64), None, 1).is_err());
+    let sql = rusqlite::Connection::open(&path).unwrap();
+    let plan=sql.prepare("EXPLAIN QUERY PLAN SELECT id FROM catalog_reviews WHERE json_extract(CAST(body AS TEXT),'$.request.catalog_identity')=?1 AND id>?2 ORDER BY id LIMIT 26").unwrap().query_map(rusqlite::params![scope,""],|r|r.get::<_,String>(3)).unwrap().collect::<Result<Vec<_>,_>>().unwrap().join(" ");
+    assert!(plan.contains("reviews_scope"), "{plan}");
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args(["catalog-reviews", path.to_str().unwrap(), &scope, "-", "2"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let page: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(page["reports"].as_array().unwrap().len(), 2);
+}

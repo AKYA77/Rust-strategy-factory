@@ -64,3 +64,5 @@ Catalog UI follow-up: optional authenticated bounded identity pages/detail/exact
 Correction lifecycle: immutable parent/reason receipts and bounded ancestry/context verification now work across CLI/read/page/snapshot, preserving originals and legacy hashes. Same-window correction only; independent evidence reviews/approvals and extension/split/merge relationships remain open. Next: receipt-bound review evidence with explicit incomplete/rejected states and no synthetic eligibility.
 
 Review journal: immutable five-area text evidence/receipt binding and explicit incomplete/rejected/assertions-recorded states now work through CLI and snapshots. Claims never grant approval. Next: discoverable bounded history, then independent typed evidence validation and review authority.
+
+Review history: indexed bounded receipt-scoped listing, validated reports, hash cursors and actual CLI/plan/append-stability tests now pass. SQL-only fixture timing is limited and not a research speed claim. Next critical step: typed calendar/coverage/quality validators and source/profile review authority, then review UI.

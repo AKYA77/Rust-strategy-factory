@@ -1,0 +1,192 @@
+{
+  "class": "SQL_COMPONENT_METADATA_FIXTURE_NOT_VALID_REVIEWS",
+  "sqlite_version": "3.53.1",
+  "rows": 5000,
+  "matches": 5,
+  "measurements": [
+    {
+      "repetition": 0,
+      "mode": "scan",
+      "twelve_queries_ms": 14.040811998711433,
+      "plan": [
+        "SEARCH catalog_reviews USING INDEX sqlite_autoindex_catalog_reviews_1 (id>?)"
+      ]
+    },
+    {
+      "repetition": 0,
+      "mode": "index",
+      "twelve_queries_ms": 0.08486099977744743,
+      "plan": [
+        "SEARCH catalog_reviews USING COVERING INDEX reviews_scope (<expr>=? AND id>?)"
+      ]
+    },
+    {
+      "repetition": 1,
+      "mode": "index",
+      "twelve_queries_ms": 0.07327600178541616,
+      "plan": [
+        "SEARCH catalog_reviews USING COVERING INDEX reviews_scope (<expr>=? AND id>?)"
+      ]
+    },
+    {
+      "repetition": 1,
+      "mode": "scan",
+      "twelve_queries_ms": 13.435191001917701,
+      "plan": [
+        "SEARCH catalog_reviews USING INDEX sqlite_autoindex_catalog_reviews_1 (id>?)"
+      ]
+    },
+    {
+      "repetition": 2,
+      "mode": "scan",
+      "twelve_queries_ms": 12.937435996718705,
+      "plan": [
+        "SEARCH catalog_reviews USING INDEX sqlite_autoindex_catalog_reviews_1 (id>?)"
+      ]
+    },
+    {
+      "repetition": 2,
+      "mode": "index",
+      "twelve_queries_ms": 0.07623399869771674,
+      "plan": [
+        "SEARCH catalog_reviews USING COVERING INDEX reviews_scope (<expr>=? AND id>?)"
+      ]
+    },
+    {
+      "repetition": 3,
+      "mode": "index",
+      "twelve_queries_ms": 0.07413700222969055,
+      "plan": [
+        "SEARCH catalog_reviews USING COVERING INDEX reviews_scope (<expr>=? AND id>?)"
+      ]
+    },
+    {
+      "repetition": 3,
+      "mode": "scan",
+      "twelve_queries_ms": 12.330745994404424,
+      "plan": [
+        "SEARCH catalog_reviews USING INDEX sqlite_autoindex_catalog_reviews_1 (id>?)"
+      ]
+    },
+    {
+      "repetition": 4,
+      "mode": "scan",
+      "twelve_queries_ms": 14.123114000540227,
+      "plan": [
+        "SEARCH catalog_reviews USING INDEX sqlite_autoindex_catalog_reviews_1 (id>?)"
+      ]
+    },
+    {
+      "repetition": 4,
+      "mode": "index",
+      "twelve_queries_ms": 0.07750499935355037,
+      "plan": [
+        "SEARCH catalog_reviews USING COVERING INDEX reviews_scope (<expr>=? AND id>?)"
+      ]
+    },
+    {
+      "repetition": 5,
+      "mode": "index",
+      "twelve_queries_ms": 0.07461299537681043,
+      "plan": [
+        "SEARCH catalog_reviews USING COVERING INDEX reviews_scope (<expr>=? AND id>?)"
+      ]
+    },
+    {
+      "repetition": 5,
+      "mode": "scan",
+      "twelve_queries_ms": 12.31434700457612,
+      "plan": [
+        "SEARCH catalog_reviews USING INDEX sqlite_autoindex_catalog_reviews_1 (id>?)"
+      ]
+    },
+    {
+      "repetition": 6,
+      "mode": "scan",
+      "twelve_queries_ms": 12.150058995757718,
+      "plan": [
+        "SEARCH catalog_reviews USING INDEX sqlite_autoindex_catalog_reviews_1 (id>?)"
+      ]
+    },
+    {
+      "repetition": 6,
+      "mode": "index",
+      "twelve_queries_ms": 0.07361699681496248,
+      "plan": [
+        "SEARCH catalog_reviews USING COVERING INDEX reviews_scope (<expr>=? AND id>?)"
+      ]
+    },
+    {
+      "repetition": 7,
+      "mode": "index",
+      "twelve_queries_ms": 0.09867399785434827,
+      "plan": [
+        "SEARCH catalog_reviews USING COVERING INDEX reviews_scope (<expr>=? AND id>?)"
+      ]
+    },
+    {
+      "repetition": 7,
+      "mode": "scan",
+      "twelve_queries_ms": 12.46663700294448,
+      "plan": [
+        "SEARCH catalog_reviews USING INDEX sqlite_autoindex_catalog_reviews_1 (id>?)"
+      ]
+    },
+    {
+      "repetition": 8,
+      "mode": "scan",
+      "twelve_queries_ms": 12.31796800129814,
+      "plan": [
+        "SEARCH catalog_reviews USING INDEX sqlite_autoindex_catalog_reviews_1 (id>?)"
+      ]
+    },
+    {
+      "repetition": 8,
+      "mode": "index",
+      "twelve_queries_ms": 0.07525499677285552,
+      "plan": [
+        "SEARCH catalog_reviews USING COVERING INDEX reviews_scope (<expr>=? AND id>?)"
+      ]
+    },
+    {
+      "repetition": 9,
+      "mode": "index",
+      "twelve_queries_ms": 0.07394999556709081,
+      "plan": [
+        "SEARCH catalog_reviews USING COVERING INDEX reviews_scope (<expr>=? AND id>?)"
+      ]
+    },
+    {
+      "repetition": 9,
+      "mode": "scan",
+      "twelve_queries_ms": 12.88861500506755,
+      "plan": [
+        "SEARCH catalog_reviews USING INDEX sqlite_autoindex_catalog_reviews_1 (id>?)"
+      ]
+    }
+  ],
+  "median_twelve_queries_ms": {
+    "scan": 12.677626004006015,
+    "index": 0.07493399607483298
+  },
+  "source_manifest": [
+    {
+      "path": "scripts/benchmark-review-query.py",
+      "sha256": "032bd891c83bfd2e5926f9461967116f59b56c45fb6344b02b2ed6bdda4d2a87"
+    },
+    {
+      "path": "src/catalog.rs",
+      "sha256": "4fa89ec1edfb12030dbcd9e552abe7c0fd8a1260183ba5075cf0b01c1117a88c"
+    },
+    {
+      "path": "src/data_review.rs",
+      "sha256": "f946eec47dc268a3add7abe03d78f4ff2a0330d8b2a4dc7e15dbaee96bd618fe"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "d6a244857aabf550ea6850c8428bed5a8b36e2b50509a31e7b6e25ba465d156f"
+    }
+  ],
+  "whole_process_peak_rss_kib_linux": 21056,
+  "limitations": "Warm in-memory Python SQLite query only; its library can differ from bundled Rust SQLite. Invalid business-receipt metadata fixtures, no market data. Includes query setup/fetch, excludes DDL/fixture construction. Not Rust API/receipt validation, filesystem/cold I/O, acquisition, qualification or research throughput. No application speedup claim."
+}
