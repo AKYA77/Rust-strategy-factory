@@ -600,6 +600,11 @@ impl Registry {
         if result["proof_rejection"] == true && matches!(outcome, Outcome::Rejected) {
             crate::proof_screen::guard(&tx)?;
         }
+        if !result["indexed_policy"].is_null()
+            && matches!(outcome, Outcome::Completed | Outcome::Rejected)
+        {
+            crate::indexed_policy::guard(&tx)?;
+        }
         let (state, token, expiry, old_hash): (
             String,
             Option<String>,

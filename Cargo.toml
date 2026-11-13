@@ -71,3 +71,7 @@ harness = false
 [[bench]]
 name = "indexed_replay"
 harness = false
+
+[[bench]]
+name = "indexed_factory"
+harness = false

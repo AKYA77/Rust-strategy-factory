@@ -41,6 +41,7 @@ fn options() -> EvaluationOptions<'static> {
         evaluation: None,
         shadow_policy: None,
         proof_policy: None,
+        indexed_policy: None,
     }
 }
 fn main() {

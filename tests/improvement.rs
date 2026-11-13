@@ -95,6 +95,7 @@ fn comparable_children_preserve_explicit_shadow_policy_identity() {
             evaluation: None,
             shadow_policy: Some(&policy),
             proof_policy: None,
+            indexed_policy: None,
         },
     )
     .unwrap();
@@ -155,6 +156,111 @@ fn comparable_children_preserve_explicit_shadow_policy_identity() {
 }
 
 #[test]
+fn indexed_training_review_preserves_policy_and_independent_proof_audits() {
+    let d = dir();
+    let mut registry = Registry::open(&d.join("state.sqlite")).unwrap();
+    let input = input(99800);
+    let revision = research::compute_revision().unwrap();
+    let indexed = rust_strategy_factory::indexed_policy::Policy {
+        audit_bps: 10000,
+        ..Default::default()
+    };
+    let options = research::EvaluationOptions {
+        feature_cells: 10000,
+        evaluation: None,
+        shadow_policy: None,
+        proof_policy: None,
+        indexed_policy: Some(&indexed),
+    };
+    let parent = research::evaluate_configured(
+        &mut registry,
+        &input,
+        &strategy(),
+        &Costs::default(),
+        &revision,
+        options,
+    )
+    .unwrap();
+    let diagnosis = improvement::diagnose(
+        &mut registry,
+        &parent.experiment_id,
+        &Options {
+            max_children: 1,
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .report;
+    let review = rust_strategy_factory::training_review::execute(
+        &mut registry,
+        &input,
+        &diagnosis.id,
+        10000,
+        256 * 1024 * 1024,
+    )
+    .unwrap()
+    .report;
+    assert_eq!(review.baseline.experiment_id, parent.experiment_id);
+    assert!(
+        review
+            .baseline
+            .net_basis
+            .as_ref()
+            .unwrap()
+            .contains("independent sequential")
+    );
+    for e in std::iter::once(&review.baseline).chain(review.children.iter().map(|c| &c.evidence)) {
+        let result = registry.result(&e.experiment_id).unwrap().unwrap();
+        assert_eq!(
+            result.result["indexed_policy"],
+            serde_json::to_value(&indexed).unwrap()
+        );
+        assert_eq!(
+            registry
+                .experiment_key(&e.experiment_id)
+                .unwrap()
+                .unwrap()
+                .configuration_hash,
+            diagnosis.parent_key.configuration_hash
+        );
+    }
+    assert!(
+        rust_strategy_factory::training_review::read_report(&registry, &review.id)
+            .unwrap()
+            .is_some()
+    );
+    let proof = rust_strategy_factory::proof_screen::Policy {
+        audit_bps: 10000,
+        ..Default::default()
+    };
+    let mut short = strategy();
+    short.stop_ticks = 30;
+    let result = research::evaluate_configured(
+        &mut registry,
+        &input,
+        &short,
+        &Costs::default(),
+        &revision,
+        research::EvaluationOptions {
+            proof_policy: Some(&proof),
+            ..options
+        },
+    )
+    .unwrap();
+    assert_eq!(result.outcome, "rejected");
+    assert_eq!(result.result["proof_audited"], true);
+    assert_eq!(result.result["indexed_replay"]["used_index"], false);
+    assert!(
+        !result.result["tick_replay"]["rejections"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    drop(registry);
+    std::fs::remove_dir_all(d).unwrap();
+}
+
+#[test]
 fn exact_proof_rejection_audits_and_comparable_children_preserve_real_evidence() {
     use rust_strategy_factory::{proof_screen, training_review};
     let d = dir();
@@ -181,6 +287,7 @@ fn exact_proof_rejection_audits_and_comparable_children_preserve_real_evidence()
                 evaluation: None,
                 shadow_policy: None,
                 proof_policy: Some(&policy),
+                indexed_policy: None,
             },
         )
         .unwrap();
@@ -217,6 +324,7 @@ fn exact_proof_rejection_audits_and_comparable_children_preserve_real_evidence()
             evaluation: None,
             shadow_policy: None,
             proof_policy: Some(&audited_policy),
+            indexed_policy: None,
         },
     )
     .unwrap();
@@ -336,7 +444,8 @@ fn exact_proof_rejection_audits_and_comparable_children_preserve_real_evidence()
                 feature_cells: 10000,
                 evaluation: None,
                 shadow_policy: None,
-                proof_policy: Some(&audited_policy)
+                proof_policy: Some(&audited_policy),
+                indexed_policy: None,
             }
         )
         .unwrap_err()
@@ -362,6 +471,7 @@ fn exact_proof_rejection_audits_and_comparable_children_preserve_real_evidence()
         }],
         research::Config {
             proof_policy: Some(audited_policy.clone()),
+            indexed_policy: None,
             ..Default::default()
         },
         revision.clone(),
@@ -408,6 +518,7 @@ fn proof_screening_cannot_hide_bad_conversions_or_adapt_scientific_windows() {
             evaluation: None,
             shadow_policy: None,
             proof_policy: Some(&policy),
+            indexed_policy: None,
         },
     )
     .unwrap();
@@ -438,6 +549,7 @@ fn proof_screening_cannot_hide_bad_conversions_or_adapt_scientific_windows() {
             evaluation: Some(&training),
             shadow_policy: None,
             proof_policy: Some(&policy),
+            indexed_policy: None,
         },
     )
     .unwrap();
@@ -462,7 +574,8 @@ fn proof_screening_cannot_hide_bad_conversions_or_adapt_scientific_windows() {
                 feature_cells: 10000,
                 evaluation: Some(&evaluation),
                 shadow_policy: None,
-                proof_policy: Some(&policy)
+                proof_policy: Some(&policy),
+                indexed_policy: None,
             }
         )
         .is_err()
@@ -489,6 +602,7 @@ fn proof_screening_cannot_hide_bad_conversions_or_adapt_scientific_windows() {
             evaluation: None,
             shadow_policy: None,
             proof_policy: Some(&policy),
+            indexed_policy: None,
         },
     )
     .unwrap();

@@ -80,7 +80,8 @@
     "Opt-in training-only exact fixed-market proof rejection with deterministic mandatory tick audits, scoped input/entry validation, context-exact proof-only diagnosis/child review basis, durable contradiction blocking and atomic publication refusal/coordinator pause; real browser proof view/export and measured no-entry current-pipeline comparison",
     "Bounded shared same-frame candidate batch API/CLI with immutable verified input/configuration preparation, shared features and exact scalar receipt identity, per-experiment fencing/durable prefix retry, budgets and actual all-eight/window/pending/ATR/proof equivalence; retained negative baseline and improved complete synthetic pipeline measurement",
     "Experimental complete indexed market-entry replay for scoped literal-USD integral-cash grids, exact ordered equity/drawdown/MFE/MAE and actual fills/fees/gaps/deadlines, strict sequential fallback and shared authoritative input validation;512 seeded whole-replay comparisons plus range/deadline/full-u64 oracles; measured shared engine only, no factory promotion",
-    "Exact decimal-string projection/display for first500 trade event IDs, safe legacy numeric fallback and actual full-u64 desktop/mobile raw-export regression; unchanged financial/version compute identity"
+    "Exact decimal-string projection/display for first500 trade event IDs, safe legacy numeric fallback and actual full-u64 desktop/mobile raw-export regression; unchanged financial/version compute identity",
+    "Explicit training-only indexed batch/API policy with versioned full cache/review context, lazy post-authorization index setup, mandatory independent sequential full-replay audits, durable disagreement blocking and atomic publication refusal; protected-science/autonomous refusal, proof-audit reference independence, comparable review basis and actual CLI/browser/export evidence"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -88,9 +89,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Bind experimental shared index to explicit training experiment/review contexts with independent sequential audits and measure full factory pipeline before promotion; continue remaining blueprint scope.",
+  "next_action": "Keep indexed policy experimental; profile and validate representative full-pipeline work before promotion, add checkpoint-aware lifecycle/aggregate audit monitoring and metadata-scale health checks; continue importer/catalog/scientific/operations blueprint scope.",
   "qualified_strategies": 0,
-  "tests_passed": 184,
+  "tests_passed": 188,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
@@ -99,10 +100,10 @@
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43484232777,
-    "sha": "a33803806f195c14dfa27f2eccd35c2858ed0e57",
+    "run_id": 43486269725,
+    "sha": "1a17220538bbda6afa32e14286cf9bdaeb84582c",
     "conclusion": "success",
-    "verification": "Exact public commit/success summary retrieved; exact-event UI milestone hosted verification follows publication"
+    "verification": "Exact public commit/success summary retrieved; indexed-policy milestone hosted verification follows publication"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
   "vps_acceptance": "VPS_PERFORMANCE_PENDING",
@@ -114,5 +115,7 @@
   "proof_screen_benchmark": "docs/BENCHMARKS/proof-screen-v1.json",
   "shared_batch_benchmark": "docs/BENCHMARKS/shared-batch-v2-prepared.json",
   "shared_batch_negative_baseline": "docs/BENCHMARKS/shared-batch-v1.json",
-  "indexed_engine_benchmark": "docs/BENCHMARKS/indexed-replay-v1.json"
+  "indexed_engine_benchmark": "docs/BENCHMARKS/indexed-replay-v1.json",
+  "indexed_factory_benchmark": "docs/BENCHMARKS/indexed-factory-v1.json",
+  "indexed_factory_performance_status": "INCONCLUSIVE; lower synthetic median but3/5 paired regressions; no default/autonomous promotion"
 }

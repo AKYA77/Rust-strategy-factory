@@ -107,6 +107,7 @@ fn options<'a>(
             evaluation,
             shadow_policy: None,
             proof_policy,
+            indexed_policy: None,
         },
         state_budget_bytes: 256 * 1024 * 1024,
     }
@@ -398,7 +399,7 @@ fn actual_batch_cli_reports_shared_compilation_and_separate_cached_reuse() {
         serde_json::to_vec(&candidates).unwrap(),
     )
     .unwrap();
-    fs::write(d.join("config.json"),serde_json::to_vec(&serde_json::json!({"inputs":[{"dataset":"input.json"}],"limits":{"feature_cells":100000}})).unwrap()).unwrap();
+    fs::write(d.join("config.json"),serde_json::to_vec(&serde_json::json!({"inputs":[{"dataset":"input.json"}],"limits":{"feature_cells":100000,"indexed_policy":{"version":"training-shared-index-v1","audit_bps":10000,"seed":42}}})).unwrap()).unwrap();
     let invoke = || {
         let output = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
             .args([
@@ -420,6 +421,13 @@ fn actual_batch_cli_reports_shared_compilation_and_separate_cached_reuse() {
     assert_eq!(first["new_attempts"], 4);
     assert_eq!(first["reused"], 0);
     assert!(first["shared_feature_builds"].as_u64().unwrap() > 0);
+    assert!(
+        first["executions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|e| e["result"]["indexed_replay"]["reference_audited"] == true)
+    );
     let second = invoke();
     assert_eq!(second["new_attempts"], 0);
     assert_eq!(second["reused"], 4);
@@ -437,4 +445,215 @@ fn actual_batch_cli_reports_shared_compilation_and_separate_cached_reuse() {
     assert_eq!(registry.counts().unwrap().attempts, 4);
     drop(registry);
     fs::remove_dir_all(d).unwrap();
+}
+
+#[test]
+fn indexed_training_batches_preserve_financial_receipts_and_audit_supported_cases() {
+    use rust_strategy_factory::indexed_policy::Policy;
+    let d = directory();
+    let mut registry = Registry::open(&d.join("state.sqlite")).unwrap();
+    let candidates = strategies();
+    let costs = Costs::default();
+    let revision = research::compute_revision().unwrap();
+    let policy = Policy {
+        audit_bps: 10000,
+        ..Default::default()
+    };
+    let mut fast = 0;
+    let mut fallback = 0;
+    for symbol in SYMBOLS {
+        let input = input(symbol);
+        let expected = research::evaluate_batch(
+            &mut registry,
+            &input,
+            &candidates,
+            &costs,
+            &revision,
+            options(None, None),
+        )
+        .unwrap();
+        let mut configured = options(None, None);
+        configured.evaluation.indexed_policy = Some(&policy);
+        let actual = research::evaluate_batch(
+            &mut registry,
+            &input,
+            &candidates,
+            &costs,
+            &revision,
+            configured,
+        )
+        .unwrap();
+        for (a, b) in actual.iter().zip(expected) {
+            assert_ne!(a.experiment_id, b.experiment_id);
+            assert_eq!(a.result["tick_replay"], b.result["tick_replay"]);
+            assert_eq!(a.outcome, b.outcome);
+            if a.result["indexed_replay"]["used_index"] == true {
+                fast += 1;
+                assert_eq!(a.result["indexed_replay"]["reference_audited"], true);
+                let hashes = a.result["indexed_replay"]["reference_hashes"]
+                    .as_array()
+                    .unwrap();
+                assert_eq!(hashes[0], hashes[1]);
+            } else {
+                fallback += 1;
+                assert_eq!(a.result["indexed_replay"]["reference_audited"], false);
+            }
+        }
+        let mut configured = options(None, None);
+        configured.evaluation.indexed_policy = Some(&policy);
+        assert!(
+            research::evaluate_batch(
+                &mut registry,
+                &input,
+                &candidates,
+                &costs,
+                &revision,
+                configured
+            )
+            .unwrap()
+            .iter()
+            .all(|e| e.reused)
+        );
+    }
+    assert_eq!((fast, fallback), (20, 12));
+    assert_eq!(registry.counts().unwrap().attempts, 64);
+    registry.integrity().unwrap();
+    drop(registry);
+    std::fs::remove_dir_all(d).unwrap();
+}
+
+#[test]
+fn indexed_policy_health_blocks_cached_and_pending_publication_and_protects_science() {
+    use rust_strategy_factory::{
+        indexed_policy::{self, Policy},
+        storage::{Claim, Outcome},
+    };
+    let d = directory();
+    let mut registry = Registry::open(&d.join("state.sqlite")).unwrap();
+    let input = input("EURUSD");
+    let candidates = strategies();
+    let costs = Costs::default();
+    let revision = research::compute_revision().unwrap();
+    let policy = Policy {
+        audit_bps: 10000,
+        ..Default::default()
+    };
+    let mut settings = options(None, None);
+    settings.evaluation.indexed_policy = Some(&policy);
+    let reference = research::evaluate_configured(
+        &mut registry,
+        &input,
+        &candidates[0],
+        &costs,
+        &revision,
+        options(None, None).evaluation,
+    )
+    .unwrap();
+    let execution = research::evaluate_configured(
+        &mut registry,
+        &input,
+        &candidates[0],
+        &costs,
+        &revision,
+        settings.evaluation,
+    )
+    .unwrap();
+    let actual: rust_strategy_factory::tick_engine::Replay =
+        serde_json::from_value(execution.result["tick_replay"].clone()).unwrap();
+    let mut altered = actual.clone();
+    altered.maximum_drawdown_micro_usd += 1;
+    assert!(indexed_policy::compare(&actual, &altered).is_err());
+    let key = registry
+        .experiment_key(&execution.experiment_id)
+        .unwrap()
+        .unwrap();
+    let mut pending = key.clone();
+    pending.code_revision = "indexed-publication-race-fixture".into();
+    let id = registry.register(&pending).unwrap();
+    let Claim::Acquired(lease) = registry.claim(&id, 0, 300000).unwrap() else {
+        panic!("new pending fixture")
+    };
+    let c = rusqlite::Connection::open(d.join("state.sqlite")).unwrap();
+    c.execute("INSERT INTO events(experiment_id,at_ms,action,attempt) VALUES (?1,0,'indexed-audit-contradiction-v1',1)",[&execution.experiment_id]).unwrap();
+    drop(c);
+    assert!(
+        registry
+            .finish(&lease, 1, Outcome::Completed, &execution.result)
+            .unwrap_err()
+            .contains(indexed_policy::BLOCKED)
+    );
+    registry
+        .finish(
+            &lease,
+            1,
+            Outcome::Failed,
+            &serde_json::json!({"error":"injected index failure"}),
+        )
+        .unwrap();
+    assert!(
+        research::evaluate_configured(
+            &mut registry,
+            &input,
+            &candidates[0],
+            &costs,
+            &revision,
+            settings.evaluation
+        )
+        .unwrap_err()
+        .contains(indexed_policy::BLOCKED)
+    );
+    assert_eq!(
+        research::evaluate_configured(
+            &mut registry,
+            &input,
+            &candidates[0],
+            &costs,
+            &revision,
+            options(None, None).evaluation
+        )
+        .unwrap()
+        .experiment_id,
+        reference.experiment_id
+    );
+    let w = Interval {
+        start_ms: input.dataset.manifest.first_ms,
+        end_exclusive_ms: input.dataset.manifest.last_ms + 1,
+    };
+    let evaluation = Evaluation {
+        window: w,
+        stage: Stage::IndependentValidation,
+        protocol_hash: "scientific".into(),
+    };
+    let mut science = options(Some(&evaluation), None);
+    science.evaluation.indexed_policy = Some(&policy);
+    // Use a clean registry so this refusal is authorization, not the failure marker.
+    let mut clean = Registry::open(&d.join("clean.sqlite")).unwrap();
+    assert!(
+        research::evaluate_configured(
+            &mut clean,
+            &input,
+            &candidates[0],
+            &costs,
+            &revision,
+            science.evaluation
+        )
+        .unwrap_err()
+        .contains("adaptation requires")
+    );
+    assert_eq!(clean.counts().unwrap().registered, 0);
+    assert!(
+        research::Driver::open(
+            &d.join("driver.sqlite"),
+            vec![input],
+            research::Config {
+                indexed_policy: Some(policy),
+                ..Default::default()
+            },
+            revision
+        )
+        .is_err()
+    );
+    drop(clean);
+    drop(registry);
+    std::fs::remove_dir_all(d).unwrap();
 }

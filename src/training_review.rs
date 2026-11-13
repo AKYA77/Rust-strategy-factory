@@ -76,8 +76,20 @@ fn evidence(registry: &Registry, id: &str) -> Result<Evidence> {
         result_hash: stored.result_hash,
         outcome: stored.outcome,
         resolved_net_micro_usd: net,
-        net_basis: proof
-            .then(|| "zero from verified no-entry proof; no executed zero-return trade".into()),
+        net_basis: if proof {
+            Some("zero from verified no-entry proof; no executed zero-return trade".into())
+        } else if stored.result["indexed_replay"]["used_index"] == true {
+            Some(
+                if stored.result["indexed_replay"]["reference_audited"] == true {
+                    "indexed replay with independent sequential reference match"
+                } else {
+                    "experimental indexed replay; this result lacks independent sequential audit"
+                }
+                .into(),
+            )
+        } else {
+            None
+        },
     })
 }
 fn compatible(key: &ExperimentKey, parent: &ExperimentKey, concept: &str, revision: &str) -> bool {
@@ -231,6 +243,9 @@ fn run(
             .map_err(|e| e.to_string())?;
     let proof_policy: Option<crate::proof_screen::Policy> =
         serde_json::from_value(parent.result["proof_policy"].clone()).map_err(|e| e.to_string())?;
+    let indexed_policy: Option<crate::indexed_policy::Policy> =
+        serde_json::from_value(parent.result["indexed_policy"].clone())
+            .map_err(|e| e.to_string())?;
     if input.conversions.len() != input.dataset.ticks.len()
         || input.dataset.manifest.content_hash != key.dataset_hash
         || input.dataset.manifest.profile_hash != key.profile_hash
@@ -243,6 +258,7 @@ fn run(
             feature_cells,
             shadow_policy.as_ref(),
             proof_policy.as_ref(),
+            indexed_policy.as_ref(),
         )? != key.configuration_hash
     {
         return Err("review requires exact parent data, profile, provenance, costs, conversions and feature configuration".into());
@@ -287,6 +303,7 @@ fn run(
                 evaluation: evaluation.as_ref(),
                 shadow_policy: shadow_policy.as_ref(),
                 proof_policy: proof_policy.as_ref(),
+                indexed_policy: indexed_policy.as_ref(),
             },
         )?;
         evidence(registry, &execution.experiment_id)

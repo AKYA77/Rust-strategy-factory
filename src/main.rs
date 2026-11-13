@@ -438,13 +438,14 @@ fn run(args: &[String]) -> Result<()> {
                         evaluation: evaluation.as_ref(),
                         shadow_policy: limits.shadow_policy.as_ref(),
                         proof_policy: limits.proof_policy.as_ref(),
+                        indexed_policy: limits.indexed_policy.as_ref(),
                     },
                     state_budget_bytes: limits.state_budget_bytes,
                 },
             )?;
             print(
                 &serde_json::json!({"new_attempts":report.executions.iter().filter(|e|!e.reused).count(),"reused":report.executions.iter().filter(|e|e.reused).count(),"executions":report.executions,
-                "shared_feature_builds":report.shared_feature_builds,"shared_cache_hits":report.shared_cache_hits,"primary_candles":report.primary_candles,"visible_candles":report.visible_candles}),
+                "shared_index_initialized":report.shared_index_initialized,"shared_feature_builds":report.shared_feature_builds,"shared_cache_hits":report.shared_cache_hits,"primary_candles":report.primary_candles,"visible_candles":report.visible_candles}),
             )
         }
         ["research", config, database] | ["research", config, database, _] => {

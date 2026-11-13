@@ -31,6 +31,8 @@ pub struct Config {
     pub shadow_policy: Option<crate::candidate_screen::ShadowPolicy>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof_policy: Option<crate::proof_screen::Policy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub indexed_policy: Option<crate::indexed_policy::Policy>,
 }
 fn zero_children(n: &usize) -> bool {
     *n == 0
@@ -48,6 +50,7 @@ impl Default for Config {
             improvement_children: 0,
             shadow_policy: None,
             proof_policy: None,
+            indexed_policy: None,
         }
     }
 }
@@ -73,6 +76,7 @@ pub struct EvaluationOptions<'a> {
     pub evaluation: Option<&'a Evaluation>,
     pub shadow_policy: Option<&'a crate::candidate_screen::ShadowPolicy>,
     pub proof_policy: Option<&'a crate::proof_screen::Policy>,
+    pub indexed_policy: Option<&'a crate::indexed_policy::Policy>,
 }
 pub fn evaluate(
     registry: &mut Registry,
@@ -93,6 +97,7 @@ pub fn evaluate(
             evaluation: None,
             shadow_policy: None,
             proof_policy: None,
+            indexed_policy: None,
         },
     )
 }
@@ -116,6 +121,7 @@ pub fn evaluate_window(
             evaluation: Some(evaluation),
             shadow_policy: None,
             proof_policy: None,
+            indexed_policy: None,
         },
     )
 }
@@ -125,6 +131,7 @@ pub(crate) fn configuration_hash(
     feature_cells: usize,
     shadow_policy: Option<&crate::candidate_screen::ShadowPolicy>,
     proof_policy: Option<&crate::proof_screen::Policy>,
+    indexed_policy: Option<&crate::indexed_policy::Policy>,
 ) -> Result<String> {
     let original = data::hash(&(
         feature_cells,
@@ -139,11 +146,18 @@ pub(crate) fn configuration_hash(
             data::hash(&("shadow-policy-context-v1", original, policy))
         }
     }?;
-    match proof_policy {
+    let proof_context = match proof_policy {
         None => Ok(shadow_context),
         Some(policy) => {
             policy.validate()?;
             data::hash(&("proof-policy-context-v1", shadow_context, policy))
+        }
+    }?;
+    match indexed_policy {
+        None => Ok(proof_context),
+        Some(policy) => {
+            policy.validate()?;
+            data::hash(&("indexed-training-context-v1", proof_context, policy))
         }
     }
 }
@@ -158,26 +172,28 @@ pub fn evaluate_configured(
 ) -> Result<Execution> {
     evaluate_prepared(registry, input, strategy, costs, revision, options, None)
 }
-struct Prepared<'c, 'f> {
+struct Prepared<'c, 'f, 'data> {
     candles: &'c [candles::Candle],
     features: &'f mut Features<'c>,
     visible: usize,
     configuration_hash: &'c str,
+    index: Option<&'c std::cell::OnceCell<Result<crate::indexed_replay::Index<'data>>>>,
 }
-fn evaluate_prepared(
+fn evaluate_prepared<'data>(
     registry: &mut Registry,
-    input: &Input,
+    input: &'data Input,
     strategy: &Strategy,
-    costs: &Costs,
+    costs: &'data Costs,
     revision: &str,
     options: EvaluationOptions<'_>,
-    prepared: Option<Prepared<'_, '_>>,
+    prepared: Option<Prepared<'_, '_, 'data>>,
 ) -> Result<Execution> {
     let EvaluationOptions {
         feature_cells,
         evaluation,
         shadow_policy,
         proof_policy,
+        indexed_policy,
     } = options;
     if let Some(e) = evaluation {
         e.window.validate()?;
@@ -191,6 +207,9 @@ fn evaluate_prepared(
         policy.validate()?;
     }
     if let Some(policy) = proof_policy {
+        policy.validate()?;
+    }
+    if let Some(policy) = indexed_policy {
         policy.validate()?;
     }
     let d = &input.dataset;
@@ -225,7 +244,14 @@ fn evaluate_prepared(
         configuration_hash: if let Some(p) = prepared.as_ref() {
             p.configuration_hash.to_owned()
         } else {
-            configuration_hash(input, costs, feature_cells, shadow_policy, proof_policy)?
+            configuration_hash(
+                input,
+                costs,
+                feature_cells,
+                shadow_policy,
+                proof_policy,
+                indexed_policy,
+            )?
         },
         stage: evaluation.map_or(Stage::TickVerification, |e| e.stage.clone()),
     };
@@ -234,6 +260,13 @@ fn evaluate_prepared(
         crate::improvement::authorize(&key)?;
         if d.manifest.class != crate::data::DataClass::SyntheticTestOnly && evaluation.is_none() {
             return Err("real proof screening requires explicit training scope".into());
+        }
+    }
+    if indexed_policy.is_some() {
+        crate::indexed_policy::guard(&registry.connection)?;
+        crate::improvement::authorize(&key)?;
+        if d.manifest.class != crate::data::DataClass::SyntheticTestOnly && evaluation.is_none() {
+            return Err("real indexed research requires explicit training scope".into());
         }
     }
     let id = registry.register(&key)?;
@@ -254,6 +287,8 @@ fn evaluate_prepared(
                     evaluation,
                     shadow_policy,
                     proof_policy,
+                    indexed_policy,
+                    index: prepared.as_ref().and_then(|p| p.index),
                     registry,
                     lease: &lease,
                     id: &id,
@@ -311,18 +346,20 @@ fn evaluate_prepared(
         }
     }
 }
-struct ComputeContext<'a> {
-    input: &'a Input,
+struct ComputeContext<'a, 'data> {
+    input: &'data Input,
     strategy: &'a Strategy,
-    costs: &'a Costs,
+    costs: &'data Costs,
     evaluation: Option<&'a Evaluation>,
     shadow_policy: Option<&'a crate::candidate_screen::ShadowPolicy>,
     proof_policy: Option<&'a crate::proof_screen::Policy>,
+    indexed_policy: Option<&'a crate::indexed_policy::Policy>,
+    index: Option<&'a std::cell::OnceCell<Result<crate::indexed_replay::Index<'data>>>>,
     registry: &'a Registry,
     lease: &'a crate::storage::Lease,
     id: &'a str,
 }
-impl ComputeContext<'_> {
+impl<'data> ComputeContext<'_, 'data> {
     fn calculate(
         &self,
         c: &[candles::Candle],
@@ -336,6 +373,7 @@ impl ComputeContext<'_> {
         let evaluation = self.evaluation;
         let shadow_policy = self.shadow_policy;
         let proof_policy = self.proof_policy;
+        let indexed_policy = self.indexed_policy;
         let registry = self.registry;
         let lease = self.lease;
         let id = self.id;
@@ -359,7 +397,7 @@ impl ComputeContext<'_> {
         }
         if !screen.requires_tick_verification {
             return Ok(
-                serde_json::json!({"screen":screen,"tick_replay":null,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation,"shadow_policy":shadow_policy,"proof_policy":proof_policy}),
+                serde_json::json!({"screen":screen,"tick_replay":null,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation,"shadow_policy":shadow_policy,"proof_policy":proof_policy,"indexed_policy":indexed_policy}),
             );
         }
         let market_stop_proof = crate::screen::market_stop_proof(&d.profile, costs, strategy)?;
@@ -417,7 +455,7 @@ impl ComputeContext<'_> {
         if proof_rejection && !proof_audited {
             return Ok(
                 serde_json::json!({"screen":screen,"tick_replay":null,"market_stop_proof":market_stop_proof,
-                "proof_rejection":true,"proof_audited":false,"proof_policy":proof_policy,"shadow_policy":shadow_policy,
+                "proof_rejection":true,"proof_audited":false,"proof_policy":proof_policy,"indexed_policy":indexed_policy,"shadow_policy":shadow_policy,
                 "strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation}),
             );
         }
@@ -430,17 +468,73 @@ impl ComputeContext<'_> {
             costs,
             evaluation.map(|e| &e.window),
         );
-        let replay = if let Some(e) = evaluation {
-            tick_engine::replay_window(d, c, &mask, strategy, costs, &input.conversions, &e.window)?
+        let (replay, indexed_metadata) = if let Some(policy) =
+            indexed_policy.filter(|_| !proof_audited)
+        {
+            let crate::indexed_replay::Execution {
+                replay,
+                used_index,
+                fallback_reason,
+                work,
+            } = self.indexed(c, &mask)?;
+            let audited = used_index && policy.audit(id)?;
+            let hashes = if audited {
+                let reference = match self.reference(c, &mask) {
+                    Ok(reference) => reference,
+                    Err(error) => {
+                        crate::indexed_policy::record_failure(registry, lease)?;
+                        return Err(format!(
+                            "{}: reference failed: {error}",
+                            crate::indexed_policy::DISAGREEMENT
+                        ));
+                    }
+                };
+                match crate::indexed_policy::compare(&replay, &reference) {
+                    Ok(h) => Some(h),
+                    Err(error) => {
+                        crate::indexed_policy::record_failure(registry, lease)?;
+                        return Err(error);
+                    }
+                }
+            } else {
+                None
+            };
+            (
+                replay,
+                Some(
+                    serde_json::json!({"version":policy.version,"used_index":used_index,"fallback_reason":fallback_reason,"work":work,"reference_audited":audited,"reference_hashes":hashes}),
+                ),
+            )
         } else {
-            tick_engine::replay(d, c, &mask, strategy, costs, &input.conversions)?
+            (self.reference(c,&mask)?,indexed_policy.map(|_|serde_json::json!({"used_index":false,"fallback_reason":"independent proof audit uses sequential reference","reference_audited":false})))
         };
-        let screen_audit = crate::screen::audit_replay(d, costs, &replay)?;
+        let screen_audit = match crate::screen::audit_replay(d, costs, &replay) {
+            Ok(a) => a,
+            Err(error) => {
+                if indexed_metadata
+                    .as_ref()
+                    .is_some_and(|m| m["used_index"] == true)
+                {
+                    crate::indexed_policy::record_failure(registry, lease)?;
+                }
+                return Err(error);
+            }
+        };
         if market_stop_proof.is_some()
             && (!replay.trades.is_empty()
                 || replay.unresolved.is_some()
                 || replay.pending_entry.is_some())
         {
+            if indexed_metadata
+                .as_ref()
+                .is_some_and(|m| m["used_index"] == true)
+            {
+                crate::indexed_policy::record_failure(registry, lease)?;
+                return Err(format!(
+                    "{}: fixed-market proof contradicted",
+                    crate::indexed_policy::DISAGREEMENT
+                ));
+            }
             crate::proof_screen::record_contradiction(registry, lease)?;
             return Err(
                 "market-stop proof excluded an authoritative entry; screening must remain disabled"
@@ -459,8 +553,70 @@ impl ComputeContext<'_> {
                 "candidate_rejected":false,"qualification_evidence":false}),
         };
         Ok(
-            serde_json::json!({"screen":screen,"screen_audit":screen_audit,"market_stop_proof":market_stop_proof,"proof_rejection":proof_rejection,"proof_audited":proof_audited,"candidate_screen_audit":candidate_screen_audit,"tick_replay":replay,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation,"shadow_policy":shadow_policy,"proof_policy":proof_policy}),
+            serde_json::json!({"screen":screen,"screen_audit":screen_audit,"indexed_replay":indexed_metadata,"market_stop_proof":market_stop_proof,"proof_rejection":proof_rejection,"proof_audited":proof_audited,"candidate_screen_audit":candidate_screen_audit,"tick_replay":replay,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation,"shadow_policy":shadow_policy,"proof_policy":proof_policy,"indexed_policy":indexed_policy}),
         )
+    }
+    fn reference(
+        &self,
+        c: &[candles::Candle],
+        mask: &crate::indicators::Mask,
+    ) -> Result<tick_engine::Replay> {
+        if let Some(e) = self.evaluation {
+            tick_engine::replay_window(
+                &self.input.dataset,
+                c,
+                mask,
+                self.strategy,
+                self.costs,
+                &self.input.conversions,
+                &e.window,
+            )
+        } else {
+            tick_engine::replay(
+                &self.input.dataset,
+                c,
+                mask,
+                self.strategy,
+                self.costs,
+                &self.input.conversions,
+            )
+        }
+    }
+    fn indexed(
+        &self,
+        c: &[candles::Candle],
+        mask: &crate::indicators::Mask,
+    ) -> Result<crate::indexed_replay::Execution> {
+        let fallback = |reason: String| -> Result<crate::indexed_replay::Execution> {
+            Ok(crate::indexed_replay::Execution {
+                replay: self.reference(c, mask)?,
+                used_index: false,
+                fallback_reason: Some(reason),
+                work: Default::default(),
+            })
+        };
+        match self.index {
+            Some(cell) => match cell.get_or_init(|| {
+                crate::indexed_replay::Index::build(
+                    &self.input.dataset,
+                    self.costs,
+                    &self.input.conversions,
+                    self.evaluation.map(|e| &e.window),
+                )
+            }) {
+                Ok(index) => index.replay(c, mask, self.strategy).or_else(fallback),
+                Err(reason) => fallback(reason.clone()),
+            },
+            None => crate::indexed_replay::replay(
+                &self.input.dataset,
+                c,
+                mask,
+                self.strategy,
+                self.costs,
+                &self.input.conversions,
+                self.evaluation.map(|e| &e.window),
+            ),
+        }
     }
 }
 /// One input/frame/window, at most64 candidates, one lease at a time. Each committed
@@ -477,6 +633,7 @@ pub struct BatchReport {
     pub visible_candles: usize,
     pub shared_feature_builds: usize,
     pub shared_cache_hits: usize,
+    pub shared_index_initialized: bool,
 }
 pub fn evaluate_batch(
     registry: &mut Registry,
@@ -526,7 +683,16 @@ pub fn evaluate_batch_report(
         options.evaluation.feature_cells,
         options.evaluation.shadow_policy,
         options.evaluation.proof_policy,
+        options.evaluation.indexed_policy,
     )?;
+    if options.evaluation.indexed_policy.is_some() {
+        crate::indexed_policy::guard(&registry.connection)?;
+    }
+    // Quote summaries are initialized only after a candidate is authorized and leased.
+    let indexed = options
+        .evaluation
+        .indexed_policy
+        .map(|_| std::cell::OnceCell::new());
     let c = candles::build(&input.dataset, timeframe)?;
     let visible = options.evaluation.evaluation.map_or(c.len(), |e| {
         c.partition_point(|c| c.available_ms < e.window.end_exclusive_ms)
@@ -552,6 +718,7 @@ pub fn evaluate_batch_report(
                 features: &mut features,
                 visible,
                 configuration_hash: &configuration_hash,
+                index: indexed.as_ref(),
             }),
         )?);
     }
@@ -561,6 +728,7 @@ pub fn evaluate_batch_report(
         visible_candles: visible,
         shared_feature_builds: features.feature_builds,
         shared_cache_hits: features.cache_hits,
+        shared_index_initialized: indexed.as_ref().is_some_and(|cell| cell.get().is_some()),
     })
 }
 /// Bounded novel parameter regions; no cycling through already completed template ranges.
@@ -821,6 +989,9 @@ impl Driver {
         if total > config.max_total_events {
             return Err("loaded inputs exceed configured event budget".into());
         }
+        if config.indexed_policy.is_some() {
+            return Err("experimental indexed policy currently requires batch-experiments; autonomous index lifecycle is incomplete".into());
+        }
         if let Some(policy) = &config.proof_policy {
             policy.validate()?;
         }
@@ -976,6 +1147,7 @@ impl Driver {
                 evaluation: evaluation.as_ref(),
                 shadow_policy: self.config.shadow_policy.as_ref(),
                 proof_policy: self.config.proof_policy.as_ref(),
+                indexed_policy: self.config.indexed_policy.as_ref(),
             },
         );
         let (id, outcome, reused, error) = match execution {
@@ -1009,7 +1181,10 @@ impl Driver {
         }
         tx.execute("INSERT INTO research_steps(run_id,cursor,experiment_id,outcome,reused,error) VALUES (?1,?2,?3,?4,?5,?6)",params![self.id,s.cursor as i64,id,outcome,i64::from(reused),error]).map_err(|e|e.to_string())?;
         if error.as_ref().is_some_and(|e| {
-            e.contains(crate::proof_screen::BLOCKED) || e.contains("market-stop proof excluded")
+            e.contains(crate::proof_screen::BLOCKED)
+                || e.contains("market-stop proof excluded")
+                || e.contains(crate::indexed_policy::BLOCKED)
+                || e.contains(crate::indexed_policy::DISAGREEMENT)
         }) {
             tx.execute(
                 "UPDATE research_runs SET state='paused' WHERE id=?1 AND token=?2",

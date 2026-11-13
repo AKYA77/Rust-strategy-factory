@@ -31,7 +31,7 @@ Native `.rsf` storage supports lossless packing/unpacking and the same dataset i
 
 Bounded [candidate batches](docs/RUNBOOKS/candidate-batches.md) share immutable input preparation and feature compilation through the `batch-experiments` CLI while preserving exact scalar receipts. The standalone autonomous scheduler remains one candidate per checkpoint.
 
-An [experimental full-accounting indexed engine](docs/RUNBOOKS/indexed-replay.md) supports exact restricted USD market cases with sequential fallback. Research and scientific workflows continue to use the sequential default; engine-only measurements do not establish factory throughput.
+An [experimental full-accounting indexed engine](docs/RUNBOOKS/indexed-replay.md) supports exact restricted USD market cases with sequential fallback. Sequential remains the default. Explicit training batches can request independent sequential audits of indexed results; full factory performance is inconclusive, so autonomous/scientific promotion is not enabled.
 
 Training-only deterministic diagnostics persist bounded unevaluated child proposals; see [training improvement](docs/RUNBOOKS/training-improvement.md). Scientific/OOS/final receipts cannot authorize adaptation. Explicit bounded reviews replay comparable parent/children and retain immutable evaluation edges; opt-in bounded one-worker jobs retain scheduling/recovery state. Individual child checkpoints preserve pause/restart recovery; full improvement acceptance remains unfinished.
 

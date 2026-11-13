@@ -108,6 +108,7 @@ fn main() {
                             evaluation: None,
                             shadow_policy: None,
                             proof_policy: optimized.then_some(&policy),
+                            indexed_policy: None,
                         },
                     )
                     .unwrap();

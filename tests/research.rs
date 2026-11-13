@@ -93,6 +93,7 @@ fn configured_shadow_policy_separates_cache_identity_and_survives_driver_restart
             evaluation: None,
             shadow_policy: Some(&policy),
             proof_policy: None,
+            indexed_policy: None,
         },
     )
     .unwrap();
@@ -128,6 +129,7 @@ fn configured_shadow_policy_separates_cache_identity_and_survives_driver_restart
             evaluation: None,
             shadow_policy: Some(&changed),
             proof_policy: None,
+            indexed_policy: None,
         },
     )
     .unwrap();

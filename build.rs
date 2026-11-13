@@ -23,6 +23,7 @@ fn main() {
         "src/stops.rs",
         "src/tick_engine.rs",
         "src/indexed_replay.rs",
+        "src/indexed_policy.rs",
         "src/screen.rs",
         "src/candidate_screen.rs",
         "src/proof_screen.rs",
