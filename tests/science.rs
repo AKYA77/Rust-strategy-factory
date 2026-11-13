@@ -121,7 +121,7 @@ fn frozen_protocol_executes_all_windows_and_reuses_an_immutable_report() {
             > 0
     );
     assert_eq!(first.report.candidates[0].failed_windows, 0);
-    assert_eq!(first.report.candidates[0].robustness.len(), 3);
+    assert_eq!(first.report.candidates[0].robustness.len(), 5);
     for probe in &first.report.candidates[0].robustness {
         assert_eq!(probe.experiments.len(), 2);
         assert_eq!(probe.status, "DESCRIPTIVE_ONLY");
@@ -407,7 +407,7 @@ fn identical_numeric_histories_on_different_instruments_have_independent_holdout
     let eur = science::execute(&mut registry, &a, &p, "code", &budget).unwrap();
     let gbp = science::execute(&mut registry, &b, &p, "code", &budget).unwrap();
     assert_ne!(eur.report.protocol_id, gbp.report.protocol_id);
-    assert_eq!(registry.counts().unwrap().registered, 24);
+    assert_eq!(registry.counts().unwrap().registered, 32);
     registry.integrity().unwrap();
     drop(registry);
     std::fs::remove_dir_all(dir).unwrap();

@@ -9,7 +9,7 @@ use crate::{
     validation::Observation,
 };
 use serde::{Deserialize, Serialize};
-pub const VERSION: &str = "fixed-cost-stop-neighborhood-v1";
+pub const VERSION: &str = "fixed-cost-stop-rule-neighborhood-v2";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Case {
     pub name: String,
@@ -49,6 +49,18 @@ pub fn cases(strategy: &Strategy, costs: &Costs) -> Result<Vec<Case>> {
                 costs: costs.clone(),
             });
         }
+    }
+    for (i, rule) in crate::neighborhood::rules(&strategy.rule)?
+        .into_iter()
+        .enumerate()
+    {
+        let mut neighbor = strategy.clone();
+        neighbor.rule = rule;
+        cases.push(Case {
+            name: format!("rule-neighbor-{i}"),
+            strategy: neighbor.canonical()?,
+            costs: costs.clone(),
+        });
     }
     Ok(cases)
 }

@@ -44,7 +44,8 @@
     "exact OOS exit-year and UTC entry-session breakdowns with reset-fold realized cash drawdown and overflow-safe diagnostic updates",
     "fixed prior-only closed-M1 trend/range regime bins with gap/warmup/stale labels, shared publication summaries and prefix invariance",
     "revision-pinned selected-source/license review for Tickforge, Wickra and LZ4 Flex with reproducible file hash receipts; no copied code or dependency adoption",
-    "bounded lossless native uncompressed SoA artifact format with immutable publication, exact stream checksums, CLI/research loading and JSON-equivalent receipt reuse"
+    "bounded lossless native uncompressed SoA artifact format with immutable publication, exact stream checksums, CLI/research loading and JSON-equivalent receipt reuse",
+    "bounded canonical single-scalar rule parameter probes frozen before OOS with actual replay identities and declared-trial accounting"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -52,9 +53,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Implement broader parameter neighborhoods and dependence-aware inference, approval/coverage qualification prerequisites, then remaining full queue.",
+  "next_action": "Implement higher-timeframe confirmations and additional operators, dependence-aware inference and prespecified evidence acceptance; continue full implementation queue.",
   "qualified_strategies": 0,
-  "tests_passed": 97,
+  "tests_passed": 99,
   "benchmark": "docs/BENCHMARKS/2026-11-12-synthetic-replay.json",
   "browser_acceptance": "Chromium desktop/mobile against actual Rust HTTP server and SQLite; auth, CSRF/origin/host/body/rates, controls, receipts/export, restart/logout passed"
 }

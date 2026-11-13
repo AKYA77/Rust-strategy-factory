@@ -9,3 +9,9 @@ Every probe actually replays each OOS fold from a flat account with causal warmu
 The report marks probes `DESCRIPTIVE_ONLY` and retains `INSUFFICIENT_EVIDENCE` overall. There is no fitted acceptance threshold or automatic promotion. Real final execution remains blocked while independent prerequisites are unfinished. No adaptation uses protected-final results. Regime/session analysis, broader rule neighborhoods, dependence-aware inference, approved data coverage and prespecified robustness acceptance gates remain required.
 
 Tests check the exact changes, unchanged base specification, deterministic generation, grammar/cost limits and trial-budget rejection. Actual synthetic protocol tests verify nonzero OOS probe trades, effective concept/cost identities, tick-verification stage, exact fold windows, absence of final-window inputs, immutable reuse and no extra attempts on restart. Old reports omit optional later evidence fields and remain hash-readable without retroactive statistics.
+
+## Rule-neighborhood extension
+
+Protocol v6 binds `fixed-cost-stop-rule-neighborhood-v2` and `canonical-first-six-scalar-rule-neighbors-v1`. Canonical JSON traversal enumerates eligible window/lookback/fast/slow/basis_points/multiple_bps scalars. One scalar changes by max(1,floor(value/10)); invalid or equivalent canonical rules are omitted. At most six valid distinct rule cases are retained in deterministic order. Session flags/hours, side, timeframe and pending-entry fields remain fixed. This bounded deterministic prefix is not an exhaustive or fitted neighborhood and cannot prove broad stability.
+
+Two focused tests cover exact perturbations, equivalent Boolean ordering, canonical uniqueness, domain edges and fixed-session exclusion. Existing actual OOS tests now execute these probes, verify identities/windows/stages and unchanged attempt counts on restart. Trial budgets cover every derived case before execution. No variant sees the protected-final interval.

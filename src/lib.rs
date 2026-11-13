@@ -29,3 +29,5 @@ pub mod diagnostics;
 pub mod regimes;
 
 pub mod native;
+
+pub mod neighborhood;

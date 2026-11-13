@@ -19,7 +19,7 @@ fn frozen_probes_change_exactly_prespecified_cost_or_stop_fields() {
     let base = strategy(100);
     let costs = Costs::default();
     let cases = robustness::cases(&base, &costs).unwrap();
-    assert_eq!(cases.len(), 3);
+    assert_eq!(cases.len(), 5);
     assert_eq!(
         cases[0].strategy.identity().unwrap(),
         base.identity().unwrap()
@@ -51,10 +51,10 @@ fn frozen_probes_change_exactly_prespecified_cost_or_stop_fields() {
 #[test]
 fn probes_obey_stop_domain_and_reject_unrepresentable_cost_stress() {
     let at_min = robustness::cases(&strategy(1), &Costs::default()).unwrap();
-    assert_eq!(at_min.len(), 2);
+    assert_eq!(at_min.len(), 4);
     assert_eq!(at_min[1].strategy.stop_ticks, 2);
     let at_max = robustness::cases(&strategy(1_000_000), &Costs::default()).unwrap();
-    assert_eq!(at_max.len(), 2);
+    assert_eq!(at_max.len(), 4);
     assert_eq!(at_max[1].strategy.stop_ticks, 900_000);
     assert!(
         robustness::cases(
