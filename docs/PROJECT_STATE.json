@@ -69,7 +69,8 @@
     "normalized Boolean arity enforcement after flatten/dedup with failing-before-fix regression and1000 seeded idempotence/JSON-roundtrip attempts",
     "authenticated bounded cursor experiment-history pages with server-side symbol filters, full-i64 string cursors, legacy API compatibility and >100-record responsive/race/concurrent-insert browser coverage",
     "Python3.11+ content-addressed local install/update/rollback with verified activation, staged native backup/new-path offline restore, refusal/preservation acceptance and statically verified non-root systemd resource-limit templates",
-    "graceful Unix SIGINT/SIGTERM research checkpoint exits with coordinator lease release and preserved running/paused state; four process signal/state combinations restart immediately"
+    "graceful Unix SIGINT/SIGTERM research checkpoint exits with coordinator lease release and preserved running/paused state; four process signal/state combinations restart immediately",
+    "authenticated paginated immutable training diagnosis/review lineage, verified raw detail/export, tamper refusal and desktop/mobile extreme-integer evidence display with fixed detail-hash overflow"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -77,11 +78,11 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Authenticated paginated dashboard training diagnosis/review lineage with exact JSON exports and actual immutable parent/child browser evidence; continue full queue.",
+  "next_action": "Review codec source/licenses and add bounded lossless ZSTD/native baseline with exact identity/replay equivalence and measurements; compare Parquet and continue full queue.",
   "qualified_strategies": 0,
-  "tests_passed": 147,
+  "tests_passed": 148,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
-  "browser_acceptance": "Chromium desktop/mobile against real Rust/SQLite/native input and ATR/MACD/higher protocol; auth/control/export/restart plus actual extreme-loss diagnostic guards, exact positive/negative safe-boundary currency and byte-identical raw download passed",
+  "browser_acceptance": "Chromium desktop/mobile against actual Rust/SQLite/native input: auth/control/export/restart, >100-history paging and filter/race, actual immutable training lineage/review and exact extreme-loss training exports",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
   "component_benchmark": "docs/BENCHMARKS/v6-prefix-component.json",
   "generation_component_benchmark": "docs/BENCHMARKS/structural-generation-v1.json",

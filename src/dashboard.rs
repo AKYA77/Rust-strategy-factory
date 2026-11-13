@@ -396,6 +396,132 @@ async fn experiments(State(app): State<Arc<App>>) -> Response {
         ),
     }
 }
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TrainingQuery {
+    parent: String,
+    before: Option<String>,
+    limit: Option<usize>,
+}
+fn valid_identity(id: &str) -> bool {
+    id.len() == 64 && id.bytes().all(|b| b.is_ascii_hexdigit())
+}
+fn training_record(
+    registry: &Registry,
+    id: &str,
+    reviews: bool,
+) -> Result<Option<serde_json::Value>> {
+    if reviews {
+        crate::training_review::read_report(registry, id)?.map(serde_json::to_value)
+    } else {
+        crate::improvement::read_report(registry, id)?.map(serde_json::to_value)
+    }
+    .transpose()
+    .map_err(|e| e.to_string())
+}
+fn training_page(
+    registry: &Registry,
+    parent: &str,
+    before: Option<i64>,
+    limit: usize,
+    reviews: bool,
+) -> Result<HistoryPage> {
+    let (table, field) = if reviews {
+        ("training_reviews", "diagnosis_id")
+    } else {
+        ("training_diagnoses", "parent_id")
+    };
+    let mut sql = format!("SELECT rowid,id FROM {table} WHERE {field}=?");
+    let mut values = vec![rusqlite::types::Value::from(parent.to_string())];
+    if let Some(before) = before {
+        sql.push_str(" AND rowid < ?");
+        values.push(before.into());
+    }
+    sql.push_str(" ORDER BY rowid DESC LIMIT ?");
+    values.push(((limit + 1) as i64).into());
+    let mut query = registry
+        .connection
+        .prepare(&sql)
+        .map_err(|e| e.to_string())?;
+    let mut ids = query
+        .query_map(rusqlite::params_from_iter(values), |r| {
+            Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    let more = ids.len() > limit;
+    ids.truncate(limit);
+    let next_cursor = if more {
+        ids.last().map(|(cursor, _)| cursor.to_string())
+    } else {
+        None
+    };
+    let mut rows = Vec::new();
+    for (_, id) in ids {
+        let report = training_record(registry, &id, reviews)?.ok_or("training record missing")?;
+        let children = report[if reviews { "children" } else { "proposals" }]
+            .as_array()
+            .ok_or("training child evidence missing")?
+            .len();
+        rows.push(serde_json::json!({"id":id,"version":report["version"],"status":report["status"],"children":children}));
+    }
+    Ok(HistoryPage { rows, next_cursor })
+}
+async fn training_list(app: Arc<App>, query: TrainingQuery, reviews: bool) -> Response {
+    let before = match query.before {
+        None => None,
+        Some(value) => match value.parse::<i64>() {
+            Ok(n) if n > 0 && value.bytes().all(|b| b.is_ascii_digit()) => Some(n),
+            _ => return api_error(StatusCode::BAD_REQUEST, "invalid training cursor"),
+        },
+    };
+    let limit = query.limit.unwrap_or(10);
+    if !valid_identity(&query.parent) || !(1..=25).contains(&limit) {
+        return api_error(
+            StatusCode::BAD_REQUEST,
+            "invalid training identity or page size",
+        );
+    }
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match training_page(&registry, &query.parent, before, limit, reviews) {
+        Ok(page) => Json(page).into_response(),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "training evidence integrity/read failure",
+        ),
+    }
+}
+async fn diagnoses(State(app): State<Arc<App>>, Query(query): Query<TrainingQuery>) -> Response {
+    training_list(app, query, false).await
+}
+async fn reviews(State(app): State<Arc<App>>, Query(query): Query<TrainingQuery>) -> Response {
+    training_list(app, query, true).await
+}
+async fn training_detail(app: Arc<App>, id: String, reviews: bool) -> Response {
+    if !valid_identity(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid training identity");
+    }
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match training_record(&registry, &id, reviews) {
+        Ok(Some(report)) => Json(report).into_response(),
+        Ok(None) => api_error(StatusCode::NOT_FOUND, "training record not found"),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "training evidence integrity/read failure",
+        ),
+    }
+}
+async fn diagnosis_detail(State(app): State<Arc<App>>, Param(id): Param<String>) -> Response {
+    training_detail(app, id, false).await
+}
+async fn review_detail(State(app): State<Arc<App>>, Param(id): Param<String>) -> Response {
+    training_detail(app, id, true).await
+}
 async fn detail(State(app): State<Arc<App>>, Param(id): Param<String>) -> Response {
     if id.len() != 64 || !id.bytes().all(|b| b.is_ascii_hexdigit()) {
         return api_error(StatusCode::BAD_REQUEST, "invalid experiment identity");
@@ -554,6 +680,10 @@ pub async fn serve(database: &Path, auth_path: &Path, port: u16) -> Result<()> {
         .route("/api/overview", get(overview))
         .route("/api/experiments", get(experiments))
         .route("/api/experiment-history", get(history))
+        .route("/api/training-diagnoses", get(diagnoses))
+        .route("/api/training-diagnoses/{id}", get(diagnosis_detail))
+        .route("/api/training-reviews", get(reviews))
+        .route("/api/training-reviews/{id}", get(review_detail))
         .route("/api/protocols", get(protocols))
         .route("/api/protocols/{id}", get(protocol_detail))
         .route("/api/experiments/{id}", get(detail))
@@ -610,5 +740,100 @@ mod history_tests {
         let missing = experiment_page(&registry, None, Some("XAUUSD"), 25).unwrap();
         assert!(missing.rows.is_empty());
         assert!(missing.next_cursor.is_none());
+    }
+}
+
+#[cfg(test)]
+mod training_lineage_tests {
+    use super::*;
+    #[test]
+    fn training_pages_follow_verified_lineage_and_refuse_tampered_evidence() {
+        let directory = std::env::temp_dir().join(format!(
+            "factory-dashboard-lineage-{}",
+            random_hex().unwrap()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let mut registry = Registry::open(&directory.join("state.sqlite")).unwrap();
+        let dataset = crate::data::synthetic_fixture("EURUSD").unwrap();
+        let input = research::Input {
+            conversions: vec![crate::contracts::Conversion::usd(); dataset.ticks.len()],
+            dataset,
+        };
+        let strategy = crate::strategies::Strategy {
+            timeframe: crate::candles::Timeframe::M1,
+            side: crate::contracts::Side::Long,
+            entry: None,
+            stop_ticks: 100,
+            stop_policy: None,
+            rule: crate::strategies::Rule::AboveMean { window: 100000 },
+        };
+        let parent = research::evaluate(
+            &mut registry,
+            &input,
+            &strategy,
+            &crate::tick_engine::Costs::default(),
+            "lineage-query-fixture",
+            10000,
+        )
+        .unwrap();
+        let mut report_ids = Vec::new();
+        for seed in 0..3 {
+            report_ids.push(
+                crate::improvement::diagnose(
+                    &mut registry,
+                    &parent.experiment_id,
+                    &crate::improvement::Options {
+                        seed,
+                        max_children: 1,
+                        ..Default::default()
+                    },
+                )
+                .unwrap()
+                .report
+                .id,
+            );
+        }
+        let first = training_page(&registry, &parent.experiment_id, None, 2, false).unwrap();
+        assert_eq!(
+            first
+                .rows
+                .iter()
+                .map(|r| r["id"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            vec![report_ids[2].as_str(), report_ids[1].as_str()]
+        );
+        let last = training_page(
+            &registry,
+            &parent.experiment_id,
+            Some(first.next_cursor.unwrap().parse().unwrap()),
+            2,
+            false,
+        )
+        .unwrap();
+        assert_eq!(last.rows.len(), 1);
+        assert_eq!(last.rows[0]["id"], report_ids[0]);
+        assert!(last.next_cursor.is_none());
+        let review = crate::training_review::execute(
+            &mut registry,
+            &input,
+            &report_ids[0],
+            10000,
+            256 * 1024 * 1024,
+        )
+        .unwrap();
+        let reviews = training_page(&registry, &report_ids[0], None, 10, true).unwrap();
+        assert_eq!(reviews.rows[0]["id"], review.report.id);
+        assert_eq!(
+            training_record(&registry, &review.report.id, true)
+                .unwrap()
+                .unwrap()["diagnosis_id"],
+            report_ids[0]
+        );
+        registry.integrity().unwrap();
+        registry.connection.execute("UPDATE training_diagnoses SET report_json=json_set(report_json,'$.status','FORGED') WHERE id=?1",[&report_ids[2]]).unwrap();
+        assert!(training_record(&registry, &report_ids[2], false).is_err());
+        assert!(training_page(&registry, &parent.experiment_id, None, 2, false).is_err());
+        drop(registry);
+        std::fs::remove_dir_all(directory).unwrap();
     }
 }
