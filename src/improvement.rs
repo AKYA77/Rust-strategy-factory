@@ -9,7 +9,7 @@ use crate::{
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-pub const VERSION: &str = "training-proposals-v2-receipt-breakdown";
+pub const VERSION: &str = "training-proposals-v3-friction-stop";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Options {
@@ -195,6 +195,7 @@ pub fn diagnose(registry: &mut Registry, parent_id: &str, options: &Options) -> 
             return Err("parent specification identity mismatch".into());
         }
         let mut eligible = true;
+        let mut stop_rejected = false;
         if parent.result["tick_replay"].is_null() {
             if parent.result["screen"]["signals"].as_u64() != Some(0) {
                 return Err("missing replay without proven zero signals".into());
@@ -234,11 +235,27 @@ pub fn diagnose(registry: &mut Registry, parent_id: &str, options: &Options) -> 
             if net < 0 {
                 report.reasons.push("recorded_net_loss".into());
             }
+            stop_rejected = replay.rejections.iter().any(|r| r.reason == "initial protective stop is crossed or violates executable-side minimum distance");
             if !replay.rejections.is_empty() {
                 report.reasons.push("entry_rejections".into());
             }
         }
         if eligible {
+            if stop_rejected
+                && options.max_children > 0
+                && let Some(child) = friction_stop_probe(&strategy, &costs, &profile)?
+            {
+                let concept_id = child.identity()?;
+                let operator = "declared-friction-minimum-stop";
+                report.proposals.push(Proposal {
+                        edge_id: edge(&report, &concept_id, operator)?,
+                        concept_id,
+                        strategy: child,
+                        operator: operator.into(),
+                        rationale: "Training hypothesis: minimum distance plus declared spread floor and entry slippage; wider observed spreads, gaps, risk and margin may still reject entry. Actual replay required".into(),
+                        status: "UNEVALUATED".into(),
+                    });
+            }
             let mut candidates = robustness::strategy_cases(&strategy, &costs)?
                 .into_iter()
                 .map(|c| {
@@ -250,6 +267,7 @@ pub fn diagnose(registry: &mut Registry, parent_id: &str, options: &Options) -> 
                 .collect::<Result<Vec<_>>>()?;
             candidates.sort_by(|a, b| a.0.cmp(&b.0));
             let mut seen = BTreeSet::from([strategy.identity()?]);
+            seen.extend(report.proposals.iter().map(|p| p.concept_id.clone()));
             for (_, case) in candidates {
                 let concept_id = case.strategy.identity()?;
                 if report.proposals.len() >= options.max_children {
@@ -286,4 +304,32 @@ pub fn diagnose(registry: &mut Registry, parent_id: &str, options: &Options) -> 
         reused: inserted == 0,
         report: stored,
     })
+}
+
+/// A declared-floor hypothesis, never an observed-spread guarantee or pending repricing.
+pub fn friction_stop_probe(
+    strategy: &Strategy,
+    costs: &Costs,
+    profile: &crate::contracts::Profile,
+) -> Result<Option<Strategy>> {
+    profile.validate()?;
+    costs.validate()?;
+    let strategy = strategy.canonical()?;
+    let entry_slip = if matches!(
+        strategy.entry,
+        Some(crate::strategies::EntryPlan::Limit { .. })
+    ) {
+        0
+    } else {
+        costs.slippage_pips
+    };
+    let ticks = i128::from(profile.min_stop_ticks)
+        + (i128::from(costs.spread_floor_pips) + i128::from(entry_slip)) * i128::from(profile.pip)
+            / i128::from(profile.tick);
+    if ticks <= i128::from(strategy.stop_ticks) || ticks > 1_000_000 {
+        return Ok(None);
+    }
+    let mut child = strategy;
+    child.stop_ticks = ticks as i64;
+    Ok(Some(child.canonical()?))
 }

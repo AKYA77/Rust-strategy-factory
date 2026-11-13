@@ -777,3 +777,163 @@ fn actual_v1_diagnosis_fixture_remains_hash_readable_after_optional_extension() 
     drop(registry);
     std::fs::remove_dir_all(d).unwrap();
 }
+
+#[test]
+fn rejected_parent_gets_declared_floor_probe_with_exact_child_tick_accounting() {
+    let d = dir();
+    let mut r = Registry::open(&d.join("state.sqlite")).unwrap();
+    let mut s = strategy();
+    s.stop_ticks = 30;
+    let parent = evaluate(&mut r, &s, 99800);
+    assert_eq!(
+        parent.result["tick_replay"]["trades"]
+            .as_array()
+            .unwrap()
+            .len(),
+        0
+    );
+    assert!(parent.result["tick_replay"]["rejections"].as_array().unwrap().iter().any(|x| x["reason"] == "initial protective stop is crossed or violates executable-side minimum distance"));
+    let diagnosis = improvement::diagnose(
+        &mut r,
+        &parent.experiment_id,
+        &Options {
+            max_children: 1,
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .report;
+    assert_eq!(diagnosis.proposals.len(), 1);
+    let proposal = &diagnosis.proposals[0];
+    assert_eq!(proposal.operator, "declared-friction-minimum-stop");
+    assert_eq!(proposal.strategy.stop_ticks, 41); // 1 minimum + 20 spread + 20 entry slip.
+    assert_eq!(proposal.status, "UNEVALUATED");
+    let child = evaluate(&mut r, &proposal.strategy, 99800);
+    let trade = &child.result["tick_replay"]["trades"][0];
+    // Short effective entry=100050-20; target=entry-3*41; margin+mark caps quantity.
+    assert_eq!(trade["entry"], 100030);
+    assert_eq!(trade["stop"], 100071);
+    assert_eq!(trade["target"], 99907);
+    assert_eq!(trade["exit"], 99907);
+    assert_eq!(trade["volume_micro_lots"], 19220);
+    assert_eq!(trade["net_micro_usd"], 2_364_060);
+    assert_eq!(child.result["cost_profile"], parent.result["cost_profile"]);
+    assert_eq!(
+        child.result["instrument_profile"],
+        parent.result["instrument_profile"]
+    );
+    let review = rust_strategy_factory::training_review::execute(
+        &mut r,
+        &input(99800),
+        &diagnosis.id,
+        10000,
+        256 * 1024 * 1024,
+    )
+    .unwrap();
+    assert_eq!(review.report.baseline.resolved_net_micro_usd, Some(0));
+    assert_eq!(
+        review.report.children[0].evidence.resolved_net_micro_usd,
+        Some(2_364_060)
+    );
+    assert_eq!(
+        review.report.children[0].net_delta_micro_usd,
+        Some(2_364_060)
+    );
+    assert_eq!(review.report.status, "DESCRIPTIVE_TRAINING_ONLY");
+    r.integrity().unwrap();
+    drop(r);
+    std::fs::remove_dir_all(d).unwrap();
+}
+
+#[test]
+fn declared_stop_probe_preserves_policies_and_refuses_noop_and_grammar_overflow() {
+    use rust_strategy_factory::{stops::Policy, strategies::EntryPlan};
+    let mut p = Profile::synthetic("EURUSD").unwrap();
+    let mut s = strategy();
+    s.stop_ticks = 1;
+    s.stop_policy = Some(Policy::Atr {
+        window: 2,
+        multiple_bps: 15000,
+    });
+    s.entry = Some(EntryPlan::Limit {
+        offset_ticks: 2,
+        ttl_ms: 60000,
+        cancel_on_signal_false: true,
+    });
+    let costs = Costs::default();
+    let child = improvement::friction_stop_probe(&s, &costs, &p)
+        .unwrap()
+        .unwrap();
+    assert_eq!(child.stop_ticks, 21); // Passive entry has no adverse entry slippage.
+    let mut expected = s.clone();
+    expected.stop_ticks = 21;
+    assert_eq!(child.identity().unwrap(), expected.identity().unwrap());
+    assert!(
+        improvement::friction_stop_probe(&child, &costs, &p)
+            .unwrap()
+            .is_none()
+    );
+    p.min_stop_ticks = 1_000_000;
+    assert!(
+        improvement::friction_stop_probe(&s, &costs, &p)
+            .unwrap()
+            .is_none()
+    );
+    p.min_stop_ticks = i64::MAX;
+    assert!(
+        improvement::friction_stop_probe(&s, &costs, &p)
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn declared_floor_is_not_a_wide_spread_guarantee() {
+    let d = dir();
+    let mut r = Registry::open(&d.join("state.sqlite")).unwrap();
+    let mut source = input(99800);
+    let ticks = source
+        .dataset
+        .ticks
+        .iter()
+        .map(|t| Tick {
+            ask: t.bid + 100,
+            ..*t
+        })
+        .collect();
+    source.dataset = data::dataset(
+        Profile::synthetic("EURUSD").unwrap(),
+        ticks,
+        "synthetic wide-spread fixture",
+        "generated".into(),
+        true,
+    )
+    .unwrap();
+    let mut s = strategy();
+    s.stop_ticks = 30;
+    for side in [Side::Long, Side::Short] {
+        s.side = side;
+        let child =
+            improvement::friction_stop_probe(&s, &Costs::default(), &source.dataset.profile)
+                .unwrap()
+                .unwrap();
+        let result = research::evaluate(
+            &mut r,
+            &source,
+            &child,
+            &Costs::default(),
+            "wide-spread",
+            10000,
+        )
+        .unwrap();
+        assert!(
+            result.result["tick_replay"]["trades"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        assert!(result.result["tick_replay"]["rejections"].as_array().unwrap().iter().any(|x| x["reason"] == "initial protective stop is crossed or violates executable-side minimum distance"));
+    }
+    drop(r);
+    std::fs::remove_dir_all(d).unwrap();
+}
