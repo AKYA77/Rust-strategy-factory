@@ -285,3 +285,193 @@ fn competing_connections_publish_one_deterministic_report() {
     drop(r);
     std::fs::remove_dir_all(d).unwrap();
 }
+
+#[test]
+fn comparable_training_review_replays_and_retains_exact_evaluation_edges() {
+    use rust_strategy_factory::training_review;
+    let d = dir();
+    let path = d.join("state.sqlite");
+    let mut r = Registry::open(&path).unwrap();
+    let parent = evaluate(&mut r, &strategy(), 100300);
+    let diagnosis = improvement::diagnose(
+        &mut r,
+        &parent.experiment_id,
+        &Options {
+            max_children: 3,
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .report;
+    // Simulate a restart after the baseline and one child commit, before review publication.
+    let revision = research::compute_revision().unwrap();
+    research::evaluate(
+        &mut r,
+        &input(100300),
+        &strategy(),
+        &Costs::default(),
+        &revision,
+        10000,
+    )
+    .unwrap();
+    research::evaluate(
+        &mut r,
+        &input(100300),
+        &diagnosis.proposals[0].strategy,
+        &Costs::default(),
+        &revision,
+        10000,
+    )
+    .unwrap();
+    let before = r.counts().unwrap().attempts;
+    drop(r);
+    let mut r = Registry::open(&path).unwrap();
+    let review = training_review::execute(
+        &mut r,
+        &input(100300),
+        &diagnosis.id,
+        10000,
+        256 * 1024 * 1024,
+    )
+    .unwrap();
+    assert!(!review.reused);
+    assert_eq!(review.report.children.len(), 3);
+    assert_eq!(
+        review.report.baseline.resolved_net_micro_usd,
+        Some(-5_958_200)
+    );
+    assert_eq!(review.report.status, "DESCRIPTIVE_TRAINING_ONLY");
+    assert_eq!(r.counts().unwrap().attempts, before + 2);
+    for (child, proposal) in review.report.children.iter().zip(&diagnosis.proposals) {
+        assert_eq!(child.proposal_edge_id, proposal.edge_id);
+        let key = r
+            .experiment_key(&child.evidence.experiment_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(key.code_revision, revision);
+        assert_eq!(key.concept_hash, proposal.concept_id);
+        assert_eq!(key.cost_hash, diagnosis.parent_key.cost_hash);
+        assert_eq!(
+            key.configuration_hash,
+            diagnosis.parent_key.configuration_hash
+        );
+        assert_eq!(key.start_ms, diagnosis.parent_key.start_ms);
+        assert_eq!(key.end_exclusive_ms, diagnosis.parent_key.end_exclusive_ms);
+        if let Some(net) = child.evidence.resolved_net_micro_usd {
+            assert_eq!(child.net_delta_micro_usd, Some(net + 5_958_200));
+        }
+        assert_eq!(
+            child.evidence.result_hash,
+            r.result(&child.evidence.experiment_id)
+                .unwrap()
+                .unwrap()
+                .result_hash
+        );
+    }
+    let count = r.counts().unwrap().attempts;
+    assert!(
+        training_review::execute(
+            &mut r,
+            &input(100300),
+            &diagnosis.id,
+            10000,
+            256 * 1024 * 1024
+        )
+        .unwrap()
+        .reused
+    );
+    assert_eq!(r.counts().unwrap().attempts, count);
+    r.integrity().unwrap();
+    r.backup(&d.join("backup.sqlite")).unwrap();
+    let backup = Registry::open(&d.join("backup.sqlite")).unwrap();
+    assert!(
+        training_review::read_report(&backup, &review.report.id)
+            .unwrap()
+            .is_some()
+    );
+    drop(backup);
+    let conn = rusqlite::Connection::open(&path).unwrap();
+    conn.execute(
+        "UPDATE training_reviews SET report_json=json_set(report_json,'$.status','FORGED')",
+        [],
+    )
+    .unwrap();
+    assert!(r.integrity().is_err());
+    drop(conn);
+    drop(r);
+    std::fs::remove_dir_all(d).unwrap();
+}
+#[test]
+fn review_refuses_changed_context_before_registering_and_keeps_scoped_window() {
+    use rust_strategy_factory::training_review;
+    let d = dir();
+    let mut r = Registry::open(&d.join("state.sqlite")).unwrap();
+    let data = input(100300);
+    let window = Interval {
+        start_ms: 1735689660000,
+        end_exclusive_ms: 1735689721001,
+    };
+    let parent = research::evaluate_window(
+        &mut r,
+        &data,
+        &strategy(),
+        &Costs::default(),
+        "old-build",
+        10000,
+        &Evaluation {
+            window: window.clone(),
+            stage: Stage::TickVerification,
+            protocol_hash: data::hash(&("training-window-v1", &window)).unwrap(),
+        },
+    )
+    .unwrap();
+    let diagnosis = improvement::diagnose(
+        &mut r,
+        &parent.experiment_id,
+        &Options {
+            max_children: 2,
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .report;
+    let before = r.counts().unwrap().attempts;
+    assert!(
+        training_review::execute(&mut r, &data, &diagnosis.id, 9999, 256 * 1024 * 1024).is_err()
+    );
+    assert!(
+        training_review::execute(
+            &mut r,
+            &input(100400),
+            &diagnosis.id,
+            10000,
+            256 * 1024 * 1024
+        )
+        .is_err()
+    );
+    let mut changed = input(100300);
+    changed.dataset.manifest.source = "different provenance".into();
+    assert!(
+        training_review::execute(&mut r, &changed, &diagnosis.id, 10000, 256 * 1024 * 1024)
+            .is_err()
+    );
+    let mut changed = input(100300);
+    changed.conversions[0].as_of_ms = 1;
+    assert!(
+        training_review::execute(&mut r, &changed, &diagnosis.id, 10000, 256 * 1024 * 1024)
+            .is_err()
+    );
+    assert_eq!(r.counts().unwrap().attempts, before);
+    let review =
+        training_review::execute(&mut r, &data, &diagnosis.id, 10000, 256 * 1024 * 1024).unwrap();
+    for evidence in std::iter::once(&review.report.baseline)
+        .chain(review.report.children.iter().map(|c| &c.evidence))
+    {
+        let key = r.experiment_key(&evidence.experiment_id).unwrap().unwrap();
+        assert_eq!(key.start_ms, window.start_ms);
+        assert_eq!(key.end_exclusive_ms, window.end_exclusive_ms);
+    }
+    r.integrity().unwrap();
+    drop(r);
+    std::fs::remove_dir_all(d).unwrap();
+}

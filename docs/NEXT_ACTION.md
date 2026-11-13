@@ -4,7 +4,9 @@ Status: SOFTWARE_INCOMPLETE. Read AGENTS.md, PROJECT_STATE.json, ACCEPTANCE.md a
 
 ## Latest milestone
 
-126 Rust tests, formatting/Clippy, debug/release builds and Chromium desktop/mobile acceptance pass. Schema7 persists immutable training-only diagnostic reports and bounded UNEVALUATED child proposals. Reports bind parent key/result hash, diagnostic build, operator/reason/seed and canonical identities; no experiment counters increase. Explicit training protocol authorization refuses scientific/OOS/final receipts despite their shared tick stage. Actual loss, no-signals, failed/unresolved evidence, concurrent publication, restart/backup and tamper detection are tested. See RUNBOOKS/training-improvement.md. Proposals are not executed or qualified.
+128 Rust tests, formatting/Clippy, debug/release builds and Chromium desktop/mobile acceptance pass. Schema8 persists bounded comparable training reviews: baseline and children share the current build and exact parent data/provenance/profile/cost/conversion/feature/window context. Immutable proposal edges link actual experiment/result hashes; resolved net differences remain DESCRIPTIVE_TRAINING_ONLY. Restart after baseline/one-child commit reuses work without extra attempts; changed contexts are refused before registration, and backup/tamper checks cover review evidence. The CLI executes/reads/reuses reviews through native inputs. See RUNBOOKS/training-improvement.md.
+
+Schema7 training-only diagnostics and UNEVALUATED proposals remain verified. Scientific/OOS/final receipts cannot authorize adaptation. Failure/unresolved diagnoses produce no proposals; no qualified status is issued.
 
 Packed prefix and current synthetic/component benchmark receipts remain verified; see BENCHMARKS/README.md. Component timings are not research throughput or whole-engine A/B evidence.
 
@@ -22,7 +24,7 @@ Previous verified foundations include chronological replay, initial executable-s
 
 ## Begin next
 
-Execute bounded child training reviews from immutable proposals, with exact parent/child dataset, profile, costs, conversions and window comparability. Rerun the parent under the same build as children, retain permanent evaluation edges and restart-safe cached results, and enforce registered protected ranges for every evaluation. Integrate bounded queue scheduling later; no OOS/protected-final adaptation. Continue dependence-aware inference, sufficient-sample/prespecified robustness acceptance and independent approval/coverage prerequisites before unlocking real final evaluation. Current protocols and pooled reset-fold statistics cannot issue validated status.
+Integrate bounded durable improvement scheduling with the one-worker loop: opt-in child limits, one safe checkpoint at a time, restart-safe work/lineage, state backpressure and honest base/child simulation counters. Explicit comparable reviews now execute; automatic queue integration remains pending. No OOS/protected-final adaptation. Continue dependence-aware inference, sufficient-sample/prespecified robustness acceptance and independent approval/coverage prerequisites before unlocking real final evaluation. Current protocols and pooled reset-fold statistics cannot issue validated status.
 
 Continue bounded mutation/improvement lineage, candidate-level net candle screening, Parquet/ZSTD and measured codec/native streaming work, source acquisition/import acceptance, worker pools/OS resource control, full dashboard operations, production deployment and final end-to-end acceptance. Follow the entire IMPLEMENTATION_QUEUE.md.
 

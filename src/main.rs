@@ -156,6 +156,37 @@ fn run(args: &[String]) -> Result<()> {
                 },
             )?)
         }
+        ["review-training", inputs, database, id] => {
+            if !Path::new(database).is_file() {
+                return Err("registry does not exist".into());
+            }
+            let (inputs, limits) = research_inputs(inputs)?;
+            if inputs.len() != 1 {
+                return Err("training review requires exactly one input dataset".into());
+            }
+            if inputs[0].dataset.ticks.len() > limits.max_total_events {
+                return Err("training review exceeds configured event budget".into());
+            }
+
+            let mut registry = Registry::open(Path::new(database))?;
+            print(&rust_strategy_factory::training_review::execute(
+                &mut registry,
+                &inputs[0],
+                id,
+                limits.feature_cells,
+                limits.state_budget_bytes,
+            )?)
+        }
+        ["training-review-report", database, id] => {
+            if !Path::new(database).is_file() {
+                return Err("registry does not exist".into());
+            }
+            let registry = Registry::open(Path::new(database))?;
+            print(
+                &rust_strategy_factory::training_review::read_report(&registry, id)?
+                    .ok_or("training review missing")?,
+            )
+        }
         ["diagnose", database, id] => {
             if !Path::new(database).is_file() {
                 return Err("registry does not exist".into());
@@ -366,7 +397,7 @@ fn run(args: &[String]) -> Result<()> {
         }
         [] | ["--help"] | ["help"] => {
             println!(
-                "Rust Strategy Factory — historical research only; SOFTWARE_INCOMPLETE\n\nvalidate-protocol <input-config.json> <plan.json> <registry.sqlite>\ndiagnose <registry.sqlite> <training-experiment-id>\ndiagnosis-report <registry.sqlite> <diagnosis-id>\nprotocol-report <registry.sqlite> <protocol-id>\nauth-init <new-auth.json> (password from stdin)\nserve <registry.sqlite> <auth.json> <port>\nprofiles\nfixture <symbol> <new-dataset.json>\ngenerate\nimport <normalized.csv> <profile.json> <source-url-or-description> <new-dataset.json> <real|synthetic>\npack-native <dataset.json|dataset.rsf> <new-dataset.rsf>\nunpack-native <dataset.rsf> <new-dataset.json>\ninspect <dataset.json|dataset.rsf>\ncandles <dataset.json|dataset.rsf> <M1|M5|M15|M30|H1|H4|D1>\nevaluate <dataset.json|dataset.rsf> <strategy.json> <new-result.json>\nexperiment <dataset.json|dataset.rsf> <strategy.json> <registry.sqlite>\nregistry-check <registry.sqlite>\nbackup <registry.sqlite> <new-backup.sqlite>\nresearch <config.json> <registry.sqlite> [max-steps]\nresearch-status <registry.sqlite> <run-id>\nresearch-control <registry.sqlite> <run-id> <running|paused|stopped>\n\nSynthetic profiles do not establish broker feasibility. No strategy qualification is implemented."
+                "Rust Strategy Factory — historical research only; SOFTWARE_INCOMPLETE\n\nvalidate-protocol <input-config.json> <plan.json> <registry.sqlite>\nreview-training <input-config.json> <registry.sqlite> <diagnosis-id>\ntraining-review-report <registry.sqlite> <review-id>\ndiagnose <registry.sqlite> <training-experiment-id>\ndiagnosis-report <registry.sqlite> <diagnosis-id>\nprotocol-report <registry.sqlite> <protocol-id>\nauth-init <new-auth.json> (password from stdin)\nserve <registry.sqlite> <auth.json> <port>\nprofiles\nfixture <symbol> <new-dataset.json>\ngenerate\nimport <normalized.csv> <profile.json> <source-url-or-description> <new-dataset.json> <real|synthetic>\npack-native <dataset.json|dataset.rsf> <new-dataset.rsf>\nunpack-native <dataset.rsf> <new-dataset.json>\ninspect <dataset.json|dataset.rsf>\ncandles <dataset.json|dataset.rsf> <M1|M5|M15|M30|H1|H4|D1>\nevaluate <dataset.json|dataset.rsf> <strategy.json> <new-result.json>\nexperiment <dataset.json|dataset.rsf> <strategy.json> <registry.sqlite>\nregistry-check <registry.sqlite>\nbackup <registry.sqlite> <new-backup.sqlite>\nresearch <config.json> <registry.sqlite> [max-steps]\nresearch-status <registry.sqlite> <run-id>\nresearch-control <registry.sqlite> <run-id> <running|paused|stopped>\n\nSynthetic profiles do not establish broker feasibility. No strategy qualification is implemented."
             );
             Ok(())
         }

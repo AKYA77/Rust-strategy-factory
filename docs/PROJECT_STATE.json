@@ -58,7 +58,8 @@
     "validated packed-word causal mask prefix comparison with 2400 seeded oracle queries and exact boundary/malformed tests",
     "current engine-v6 synthetic sequential/component measurements with source manifests, binary/compiler/CPU/cgroup/resource receipts and distinct workload classes",
     "generic diagnostic unsafe-integer guards, exact integer currency formatting through safe numeric boundaries and actual extreme-loss raw-export browser regression",
-    "immutable training-only deterministic diagnostics and bounded unevaluated child proposals with parent/result/build/operator/seed identities, restart/concurrent deduplication and backup integrity"
+    "immutable training-only deterministic diagnostics and bounded unevaluated child proposals with parent/result/build/operator/seed identities, restart/concurrent deduplication and backup integrity",
+    "bounded comparable training baseline/child replay with exact context refusal, immutable evaluation edges/result hashes, resolved net differences and partial-work restart reuse"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -66,9 +67,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Execute bounded comparable parent/child training reviews with permanent evaluation lineage and protected-range enforcement; then remaining queue.",
+  "next_action": "Integrate bounded durable opt-in improvement scheduling with one-worker checkpoints, state backpressure and honest counters; then remaining queue.",
   "qualified_strategies": 0,
-  "tests_passed": 126,
+  "tests_passed": 128,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile against real Rust/SQLite/native input and ATR/MACD/higher protocol; auth/control/export/restart plus actual extreme-loss diagnostic guards, exact positive/negative safe-boundary currency and byte-identical raw download passed",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",

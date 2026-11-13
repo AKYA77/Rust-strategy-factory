@@ -35,3 +35,5 @@ pub mod neighborhood;
 pub mod stops;
 
 pub mod improvement;
+
+pub mod training_review;

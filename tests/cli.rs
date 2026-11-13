@@ -150,6 +150,43 @@ fn import_inspect_evaluate_and_overwrite_protection() {
     let counts: serde_json::Value = serde_json::from_slice(&counts.stdout).unwrap();
     assert_eq!(counts["completed"], 1);
     assert_eq!(counts["attempts"], 1);
+    let review_config = dir.join("review-input.json");
+    fs::write(&review_config,serde_json::to_vec(&serde_json::json!({"inputs":[{"dataset":native.file_name().unwrap().to_str().unwrap()}],"limits":{"feature_cells":4_000_000}})).unwrap()).unwrap();
+    let review = invoke(&[
+        "review-training",
+        review_config.to_str().unwrap(),
+        registry.to_str().unwrap(),
+        diagnosis["report"]["id"].as_str().unwrap(),
+    ]);
+    assert!(
+        review.status.success(),
+        "{}",
+        String::from_utf8_lossy(&review.stderr)
+    );
+    let review: serde_json::Value = serde_json::from_slice(&review.stdout).unwrap();
+    assert_eq!(review["report"]["status"], "DESCRIPTIVE_TRAINING_ONLY");
+    let repeat = invoke(&[
+        "review-training",
+        review_config.to_str().unwrap(),
+        registry.to_str().unwrap(),
+        diagnosis["report"]["id"].as_str().unwrap(),
+    ]);
+    assert!(repeat.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&repeat.stdout).unwrap()["reused"],
+        true
+    );
+    let read = invoke(&[
+        "training-review-report",
+        registry.to_str().unwrap(),
+        review["report"]["id"].as_str().unwrap(),
+    ]);
+    assert!(read.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&read.stdout).unwrap(),
+        review["report"]
+    );
+
     assert!(
         invoke(&[
             "backup",

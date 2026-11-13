@@ -118,7 +118,7 @@ impl Registry {
         let version: i64 = connection
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .map_err(db_err)?;
-        if version > 7 {
+        if version > 8 {
             return Err("database schema newer than supported".into());
         }
         if version == 0 {
@@ -210,6 +210,19 @@ impl Registry {
                 id TEXT PRIMARY KEY, parent_id TEXT NOT NULL REFERENCES experiments(id),
                 report_json TEXT NOT NULL, report_hash TEXT NOT NULL
             ); PRAGMA user_version=7;",
+            )
+            .map_err(db_err)?;
+            tx.commit().map_err(db_err)?;
+        }
+        if version < 8 {
+            let tx = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(db_err)?;
+            tx.execute_batch(
+                "CREATE TABLE IF NOT EXISTS training_reviews (
+                id TEXT PRIMARY KEY, diagnosis_id TEXT NOT NULL REFERENCES training_diagnoses(id),
+                report_json TEXT NOT NULL, report_hash TEXT NOT NULL
+            ); PRAGMA user_version=8;",
             )
             .map_err(db_err)?;
             tx.commit().map_err(db_err)?;
@@ -681,6 +694,16 @@ impl Registry {
             .map_err(db_err)?;
         for id in ids {
             crate::improvement::read_report(self, &id.map_err(db_err)?)?;
+        }
+        let mut query = self
+            .connection
+            .prepare("SELECT id FROM training_reviews")
+            .map_err(db_err)?;
+        let ids = query
+            .query_map([], |r| r.get::<_, String>(0))
+            .map_err(db_err)?;
+        for id in ids {
+            crate::training_review::read_report(self, &id.map_err(db_err)?)?;
         }
         Ok(())
     }

@@ -67,7 +67,7 @@ fn identity(r: &Report) -> Result<String> {
 fn edge(r: &Report, concept: &str, operator: &str) -> Result<String> {
     data::hash(&(&r.id, concept, operator, r.options.seed))
 }
-fn authorize(key: &ExperimentKey) -> Result<()> {
+pub(crate) fn authorize(key: &ExperimentKey) -> Result<()> {
     let window = Interval {
         start_ms: key.start_ms,
         end_exclusive_ms: key.end_exclusive_ms,
