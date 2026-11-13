@@ -558,7 +558,12 @@ async fn detail(State(app): State<Arc<App>>, Param(id): Param<String>) -> Respon
                 Ok(a) => (Some(a), None),
                 Err(e) => (None, Some(e)),
             };
-            Json(serde_json::json!({"outcome":v.outcome,"result":v.result,"result_hash":v.result_hash,"numeric_training_assessment":assessment,"assessment_unavailable_reason":error})).into_response()
+            // Decimal strings preserve u64 event identity in the visible trade page.
+            // The immutable result/export keeps its original exact numeric values.
+            let trade_event_ids=v.result["tick_replay"]["trades"].as_array().into_iter().flatten().take(500).map(|trade|{
+                serde_json::json!({"entry":trade["entry_event"].as_u64().map(|n|n.to_string()),"exit":trade["exit_event"].as_u64().map(|n|n.to_string())})
+            }).collect::<Vec<_>>();
+            Json(serde_json::json!({"outcome":v.outcome,"result":v.result,"result_hash":v.result_hash,"trade_event_ids":trade_event_ids,"numeric_training_assessment":assessment,"assessment_unavailable_reason":error})).into_response()
         }
         Ok(None) => api_error(StatusCode::NOT_FOUND, "result not completed"),
         Err(_) => api_error(

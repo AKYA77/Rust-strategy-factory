@@ -79,7 +79,8 @@
     "Allocation-free validated packed active-index/prefix traversal integrated into M1 model,1100 seeded oracle cases and actual48-candidate estimate/audit/replay fingerprint equivalence with source-pinned dense/sparse component measurements",
     "Opt-in training-only exact fixed-market proof rejection with deterministic mandatory tick audits, scoped input/entry validation, context-exact proof-only diagnosis/child review basis, durable contradiction blocking and atomic publication refusal/coordinator pause; real browser proof view/export and measured no-entry current-pipeline comparison",
     "Bounded shared same-frame candidate batch API/CLI with immutable verified input/configuration preparation, shared features and exact scalar receipt identity, per-experiment fencing/durable prefix retry, budgets and actual all-eight/window/pending/ATR/proof equivalence; retained negative baseline and improved complete synthetic pipeline measurement",
-    "Experimental complete indexed market-entry replay for scoped literal-USD integral-cash grids, exact ordered equity/drawdown/MFE/MAE and actual fills/fees/gaps/deadlines, strict sequential fallback and shared authoritative input validation;512 seeded whole-replay comparisons plus range/deadline/full-u64 oracles; measured shared engine only, no factory promotion"
+    "Experimental complete indexed market-entry replay for scoped literal-USD integral-cash grids, exact ordered equity/drawdown/MFE/MAE and actual fills/fees/gaps/deadlines, strict sequential fallback and shared authoritative input validation;512 seeded whole-replay comparisons plus range/deadline/full-u64 oracles; measured shared engine only, no factory promotion",
+    "Exact decimal-string projection/display for first500 trade event IDs, safe legacy numeric fallback and actual full-u64 desktop/mobile raw-export regression; unchanged financial/version compute identity"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -87,21 +88,21 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Bind experimental shared index to explicit training experiment/review contexts with independent sequential audits and measure full factory pipeline before promotion; also fix exact large event-ID UI display and continue remaining blueprint scope.",
+  "next_action": "Bind experimental shared index to explicit training experiment/review contexts with independent sequential audits and measure full factory pipeline before promotion; continue remaining blueprint scope.",
   "qualified_strategies": 0,
   "tests_passed": 184,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
-  "browser_acceptance": "Chromium desktop/mobile against actual Rust/SQLite/native input: auth/control/export/restart, >100-history paging and filter/race, actual immutable training lineage/review and exact extreme-loss training exports",
+  "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
   "component_benchmark": "docs/BENCHMARKS/v6-prefix-component.json",
   "generation_component_benchmark": "docs/BENCHMARKS/structural-generation-v1.json",
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43478308081,
-    "sha": "206292e0133186b2c2faefd053b174eb0b53fbc3",
+    "run_id": 43484232777,
+    "sha": "a33803806f195c14dfa27f2eccd35c2858ed0e57",
     "conclusion": "success",
-    "verification": "Exact public commit/success summary retrieved; indexed-engine milestone hosted verification follows publication"
+    "verification": "Exact public commit/success summary retrieved; exact-event UI milestone hosted verification follows publication"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
   "vps_acceptance": "VPS_PERFORMANCE_PENDING",
