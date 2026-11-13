@@ -92,6 +92,7 @@ fn configured_shadow_policy_separates_cache_identity_and_survives_driver_restart
             feature_cells: 1_000_000,
             evaluation: None,
             shadow_policy: Some(&policy),
+            proof_policy: None,
         },
     )
     .unwrap();
@@ -126,6 +127,7 @@ fn configured_shadow_policy_separates_cache_identity_and_survives_driver_restart
             feature_cells: 1_000_000,
             evaluation: None,
             shadow_policy: Some(&changed),
+            proof_policy: None,
         },
     )
     .unwrap();

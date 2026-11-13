@@ -98,3 +98,34 @@ fn proof_refuses_pending_adaptive_and_tampered_contexts() {
     });
     assert!(screen::market_stop_proof(&p, &costs, &s).unwrap().is_none());
 }
+
+#[test]
+fn proof_audits_are_deterministic_and_cannot_be_disabled() {
+    use rust_strategy_factory::proof_screen::Policy;
+    let policy = Policy::default();
+    let mut sampled = 0;
+    for i in 0..1000 {
+        let id = i.to_string();
+        let a = policy.audit(&id).unwrap();
+        assert_eq!(a, policy.audit(&id).unwrap());
+        sampled += usize::from(a);
+    }
+    assert!((70..130).contains(&sampled));
+    for bps in [0, 10001] {
+        assert!(
+            Policy {
+                audit_bps: bps,
+                ..policy.clone()
+            }
+            .validate()
+            .is_err()
+        );
+    }
+    let all = Policy {
+        audit_bps: 10000,
+        ..policy
+    };
+    for i in 0..1000 {
+        assert!(all.audit(&i.to_string()).unwrap());
+    }
+}

@@ -196,11 +196,19 @@ pub fn diagnose(registry: &mut Registry, parent_id: &str, options: &Options) -> 
         }
         let mut eligible = true;
         let mut stop_rejected = false;
+        let proven_stop = crate::proof_screen::verified_rejection(&parent.result, &key)?.is_some();
         if parent.result["tick_replay"].is_null() {
-            if parent.result["screen"]["signals"].as_u64() != Some(0) {
-                return Err("missing replay without proven zero signals".into());
+            if proven_stop {
+                report
+                    .reasons
+                    .push("fixed_market_entry_infeasible_by_proof_not_observed_rejection".into());
+            } else if parent.result["screen"]["signals"].as_u64() == Some(0) {
+                report.reasons.push("no_signals".into());
+            } else {
+                return Err(
+                    "missing replay without verified no-entry proof or zero signals".into(),
+                );
             }
-            report.reasons.push("no_signals".into());
         } else {
             let replay: Replay = serde_json::from_value(parent.result["tick_replay"].clone())
                 .map_err(|e| e.to_string())?;
@@ -241,12 +249,16 @@ pub fn diagnose(registry: &mut Registry, parent_id: &str, options: &Options) -> 
             }
         }
         if eligible {
-            if stop_rejected
+            if (stop_rejected || proven_stop)
                 && options.max_children > 0
                 && let Some(child) = friction_stop_probe(&strategy, &costs, &profile)?
             {
                 let concept_id = child.identity()?;
-                let operator = "declared-friction-minimum-stop";
+                let operator = if proven_stop && !stop_rejected {
+                    "proven-friction-minimum-stop"
+                } else {
+                    "declared-friction-minimum-stop"
+                };
                 report.proposals.push(Proposal {
                         edge_id: edge(&report, &concept_id, operator)?,
                         concept_id,

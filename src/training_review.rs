@@ -16,6 +16,8 @@ pub struct Evidence {
     pub result_hash: String,
     pub outcome: String,
     pub resolved_net_micro_usd: Option<i128>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub net_basis: Option<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Child {
@@ -44,28 +46,38 @@ fn identity(diagnosis: &str, revision: &str, cells: usize, version: &str) -> Res
 }
 fn evidence(registry: &Registry, id: &str) -> Result<Evidence> {
     let stored = registry.result(id)?.ok_or("review result missing")?;
-    let net =
-        if stored.outcome == "rejected" && stored.result["screen"]["signals"].as_u64() == Some(0) {
-            Some(0)
-        } else if stored.outcome == "completed" {
-            let replay: Replay = serde_json::from_value(stored.result["tick_replay"].clone())
-                .map_err(|e| e.to_string())?;
-            if replay.unresolved.is_some() || replay.pending_entry.is_some() {
-                None
-            } else {
-                Some(replay.trades.iter().try_fold(0i128, |sum, t| {
-                    sum.checked_add(t.net_micro_usd)
-                        .ok_or("review net overflow")
-                })?)
-            }
-        } else {
+    let proof = stored.outcome == "rejected"
+        && stored.result["proof_rejection"] == true
+        && crate::proof_screen::verified_rejection(
+            &stored.result,
+            &registry.experiment_key(id)?.ok_or("review key missing")?,
+        )?
+        .is_some();
+    let proven_empty = stored.outcome == "rejected"
+        && (stored.result["screen"]["signals"].as_u64() == Some(0) || proof);
+    let net = if proven_empty {
+        Some(0)
+    } else if stored.outcome == "completed" {
+        let replay: Replay = serde_json::from_value(stored.result["tick_replay"].clone())
+            .map_err(|e| e.to_string())?;
+        if replay.unresolved.is_some() || replay.pending_entry.is_some() {
             None
-        };
+        } else {
+            Some(replay.trades.iter().try_fold(0i128, |sum, t| {
+                sum.checked_add(t.net_micro_usd)
+                    .ok_or("review net overflow")
+            })?)
+        }
+    } else {
+        None
+    };
     Ok(Evidence {
         experiment_id: id.into(),
         result_hash: stored.result_hash,
         outcome: stored.outcome,
         resolved_net_micro_usd: net,
+        net_basis: proof
+            .then(|| "zero from verified no-entry proof; no executed zero-return trade".into()),
     })
 }
 fn compatible(key: &ExperimentKey, parent: &ExperimentKey, concept: &str, revision: &str) -> bool {
@@ -217,14 +229,21 @@ fn run(
     let shadow_policy: Option<crate::candidate_screen::ShadowPolicy> =
         serde_json::from_value(parent.result["shadow_policy"].clone())
             .map_err(|e| e.to_string())?;
+    let proof_policy: Option<crate::proof_screen::Policy> =
+        serde_json::from_value(parent.result["proof_policy"].clone()).map_err(|e| e.to_string())?;
     if input.conversions.len() != input.dataset.ticks.len()
         || input.dataset.manifest.content_hash != key.dataset_hash
         || input.dataset.manifest.profile_hash != key.profile_hash
         || input.dataset.profile.symbol != key.instrument
         || data::hash(&costs)? != key.cost_hash
         || strategy.identity()? != key.concept_hash
-        || research::configuration_hash(input, &costs, feature_cells, shadow_policy.as_ref())?
-            != key.configuration_hash
+        || research::configuration_hash(
+            input,
+            &costs,
+            feature_cells,
+            shadow_policy.as_ref(),
+            proof_policy.as_ref(),
+        )? != key.configuration_hash
     {
         return Err("review requires exact parent data, profile, provenance, costs, conversions and feature configuration".into());
     }
@@ -267,6 +286,7 @@ fn run(
                 feature_cells,
                 evaluation: evaluation.as_ref(),
                 shadow_policy: shadow_policy.as_ref(),
+                proof_policy: proof_policy.as_ref(),
             },
         )?;
         evidence(registry, &execution.experiment_id)

@@ -94,6 +94,7 @@ fn comparable_children_preserve_explicit_shadow_policy_identity() {
             feature_cells: 10000,
             evaluation: None,
             shadow_policy: Some(&policy),
+            proof_policy: None,
         },
     )
     .unwrap();
@@ -150,6 +151,360 @@ fn comparable_children_preserve_explicit_shadow_policy_identity() {
             .is_some()
     );
     drop(r);
+    std::fs::remove_dir_all(d).unwrap();
+}
+
+#[test]
+fn exact_proof_rejection_audits_and_comparable_children_preserve_real_evidence() {
+    use rust_strategy_factory::{proof_screen, training_review};
+    let d = dir();
+    let mut registry = Registry::open(&d.join("state.sqlite")).unwrap();
+    let input = input(99800);
+    let revision = research::compute_revision().unwrap();
+    let mut s = strategy();
+    s.stop_ticks = 30;
+    let mut skipped = None;
+    for seed in 0..16 {
+        let policy = proof_screen::Policy {
+            audit_bps: 1,
+            seed,
+            ..Default::default()
+        };
+        let execution = research::evaluate_configured(
+            &mut registry,
+            &input,
+            &s,
+            &Costs::default(),
+            &revision,
+            research::EvaluationOptions {
+                feature_cells: 10000,
+                evaluation: None,
+                shadow_policy: None,
+                proof_policy: Some(&policy),
+            },
+        )
+        .unwrap();
+        if execution.result["proof_audited"] == false {
+            skipped = Some(execution);
+            break;
+        }
+    }
+    let skipped = skipped.expect("fixture must exercise an actual unaudited proof rejection");
+    assert_eq!(skipped.outcome, "rejected");
+    assert!(skipped.result["tick_replay"].is_null());
+    assert!(skipped.result["screen"]["signals"].as_u64().unwrap() > 0);
+    let key = registry
+        .experiment_key(&skipped.experiment_id)
+        .unwrap()
+        .unwrap();
+    assert!(
+        proof_screen::verified_rejection(&skipped.result, &key)
+            .unwrap()
+            .is_some()
+    );
+    let audited_policy = proof_screen::Policy {
+        audit_bps: 10000,
+        ..Default::default()
+    };
+    let audited = research::evaluate_configured(
+        &mut registry,
+        &input,
+        &s,
+        &Costs::default(),
+        &revision,
+        research::EvaluationOptions {
+            feature_cells: 10000,
+            evaluation: None,
+            shadow_policy: None,
+            proof_policy: Some(&audited_policy),
+        },
+    )
+    .unwrap();
+    assert_eq!(audited.outcome, "rejected");
+    assert_eq!(audited.result["proof_audited"], true);
+    assert_eq!(
+        audited.result["tick_replay"]["trades"]
+            .as_array()
+            .unwrap()
+            .len(),
+        0
+    );
+    assert!(
+        !audited.result["tick_replay"]["rejections"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    let default = research::evaluate(
+        &mut registry,
+        &input,
+        &s,
+        &Costs::default(),
+        &revision,
+        10000,
+    )
+    .unwrap();
+    assert_eq!(default.outcome, "completed");
+    assert_eq!(audited.result["tick_replay"], default.result["tick_replay"]);
+    let diagnosis = improvement::diagnose(
+        &mut registry,
+        &skipped.experiment_id,
+        &Options {
+            max_children: 1,
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .report;
+    assert!(diagnosis.training_evidence.is_none());
+    assert!(
+        diagnosis
+            .reasons
+            .iter()
+            .any(|r| r.contains("by_proof_not_observed"))
+    );
+    assert_eq!(
+        diagnosis.proposals[0].operator,
+        "proven-friction-minimum-stop"
+    );
+    let review = training_review::execute(
+        &mut registry,
+        &input,
+        &diagnosis.id,
+        10000,
+        256 * 1024 * 1024,
+    )
+    .unwrap()
+    .report;
+    assert_eq!(review.baseline.resolved_net_micro_usd, Some(0));
+    assert!(
+        review
+            .baseline
+            .net_basis
+            .as_ref()
+            .unwrap()
+            .contains("no-entry proof")
+    );
+    assert_eq!(review.children[0].net_delta_micro_usd, Some(2_364_060));
+    assert!(
+        training_review::read_report(&registry, &review.id)
+            .unwrap()
+            .is_some()
+    );
+    let mut tampered = skipped.result.clone();
+    tampered["market_stop_proof"]["fixed_stop_price_units"] = 31.into();
+    assert!(proof_screen::verified_rejection(&tampered, &key).is_err());
+    let mut pending_key = key.clone();
+    pending_key.code_revision = "proof-publication-race-fixture".into();
+    let pending_id = registry.register(&pending_key).unwrap();
+    let rust_strategy_factory::storage::Claim::Acquired(pending_lease) =
+        registry.claim(&pending_id, 0, 300000).unwrap()
+    else {
+        panic!("new fixture lease")
+    };
+    // Isolated durable failure injection, not fabricated market evidence.
+    let connection = rusqlite::Connection::open(d.join("state.sqlite")).unwrap();
+    connection.execute("INSERT INTO events(experiment_id,at_ms,action,attempt) VALUES (?1,0,'proof-audit-contradiction-v1',1)",[&skipped.experiment_id]).unwrap();
+    drop(connection);
+    assert!(
+        registry
+            .finish(
+                &pending_lease,
+                1,
+                rust_strategy_factory::storage::Outcome::Rejected,
+                &skipped.result
+            )
+            .unwrap_err()
+            .contains("disabled by recorded audit contradiction")
+    );
+    registry
+        .finish(
+            &pending_lease,
+            1,
+            rust_strategy_factory::storage::Outcome::Failed,
+            &serde_json::json!({"error":"injected audit block"}),
+        )
+        .unwrap();
+    assert!(
+        research::evaluate_configured(
+            &mut registry,
+            &input,
+            &s,
+            &Costs::default(),
+            &revision,
+            research::EvaluationOptions {
+                feature_cells: 10000,
+                evaluation: None,
+                shadow_policy: None,
+                proof_policy: Some(&audited_policy)
+            }
+        )
+        .unwrap_err()
+        .contains("disabled by recorded audit contradiction")
+    );
+    assert!(
+        research::evaluate(
+            &mut registry,
+            &input,
+            &s,
+            &Costs::default(),
+            &revision,
+            10000
+        )
+        .unwrap()
+        .reused
+    );
+    let mut driver = research::Driver::open(
+        &d.join("state.sqlite"),
+        vec![Input {
+            dataset: input.dataset.clone(),
+            conversions: input.conversions.clone(),
+        }],
+        research::Config {
+            proof_policy: Some(audited_policy.clone()),
+            ..Default::default()
+        },
+        revision.clone(),
+    )
+    .unwrap();
+    driver.acquire(0).unwrap();
+    assert!(driver.step(1).unwrap());
+    assert_eq!(
+        research::status(&driver.registry, &driver.id, 2)
+            .unwrap()
+            .state,
+        "paused"
+    );
+    assert!(!driver.step(2).unwrap());
+    driver.release().unwrap();
+    drop(driver);
+    let mut tampered = skipped.result.clone();
+    tampered["proof_audited"] = true.into();
+    assert!(proof_screen::verified_rejection(&tampered, &key).is_err());
+    drop(registry);
+    std::fs::remove_dir_all(d).unwrap();
+}
+
+#[test]
+fn proof_screening_cannot_hide_bad_conversions_or_adapt_scientific_windows() {
+    let d = dir();
+    let mut registry = Registry::open(&d.join("state.sqlite")).unwrap();
+    let mut input = input(99800);
+    let mut s = strategy();
+    s.stop_ticks = 30;
+    let policy = rust_strategy_factory::proof_screen::Policy {
+        audit_bps: 1,
+        ..Default::default()
+    };
+    input.conversions[0].as_of_ms = input.dataset.ticks[0].timestamp_ms + 1;
+    let execution = research::evaluate_configured(
+        &mut registry,
+        &input,
+        &s,
+        &Costs::default(),
+        "proof-invalid-input",
+        research::EvaluationOptions {
+            feature_cells: 10000,
+            evaluation: None,
+            shadow_policy: None,
+            proof_policy: Some(&policy),
+        },
+    )
+    .unwrap();
+    assert_eq!(execution.outcome, "failed");
+    assert!(
+        execution.result["error"]
+            .as_str()
+            .unwrap()
+            .contains("conversion")
+    );
+    let training_window = Interval {
+        start_ms: input.dataset.manifest.first_ms + 120000,
+        end_exclusive_ms: input.dataset.manifest.last_ms + 1,
+    };
+    let training = Evaluation {
+        protocol_hash: data::hash(&("training-window-v1", &training_window)).unwrap(),
+        window: training_window,
+        stage: Stage::TickVerification,
+    };
+    let scoped = research::evaluate_configured(
+        &mut registry,
+        &input,
+        &s,
+        &Costs::default(),
+        "proof-scope",
+        research::EvaluationOptions {
+            feature_cells: 10000,
+            evaluation: Some(&training),
+            shadow_policy: None,
+            proof_policy: Some(&policy),
+        },
+    )
+    .unwrap();
+    assert_eq!(scoped.outcome, "rejected");
+    assert_eq!(scoped.result["proof_rejection"], true);
+    let evaluation = Evaluation {
+        window: Interval {
+            start_ms: input.dataset.manifest.first_ms,
+            end_exclusive_ms: input.dataset.manifest.last_ms + 1,
+        },
+        stage: Stage::IndependentValidation,
+        protocol_hash: "protected".into(),
+    };
+    assert!(
+        research::evaluate_configured(
+            &mut registry,
+            &input,
+            &s,
+            &Costs::default(),
+            "proof-science-refusal",
+            research::EvaluationOptions {
+                feature_cells: 10000,
+                evaluation: Some(&evaluation),
+                shadow_policy: None,
+                proof_policy: Some(&policy)
+            }
+        )
+        .is_err()
+    );
+    input.conversions[0] = Conversion::usd();
+    let mut profile = input.dataset.profile.clone();
+    profile.pip = 100000;
+    input.dataset = data::dataset(
+        profile,
+        input.dataset.ticks.clone(),
+        "SYNTHETIC_TEST_ONLY invalid entry cost",
+        "generated".into(),
+        true,
+    )
+    .unwrap();
+    let invalid_entry = research::evaluate_configured(
+        &mut registry,
+        &input,
+        &s,
+        &Costs::default(),
+        "proof-entry-invalid",
+        research::EvaluationOptions {
+            feature_cells: 10000,
+            evaluation: None,
+            shadow_policy: None,
+            proof_policy: Some(&policy),
+        },
+    )
+    .unwrap();
+    let reference = research::evaluate(
+        &mut registry,
+        &input,
+        &s,
+        &Costs::default(),
+        "proof-entry-reference",
+        10000,
+    )
+    .unwrap();
+    assert_eq!(invalid_entry.outcome, "failed");
+    assert_eq!(reference.outcome, "failed");
+    assert_eq!(invalid_entry.result["error"], reference.result["error"]);
+    drop(registry);
     std::fs::remove_dir_all(d).unwrap();
 }
 #[test]

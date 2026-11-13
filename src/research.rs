@@ -29,6 +29,8 @@ pub struct Config {
     pub improvement_children: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shadow_policy: Option<crate::candidate_screen::ShadowPolicy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof_policy: Option<crate::proof_screen::Policy>,
 }
 fn zero_children(n: &usize) -> bool {
     *n == 0
@@ -45,6 +47,7 @@ impl Default for Config {
             training_window: None,
             improvement_children: 0,
             shadow_policy: None,
+            proof_policy: None,
         }
     }
 }
@@ -68,6 +71,7 @@ pub struct EvaluationOptions<'a> {
     pub feature_cells: usize,
     pub evaluation: Option<&'a Evaluation>,
     pub shadow_policy: Option<&'a crate::candidate_screen::ShadowPolicy>,
+    pub proof_policy: Option<&'a crate::proof_screen::Policy>,
 }
 pub fn evaluate(
     registry: &mut Registry,
@@ -87,6 +91,7 @@ pub fn evaluate(
             feature_cells,
             evaluation: None,
             shadow_policy: None,
+            proof_policy: None,
         },
     )
 }
@@ -109,6 +114,7 @@ pub fn evaluate_window(
             feature_cells,
             evaluation: Some(evaluation),
             shadow_policy: None,
+            proof_policy: None,
         },
     )
 }
@@ -117,6 +123,7 @@ pub(crate) fn configuration_hash(
     costs: &Costs,
     feature_cells: usize,
     shadow_policy: Option<&crate::candidate_screen::ShadowPolicy>,
+    proof_policy: Option<&crate::proof_screen::Policy>,
 ) -> Result<String> {
     let original = data::hash(&(
         feature_cells,
@@ -124,11 +131,18 @@ pub(crate) fn configuration_hash(
         data::hash(&input.conversions)?,
         data::dataset_identity(&input.dataset.manifest)?,
     ))?;
-    match shadow_policy {
+    let shadow_context = match shadow_policy {
         None => Ok(original),
         Some(policy) => {
             policy.validate()?;
             data::hash(&("shadow-policy-context-v1", original, policy))
+        }
+    }?;
+    match proof_policy {
+        None => Ok(shadow_context),
+        Some(policy) => {
+            policy.validate()?;
+            data::hash(&("proof-policy-context-v1", shadow_context, policy))
         }
     }
 }
@@ -145,6 +159,7 @@ pub fn evaluate_configured(
         feature_cells,
         evaluation,
         shadow_policy,
+        proof_policy,
     } = options;
     if let Some(e) = evaluation {
         e.window.validate()?;
@@ -155,6 +170,9 @@ pub fn evaluate_configured(
         }
     }
     if let Some(policy) = shadow_policy {
+        policy.validate()?;
+    }
+    if let Some(policy) = proof_policy {
         policy.validate()?;
     }
     let d = &input.dataset;
@@ -182,9 +200,22 @@ pub fn evaluate_configured(
             None => data::hash(&"training-only-conservative-signals-v1")?,
         },
         code_revision: revision.into(),
-        configuration_hash: configuration_hash(input, costs, feature_cells, shadow_policy)?,
+        configuration_hash: configuration_hash(
+            input,
+            costs,
+            feature_cells,
+            shadow_policy,
+            proof_policy,
+        )?,
         stage: evaluation.map_or(Stage::TickVerification, |e| e.stage.clone()),
     };
+    if proof_policy.is_some() {
+        crate::proof_screen::guard(&registry.connection)?;
+        crate::improvement::authorize(&key)?;
+        if d.manifest.class != crate::data::DataClass::SyntheticTestOnly && evaluation.is_none() {
+            return Err("real proof screening requires explicit training scope".into());
+        }
+    }
     let id = registry.register(&key)?;
     match registry.claim(&id, chrono::Utc::now().timestamp_millis(), 300000)? {
         Claim::Busy => Err("experiment is leased to another worker".into()),
@@ -223,7 +254,62 @@ pub fn evaluate_configured(
                 }
                 if !screen.requires_tick_verification {
                     return Ok(
-                        serde_json::json!({"screen":screen,"tick_replay":null,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation,"shadow_policy":shadow_policy}),
+                        serde_json::json!({"screen":screen,"tick_replay":null,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation,"shadow_policy":shadow_policy,"proof_policy":proof_policy}),
+                    );
+                }
+                let market_stop_proof =
+                    crate::screen::market_stop_proof(&d.profile, costs, strategy)?;
+                let proof_rejection = proof_policy.is_some() && market_stop_proof.is_some();
+                let proof_audited = if proof_rejection {
+                    // Validate every scoped conversion even when no order can be entered.
+                    for (t, fx) in d.ticks.iter().zip(&input.conversions).filter(|(t, _)| {
+                        evaluation.is_none_or(|e| e.window.contains(t.timestamp_ms))
+                    }) {
+                        fx.validate(&d.profile, t.timestamp_ms, costs.max_conversion_age_ms)?;
+                        costs.effective(&d.profile, *t)?;
+                    }
+                    let slip = costs
+                        .slippage_pips
+                        .checked_mul(d.profile.pip)
+                        .ok_or("slippage overflow")?;
+                    market_stop_proof
+                        .as_ref()
+                        .ok_or("proof missing")?
+                        .fixed_stop_price_units
+                        .checked_add(slip)
+                        .ok_or("risk overflow")?;
+                    for i in mask.set_indices_prefix(visible)? {
+                        if evaluation.is_some_and(|e| !e.window.contains(c[i].available_ms)) {
+                            continue;
+                        }
+                        let n = d
+                            .ticks
+                            .partition_point(|t| t.sequence <= c[i].publication_sequence);
+                        if let Some(t) = d.ticks.get(n).filter(|t| {
+                            evaluation.is_none_or(|e| e.window.contains(t.timestamp_ms))
+                        }) {
+                            let (bid, ask) = costs.effective(&d.profile, *t)?;
+                            crate::orders::market_from_effective(
+                                &d.profile,
+                                costs,
+                                bid,
+                                ask,
+                                strategy.side,
+                            )?;
+                        }
+                    }
+                    screen.status = strategies::ScreenStatus::ProvenNoMarketEntry;
+                    screen.version = "fixed-market-proof-screen-v1".into();
+                    screen.requires_tick_verification = false;
+                    proof_policy.ok_or("proof policy missing")?.audit(&id)?
+                } else {
+                    false
+                };
+                if proof_rejection && !proof_audited {
+                    return Ok(
+                        serde_json::json!({"screen":screen,"tick_replay":null,"market_stop_proof":market_stop_proof,
+                        "proof_rejection":true,"proof_audited":false,"proof_policy":proof_policy,"shadow_policy":shadow_policy,
+                        "strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation}),
                     );
                 }
                 // Diagnostic-only: failure/uncertainty must never suppress authoritative replay.
@@ -249,13 +335,12 @@ pub fn evaluate_configured(
                     tick_engine::replay(d, &c, &mask, strategy, costs, &input.conversions)?
                 };
                 let screen_audit = crate::screen::audit_replay(d, costs, &replay)?;
-                let market_stop_proof =
-                    crate::screen::market_stop_proof(&d.profile, costs, strategy)?;
                 if market_stop_proof.is_some()
                     && (!replay.trades.is_empty()
                         || replay.unresolved.is_some()
                         || replay.pending_entry.is_some())
                 {
+                    crate::proof_screen::record_contradiction(registry, &lease)?;
                     return Err("market-stop proof excluded an authoritative entry; screening must remain disabled".into());
                 }
                 let candidate_screen_audit = match candle_estimate {
@@ -270,12 +355,12 @@ pub fn evaluate_configured(
                         "candidate_rejected":false,"qualification_evidence":false}),
                 };
                 Ok(
-                    serde_json::json!({"screen":screen,"screen_audit":screen_audit,"market_stop_proof":market_stop_proof,"candidate_screen_audit":candidate_screen_audit,"tick_replay":replay,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation,"shadow_policy":shadow_policy}),
+                    serde_json::json!({"screen":screen,"screen_audit":screen_audit,"market_stop_proof":market_stop_proof,"proof_rejection":proof_rejection,"proof_audited":proof_audited,"candidate_screen_audit":candidate_screen_audit,"tick_replay":replay,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation,"shadow_policy":shadow_policy,"proof_policy":proof_policy}),
                 )
             };
             let (outcome, result) = match compute() {
                 Ok(result) => (
-                    if result["tick_replay"].is_null() {
+                    if result["tick_replay"].is_null() || result["proof_rejection"] == true {
                         Outcome::Rejected
                     } else {
                         Outcome::Completed
@@ -568,6 +653,9 @@ impl Driver {
         if total > config.max_total_events {
             return Err("loaded inputs exceed configured event budget".into());
         }
+        if let Some(policy) = &config.proof_policy {
+            policy.validate()?;
+        }
         if let Some(policy) = &config.shadow_policy {
             policy.validate()?;
         }
@@ -719,6 +807,7 @@ impl Driver {
                 feature_cells: self.config.feature_cells,
                 evaluation: evaluation.as_ref(),
                 shadow_policy: self.config.shadow_policy.as_ref(),
+                proof_policy: self.config.proof_policy.as_ref(),
             },
         );
         let (id, outcome, reused, error) = match execution {
@@ -751,6 +840,15 @@ impl Driver {
             );
         }
         tx.execute("INSERT INTO research_steps(run_id,cursor,experiment_id,outcome,reused,error) VALUES (?1,?2,?3,?4,?5,?6)",params![self.id,s.cursor as i64,id,outcome,i64::from(reused),error]).map_err(|e|e.to_string())?;
+        if error.as_ref().is_some_and(|e| {
+            e.contains(crate::proof_screen::BLOCKED) || e.contains("market-stop proof excluded")
+        }) {
+            tx.execute(
+                "UPDATE research_runs SET state='paused' WHERE id=?1 AND token=?2",
+                params![self.id, token],
+            )
+            .map_err(|e| e.to_string())?;
+        }
         if self.config.improvement_children > 0
             && (outcome == "completed" || outcome == "rejected")
             && let Some(id) = &id

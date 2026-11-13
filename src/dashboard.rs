@@ -532,6 +532,11 @@ async fn detail(State(app): State<Arc<App>>, Param(id): Param<String>) -> Respon
     match registry.result(&id) {
         Ok(Some(v)) => {
             let assessment = (|| -> Result<crate::validation::Assessment> {
+                if v.result["proof_rejection"] == true && v.result["tick_replay"].is_null() {
+                    return Err(
+                        "entry infeasibility proven; no tick trade series was simulated".into(),
+                    );
+                }
                 if v.result["tick_replay"]["version"].as_str() != Some(crate::ENGINE_VERSION) {
                     return Err("engine version requires fresh verification".into());
                 }

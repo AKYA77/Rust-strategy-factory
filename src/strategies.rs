@@ -879,6 +879,7 @@ pub fn generate() -> Vec<Strategy> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ScreenStatus {
     ProvenNoSignals,
+    ProvenNoMarketEntry,
     ScreenUncertain,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -76,7 +76,8 @@
     "Bounded hypothetical USD market-entry M1 cash estimates with exact risk/fees/net-win accounting, explicit collision/gap/deadline/unsupported/partial uncertainty, conservative persisted shadow policy, configurable library-level deterministic audit selection and actual tick-disagreement receipts; no execution skipping",
     "Exact fixed-market-stop infeasibility proofs bound to canonical strategy/profile/cost identities, independently reverified and persisted only with actual replay contradiction checks;96 all-profile/direction/cost/spread oracle cases, no execution skip",
     "Runtime optional versioned shadow policy with full campaign/experiment cache identity, immutable selected-policy receipts and context-exact comparable baseline/child replay; omitted-policy legacy hash formula preserved",
-    "Allocation-free validated packed active-index/prefix traversal integrated into M1 model,1100 seeded oracle cases and actual48-candidate estimate/audit/replay fingerprint equivalence with source-pinned dense/sparse component measurements"
+    "Allocation-free validated packed active-index/prefix traversal integrated into M1 model,1100 seeded oracle cases and actual48-candidate estimate/audit/replay fingerprint equivalence with source-pinned dense/sparse component measurements",
+    "Opt-in training-only exact fixed-market proof rejection with deterministic mandatory tick audits, scoped input/entry validation, context-exact proof-only diagnosis/child review basis, durable contradiction blocking and atomic publication refusal/coordinator pause; real browser proof view/export and measured no-entry current-pipeline comparison"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -84,9 +85,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Bind selectable screening execution policy into complete experiment/review identities; add safe candidate failure proofs and calibrated rejected-candidate tick audits, batched/shared sparse screens and measured full-accounting indexed replay equivalence. Current M1 model is shadow-only.",
+  "next_action": "Shared bounded candidate feature batches and representative screening calibration/aggregate audit monitoring, then full-accounting indexed replay equivalence/performance. Approximate OHLC failures remain shadow-only; fixed-market exact proof skipping is opt-in and training-only.",
   "qualified_strategies": 0,
-  "tests_passed": 170,
+  "tests_passed": 173,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile against actual Rust/SQLite/native input: auth/control/export/restart, >100-history paging and filter/race, actual immutable training lineage/review and exact extreme-loss training exports",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
@@ -95,10 +96,10 @@
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43469467056,
-    "sha": "d7b2b665fe37ae9793d809a378f1a56ca3bdf438",
+    "run_id": 43470598707,
+    "sha": "0d527afe4c61455f94c89cd865232504ee1991a0",
     "conclusion": "success",
-    "verification": "Exact public commit/success summary retrieved; sparse milestone hosted verification follows publication"
+    "verification": "Exact public commit/success summary retrieved; proof-policy milestone hosted verification follows publication"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
   "vps_acceptance": "VPS_PERFORMANCE_PENDING",
@@ -106,5 +107,6 @@
   "storage_pipeline_benchmark": "docs/BENCHMARKS/storage-pipeline-v1.json",
   "source_access": "Fresh Dukascopy/HistData info requests403; additive domain proposal save failed draft_not_editable, not applied; real sample acceptance pending",
   "candidate_screen_benchmark": "docs/BENCHMARKS/candidate-screen-v2-sparse.json",
-  "sparse_mask_benchmark": "docs/BENCHMARKS/sparse-mask-v1.json"
+  "sparse_mask_benchmark": "docs/BENCHMARKS/sparse-mask-v1.json",
+  "proof_screen_benchmark": "docs/BENCHMARKS/proof-screen-v1.json"
 }

@@ -59,3 +59,7 @@ harness = false
 [[bench]]
 name = "sparse_mask"
 harness = false
+
+[[bench]]
+name = "proof_screen"
+harness = false

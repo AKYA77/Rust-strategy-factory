@@ -597,6 +597,9 @@ impl Registry {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(db_err)?;
+        if result["proof_rejection"] == true && matches!(outcome, Outcome::Rejected) {
+            crate::proof_screen::guard(&tx)?;
+        }
         let (state, token, expiry, old_hash): (
             String,
             Option<String>,

@@ -24,6 +24,7 @@ fn main() {
         "src/tick_engine.rs",
         "src/screen.rs",
         "src/candidate_screen.rs",
+        "src/proof_screen.rs",
         "src/validation.rs",
         "src/science.rs",
         "src/uncertainty.rs",
