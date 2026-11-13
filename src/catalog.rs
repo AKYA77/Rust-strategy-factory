@@ -265,6 +265,31 @@ fn get(c: &Connection, id: &str) -> Result<Option<Entry>> {
     }
     Ok(entry)
 }
+fn verify_review_scope(c: &Connection, r: &crate::data_review::Report) -> Result<()> {
+    let entry =
+        get(c, &r.record.request.catalog_identity)?.ok_or("review catalog receipt missing")?;
+    if entry.hash != r.record.request.catalog_hash {
+        return Err("review catalog hash mismatch".into());
+    }
+    Ok(())
+}
+fn read_review(c: &Connection, id: &str) -> Result<Option<crate::data_review::Report>> {
+    let exists:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='catalog_reviews')",[],|r|r.get(0)).map_err(db)?;
+    if !exists {
+        return Ok(None);
+    }
+    let row=c.query_row("SELECT CASE WHEN typeof(body)='blob' AND length(body)<=2097152 THEN body END,hash FROM catalog_reviews WHERE id=?1",[id],|r|Ok((r.get::<_,Vec<u8>>(0)?,r.get::<_,String>(1)?))).optional().map_err(db)?;
+    row.map(|(body, hash)| {
+        if id != hash {
+            return Err("review key mismatch".into());
+        }
+        let record = serde_json::from_slice(&body).map_err(|e| e.to_string())?;
+        let report = crate::data_review::Report::verified(record, hash)?;
+        verify_review_scope(c, &report)?;
+        Ok(report)
+    })
+    .transpose()
+}
 impl Catalog {
     /// Snapshot all managed receipts, including committed WAL state, into a new
     /// standalone catalog. Never publish a partially copied destination.
@@ -330,7 +355,8 @@ impl Catalog {
                     |r| Ok((r.get(0)?, r.get(1)?)),
                 )
                 .map_err(db)?;
-            if tables != 1
+            let has_reviews:bool=source.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='catalog_reviews')",[],|r|r.get(0)).map_err(db)?;
+            if tables != if has_reviews { 2 } else { 1 }
                 || columns != 3
                 || all_columns != 3
                 || count > 10000
@@ -375,6 +401,42 @@ impl Catalog {
                 }
                 if copied != count {
                     return Err("catalog snapshot row count mismatch".into());
+                }
+                if has_reviews {
+                    let cols: i64 = source
+                        .query_row(
+                            "SELECT COUNT(*) FROM pragma_table_info('catalog_reviews')",
+                            [],
+                            |r| r.get(0),
+                        )
+                        .map_err(db)?;
+                    if cols != 3 {
+                        return Err("unknown review journal schema".into());
+                    }
+                    let (n, b): (i64, i64) = source
+                        .query_row(
+                            "SELECT COUNT(*),COALESCE(SUM(length(body)),0) FROM catalog_reviews",
+                            [],
+                            |r| Ok((r.get(0)?, r.get(1)?)),
+                        )
+                        .map_err(db)?;
+                    if n > 10000 || b > 128 * 1024 * 1024 {
+                        return Err("review snapshot quota exceeded".into());
+                    }
+                    let mut q = source
+                        .prepare("SELECT id FROM catalog_reviews ORDER BY id")
+                        .map_err(db)?;
+                    for id in q.query_map([], |r| r.get::<_, String>(0)).map_err(db)? {
+                        let id = id.map_err(db)?;
+                        let report = read_review(&source, &id)?.ok_or("review disappeared")?;
+                        let body = serde_json::to_vec(&report.record).map_err(|e| e.to_string())?;
+                        write
+                            .execute(
+                                "INSERT INTO catalog_reviews VALUES(?1,?2,?1)",
+                                params![id, body],
+                            )
+                            .map_err(db)?;
+                    }
                 }
                 write.commit().map_err(db)?;
             }
@@ -456,7 +518,49 @@ impl Catalog {
             c.execute_batch("PRAGMA journal_mode=WAL;PRAGMA synchronous=FULL;")
                 .map_err(db)?;
         }
+        if create {
+            c.execute_batch("CREATE TABLE IF NOT EXISTS catalog_reviews(id TEXT PRIMARY KEY CHECK(length(id)=64),body BLOB NOT NULL CHECK(typeof(body)='blob' AND length(body)<=2097152),hash TEXT NOT NULL CHECK(length(hash)=64));CREATE TRIGGER IF NOT EXISTS reviews_no_update BEFORE UPDATE ON catalog_reviews BEGIN SELECT RAISE(ABORT,'reviews immutable');END;CREATE TRIGGER IF NOT EXISTS reviews_no_delete BEFORE DELETE ON catalog_reviews BEGIN SELECT RAISE(ABORT,'reviews immutable');END;").map_err(db)?;
+        }
         Ok(Self { connection: c })
+    }
+    pub fn record_review(
+        &mut self,
+        request: crate::data_review::Request,
+    ) -> Result<crate::data_review::Report> {
+        let report = crate::data_review::Report::create(request)?;
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(db)?;
+        verify_review_scope(&tx, &report)?;
+        if let Some(old) = read_review(&tx, &report.hash)? {
+            tx.commit().map_err(db)?;
+            return Ok(old);
+        }
+        let body = serde_json::to_vec(&report.record).map_err(|e| e.to_string())?;
+        let (count, bytes): (i64, i64) = tx
+            .query_row(
+                "SELECT COUNT(*),COALESCE(SUM(length(body)),0) FROM catalog_reviews",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .map_err(db)?;
+        if count >= 10000 || body.len() > 2097152 || bytes + body.len() as i64 > 128 * 1024 * 1024 {
+            return Err("review journal quota exceeded".into());
+        }
+        tx.execute(
+            "INSERT INTO catalog_reviews VALUES(?1,?2,?1)",
+            params![report.hash, body],
+        )
+        .map_err(db)?;
+        tx.commit().map_err(db)?;
+        Ok(report)
+    }
+    pub fn review(&self, id: &str) -> Result<Option<crate::data_review::Report>> {
+        if !hex(id) {
+            return Err("invalid review hash".into());
+        }
+        read_review(&self.connection, id)
     }
     pub fn register(&mut self, d: &Dataset) -> Result<Registration> {
         self.register_linked(d, None)

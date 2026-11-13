@@ -90,7 +90,8 @@
     "Append-only bounded local dataset observation catalog with source/profile/archive/parser/class identities, independently observed counters, exact sequence strings, immutable hashed receipts, reimport reuse, revision separation, read-only cursor inventory and CLI/refusal/quota fixtures; declared classification never grants approval",
     "Consistent validated catalog WAL snapshot and new-path restore, exact receipt preservation, fresh guarded schema, standalone checkpoint/fsync/no-replace publication and corrupt/unknown-state cleanup refusal with actual CLI recovery tests",
     "Optional authenticated read-only catalog dashboard/API with legacy/unconfigured startup, bounded identity cursor pages, exact receipt export/full-u64 display, declared approval limits, request selection guards and corrupt-state refusal; actual desktop/mobile/restart/browser evidence",
-    "Immutable scoped correction ancestry in versioned catalog receipts with parent/reason identity, bounded full-chain validation, repeat/conflict refusal and snapshot/CLI preservation; no approval grant"
+    "Immutable scoped correction ancestry in versioned catalog receipts with parent/reason identity, bounded full-chain validation, repeat/conflict refusal and snapshot/CLI preservation; no approval grant",
+    "Immutable receipt-bound five-area text evidence journal with pending/rejected/recorded-assertion states, evidence hashes, source receipt conflict refusal and validated snapshot/legacy upgrade/CLI recovery; no approval authority"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -98,9 +99,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Implement independent immutable source/profile/calendar/quality/coverage review evidence bound to catalog receipt hashes; keep declared class and correction reasons insufficient for research eligibility.",
+  "next_action": "Add bounded receipt-scoped review history browsing, then typed independent quality/calendar/coverage evidence validation; recorded reviewer assertions never grant eligibility.",
   "qualified_strategies": 0,
-  "tests_passed": 214,
+  "tests_passed": 217,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks; persisted proof/indexed failure monitoring, restart and read-only API; optional authenticated catalog pagination/exact exports/full-u64 desktop/mobile and corrupt-state refusal",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
@@ -109,10 +110,9 @@
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43526596309,
-    "sha": "73090e358eddc9c8e8c525305deefbf4c9c8d8ad",
-    "conclusion": "success",
-    "verification": "Public Success observed; correction milestone hosted verification follows publication"
+    "run_id": 43527844081,
+    "sha": "f4ca9272783e028da225575aba42973c6d142403",
+    "conclusion": "success"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
   "vps_acceptance": "VPS_PERFORMANCE_PENDING",

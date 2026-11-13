@@ -62,3 +62,5 @@ Catalog recovery follow-up: consistent WAL-aware validated metadata snapshots/ne
 Catalog UI follow-up: optional authenticated bounded identity pages/detail/exact exports now have actual desktop/mobile/configured/unconfigured/restart/corrupt-state evidence. A mobile overflow regression was fixed without relaxing the assertion. Declared classes remain observations, never approval. Source correction/approval/coverage and import/backup activation UI remain open.
 
 Correction lifecycle: immutable parent/reason receipts and bounded ancestry/context verification now work across CLI/read/page/snapshot, preserving originals and legacy hashes. Same-window correction only; independent evidence reviews/approvals and extension/split/merge relationships remain open. Next: receipt-bound review evidence with explicit incomplete/rejected states and no synthetic eligibility.
+
+Review journal: immutable five-area text evidence/receipt binding and explicit incomplete/rejected/assertions-recorded states now work through CLI and snapshots. Claims never grant approval. Next: discoverable bounded history, then independent typed evidence validation and review authority.

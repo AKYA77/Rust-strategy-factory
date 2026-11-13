@@ -4,11 +4,11 @@ Status: SOFTWARE_INCOMPLETE. Use the existing checkout. Read AGENTS.md, PROJECT_
 
 ## Latest verified local milestone
 
-214 Rust tests/fmt/Clippy, debug/release, actual browser and local recovery checks pass. Explicit catalog-correction binds existing parents and bounded evidence reasons in immutable v2 receipts. Reads/pages/snapshots verify bounded ancestry, cycles, missing parents and same source/instrument/class/window; repeated requests reuse receipts and conflicts refuse. Legacy v1 bytes/hashes remain stable. Actual CLI and snapshot preservation pass. No approval or performance gain claimed. Prior73090e3 CI is green; correction CI follows publication.
+217 Rust tests/fmt/Clippy, debug/release, actual browser and local recovery pass. Receipt-bound five-area evidence journal retains bounded text and hashes, validates target receipt/ancestry, rejects mutation/conflicting scope and preserves reviews in standalone snapshots. States are Incomplete/Rejected/AssertionsRecorded, never approval. Reviewer identity is explicitly self-asserted; independent authenticity/eligibility validation remains unfinished. Prior correction CI is green; journal CI follows publication.
 
 ## Implement next
 
-Next specific task: add immutable independent source/profile/calendar/quality/coverage review evidence bound to catalog receipt hashes, with explicit incomplete/rejected states and synthetic eligibility refusal. Correction reasons and declared classes must never count as approval.
+Next specific task: implement bounded receipt-scoped review history listing with stable cursors and exact report links. Then implement typed quality/calendar/coverage evidence validators and independent source/profile approval policy; recorded assertions must not grant eligibility.
 
 Keep indexed policy experimental. Profile dominant complete-pipeline stages and validate varied/representative workloads before any promotion; engine-only gains or a small noisy median are insufficient. Implement checkpoint-aware shared-index/batch lifecycle, aggregate reference-audit coverage monitoring; metadata lookup scaling now has component evidence. Continue explicit source revision/correction links, catalog approval/coverage lifecycle, import/backup activation dashboard workflows and coordinated multi-component recovery; bounded immutable inventory and continuous export now exist. Preserve declared class versus independent approval and source availability. Continue remaining lifecycle, and the remaining scientific/operations queue rather than treating the performance experiment as software completion. Preserve exact eligibility/fallback, source scope, immutable evidence and reference/proof audit independence.
 

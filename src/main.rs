@@ -368,6 +368,15 @@ fn run(args: &[String]) -> Result<()> {
                     .register_correction(&read_dataset(dataset)?, parent, reason)?,
             )
         }
+        ["catalog-review", path, request] => print(
+            &rust_strategy_factory::catalog::Catalog::open(Path::new(path))?
+                .record_review(read_json(request)?)?,
+        ),
+        ["catalog-review-report", path, id] => print(
+            &rust_strategy_factory::catalog::Catalog::existing(Path::new(path))?
+                .review(id)?
+                .ok_or("review not found")?,
+        ),
         ["catalog-entry", path, id] => print(
             &rust_strategy_factory::catalog::Catalog::existing(Path::new(path))?
                 .entry(id)?
