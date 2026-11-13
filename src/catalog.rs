@@ -6,7 +6,10 @@ use crate::{
 };
 use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::{
+    fs::{self, File, OpenOptions},
+    path::Path,
+};
 const APP_ID: i64 = 0x52534341;
 const VERSION: &str = "local-dataset-catalog-v1";
 const MAX_BODY: usize = 128 * 1024;
@@ -208,6 +211,160 @@ fn get(c: &Connection, id: &str) -> Result<Option<Entry>> {
     .transpose()
 }
 impl Catalog {
+    /// Snapshot all managed receipts, including committed WAL state, into a new
+    /// standalone catalog. Never publish a partially copied destination.
+    pub fn backup(&self, destination: &Path) -> Result<()> {
+        if destination.exists() {
+            return Err("catalog backup destination must be new".into());
+        }
+        let parent = destination
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or(Path::new("."));
+        let mut nonce = [0u8; 16];
+        getrandom::fill(&mut nonce).map_err(|e| e.to_string())?;
+        let nonce = nonce.iter().map(|b| format!("{b:02x}")).collect::<String>();
+        let temp = parent.join(format!(".catalog-backup-{nonce}.sqlite"));
+        drop(
+            OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&temp)
+                .map_err(|e| e.to_string())?,
+        );
+        let publication = (|| -> Result<()> {
+            let source = self.connection.unchecked_transaction().map_err(db)?;
+            let pages: i64 = source
+                .query_row("PRAGMA page_count", [], |r| r.get(0))
+                .map_err(db)?;
+            let page_size: i64 = source
+                .query_row("PRAGMA page_size", [], |r| r.get(0))
+                .map_err(db)?;
+            if pages
+                .checked_mul(page_size)
+                .ok_or("catalog snapshot size overflow")?
+                > 512 * 1024 * 1024
+            {
+                return Err("catalog snapshot physical budget exceeded".into());
+            }
+            let integrity: String = source
+                .query_row("PRAGMA integrity_check", [], |r| r.get(0))
+                .map_err(db)?;
+            if integrity != "ok" {
+                return Err("source catalog SQLite integrity mismatch".into());
+            }
+            let tables: i64 = source
+                .query_row(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type='table'",
+                    [],
+                    |r| r.get(0),
+                )
+                .map_err(db)?;
+            let columns:i64=source.query_row("SELECT COUNT(*) FROM pragma_table_info('catalog_entries') WHERE name IN ('id','body','hash')",[],|r|r.get(0)).map_err(db)?;
+            let all_columns: i64 = source
+                .query_row(
+                    "SELECT COUNT(*) FROM pragma_table_info('catalog_entries')",
+                    [],
+                    |r| r.get(0),
+                )
+                .map_err(db)?;
+            let (count, bytes): (i64, i64) = source
+                .query_row(
+                    "SELECT COUNT(*),COALESCE(SUM(length(body)),0) FROM catalog_entries",
+                    [],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .map_err(db)?;
+            if tables != 1
+                || columns != 3
+                || all_columns != 3
+                || count > 10000
+                || bytes > 128 * 1024 * 1024
+            {
+                return Err("catalog snapshot schema or quota unsupported".into());
+            }
+            let mut dest = Self::open(&temp)?;
+            {
+                let write = dest
+                    .connection
+                    .transaction_with_behavior(TransactionBehavior::Immediate)
+                    .map_err(db)?;
+                let mut copied = 0i64;
+                {
+                    let mut q = source
+                        .prepare(&format!(
+                            "SELECT {PROJECTION} FROM catalog_entries ORDER BY id"
+                        ))
+                        .map_err(db)?;
+                    let rows = q
+                        .query_map([], |r| {
+                            Ok((
+                                r.get::<_, String>(0)?,
+                                r.get::<_, Vec<u8>>(1)?,
+                                r.get::<_, String>(2)?,
+                            ))
+                        })
+                        .map_err(db)?;
+                    for row in rows {
+                        let (id, body, hash) = row.map_err(db)?;
+                        decode(id.clone(), body.clone(), hash.clone())?;
+                        write
+                            .execute(
+                                "INSERT INTO catalog_entries VALUES(?1,?2,?3)",
+                                params![id, body, hash],
+                            )
+                            .map_err(db)?;
+                        copied += 1;
+                    }
+                }
+                if copied != count {
+                    return Err("catalog snapshot row count mismatch".into());
+                }
+                write.commit().map_err(db)?;
+            }
+            source.commit().map_err(db)?;
+            let integrity: String = dest
+                .connection
+                .query_row("PRAGMA quick_check", [], |r| r.get(0))
+                .map_err(db)?;
+            if integrity != "ok" {
+                return Err("catalog snapshot integrity mismatch".into());
+            }
+            let (busy, _, _): (i64, i64, i64) = dest
+                .connection
+                .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |r| {
+                    Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+                })
+                .map_err(db)?;
+            if busy != 0 {
+                return Err("catalog snapshot checkpoint busy".into());
+            }
+            let mode: String = dest
+                .connection
+                .query_row("PRAGMA journal_mode=DELETE", [], |r| r.get(0))
+                .map_err(db)?;
+            if mode != "delete" {
+                return Err("catalog snapshot is not standalone".into());
+            }
+            drop(dest);
+            File::open(&temp)
+                .and_then(|f| f.sync_all())
+                .map_err(|e| e.to_string())?;
+            fs::hard_link(&temp, destination).map_err(|e| e.to_string())?;
+            File::open(parent)
+                .and_then(|f| f.sync_all())
+                .map_err(|e| e.to_string())
+        })();
+        let cleanup = fs::remove_file(&temp).map_err(|e| e.to_string());
+        // Only remove this operation's private SQLite sidecars, never other files.
+        for suffix in ["-wal", "-shm"] {
+            let sidecar = parent.join(format!(".catalog-backup-{nonce}.sqlite{suffix}"));
+            if sidecar.exists() {
+                fs::remove_file(sidecar).map_err(|e| e.to_string())?;
+            }
+        }
+        publication.and(cleanup)
+    }
     pub fn open(path: &Path) -> Result<Self> {
         Self::connect(path, true)
     }

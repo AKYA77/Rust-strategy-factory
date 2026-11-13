@@ -212,3 +212,132 @@ fn actual_cli_record_list_detail_and_reimport_reuse() {
     assert_eq!(page["entries"].as_array().unwrap().len(), 1);
     assert!(page["next_cursor"].is_null());
 }
+
+#[test]
+fn online_snapshot_includes_committed_wal_and_restores_exact_immutable_receipts() {
+    let f = Fixture::new("backup");
+    let mut c = Catalog::open(&f.path).unwrap();
+    let mut d = dataset();
+    let first = c.register(&d).unwrap();
+    d.manifest.archive_hash = "second synthetic revision".into();
+    let second = c.register(&d).unwrap();
+    let wal = f.root.join("catalog.sqlite-wal");
+    assert!(fs::metadata(&wal).unwrap().len() > 0);
+    let backup = f.root.join("backup.sqlite");
+    c.backup(&backup).unwrap();
+    let bytes = fs::read(&backup).unwrap();
+    assert!(c.backup(&backup).is_err());
+    assert_eq!(fs::read(&backup).unwrap(), bytes);
+    let snapshot = Catalog::existing(&backup).unwrap();
+    assert_eq!(
+        snapshot
+            .entry(&first.entry.receipt.facts.dataset_identity)
+            .unwrap()
+            .unwrap()
+            .hash,
+        first.entry.hash
+    );
+    assert_eq!(
+        snapshot
+            .entry(&second.entry.receipt.facts.dataset_identity)
+            .unwrap()
+            .unwrap()
+            .hash,
+        second.entry.hash
+    );
+    d.manifest.archive_hash = "later synthetic revision".into();
+    c.register(&d).unwrap();
+    assert_eq!(snapshot.page(None, 100).unwrap().entries.len(), 2);
+    let restored = f.root.join("restore.sqlite");
+    snapshot.backup(&restored).unwrap();
+    let mut restored = Catalog::open(&restored).unwrap();
+    let reuse = restored.register(&d).unwrap();
+    assert!(!reuse.reused);
+    assert_eq!(restored.page(None, 100).unwrap().entries.len(), 3);
+    assert!(!f.root.join("backup.sqlite-wal").exists());
+    assert!(!f.root.join("backup.sqlite-shm").exists());
+    assert!(!fs::read_dir(&f.root).unwrap().any(|e| {
+        e.unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".catalog-backup-")
+    }));
+}
+
+#[test]
+fn invalid_or_unknown_snapshot_state_never_publishes_and_preserves_unrelated_files() {
+    let f = Fixture::new("backup-refuse");
+    let mut c = Catalog::open(&f.path).unwrap();
+    c.register(&dataset()).unwrap();
+    let keep = f.root.join(".keep");
+    fs::write(&keep, b"preserve").unwrap();
+    let dest = f.root.join("backup.sqlite");
+    let sql = rusqlite::Connection::open(&f.path).unwrap();
+    sql.execute_batch(
+        "CREATE TABLE unknown_state(value);INSERT INTO unknown_state VALUES('preserve');",
+    )
+    .unwrap();
+    assert!(c.backup(&dest).is_err());
+    assert!(!dest.exists());
+    sql.execute_batch("DROP TABLE unknown_state;DROP TRIGGER catalog_no_update;UPDATE catalog_entries SET hash=printf('%064x',0);").unwrap();
+    assert!(c.backup(&dest).is_err());
+    assert!(!dest.exists());
+    assert_eq!(fs::read(&keep).unwrap(), b"preserve");
+    assert!(!fs::read_dir(&f.root).unwrap().any(|e| {
+        e.unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".catalog-backup-")
+    }));
+}
+
+#[test]
+fn actual_cli_snapshot_and_new_path_restore_preserve_all_receipts() {
+    let f = Fixture::new("backup-cli");
+    let mut c = Catalog::open(&f.path).unwrap();
+    let entry = c.register(&dataset()).unwrap().entry;
+    let backup = f.root.join("backup.sqlite");
+    let restore = f.root.join("restore.sqlite");
+    let exe = env!("CARGO_BIN_EXE_rust-strategy-factory");
+    for args in [
+        [
+            "catalog-backup",
+            f.path.to_str().unwrap(),
+            backup.to_str().unwrap(),
+        ],
+        [
+            "catalog-restore",
+            backup.to_str().unwrap(),
+            restore.to_str().unwrap(),
+        ],
+    ] {
+        let out = std::process::Command::new(exe).args(args).output().unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+    assert_eq!(
+        Catalog::existing(&restore)
+            .unwrap()
+            .entry(&entry.receipt.facts.dataset_identity)
+            .unwrap()
+            .unwrap()
+            .hash,
+        entry.hash
+    );
+    let bytes = fs::read(&restore).unwrap();
+    assert!(
+        !std::process::Command::new(exe)
+            .args([
+                "catalog-restore",
+                backup.to_str().unwrap(),
+                restore.to_str().unwrap()
+            ])
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert_eq!(fs::read(&restore).unwrap(), bytes);
+}
