@@ -4,7 +4,9 @@ Status: SOFTWARE_INCOMPLETE. Read AGENTS.md, PROJECT_STATE.json, ACCEPTANCE.md a
 
 ## Latest milestone
 
-128 Rust tests, formatting/Clippy, debug/release builds and Chromium desktop/mobile acceptance pass. Schema8 persists bounded comparable training reviews: baseline and children share the current build and exact parent data/provenance/profile/cost/conversion/feature/window context. Immutable proposal edges link actual experiment/result hashes; resolved net differences remain DESCRIPTIVE_TRAINING_ONLY. Restart after baseline/one-child commit reuses work without extra attempts; changed contexts are refused before registration, and backup/tamper checks cover review evidence. The CLI executes/reads/reuses reviews through native inputs. See RUNBOOKS/training-improvement.md.
+131 Rust tests, formatting/Clippy, debug/release builds and actual Chromium desktop/mobile acceptance pass. Schema9 adds opt-in bounded durable improvement jobs to the one-worker loop (default0/max4 children, one queued job, no recursive descendants). Base checkpoints enqueue atomically; jobs recover committed evidence after restart, obey coordinator fencing/pause and preserve queued work under state pressure. Base counters and child receipt links are explicitly separate in status/dashboard. Browser acceptance executed ten jobs and verified their counters/history. See RUNBOOKS/research-loop.md and training-improvement.md.
+
+Schema8 comparable training reviews remain verified: parent/children share build and exact data/provenance/profile/cost/conversion/feature/window context, with immutable experiment/result/edge links and descriptive resolved net differences.
 
 Schema7 training-only diagnostics and UNEVALUATED proposals remain verified. Scientific/OOS/final receipts cannot authorize adaptation. Failure/unresolved diagnoses produce no proposals; no qualified status is issued.
 
@@ -24,7 +26,7 @@ Previous verified foundations include chronological replay, initial executable-s
 
 ## Begin next
 
-Integrate bounded durable improvement scheduling with the one-worker loop: opt-in child limits, one safe checkpoint at a time, restart-safe work/lineage, state backpressure and honest base/child simulation counters. Explicit comparable reviews now execute; automatic queue integration remains pending. No OOS/protected-final adaptation. Continue dependence-aware inference, sufficient-sample/prespecified robustness acceptance and independent approval/coverage prerequisites before unlocking real final evaluation. Current protocols and pooled reset-fold statistics cannot issue validated status.
+Refine improvement jobs to yield at individual child experiment checkpoints rather than processing a bounded review batch, so pause/stop and coordinator renewal occur between children. Preserve deterministic review identities and exact cached recovery, and keep counters honest. Then continue richer training diagnoses, bounded mutation/diversity/acceptance and the entire remaining queue. No OOS/protected-final adaptation. Continue dependence-aware inference, sufficient-sample/prespecified robustness acceptance and independent approval/coverage prerequisites before unlocking real final evaluation. Current protocols and pooled reset-fold statistics cannot issue validated status.
 
 Continue bounded mutation/improvement lineage, candidate-level net candle screening, Parquet/ZSTD and measured codec/native streaming work, source acquisition/import acceptance, worker pools/OS resource control, full dashboard operations, production deployment and final end-to-end acceptance. Follow the entire IMPLEMENTATION_QUEUE.md.
 

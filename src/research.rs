@@ -7,7 +7,7 @@ use crate::{
     strategies::{self, EntryPlan, Features, Rule, Strategy},
     tick_engine::{self, Costs},
 };
-use rusqlite::{TransactionBehavior, params};
+use rusqlite::{OptionalExtension, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -25,6 +25,11 @@ pub struct Config {
     pub lease_ms: i64,
     pub state_budget_bytes: u64,
     pub training_window: Option<crate::validation::Interval>,
+    #[serde(skip_serializing_if = "zero_children")]
+    pub improvement_children: usize,
+}
+fn zero_children(n: &usize) -> bool {
+    *n == 0
 }
 impl Default for Config {
     fn default() -> Self {
@@ -36,6 +41,7 @@ impl Default for Config {
             lease_ms: 300000,
             state_budget_bytes: 256 * 1024 * 1024,
             training_window: None,
+            improvement_children: 0,
         }
     }
 }
@@ -373,12 +379,51 @@ pub struct Status {
     pub active: bool,
     pub latest: Option<String>,
     pub last_error: Option<String>,
+    pub improvements: ImprovementStatus,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImprovementStatus {
+    pub queued: i64,
+    pub completed: i64,
+    pub failed: i64,
+    pub child_receipt_links: i64,
 }
 pub fn status(registry: &Registry, id: &str, now: i64) -> Result<Status> {
+    let improvements = registry.connection.query_row("SELECT coalesce(sum(j.state='queued'),0),coalesce(sum(j.state='completed'),0),coalesce(sum(j.state='failed'),0),coalesce(sum(json_array_length(r.report_json,'$.children')),0) FROM improvement_jobs j LEFT JOIN training_reviews r ON r.id=j.review_id WHERE j.run_id=?1",[id],|r|Ok(ImprovementStatus {queued:r.get(0)?,completed:r.get(1)?,failed:r.get(2)?,child_receipt_links:r.get(3)?})).map_err(|e|e.to_string())?;
+
     registry.connection.query_row("SELECT state,cursor,executed,reused,rejected,failed,active,expires_ms,latest,last_error FROM research_runs WHERE id=?1",[id],|r|{
         let active:i64=r.get(6)?;let expires:Option<i64>=r.get(7)?;
-        Ok(Status {id:id.into(),state:r.get(0)?,cursor:r.get::<_,i64>(1)? as u64,executed:r.get(2)?,reused:r.get(3)?,rejected:r.get(4)?,failed:r.get(5)?,active:active==1 && expires.is_some_and(|t|t>now),latest:r.get(8)?,last_error:r.get(9)?})
+        Ok(Status {id:id.into(),state:r.get(0)?,cursor:r.get::<_,i64>(1)? as u64,executed:r.get(2)?,reused:r.get(3)?,rejected:r.get(4)?,failed:r.get(5)?,active:active==1 && expires.is_some_and(|t|t>now),latest:r.get(8)?,last_error:r.get(9)?,improvements})
     }).map_err(|e|e.to_string())
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImprovementJob {
+    pub parent_cursor: i64,
+    pub input_index: usize,
+    pub parent_id: String,
+    pub state: String,
+    pub diagnosis_id: Option<String>,
+    pub review_id: Option<String>,
+    pub error: Option<String>,
+}
+/// Most recent hundred durable jobs; history remains in the registry/backup.
+pub fn improvement_jobs(registry: &Registry, id: &str) -> Result<Vec<ImprovementJob>> {
+    let mut query = registry.connection.prepare("SELECT parent_cursor,input_index,parent_id,state,diagnosis_id,review_id,error FROM improvement_jobs WHERE run_id=?1 ORDER BY parent_cursor DESC LIMIT 100").map_err(|e|e.to_string())?;
+    query
+        .query_map([id], |r| {
+            Ok(ImprovementJob {
+                parent_cursor: r.get(0)?,
+                input_index: r.get(1)?,
+                parent_id: r.get(2)?,
+                state: r.get(3)?,
+                diagnosis_id: r.get(4)?,
+                review_id: r.get(5)?,
+                error: r.get(6)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .map(|r| r.map_err(|e| e.to_string()))
+        .collect()
 }
 pub fn control(registry: &Registry, id: &str, state: &str) -> Result<()> {
     if !["running", "paused", "stopped"].contains(&state) {
@@ -433,6 +478,7 @@ impl Driver {
     pub fn open(path: &Path, inputs: Vec<Input>, config: Config, revision: String) -> Result<Self> {
         if inputs.is_empty()
             || inputs.len() > 8
+            || config.improvement_children > 4
             || config.feature_cells == 0
             || config.feature_cells > 4_000_000
             || config.max_total_events == 0
@@ -443,6 +489,9 @@ impl Driver {
             || !(32 * 1024 * 1024..=8 * 1024 * 1024 * 1024).contains(&config.state_budget_bytes)
         {
             return Err("research configuration exceeds worker/cache/input/region limits".into());
+        }
+        if config.improvement_children > 0 && revision != compute_revision()? {
+            return Err("automatic improvement requires the current compiled revision".into());
         }
         let total = inputs.iter().try_fold(0_usize, |n, input| {
             n.checked_add(input.dataset.ticks.len())
@@ -551,10 +600,11 @@ impl Driver {
             .checked_mul(strategies::family_templates().len() as u64)
             .and_then(|v| v.checked_mul(self.inputs.len() as u64))
             .ok_or("research budget overflow")?;
+        let pending: Option<(i64,usize,String)> = self.registry.connection.query_row("SELECT parent_cursor,input_index,parent_id FROM improvement_jobs WHERE run_id=?1 AND state='queued'",[&self.id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional().map_err(|e|e.to_string())?;
         let expires = now
             .checked_add(self.config.lease_ms)
             .ok_or("lease overflow")?;
-        let n=self.registry.connection.execute("UPDATE research_runs SET expires_ms=?3,active=?4 WHERE id=?1 AND token=?2 AND expires_ms>?5",params![self.id,token,expires,i64::from(s.state=="running" && s.cursor<limit),now]).map_err(|e|e.to_string())?;
+        let n=self.registry.connection.execute("UPDATE research_runs SET expires_ms=?3,active=?4 WHERE id=?1 AND token=?2 AND expires_ms>?5",params![self.id,token,expires,i64::from(s.state=="running" && (s.cursor<limit || pending.is_some())),now]).map_err(|e|e.to_string())?;
         if n != 1 {
             return Err("coordinator lease expired or fenced".into());
         }
@@ -564,6 +614,9 @@ impl Driver {
         if let Err(error) = check_state_budget(&self.registry, self.config.state_budget_bytes) {
             self.registry.connection.execute("UPDATE research_runs SET state='paused',active=0,last_error=?3 WHERE id=?1 AND token=?2",params![self.id,token,error]).map_err(|e|e.to_string())?;
             return Ok(false);
+        }
+        if let Some(job) = pending {
+            return self.improvement_step(now, started, job);
         }
         if s.cursor >= limit {
             control(&self.registry, &self.id, "stopped")?;
@@ -627,8 +680,83 @@ impl Driver {
             );
         }
         tx.execute("INSERT INTO research_steps(run_id,cursor,experiment_id,outcome,reused,error) VALUES (?1,?2,?3,?4,?5,?6)",params![self.id,s.cursor as i64,id,outcome,i64::from(reused),error]).map_err(|e|e.to_string())?;
+        if self.config.improvement_children > 0
+            && (outcome == "completed" || outcome == "rejected")
+            && let Some(id) = &id
+        {
+            tx.execute("INSERT INTO improvement_jobs(run_id,parent_cursor,input_index,parent_id) VALUES(?1,?2,?3,?4)",params![self.id,s.cursor as i64,input_index as i64,id]).map_err(|e|e.to_string())?;
+        }
         tx.commit().map_err(|e| e.to_string())?;
         Ok(true)
+    }
+    fn improvement_step(
+        &mut self,
+        now: i64,
+        started: std::time::Instant,
+        job: (i64, usize, String),
+    ) -> Result<bool> {
+        let token = self.token.as_ref().ok_or("coordinator lease required")?;
+        let execution = (|| -> Result<(String, Option<String>)> {
+            let input = self
+                .inputs
+                .get(job.1)
+                .ok_or("improvement input index invalid")?;
+            let diagnosis = crate::improvement::diagnose(
+                &mut self.registry,
+                &job.2,
+                &crate::improvement::Options {
+                    seed: self.config.seed,
+                    max_children: self.config.improvement_children,
+                    state_budget_bytes: self.config.state_budget_bytes,
+                },
+            )?
+            .report;
+            let review = if diagnosis.proposals.is_empty() {
+                None
+            } else {
+                Some(
+                    crate::training_review::execute(
+                        &mut self.registry,
+                        input,
+                        &diagnosis.id,
+                        self.config.feature_cells,
+                        self.config.state_budget_bytes,
+                    )?
+                    .report
+                    .id,
+                )
+            };
+            Ok((diagnosis.id, review))
+        })();
+        let (diagnosis, review, error) = match execution {
+            Ok((d, r)) => (Some(d), r, None),
+            Err(e) => (None, None, Some(e)),
+        };
+        let pressure = error.is_some()
+            && check_state_budget(&self.registry, self.config.state_budget_bytes).is_err();
+        let finished = now
+            .checked_add(
+                i64::try_from(started.elapsed().as_millis())
+                    .map_err(|_| "elapsed time overflow")?,
+            )
+            .ok_or("checkpoint time overflow")?;
+        let tx = self
+            .registry
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| e.to_string())?;
+        let n=tx.execute("UPDATE research_runs SET active=0,last_error=?4,state=CASE WHEN ?5 THEN 'paused' ELSE state END WHERE id=?1 AND token=?2 AND expires_ms>?3",params![self.id,token,finished,error,pressure]).map_err(|e|e.to_string())?;
+        if n != 1 {
+            return Err(
+                "improvement completion fenced; committed evidence retained for recovery".into(),
+            );
+        }
+        let n=tx.execute("UPDATE improvement_jobs SET state=?3,diagnosis_id=?4,review_id=?5,error=?6 WHERE run_id=?1 AND parent_cursor=?2 AND state='queued'",params![self.id,job.0,if pressure {"queued"} else if error.is_some() {"failed"} else {"completed"},diagnosis,review,error]).map_err(|e|e.to_string())?;
+        if n != 1 {
+            return Err("improvement job already completed".into());
+        }
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok(!pressure)
     }
 }
 impl Drop for Driver {

@@ -118,7 +118,7 @@ impl Registry {
         let version: i64 = connection
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .map_err(db_err)?;
-        if version > 8 {
+        if version > 9 {
             return Err("database schema newer than supported".into());
         }
         if version == 0 {
@@ -225,6 +225,20 @@ impl Registry {
             ); PRAGMA user_version=8;",
             )
             .map_err(db_err)?;
+            tx.commit().map_err(db_err)?;
+        }
+        if version < 9 {
+            let tx = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(db_err)?;
+            tx.execute_batch("CREATE TABLE IF NOT EXISTS improvement_jobs (
+                run_id TEXT NOT NULL REFERENCES research_runs(id), parent_cursor INTEGER NOT NULL,
+                input_index INTEGER NOT NULL CHECK(input_index>=0), parent_id TEXT NOT NULL REFERENCES experiments(id),
+                state TEXT NOT NULL DEFAULT 'queued' CHECK(state IN ('queued','completed','failed')),
+                diagnosis_id TEXT REFERENCES training_diagnoses(id), review_id TEXT REFERENCES training_reviews(id), error TEXT,
+                PRIMARY KEY(run_id,parent_cursor), FOREIGN KEY(run_id,parent_cursor) REFERENCES research_steps(run_id,cursor)
+            ); CREATE UNIQUE INDEX IF NOT EXISTS one_pending_improvement ON improvement_jobs(run_id) WHERE state='queued';
+            PRAGMA user_version=9;").map_err(db_err)?;
             tx.commit().map_err(db_err)?;
         }
         Ok(Self { connection })
@@ -704,6 +718,19 @@ impl Registry {
             .map_err(db_err)?;
         for id in ids {
             crate::training_review::read_report(self, &id.map_err(db_err)?)?;
+        }
+        let inconsistent: bool = self.connection.query_row("SELECT EXISTS(SELECT 1 FROM improvement_jobs j JOIN research_steps s ON s.run_id=j.run_id AND s.cursor=j.parent_cursor LEFT JOIN training_diagnoses d ON d.id=j.diagnosis_id LEFT JOIN training_reviews r ON r.id=j.review_id WHERE s.experiment_id IS NOT j.parent_id OR (j.diagnosis_id IS NOT NULL AND d.parent_id IS NOT j.parent_id) OR (j.review_id IS NOT NULL AND r.diagnosis_id IS NOT j.diagnosis_id) OR (j.state='completed' AND (j.diagnosis_id IS NULL OR (json_array_length(d.report_json,'$.proposals')>0 AND j.review_id IS NULL))))",[],|r|r.get(0)).map_err(db_err)?;
+        if inconsistent {
+            return Err("improvement job lineage mismatch".into());
+        }
+        let dangling: bool = self
+            .connection
+            .prepare("PRAGMA foreign_key_check")
+            .map_err(db_err)?
+            .exists([])
+            .map_err(db_err)?;
+        if dangling {
+            return Err("registry foreign key integrity mismatch".into());
         }
         Ok(())
     }

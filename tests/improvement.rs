@@ -475,3 +475,142 @@ fn review_refuses_changed_context_before_registering_and_keeps_scoped_window() {
     drop(r);
     std::fs::remove_dir_all(d).unwrap();
 }
+
+fn queued_driver(path: &std::path::Path, children: usize, budget: u64) -> research::Driver {
+    research::Driver::open(
+        path,
+        vec![input(100300)],
+        research::Config {
+            seed: 0,
+            feature_cells: 10000,
+            improvement_children: children,
+            state_budget_bytes: budget,
+            ..Default::default()
+        },
+        research::compute_revision().unwrap(),
+    )
+    .unwrap()
+}
+#[test]
+fn opt_in_queue_is_bounded_pauses_and_recovers_a_committed_review() {
+    let d = dir();
+    let path = d.join("state.sqlite");
+    let mut driver = queued_driver(&path, 2, 256 * 1024 * 1024);
+    driver.acquire(0).unwrap();
+    assert!(driver.step(1).unwrap());
+    let first = research::status(&driver.registry, &driver.id, 2).unwrap();
+    assert_eq!(first.cursor, 1);
+    assert_eq!(first.improvements.queued, 1);
+    assert_eq!(driver.registry.counts().unwrap().attempts, 1);
+    research::control(&driver.registry, &driver.id, "paused").unwrap();
+    assert!(!driver.step(3).unwrap());
+    assert_eq!(
+        research::status(&driver.registry, &driver.id, 3)
+            .unwrap()
+            .improvements
+            .queued,
+        1
+    );
+    // Simulate evidence commits followed by a crash before the queue checkpoint.
+    let diagnosis = improvement::diagnose(
+        &mut driver.registry,
+        first.latest.as_ref().unwrap(),
+        &Options {
+            seed: 0,
+            max_children: 2,
+            state_budget_bytes: 256 * 1024 * 1024,
+        },
+    )
+    .unwrap()
+    .report;
+    let review = rust_strategy_factory::training_review::execute(
+        &mut driver.registry,
+        &input(100300),
+        &diagnosis.id,
+        10000,
+        256 * 1024 * 1024,
+    )
+    .unwrap();
+    assert_eq!(review.report.children.len(), 2);
+    let attempts = driver.registry.counts().unwrap().attempts;
+    let run_id = driver.id.clone();
+    drop(driver);
+    let mut driver = queued_driver(&path, 2, 256 * 1024 * 1024);
+    assert_eq!(driver.id, run_id);
+    driver.acquire(4).unwrap();
+    research::control(&driver.registry, &driver.id, "running").unwrap();
+    assert!(driver.step(5).unwrap());
+    let status = research::status(&driver.registry, &driver.id, 6).unwrap();
+    assert_eq!(status.cursor, 1);
+    assert_eq!(status.improvements.queued, 0);
+    assert_eq!(status.improvements.completed, 1);
+    assert_eq!(status.improvements.failed, 0);
+    assert_eq!(status.improvements.child_receipt_links, 2);
+    assert_eq!(status.executed, first.executed);
+    assert_eq!(status.rejected, first.rejected);
+    assert_eq!(driver.registry.counts().unwrap().attempts, attempts);
+    assert!(driver.step(7).unwrap());
+    assert_eq!(
+        research::status(&driver.registry, &driver.id, 8)
+            .unwrap()
+            .improvements
+            .queued,
+        1
+    );
+    driver.registry.integrity().unwrap();
+    drop(driver);
+    std::fs::remove_dir_all(d).unwrap();
+}
+#[test]
+fn queued_work_obeys_fencing_and_state_pressure_without_losing_the_job() {
+    let d = dir();
+    let path = d.join("state.sqlite");
+    let mut old = queued_driver(&path, 2, 32 * 1024 * 1024);
+    old.acquire(0).unwrap();
+    assert!(old.step(1).unwrap());
+    let mut current = queued_driver(&path, 2, 32 * 1024 * 1024);
+    current.acquire(300_002).unwrap();
+    assert!(old.step(2).is_err());
+    let conn = rusqlite::Connection::open(&path).unwrap();
+    conn.execute_batch("CREATE TABLE pressure_fixture(bytes BLOB); INSERT INTO pressure_fixture VALUES(zeroblob(20000000));").unwrap();
+    assert!(!current.step(300_003).unwrap());
+    let status = research::status(&current.registry, &current.id, 300_004).unwrap();
+    assert_eq!(status.state, "paused");
+    assert_eq!(status.cursor, 1);
+    assert_eq!(status.improvements.queued, 1);
+    assert_eq!(status.improvements.failed, 0);
+    assert_eq!(current.registry.counts().unwrap().attempts, 1);
+    drop(conn);
+    drop(old);
+    drop(current);
+    std::fs::remove_dir_all(d).unwrap();
+}
+#[test]
+fn automatic_improvement_limits_and_build_identity_are_enforced() {
+    let d = dir();
+    assert!(
+        research::Driver::open(
+            &d.join("invalid.sqlite"),
+            vec![input(100300)],
+            research::Config {
+                improvement_children: 5,
+                ..Default::default()
+            },
+            research::compute_revision().unwrap()
+        )
+        .is_err()
+    );
+    assert!(
+        research::Driver::open(
+            &d.join("invalid.sqlite"),
+            vec![input(100300)],
+            research::Config {
+                improvement_children: 1,
+                ..Default::default()
+            },
+            "different-build".into()
+        )
+        .is_err()
+    );
+    std::fs::remove_dir_all(d).unwrap();
+}
