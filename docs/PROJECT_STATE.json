@@ -77,7 +77,8 @@
     "Exact fixed-market-stop infeasibility proofs bound to canonical strategy/profile/cost identities, independently reverified and persisted only with actual replay contradiction checks;96 all-profile/direction/cost/spread oracle cases, no execution skip",
     "Runtime optional versioned shadow policy with full campaign/experiment cache identity, immutable selected-policy receipts and context-exact comparable baseline/child replay; omitted-policy legacy hash formula preserved",
     "Allocation-free validated packed active-index/prefix traversal integrated into M1 model,1100 seeded oracle cases and actual48-candidate estimate/audit/replay fingerprint equivalence with source-pinned dense/sparse component measurements",
-    "Opt-in training-only exact fixed-market proof rejection with deterministic mandatory tick audits, scoped input/entry validation, context-exact proof-only diagnosis/child review basis, durable contradiction blocking and atomic publication refusal/coordinator pause; real browser proof view/export and measured no-entry current-pipeline comparison"
+    "Opt-in training-only exact fixed-market proof rejection with deterministic mandatory tick audits, scoped input/entry validation, context-exact proof-only diagnosis/child review basis, durable contradiction blocking and atomic publication refusal/coordinator pause; real browser proof view/export and measured no-entry current-pipeline comparison",
+    "Bounded shared same-frame candidate batch API/CLI with immutable verified input/configuration preparation, shared features and exact scalar receipt identity, per-experiment fencing/durable prefix retry, budgets and actual all-eight/window/pending/ATR/proof equivalence; retained negative baseline and improved complete synthetic pipeline measurement"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -85,9 +86,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Shared bounded candidate feature batches and representative screening calibration/aggregate audit monitoring, then full-accounting indexed replay equivalence/performance. Approximate OHLC failures remain shadow-only; fixed-market exact proof skipping is opt-in and training-only.",
+  "next_action": "Full-accounting experimental indexed replay with strict supported-case fallback, independent differential checks and actual pipeline/resource measurement before promotion; automatic checkpoint-aware batching and broader screening/monitoring remain open.",
   "qualified_strategies": 0,
-  "tests_passed": 173,
+  "tests_passed": 178,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile against actual Rust/SQLite/native input: auth/control/export/restart, >100-history paging and filter/race, actual immutable training lineage/review and exact extreme-loss training exports",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
@@ -96,10 +97,10 @@
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43470598707,
-    "sha": "0d527afe4c61455f94c89cd865232504ee1991a0",
+    "run_id": 43473788831,
+    "sha": "652ac6a3cefc7a00966764ef344144b1cae034e1",
     "conclusion": "success",
-    "verification": "Exact public commit/success summary retrieved; proof-policy milestone hosted verification follows publication"
+    "verification": "Exact public commit/success summary retrieved; shared-batch milestone hosted verification follows publication"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
   "vps_acceptance": "VPS_PERFORMANCE_PENDING",
@@ -108,5 +109,7 @@
   "source_access": "Fresh Dukascopy/HistData info requests403; additive domain proposal save failed draft_not_editable, not applied; real sample acceptance pending",
   "candidate_screen_benchmark": "docs/BENCHMARKS/candidate-screen-v2-sparse.json",
   "sparse_mask_benchmark": "docs/BENCHMARKS/sparse-mask-v1.json",
-  "proof_screen_benchmark": "docs/BENCHMARKS/proof-screen-v1.json"
+  "proof_screen_benchmark": "docs/BENCHMARKS/proof-screen-v1.json",
+  "shared_batch_benchmark": "docs/BENCHMARKS/shared-batch-v2-prepared.json",
+  "shared_batch_negative_baseline": "docs/BENCHMARKS/shared-batch-v1.json"
 }

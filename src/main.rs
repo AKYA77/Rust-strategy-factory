@@ -398,6 +398,55 @@ fn run(args: &[String]) -> Result<()> {
             }
             research::control(&Registry::open(Path::new(database))?, id, state)
         }
+        ["batch-experiments", config, candidates, database] => {
+            let (mut inputs, limits) = research_inputs(config)?;
+            if inputs.len() != 1 || limits.improvement_children != 0 {
+                return Err(
+                    "batch-experiments requires one input and improvement_children=0".into(),
+                );
+            }
+            let input = inputs.pop().ok_or("batch input missing")?;
+            if input.dataset.ticks.len() > limits.max_total_events
+                || input.dataset.manifest.class != data::DataClass::SyntheticTestOnly
+                    && limits.training_window.is_none()
+            {
+                return Err(
+                    "batch exceeds event budget or lacks explicit real-data training scope".into(),
+                );
+            }
+            let candidates: Vec<Strategy> = read_json(candidates)?;
+            let evaluation = limits
+                .training_window
+                .as_ref()
+                .map(|window| -> Result<research::Evaluation> {
+                    Ok(research::Evaluation {
+                        window: window.clone(),
+                        stage: rust_strategy_factory::storage::Stage::TickVerification,
+                        protocol_hash: data::hash(&("training-window-v1", window))?,
+                    })
+                })
+                .transpose()?;
+            let report = research::evaluate_batch_report(
+                &mut Registry::open(Path::new(database))?,
+                &input,
+                &candidates,
+                &Costs::default(),
+                &research::compute_revision()?,
+                research::BatchOptions {
+                    evaluation: research::EvaluationOptions {
+                        feature_cells: limits.feature_cells,
+                        evaluation: evaluation.as_ref(),
+                        shadow_policy: limits.shadow_policy.as_ref(),
+                        proof_policy: limits.proof_policy.as_ref(),
+                    },
+                    state_budget_bytes: limits.state_budget_bytes,
+                },
+            )?;
+            print(
+                &serde_json::json!({"new_attempts":report.executions.iter().filter(|e|!e.reused).count(),"reused":report.executions.iter().filter(|e|e.reused).count(),"executions":report.executions,
+                "shared_feature_builds":report.shared_feature_builds,"shared_cache_hits":report.shared_cache_hits,"primary_candles":report.primary_candles,"visible_candles":report.visible_candles}),
+            )
+        }
         ["research", config, database] | ["research", config, database, _] => {
             let max_steps = args
                 .get(3)
@@ -456,7 +505,7 @@ fn run(args: &[String]) -> Result<()> {
         }
         [] | ["--help"] | ["help"] => {
             println!(
-                "Rust Strategy Factory — historical research only; SOFTWARE_INCOMPLETE\n\nvalidate-protocol <input-config.json> <plan.json> <registry.sqlite>\nreview-training <input-config.json> <registry.sqlite> <diagnosis-id>\ntraining-review-report <registry.sqlite> <review-id>\ndiagnose <registry.sqlite> <training-experiment-id>\ndiagnosis-report <registry.sqlite> <diagnosis-id>\nprotocol-report <registry.sqlite> <protocol-id>\nauth-init <new-auth.json> (password from stdin)\nserve <registry.sqlite> <auth.json> <port>\nprofiles\nfixture <symbol> <new-dataset.json>\ngenerate\nimport <normalized.csv> <profile.json> <source-url-or-description> <new-dataset.json> <real|synthetic>\npack-native <dataset.json|dataset.rsf|dataset.rsfz> <new-dataset.rsf>\npack-parquet <dataset.json|dataset.rsf|dataset.rsfz> <new-dataset.parquet>\nunpack-parquet <dataset.parquet> <new-dataset.json>\ncompress-native <dataset.rsf> <new-dataset.rsfz>\ndecompress-native <dataset.rsfz> <new-dataset.rsf>\nunpack-native <dataset.rsf> <new-dataset.json>\ninspect <dataset.json|dataset.rsf>\ncandles <dataset.json|dataset.rsf> <M1|M5|M15|M30|H1|H4|D1>\nevaluate <dataset.json|dataset.rsf> <strategy.json> <new-result.json>\nexperiment <dataset.json|dataset.rsf> <strategy.json> <registry.sqlite>\nregistry-check <registry.sqlite>\nbackup <registry.sqlite> <new-backup.sqlite>\nresearch <config.json> <registry.sqlite> [max-steps]\nimprovement-jobs <registry.sqlite> <run-id>\nresearch-status <registry.sqlite> <run-id>\nresearch-control <registry.sqlite> <run-id> <running|paused|stopped>\n\nSynthetic profiles do not establish broker feasibility. No strategy qualification is implemented."
+                "Rust Strategy Factory — historical research only; SOFTWARE_INCOMPLETE\n\nvalidate-protocol <input-config.json> <plan.json> <registry.sqlite>\nreview-training <input-config.json> <registry.sqlite> <diagnosis-id>\ntraining-review-report <registry.sqlite> <review-id>\ndiagnose <registry.sqlite> <training-experiment-id>\ndiagnosis-report <registry.sqlite> <diagnosis-id>\nprotocol-report <registry.sqlite> <protocol-id>\nauth-init <new-auth.json> (password from stdin)\nserve <registry.sqlite> <auth.json> <port>\nprofiles\nfixture <symbol> <new-dataset.json>\ngenerate\nimport <normalized.csv> <profile.json> <source-url-or-description> <new-dataset.json> <real|synthetic>\npack-native <dataset.json|dataset.rsf|dataset.rsfz> <new-dataset.rsf>\npack-parquet <dataset.json|dataset.rsf|dataset.rsfz> <new-dataset.parquet>\nunpack-parquet <dataset.parquet> <new-dataset.json>\ncompress-native <dataset.rsf> <new-dataset.rsfz>\ndecompress-native <dataset.rsfz> <new-dataset.rsf>\nunpack-native <dataset.rsf> <new-dataset.json>\ninspect <dataset.json|dataset.rsf>\ncandles <dataset.json|dataset.rsf> <M1|M5|M15|M30|H1|H4|D1>\nevaluate <dataset.json|dataset.rsf> <strategy.json> <new-result.json>\nexperiment <dataset.json|dataset.rsf> <strategy.json> <registry.sqlite>\nregistry-check <registry.sqlite>\nbackup <registry.sqlite> <new-backup.sqlite>\nresearch <config.json> <registry.sqlite> [max-steps]\nbatch-experiments <one-input-config.json> <same-timeframe-strategies.json> <registry.sqlite>\nimprovement-jobs <registry.sqlite> <run-id>\nresearch-status <registry.sqlite> <run-id>\nresearch-control <registry.sqlite> <run-id> <running|paused|stopped>\n\nSynthetic profiles do not establish broker feasibility. No strategy qualification is implemented."
             );
             Ok(())
         }

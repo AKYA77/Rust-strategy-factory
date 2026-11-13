@@ -1,0 +1,64 @@
+--- a/src/research.rs
++++ b/src/research.rs
+@@ -162,7 +162,6 @@
+     candles: &'c [candles::Candle],
+     features: &'f mut Features<'c>,
+     visible: usize,
+-    configuration_hash: &'c str,
+ }
+ fn evaluate_prepared(
+     registry: &mut Registry,
+@@ -194,11 +193,7 @@
+         policy.validate()?;
+     }
+     let d = &input.dataset;
+-    // A private preparation is created only after validating this immutable input.
+-    // Authoritative replay retains its independent validation in either path.
+-    if prepared.is_none() {
+-        d.verify()?;
+-    }
++    d.verify()?;
+     if input.conversions.len() != d.ticks.len() {
+         return Err("event-aligned conversions required".into());
+     }
+@@ -222,11 +217,13 @@
+             None => data::hash(&"training-only-conservative-signals-v1")?,
+         },
+         code_revision: revision.into(),
+-        configuration_hash: if let Some(p) = prepared.as_ref() {
+-            p.configuration_hash.to_owned()
+-        } else {
+-            configuration_hash(input, costs, feature_cells, shadow_policy, proof_policy)?
+-        },
++        configuration_hash: configuration_hash(
++            input,
++            costs,
++            feature_cells,
++            shadow_policy,
++            proof_policy,
++        )?,
+         stage: evaluation.map_or(Stage::TickVerification, |e| e.stage.clone()),
+     };
+     if proof_policy.is_some() {
+@@ -520,13 +517,6 @@
+         return Err("batch requires event-aligned conversions".into());
+     }
+     check_state_budget(registry, options.state_budget_bytes)?;
+-    let configuration_hash = configuration_hash(
+-        input,
+-        costs,
+-        options.evaluation.feature_cells,
+-        options.evaluation.shadow_policy,
+-        options.evaluation.proof_policy,
+-    )?;
+     let c = candles::build(&input.dataset, timeframe)?;
+     let visible = options.evaluation.evaluation.map_or(c.len(), |e| {
+         c.partition_point(|c| c.available_ms < e.window.end_exclusive_ms)
+@@ -551,7 +541,6 @@
+                 candles: &c,
+                 features: &mut features,
+                 visible,
+-                configuration_hash: &configuration_hash,
+             }),
+         )?);
+     }

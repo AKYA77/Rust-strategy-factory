@@ -63,3 +63,7 @@ harness = false
 [[bench]]
 name = "proof_screen"
 harness = false
+
+[[bench]]
+name = "batch"
+harness = false

@@ -29,6 +29,8 @@ Native `.rsf` storage supports lossless packing/unpacking and the same dataset i
 
 [Candidate screening](docs/RUNBOOKS/candidate-screening.md) persists bounded hypothetical M1 net diagnostics separately from authoritative tick fills. Approximate failures remain shadow-only. Optional training proof screening can skip only exact fixed-market entry impossibility, with deterministic tick audits, durable failure blocking and explicit proof-only evidence; see `config/research-proof.example.json`. It does not qualify strategies.
 
+Bounded [candidate batches](docs/RUNBOOKS/candidate-batches.md) share immutable input preparation and feature compilation through the `batch-experiments` CLI while preserving exact scalar receipts. The standalone autonomous scheduler remains one candidate per checkpoint.
+
 Training-only deterministic diagnostics persist bounded unevaluated child proposals; see [training improvement](docs/RUNBOOKS/training-improvement.md). Scientific/OOS/final receipts cannot authorize adaptation. Explicit bounded reviews replay comparable parent/children and retain immutable evaluation edges; opt-in bounded one-worker jobs retain scheduling/recovery state. Individual child checkpoints preserve pause/restart recovery; full improvement acceptance remains unfinished.
 
 Start with [research loop operations](docs/RUNBOOKS/research-loop.md), [frozen protocol execution](docs/RUNBOOKS/scientific-protocol.md), and [dashboard operations](docs/RUNBOOKS/dashboard.md). `fixture` creates explicitly synthetic software-test data; `profiles` prints arbitrary test contracts. Neither establishes broker feasibility. Real autonomous research requires an explicit training interval.
