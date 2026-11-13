@@ -142,6 +142,12 @@ impl Facts {
         Ok(value)
     }
 }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Correction {
+    pub parent: String,
+    pub reason: String,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Receipt {
@@ -149,6 +155,8 @@ pub struct Receipt {
     pub facts: Facts,
     pub recorded_at: String,
     pub limitations: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub correction: Option<Correction>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -179,7 +187,12 @@ fn decode(id: String, body: Vec<u8>, hash: String) -> Result<Entry> {
     }
     let receipt: Receipt = serde_json::from_slice(&body).map_err(|e| e.to_string())?;
     if receipt.limitations != LIMITATIONS
-        || receipt.version != VERSION
+        || receipt.version
+            != if receipt.correction.is_some() {
+                "local-dataset-catalog-v2"
+            } else {
+                VERSION
+            }
         || receipt.recorded_at.len() > 100
         || chrono::DateTime::parse_from_rfc3339(&receipt.recorded_at).is_err()
         || receipt.facts.dataset_identity != id
@@ -187,13 +200,21 @@ fn decode(id: String, body: Vec<u8>, hash: String) -> Result<Entry> {
     {
         return Err("catalog receipt integrity mismatch".into());
     }
+    if let Some(link) = &receipt.correction
+        && (!hex(&link.parent)
+            || link.parent == id
+            || link.reason.trim().is_empty()
+            || link.reason.len() > 4096)
+    {
+        return Err("invalid catalog correction".into());
+    }
     receipt.facts.validate()?;
     Ok(Entry { receipt, hash })
 }
 // Managed JSON is stored as BLOB so SQLite can inspect byte length from record
 // metadata before returning a bounded payload to Rust.
 const PROJECTION: &str = "CASE WHEN length(id)=64 THEN id END,CASE WHEN typeof(body)='blob' AND length(body)<=131072 THEN body END,CASE WHEN length(hash)=64 THEN hash END";
-fn get(c: &Connection, id: &str) -> Result<Option<Entry>> {
+fn get_raw(c: &Connection, id: &str) -> Result<Option<Entry>> {
     c.query_row(
         &format!("SELECT {PROJECTION} FROM catalog_entries WHERE id=?1"),
         [id],
@@ -209,6 +230,40 @@ fn get(c: &Connection, id: &str) -> Result<Option<Entry>> {
     .map_err(db)?
     .map(|(id, body, hash)| decode(id, body, hash))
     .transpose()
+}
+fn correction_context(c: &Connection, entry: &Entry) -> Result<()> {
+    let mut current = entry.receipt.clone();
+    let mut seen = std::collections::HashSet::new();
+    seen.insert(current.facts.dataset_identity.clone());
+    for _ in 0..64 {
+        let Some(link) = &current.correction else {
+            return Ok(());
+        };
+        if !seen.insert(link.parent.clone()) {
+            return Err("catalog correction cycle".into());
+        }
+        let parent = get_raw(c, &link.parent)?.ok_or("correction parent missing")?;
+        let a = &parent.receipt.facts;
+        let b = &current.facts;
+        if a.source != b.source
+            || a.profile.symbol != b.profile.symbol
+            || a.declared_class != b.declared_class
+            || a.first_ms != b.first_ms
+            || a.last_ms != b.last_ms
+        {
+            return Err("correction parent source/instrument/class/window mismatch".into());
+        }
+        current = parent.receipt;
+    }
+    Err("catalog correction depth exceeds64".into())
+}
+
+fn get(c: &Connection, id: &str) -> Result<Option<Entry>> {
+    let entry = get_raw(c, id)?;
+    if let Some(entry) = &entry {
+        correction_context(c, entry)?;
+    }
+    Ok(entry)
 }
 impl Catalog {
     /// Snapshot all managed receipts, including committed WAL state, into a new
@@ -307,7 +362,8 @@ impl Catalog {
                         .map_err(db)?;
                     for row in rows {
                         let (id, body, hash) = row.map_err(db)?;
-                        decode(id.clone(), body.clone(), hash.clone())?;
+                        let entry = decode(id.clone(), body.clone(), hash.clone())?;
+                        correction_context(&source, &entry)?;
                         write
                             .execute(
                                 "INSERT INTO catalog_entries VALUES(?1,?2,?3)",
@@ -403,13 +459,37 @@ impl Catalog {
         Ok(Self { connection: c })
     }
     pub fn register(&mut self, d: &Dataset) -> Result<Registration> {
+        self.register_linked(d, None)
+    }
+    pub fn register_correction(
+        &mut self,
+        d: &Dataset,
+        parent: &str,
+        reason: &str,
+    ) -> Result<Registration> {
+        if !hex(parent) || reason.trim().is_empty() || reason.len() > 4096 {
+            return Err("correction parent and bounded reason required".into());
+        }
+        self.register_linked(
+            d,
+            Some(Correction {
+                parent: parent.into(),
+                reason: reason.into(),
+            }),
+        )
+    }
+    fn register_linked(
+        &mut self,
+        d: &Dataset,
+        correction: Option<Correction>,
+    ) -> Result<Registration> {
         let facts = Facts::observe(d)?;
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(db)?;
         if let Some(entry) = get(&tx, &facts.dataset_identity)? {
-            if entry.receipt.facts != facts {
+            if entry.receipt.facts != facts || entry.receipt.correction != correction {
                 return Err("catalog identity already has conflicting facts".into());
             }
             tx.commit().map_err(db)?;
@@ -419,11 +499,30 @@ impl Catalog {
             });
         }
         let receipt = Receipt {
-            version: VERSION.into(),
+            version: if correction.is_some() {
+                "local-dataset-catalog-v2"
+            } else {
+                VERSION
+            }
+            .into(),
             facts,
             recorded_at: chrono::Utc::now().to_rfc3339(),
             limitations: LIMITATIONS.into(),
+            correction,
         };
+        let provisional = Entry {
+            hash: data::hash(&receipt)?,
+            receipt: receipt.clone(),
+        };
+        if provisional
+            .receipt
+            .correction
+            .as_ref()
+            .is_some_and(|x| x.parent == provisional.receipt.facts.dataset_identity)
+        {
+            return Err("self correction forbidden".into());
+        }
+        correction_context(&tx, &provisional)?;
         let body = serde_json::to_vec(&receipt).map_err(|e| e.to_string())?;
         if body.len() > MAX_BODY {
             return Err("catalog metadata budget exceeded".into());
@@ -483,7 +582,9 @@ impl Catalog {
         let mut entries = Vec::new();
         for row in rows {
             let (id, body, hash) = row.map_err(db)?;
-            entries.push(decode(id, body, hash)?);
+            let entry = decode(id, body, hash)?;
+            correction_context(&self.connection, &entry)?;
+            entries.push(entry);
         }
         let more = entries.len() > limit;
         entries.truncate(limit);

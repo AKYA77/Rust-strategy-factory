@@ -3,6 +3,76 @@ use rust_strategy_factory::{
     data::{self, DataClass, Dataset},
 };
 use std::{fs, path::PathBuf};
+#[test]
+fn correction_lineage_is_immutable_scoped_and_survives_snapshot() {
+    let f = Fixture::new("correction");
+    let mut c = Catalog::open(&f.path).unwrap();
+    let mut d = dataset();
+    let original = c.register(&d).unwrap().entry;
+    let parent = original.receipt.facts.dataset_identity.clone();
+    assert!(c.register_correction(&d, &parent, "self").is_err());
+    d.manifest.archive_hash = "revised immutable archive".into();
+    let child = c
+        .register_correction(&d, &parent, "provider correction evidence reference")
+        .unwrap();
+    assert_eq!(
+        child.entry.receipt.correction.as_ref().unwrap().parent,
+        parent
+    );
+    assert!(
+        c.register_correction(&d, &parent, "provider correction evidence reference")
+            .unwrap()
+            .reused
+    );
+    assert!(
+        c.register_correction(&d, &parent, "changed reason")
+            .is_err()
+    );
+    assert!(c.register(&d).is_err());
+    let snapshot = f.root.join("lineage.sqlite");
+    c.backup(&snapshot).unwrap();
+    let restored = Catalog::existing(&snapshot).unwrap();
+    assert_eq!(
+        restored
+            .entry(&child.entry.receipt.facts.dataset_identity)
+            .unwrap()
+            .unwrap()
+            .hash,
+        child.entry.hash
+    );
+    assert_eq!(
+        restored.entry(&parent).unwrap().unwrap().hash,
+        original.hash
+    );
+    let mut bad = d.clone();
+    bad.manifest.source = "different source".into();
+    assert!(c.register_correction(&bad, &parent, "wrong scope").is_err());
+    assert!(
+        c.register_correction(&bad, &"f".repeat(64), "missing parent")
+            .is_err()
+    );
+    let file = f.root.join("correction.json");
+    fs::write(&file, serde_json::to_vec(&d).unwrap()).unwrap();
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "catalog-correction",
+            file.to_str().unwrap(),
+            f.path.to_str().unwrap(),
+            &parent,
+            "provider correction evidence reference",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let repeated: Registration = serde_json::from_slice(&out.stdout).unwrap();
+    assert!(repeated.reused);
+    assert_eq!(repeated.entry.hash, child.entry.hash);
+    assert_eq!(c.page(None, 100).unwrap().entries.len(), 2);
+}
 struct Fixture {
     root: PathBuf,
     path: PathBuf,
