@@ -17,7 +17,7 @@ use std::{
     collections::HashMap,
     fs::{self, OpenOptions},
     io::{Read, Write},
-    path::Path,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
@@ -74,6 +74,7 @@ struct Session {
 }
 struct App {
     registry: Mutex<Registry>,
+    catalog_path: Option<PathBuf>,
     password_hash: String,
     sessions: Mutex<HashMap<String, Session>>,
     login_bucket: Mutex<(Instant, u32)>,
@@ -282,6 +283,47 @@ async fn overview(State(app): State<Arc<App>>) -> Response {
         Err(_) => api_error(
             StatusCode::INTERNAL_SERVER_ERROR,
             "unable to read persisted overview",
+        ),
+    }
+}
+#[derive(Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CatalogQuery {
+    after: Option<String>,
+    limit: Option<usize>,
+}
+fn catalog_id(id: &str) -> bool {
+    id.len() == 64
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+async fn catalog_page(State(app): State<Arc<App>>, Query(query): Query<CatalogQuery>) -> Response {
+    let limit = query.limit.unwrap_or(25);
+    if limit == 0 || limit > 100 || query.after.as_deref().is_some_and(|id| !catalog_id(id)) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid catalog cursor or limit");
+    }
+    let Some(path) = &app.catalog_path else {
+        return Json(serde_json::json!({"configured":false,"entries":[],"next_cursor":null,"limitations":"No dataset catalog configured. Experiment-page provenance is separate."})).into_response();
+    };
+    match crate::catalog::Catalog::existing(path).and_then(|c|c.page(query.after.as_deref(),limit)) {
+        Ok(page)=>Json(serde_json::json!({"configured":true,"entries":page.entries,"next_cursor":page.next_cursor,"limitations":page.limitations})).into_response(),
+        Err(_)=>api_error(StatusCode::INTERNAL_SERVER_ERROR,"unable to read verified catalog observations"),
+    }
+}
+async fn catalog_detail(State(app): State<Arc<App>>, Param(id): Param<String>) -> Response {
+    if !catalog_id(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid catalog identity");
+    }
+    let Some(path) = &app.catalog_path else {
+        return api_error(StatusCode::NOT_FOUND, "dataset catalog not configured");
+    };
+    match crate::catalog::Catalog::existing(path).and_then(|c| c.entry(&id)) {
+        Ok(Some(entry)) => Json(entry).into_response(),
+        Ok(None) => api_error(StatusCode::NOT_FOUND, "catalog observation not found"),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "unable to read verified catalog observation",
         ),
     }
 }
@@ -633,11 +675,22 @@ async fn control(
     }
 }
 pub async fn serve(database: &Path, auth_path: &Path, port: u16) -> Result<()> {
+    serve_with_catalog(database, auth_path, port, None).await
+}
+pub async fn serve_with_catalog(
+    database: &Path,
+    auth_path: &Path,
+    port: u16,
+    catalog: Option<&Path>,
+) -> Result<()> {
     if port != 0 && port < 1024 {
         return Err("use an unprivileged loopback port or zero for allocation".into());
     }
     if !database.is_file() {
         return Err("registry must already exist".into());
+    }
+    if let Some(path) = catalog {
+        crate::catalog::Catalog::existing(path)?.page(None, 1)?;
     }
     let metadata = fs::metadata(auth_path).map_err(|e| e.to_string())?;
     #[cfg(unix)]
@@ -661,6 +714,7 @@ pub async fn serve(database: &Path, auth_path: &Path, port: u16) -> Result<()> {
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
     let app = Arc::new(App {
         registry: Mutex::new(Registry::open(database)?),
+        catalog_path: catalog.map(Path::to_path_buf),
         password_hash: auth.password_hash,
         sessions: Mutex::new(HashMap::new()),
         login_bucket: Mutex::new((Instant::now(), 0)),
@@ -698,6 +752,8 @@ pub async fn serve(database: &Path, auth_path: &Path, port: u16) -> Result<()> {
         .route("/api/session", get(session_info))
         .route("/api/logout", post(logout))
         .route("/api/overview", get(overview))
+        .route("/api/catalog", get(catalog_page))
+        .route("/api/catalog/{id}", get(catalog_detail))
         .route("/api/experiments", get(experiments))
         .route("/api/experiment-history", get(history))
         .route("/api/training-diagnoses", get(diagnoses))

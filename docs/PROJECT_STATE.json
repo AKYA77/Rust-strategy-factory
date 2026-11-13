@@ -88,7 +88,8 @@
     "Bounded checkpointed local normalized import API/CLI with exact source/configuration binding, separate WAL ledger, immutable native chunks, cross-chunk ordering, verified orphan reuse and nonadvancing failures; actual separate-process/writer/CSV/corruption acceptance and measured recovery overhead",
     "Verified completed import assembly/no-overwrite native export with cross-chunk diagnostics, preserved source/class and distinct parser identity, whole nonzero authoritative replay equivalence and actual SIGKILL initialization/resume exact-source recovery",
     "Append-only bounded local dataset observation catalog with source/profile/archive/parser/class identities, independently observed counters, exact sequence strings, immutable hashed receipts, reimport reuse, revision separation, read-only cursor inventory and CLI/refusal/quota fixtures; declared classification never grants approval",
-    "Consistent validated catalog WAL snapshot and new-path restore, exact receipt preservation, fresh guarded schema, standalone checkpoint/fsync/no-replace publication and corrupt/unknown-state cleanup refusal with actual CLI recovery tests"
+    "Consistent validated catalog WAL snapshot and new-path restore, exact receipt preservation, fresh guarded schema, standalone checkpoint/fsync/no-replace publication and corrupt/unknown-state cleanup refusal with actual CLI recovery tests",
+    "Optional authenticated read-only catalog dashboard/API with legacy/unconfigured startup, bounded identity cursor pages, exact receipt export/full-u64 display, declared approval limits, request selection guards and corrupt-state refusal; actual desktop/mobile/restart/browser evidence"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -96,21 +97,21 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Continue explicit source correction/revision links and approval/coverage lifecycle, dashboard data/import/backup workflows and coordinated multi-component recovery; preserve declared classification versus independent eligibility and remaining scientific/operations gates.",
+  "next_action": "Continue explicit source correction/revision and approval/coverage lifecycle, import/backup activation dashboard workflows, coordinated multi-component recovery and remaining scientific/worker/operations scope; source/provider and independent eligibility acceptance remain pending.",
   "qualified_strategies": 0,
   "tests_passed": 213,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
-  "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks; persisted proof/indexed failure monitoring, restart and read-only API",
+  "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks; persisted proof/indexed failure monitoring, restart and read-only API; optional authenticated catalog pagination/exact exports/full-u64 desktop/mobile and corrupt-state refusal",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
   "component_benchmark": "docs/BENCHMARKS/v6-prefix-component.json",
   "generation_component_benchmark": "docs/BENCHMARKS/structural-generation-v1.json",
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43521391672,
-    "sha": "a5f7e3271b816fbc51ab59ef8bfadbdbe82c4419",
+    "run_id": 43523080065,
+    "sha": "f7ce2bd6d281781546f146dacfa1eb6aef5e1895",
     "conclusion": "success",
-    "verification": "Exact public commit/success summary retrieved; catalog recovery follow-up verification follows publication"
+    "verification": "Exact public commit/success summary retrieved; catalog dashboard follow-up hosted verification follows publication"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
   "vps_acceptance": "VPS_PERFORMANCE_PENDING",
