@@ -79,3 +79,7 @@ harness = false
 [[bench]]
 name = "audit_health"
 harness = false
+
+[[bench]]
+name = "import_job"
+harness = false

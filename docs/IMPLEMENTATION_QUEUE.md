@@ -50,3 +50,5 @@ Metadata health follow-up: compatible partial covering index and upgrade/marker 
 Failure monitoring follow-up: authenticated registry-local proof/indexed blocked status now has actual desktop/mobile/restart and read-only acceptance. Aggregate audited-result coverage and false-negative statistics remain open; marker absence is not coverage.
 
 Data coverage follow-up: src/coverage.rs and tests/coverage.rs now inventory verified scoped events, exact latest sequence, empty/partial UTC months and bounded observed gaps; actual four-format CLI parity/preservation passes. Checkpointed import, immutable revision/catalog lifecycle, approved calendars/source inventories and missing-range acquisition remain open.
+
+Local import follow-up: import_job.rs and nine tests now cover bounded checkpointed source-exact normalized CSV chunks, publication/checkpoint recovery and refusals. Source-pinned import-job-v1 retains measured recovery overhead, not a speed claim. Completed continuous export, revision/catalog/approval lifecycle, network acquisition, full-history streaming and production crash/disk-full acceptance remain open.
