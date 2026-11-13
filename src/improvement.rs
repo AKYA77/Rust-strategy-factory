@@ -9,7 +9,7 @@ use crate::{
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-pub const VERSION: &str = "training-proposals-v1";
+pub const VERSION: &str = "training-proposals-v2-receipt-breakdown";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Options {
@@ -49,6 +49,8 @@ pub struct Report {
     pub reasons: Vec<String>,
     pub proposals: Vec<Proposal>,
     pub status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub training_evidence: Option<crate::training_diagnostics::Evidence>,
 }
 #[derive(Debug, Serialize)]
 pub struct Execution {
@@ -156,6 +158,7 @@ pub fn diagnose(registry: &mut Registry, parent_id: &str, options: &Options) -> 
         reasons: vec![],
         proposals: vec![],
         status: "TRAINING_ONLY_UNEVALUATED".into(),
+        training_evidence: None,
     };
     report.id = identity(&report)?;
     if let Some(report) = read_report(registry, &report.id)? {
@@ -208,6 +211,13 @@ pub fn diagnose(registry: &mut Registry, parent_id: &str, options: &Options) -> 
             {
                 return Err("parent replay identity mismatch".into());
             }
+            report.training_evidence = Some(crate::training_diagnostics::summarize(
+                &replay,
+                &Interval {
+                    start_ms: key.start_ms,
+                    end_exclusive_ms: key.end_exclusive_ms,
+                },
+            )?);
             if replay.unresolved.is_some() || replay.pending_entry.is_some() {
                 eligible = false;
                 report

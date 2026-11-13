@@ -25,6 +25,7 @@ fn main() {
         "src/uncertainty.rs",
         "src/robustness.rs",
         "src/improvement.rs",
+        "src/training_diagnostics.rs",
         "src/training_review.rs",
         "src/neighborhood.rs",
         "src/diagnostics.rs",

@@ -92,6 +92,17 @@ fn real_loss_proposals_are_bounded_immutable_and_survive_backup() {
     assert!(!first.reused);
     assert_eq!(first.report.proposals.len(), 3);
     assert!(first.report.reasons.contains(&"recorded_net_loss".into()));
+    let evidence = first.report.training_evidence.as_ref().unwrap();
+    assert_eq!(evidence.closed.resolved, 1);
+    assert_eq!(evidence.closed.losses, 1);
+    assert_eq!(evidence.closed.sum_net_micro_usd, -5_958_200);
+    assert_eq!(evidence.maximum_consecutive_losses, 1);
+    assert_eq!(evidence.closed_commission_micro_usd, 0);
+    assert_eq!(evidence.exit_years[&2025].resolved, 1);
+    assert_eq!(evidence.entry_utc_six_hour_bins[&0].resolved, 1);
+    assert_eq!(evidence.recorded_realized_cash_micro_usd, 14_041_800);
+    assert_eq!(evidence.status, "INSUFFICIENT_EVIDENCE");
+
     for p in &first.report.proposals {
         assert_eq!(p.status, "UNEVALUATED");
         assert_eq!(p.strategy.side, Side::Short);
@@ -720,5 +731,49 @@ fn worker_pause_and_restart_between_children_preserve_progress_and_counters() {
     assert_eq!(status.rejected, 1);
     driver.registry.integrity().unwrap();
     drop(driver);
+    std::fs::remove_dir_all(d).unwrap();
+}
+
+#[test]
+fn actual_v1_diagnosis_fixture_remains_hash_readable_after_optional_extension() {
+    use rust_strategy_factory::storage::{Claim, ExperimentKey, Outcome};
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../docs/VERIFICATION/training-diagnosis-v1-fixture.json"
+    ))
+    .unwrap();
+    let d = dir();
+    let mut registry = Registry::open(&d.join("state.sqlite")).unwrap();
+    let key: ExperimentKey = serde_json::from_value(fixture["parent_key"].clone()).unwrap();
+    let id = registry.register(&key).unwrap();
+    let Claim::Acquired(lease) = registry.claim(&id, 0, 10000).unwrap() else {
+        panic!("new fixture lease");
+    };
+    registry
+        .finish(&lease, 1, Outcome::Rejected, &fixture["parent_result"])
+        .unwrap();
+    let raw = fixture["diagnosis_json"].as_str().unwrap();
+    let report: improvement::Report = serde_json::from_str(raw).unwrap();
+    assert!(report.training_evidence.is_none());
+    let conn = rusqlite::Connection::open(d.join("state.sqlite")).unwrap();
+    conn.execute(
+        "INSERT INTO training_diagnoses(id,parent_id,report_json,report_hash) VALUES(?1,?2,?3,?4)",
+        rusqlite::params![
+            report.id,
+            id,
+            raw,
+            fixture["diagnosis_hash"].as_str().unwrap()
+        ],
+    )
+    .unwrap();
+    assert_eq!(
+        improvement::read_report(&registry, &report.id)
+            .unwrap()
+            .unwrap()
+            .version,
+        "training-proposals-v1"
+    );
+    registry.integrity().unwrap();
+    drop(conn);
+    drop(registry);
     std::fs::remove_dir_all(d).unwrap();
 }

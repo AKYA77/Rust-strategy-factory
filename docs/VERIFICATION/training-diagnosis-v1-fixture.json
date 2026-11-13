@@ -1,0 +1,84 @@
+{
+  "producer_commit": "97eb6c767dda4a6cd876a8d99a1ec3c225ce142e",
+  "scope": "Actual pre-extension CLI synthetic no-signals receipt; no raw market archive",
+  "parent_key": {
+    "concept_hash": "92ce37b06c63fe0f9fe97f9892ff74eec35791f601875b65174db71e00e66cb8",
+    "instrument": "EURUSD",
+    "dataset_hash": "92cb260970290bc24b624b3ca2c44c25672586e07be235b1a93a91d02ba4e9d2",
+    "start_ms": 1735689600000,
+    "end_exclusive_ms": 1767235590001,
+    "signal_version": "closed-publication-next-event-v3-scoped-features",
+    "indicator_version": "causal-primitives-v4-outward-atr",
+    "cost_hash": "8c1435f646ac3b15b1216696721d1776ffbd97997d192153366184c0378c9bdc",
+    "fill_policy": "full-l1-assumption-target-at-limit-preflight-v3",
+    "profile_hash": "c1e47c8162f5b1460948489d5971a0adaef68ee1a6efe6eb7849e3f150bd58ee",
+    "engine_version": "ordered-l1-v6-frozen-atr-stops",
+    "protocol_hash": "e6187cacb381139f1cad7ff3c1df9a75d0c5f9e8d25d3e19e37b8d72b2ee9fd5",
+    "code_revision": "compute-blake3:5d67bc31c52be816dd685e1c9c90e83d43717d87e04abe77a1c3c26646c5a30a",
+    "configuration_hash": "fddfae0a2600fd64775dd9295564ad0d25748b8e88cffc7c2655ebb55f4f3fec",
+    "stage": "TickVerification"
+  },
+  "parent_result": {
+    "cost_profile": {
+      "commission_micro_usd_per_lot_per_fill": 0,
+      "max_conversion_age_ms": 60000,
+      "slippage_pips": 2,
+      "spread_floor_pips": 2,
+      "version": "bid-anchored-floor-v1"
+    },
+    "data_manifest": {
+      "archive_hash": "generated-no-raw-archive",
+      "class": "SYNTHETIC_TEST_ONLY",
+      "content_hash": "92cb260970290bc24b624b3ca2c44c25672586e07be235b1a93a91d02ba4e9d2",
+      "events": 2000,
+      "first_ms": 1735689600000,
+      "gaps_over_hour": 1,
+      "identical_quote_events": 0,
+      "imported_at": "2026-11-13T02:50:52.105605209+00:00",
+      "issues": [],
+      "last_ms": 1767235590000,
+      "parser_version": "normalized-csv-v1",
+      "profile_hash": "c1e47c8162f5b1460948489d5971a0adaef68ee1a6efe6eb7849e3f150bd58ee",
+      "source": "SYNTHETIC_TEST_ONLY generated-fixture-v1; two short artificial 2025/2026 windows",
+      "symbol": "EURUSD",
+      "timestamp_ties": 0
+    },
+    "evaluation": null,
+    "instrument_profile": {
+      "base": "EUR",
+      "contract_units": 100000,
+      "leverage": 100,
+      "max_micro_lots": 1000000,
+      "min_micro_lots": 10,
+      "min_stop_ticks": 1,
+      "pip": 10,
+      "price_scale": 100000,
+      "provenance": "SYNTHETIC_TEST_ONLY; arbitrary test volume/leverage; gold pip=0.01 is a test convention, not approved",
+      "quote": "USD",
+      "research_only": true,
+      "step_micro_lots": 10,
+      "symbol": "EURUSD",
+      "tick": 1,
+      "version": "synthetic-v1"
+    },
+    "screen": {
+      "requires_tick_verification": false,
+      "signals": 0,
+      "status": "ProvenNoSignals",
+      "version": "conservative-signals-v1"
+    },
+    "strategy": {
+      "rule": {
+        "AboveMean": {
+          "window": 100000
+        }
+      },
+      "side": "Short",
+      "stop_ticks": 50,
+      "timeframe": "M1"
+    },
+    "tick_replay": null
+  },
+  "diagnosis_json": "{\"id\":\"eeee1e7da6c666066f4e42d67eb9260ee7ed7b75dabfc5948aa1de00665f424c\",\"version\":\"training-proposals-v1\",\"parent_id\":\"adbdf91828fa85dba2b1e2132a927e874ecd5c6bbf2383cc69b23a057aaa09fb\",\"parent_key\":{\"concept_hash\":\"92ce37b06c63fe0f9fe97f9892ff74eec35791f601875b65174db71e00e66cb8\",\"instrument\":\"EURUSD\",\"dataset_hash\":\"92cb260970290bc24b624b3ca2c44c25672586e07be235b1a93a91d02ba4e9d2\",\"start_ms\":1735689600000,\"end_exclusive_ms\":1767235590001,\"signal_version\":\"closed-publication-next-event-v3-scoped-features\",\"indicator_version\":\"causal-primitives-v4-outward-atr\",\"cost_hash\":\"8c1435f646ac3b15b1216696721d1776ffbd97997d192153366184c0378c9bdc\",\"fill_policy\":\"full-l1-assumption-target-at-limit-preflight-v3\",\"profile_hash\":\"c1e47c8162f5b1460948489d5971a0adaef68ee1a6efe6eb7849e3f150bd58ee\",\"engine_version\":\"ordered-l1-v6-frozen-atr-stops\",\"protocol_hash\":\"e6187cacb381139f1cad7ff3c1df9a75d0c5f9e8d25d3e19e37b8d72b2ee9fd5\",\"code_revision\":\"compute-blake3:5d67bc31c52be816dd685e1c9c90e83d43717d87e04abe77a1c3c26646c5a30a\",\"configuration_hash\":\"fddfae0a2600fd64775dd9295564ad0d25748b8e88cffc7c2655ebb55f4f3fec\",\"stage\":\"TickVerification\"},\"parent_result_hash\":\"f809b5869f10da9d7995606d4407db800b91119bb07660bf6473d562dbff8d99\",\"parent_outcome\":\"rejected\",\"parent_data_class\":\"SYNTHETIC_TEST_ONLY\",\"compute_revision\":\"compute-blake3:5d67bc31c52be816dd685e1c9c90e83d43717d87e04abe77a1c3c26646c5a30a\",\"options\":{\"seed\":42,\"max_children\":8,\"state_budget_bytes\":268435456},\"reasons\":[\"no_signals\"],\"proposals\":[{\"edge_id\":\"b987cff608097f915a2f1e0f0ec771b4174c97bada09e34ef8e9bfae2a7c3347\",\"concept_id\":\"88f8bde29d7f84f2d7006d9bc5fcd5990e724e4d1d1d1f3ac4d7da4a3999e5d5\",\"strategy\":{\"timeframe\":\"M1\",\"side\":\"Short\",\"stop_ticks\":45,\"rule\":{\"AboveMean\":{\"window\":100000}}},\"operator\":\"stop-minus-ten-percent\",\"rationale\":\"Bounded training neighborhood probe; performance effect unknown\",\"status\":\"UNEVALUATED\"},{\"edge_id\":\"d00364ddff9acb1d9dddf8fc191f2ac6890576cbb2bf74d78c991c31fa887261\",\"concept_id\":\"2bcd6334795f1fb30609d2ceb03a65690b11f7adff60159ce82e1aea82456f6f\",\"strategy\":{\"timeframe\":\"M1\",\"side\":\"Short\",\"stop_ticks\":55,\"rule\":{\"AboveMean\":{\"window\":100000}}},\"operator\":\"stop-plus-ten-percent\",\"rationale\":\"Bounded training neighborhood probe; performance effect unknown\",\"status\":\"UNEVALUATED\"},{\"edge_id\":\"9d47018ba844b51ec551bd55099a4273c586923d8478836605b94079cacc37c3\",\"concept_id\":\"47945a41060fe6c0ff8d519afe44b2eb55e38ce89650140e56fe71c07710c2ec\",\"strategy\":{\"timeframe\":\"M1\",\"side\":\"Short\",\"stop_ticks\":50,\"rule\":{\"AboveMean\":{\"window\":90000}}},\"operator\":\"rule-neighbor-0\",\"rationale\":\"Bounded training neighborhood probe; performance effect unknown\",\"status\":\"UNEVALUATED\"}],\"status\":\"TRAINING_ONLY_UNEVALUATED\"}",
+  "diagnosis_hash": "0a70eca4dddc32bc637323850c72d631b9adca226ee4988606dab05867f2f00f"
+}

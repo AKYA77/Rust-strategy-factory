@@ -14,7 +14,7 @@ pub struct Bucket {
     pub sum_net_micro_usd: i128,
 }
 impl Bucket {
-    fn add(&mut self, net: i128) -> Result<()> {
+    pub(crate) fn add(&mut self, net: i128) -> Result<()> {
         self.resolved += 1;
         self.wins += usize::from(net > 0);
         self.losses += usize::from(net < 0);

@@ -4,7 +4,9 @@ Status: SOFTWARE_INCOMPLETE. Read AGENTS.md, PROJECT_STATE.json, ACCEPTANCE.md a
 
 ## Latest milestone
 
-133 Rust tests, formatting/Clippy, debug/release builds and Chromium desktop/mobile acceptance pass. Incremental review advancement commits at most one missing experiment per checkpoint, then publishes the final report after all receipts exist. Explicit and incremental execution retain identical final report identities. Tests reopen between each baseline/child, pause/restart the worker between children and verify unchanged attempt counts for cached progress/publication. Browser acceptance drains ten jobs through separate Rust-process checkpoints and verifies durable history and honest counters.
+136 Rust tests, formatting/Clippy, debug/release builds and Chromium desktop/mobile acceptance pass. Diagnostic v2 adds bounded factual training trade/failure breakdowns: exact net/commissions/counts, strict consecutive negative exits, exit-year/UTC-entry bins, status/rejection reasons and recorded account fields. Empty/unresolved/independent-sample/coverage/profile limits remain explicit; status stays INSUFFICIENT_EVIDENCE. A genuine pre-extension CLI v1 receipt remains hash-readable and has a committed compatibility fixture/test. Overflow, chronology, exclusive scope and reason-budget refusal are tested. See RUNBOOKS/training-improvement.md.
+
+Incremental review advancement still commits at most one missing experiment per checkpoint; explicit/incremental final identities match and restart/pause between children retains work. Browser acceptance drains ten jobs through separate Rust-process checkpoints and verifies history/counters.
 
 Schema9 opt-in scheduling remains bounded (default0/max4 children, one queued job, no descendants), with atomic enqueue, coordinator fencing and state-pressure preservation. Pause/stop and lease renewal now occur between child experiments; interruption inside one replay remains outside current scope.
 
@@ -28,7 +30,7 @@ Previous verified foundations include chronological replay, initial executable-s
 
 ## Begin next
 
-Extend training-only diagnosis evidence with bounded factual trade/failure breakdowns and explicit missing/insufficient evidence, preserving historical immutable report readability and excluding OOS/final adaptation. Continue bounded mutation/diversity/acceptance and the full remaining queue. Continue dependence-aware inference, sufficient-sample/prespecified robustness acceptance and independent approval/coverage prerequisites before unlocking real final evaluation. Current protocols and pooled reset-fold statistics cannot issue validated status.
+Add a bounded declared-friction minimum-stop probe for training parents with rejected entries, preserving actual costs/profile/risk and labeling feasibility as a hypothesis. Verify actual parent rejection and child tick accounting with an independent exact fixture; never resize frozen pending contracts or infer success from a proposal. Continue mutation/diversity/acceptance and the complete remaining queue. Continue dependence-aware inference, sufficient-sample/prespecified robustness acceptance and independent approval/coverage prerequisites before unlocking real final evaluation. Current protocols and pooled reset-fold statistics cannot issue validated status.
 
 Continue bounded mutation/improvement lineage, candidate-level net candle screening, Parquet/ZSTD and measured codec/native streaming work, source acquisition/import acceptance, worker pools/OS resource control, full dashboard operations, production deployment and final end-to-end acceptance. Follow the entire IMPLEMENTATION_QUEUE.md.
 
