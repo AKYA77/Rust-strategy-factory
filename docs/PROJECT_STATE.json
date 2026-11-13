@@ -83,7 +83,8 @@
     "Exact decimal-string projection/display for first500 trade event IDs, safe legacy numeric fallback and actual full-u64 desktop/mobile raw-export regression; unchanged financial/version compute identity",
     "Explicit training-only indexed batch/API policy with versioned full cache/review context, lazy post-authorization index setup, mandatory independent sequential full-replay audits, durable disagreement blocking and atomic publication refusal; protected-science/autonomous refusal, proof-audit reference independence, comparable review basis and actual CLI/browser/export evidence",
     "Compatible schema-v9 partial covering index for proof/indexed contradiction health checks; preserved history/marker semantics and measured metadata-only lookup scaling, not factory throughput",
-    "Authenticated read-only registry audit failure monitoring with separate proof/indexed blocked states, explicit no-marker limitations and actual desktop/mobile/service-restart acceptance"
+    "Authenticated read-only registry audit failure monitoring with separate proof/indexed blocked states, explicit no-marker limitations and actual desktop/mobile/service-restart acceptance",
+    "Read-only bounded provenance-bound observed coverage API/CLI across JSON/native/RSFZ/Parquet with exact event sequence strings, scoped partial/empty UTC months, explicit adjacent gaps/detail truncation and no completeness/classification promotion"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -91,9 +92,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Keep indexed policy experimental; continue aggregate audit coverage and checkpoint-aware lifecycle, then resumable import/catalog/coverage and scientific/operations scope.",
+  "next_action": "Continue resumable normalized import and immutable source revision/catalog/coverage lifecycle; retain incomplete source/calendar/quality acceptance and experimental indexed policy. Aggregate audit coverage and checkpoint-aware lifecycle remain open.",
   "qualified_strategies": 0,
-  "tests_passed": 189,
+  "tests_passed": 192,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks; persisted proof/indexed failure monitoring, restart and read-only API",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
@@ -102,10 +103,10 @@
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43493131959,
-    "sha": "da62884e65b22806c5bfaa128e7d50bc9d28de54",
+    "run_id": 43495832240,
+    "sha": "9b4cd65165b75390ca0f46b6688840e7046663af",
     "conclusion": "success",
-    "verification": "Exact public commit/success summary retrieved; metadata-health milestone hosted verification follows publication"
+    "verification": "Exact public commit/success summary retrieved; monitoring and coverage milestone hosted verification follows publication"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
   "vps_acceptance": "VPS_PERFORMANCE_PENDING",

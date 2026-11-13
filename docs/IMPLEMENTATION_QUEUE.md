@@ -48,3 +48,5 @@ Fresh source-info requests to both Dukascopy and HistData returned HTTP403. No t
 Metadata health follow-up: compatible partial covering index and upgrade/marker integrity test now pass; audit-health-v1 measures metadata lookup only. Aggregate audit UI, lifecycle, production startup/write pressure and full-factory acceptance remain open.
 
 Failure monitoring follow-up: authenticated registry-local proof/indexed blocked status now has actual desktop/mobile/restart and read-only acceptance. Aggregate audited-result coverage and false-negative statistics remain open; marker absence is not coverage.
+
+Data coverage follow-up: src/coverage.rs and tests/coverage.rs now inventory verified scoped events, exact latest sequence, empty/partial UTC months and bounded observed gaps; actual four-format CLI parity/preservation passes. Checkpointed import, immutable revision/catalog lifecycle, approved calendars/source inventories and missing-range acquisition remain open.

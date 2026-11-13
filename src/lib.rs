@@ -49,3 +49,5 @@ pub mod exploration;
 pub mod compressed;
 
 pub mod parquet_store;
+
+pub mod coverage;
