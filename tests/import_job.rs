@@ -345,3 +345,187 @@ fn csv_quoted_crlf_blank_tail_and_no_final_newline_resume_exactly() {
         assert_eq!(actual, expected.ticks);
     }
 }
+
+#[test]
+fn complete_assembly_recomputes_cross_chunk_diagnostics_and_refuses_partial_or_damaged() {
+    let f = Fixture::new(
+        "assemble",
+        "0,1,1.00000,1.00010\n60000,2,1.00000,1.00010\n8000000,3,1.00000,1.00010\n8000000,4,1.00000,1.00010\n16000000,5,1.00000,1.00010\n",
+    );
+    f.step(2).unwrap();
+    assert!(import_job::assemble(&f.job).is_err());
+    f.step(2).unwrap();
+    f.step(2).unwrap();
+    let d = import_job::assemble(&f.job).unwrap();
+    let expected = data::import_csv(
+        &f.input,
+        Profile::synthetic("EURUSD").unwrap(),
+        "SYNTHETIC_TEST_ONLY import fixture",
+        true,
+        1 << 20,
+        10,
+    )
+    .unwrap();
+    assert_eq!(d.ticks, expected.ticks);
+    assert_eq!(d.manifest.content_hash, expected.manifest.content_hash);
+    assert_eq!(d.manifest.archive_hash, expected.manifest.archive_hash);
+    assert_eq!(d.manifest.timestamp_ties, 1);
+    assert_eq!(d.manifest.identical_quote_events, 4);
+    assert_eq!(d.manifest.gaps_over_hour, 2);
+    assert_eq!(d.manifest.class, DataClass::SyntheticTestOnly);
+    assert_eq!(
+        d.manifest.parser_version,
+        "normalized-csv-chunks-assembled-v1"
+    );
+    assert_ne!(
+        data::dataset_identity(&d.manifest).unwrap(),
+        data::dataset_identity(&expected.manifest).unwrap()
+    );
+    assert_eq!(
+        data::hash(&d).unwrap(),
+        data::hash(&import_job::assemble(&f.job).unwrap()).unwrap()
+    );
+    fs::remove_file(f.job.join("chunk-000001.rsf")).unwrap();
+    assert!(import_job::assemble(&f.job).is_err());
+}
+
+#[test]
+fn assembled_source_preserves_nonzero_authoritative_replay_across_chunks_and_gaps() {
+    use rust_strategy_factory::{
+        candles::{self, Timeframe},
+        contracts::{Conversion, Side},
+        strategies::{Features, Rule, Strategy},
+        tick_engine::{self, Costs},
+    };
+    let original = data::synthetic_fixture("EURUSD").unwrap();
+    let f = Fixture::new("replay", "");
+    let mut csv = String::from("timestamp_ms,sequence,bid,ask\n");
+    for t in &original.ticks {
+        csv.push_str(&format!(
+            "{},{},{}.{:05},{}.{:05}\n",
+            t.timestamp_ms,
+            t.sequence,
+            t.bid / 100000,
+            t.bid % 100000,
+            t.ask / 100000,
+            t.ask % 100000
+        ));
+    }
+    fs::write(&f.input, csv).unwrap();
+    let mut p = f.step(333).unwrap();
+    while !p.complete {
+        p = f.step(333).unwrap();
+    }
+    let assembled = import_job::assemble(&f.job).unwrap();
+    assert_eq!(assembled.ticks, original.ticks);
+    let strategy = Strategy {
+        timeframe: Timeframe::M1,
+        side: Side::Long,
+        stop_ticks: 50,
+        rule: Rule::AboveMean { window: 2 },
+        entry: None,
+        stop_policy: None,
+    };
+    let replay = |d: &data::Dataset| {
+        let c = candles::build(d, Timeframe::M1).unwrap();
+        let mut features = Features::with_context(&c, 1_000_000, d, Timeframe::M1).unwrap();
+        let mask = features.signal(&strategy.rule).unwrap();
+        tick_engine::replay(
+            d,
+            &c,
+            &mask,
+            &strategy,
+            &Costs::default(),
+            &vec![Conversion::usd(); d.ticks.len()],
+        )
+        .unwrap()
+    };
+    let expected = replay(&original);
+    assert!(!expected.trades.is_empty());
+    assert_eq!(
+        data::hash(&replay(&assembled)).unwrap(),
+        data::hash(&expected).unwrap()
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn actual_sigkill_after_checkpoint_initialization_recovers_the_exact_source() {
+    use std::{
+        os::unix::process::ExitStatusExt,
+        process::{Command, Stdio},
+        time::{Duration, Instant},
+    };
+    let f = Fixture::new("sigkill", "");
+    let mut csv = String::from("timestamp_ms,sequence,bid,ask\n");
+    for i in 0..200000 {
+        csv.push_str(&format!("{},{i},1.00000,1.00010\n", i * 1000));
+    }
+    fs::write(&f.input, &csv).unwrap();
+    let profile = f.root.join("profile.json");
+    fs::write(
+        &profile,
+        serde_json::to_vec(&Profile::synthetic("EURUSD").unwrap()).unwrap(),
+    )
+    .unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "import-step",
+            f.input.to_str().unwrap(),
+            profile.to_str().unwrap(),
+            "SYNTHETIC_TEST_ONLY import fixture",
+            f.job.to_str().unwrap(),
+            "synthetic",
+            "100000",
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(15);
+    let mut initialized = false;
+    while Instant::now() < deadline {
+        if let Ok(c) = rusqlite::Connection::open_with_flags(
+            f.job.join("normalized-import.sqlite"),
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        ) && let Ok(body) =
+            c.query_row("SELECT body FROM import_state WHERE singleton=1", [], |r| {
+                r.get::<_, String>(0)
+            })
+        {
+            let p: import_job::Progress = serde_json::from_str(&body).unwrap();
+            if p.events == 0 {
+                initialized = true;
+                break;
+            }
+        }
+        if child.try_wait().unwrap().is_some() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    let _ = child.kill();
+    let status = child.wait().unwrap();
+    assert!(initialized, "worker must initialize before kill");
+    assert_eq!(status.signal(), Some(9));
+    let before = import_job::status(&f.job).unwrap();
+    assert!(before.events <= 100000);
+    assert!(!before.complete);
+    let mut p = f.step(100000).unwrap();
+    while !p.complete {
+        p = f.step(100000).unwrap();
+    }
+    assert_eq!(p.events, 200000);
+    let d = import_job::assemble(&f.job).unwrap();
+    let expected = data::import_csv(
+        &f.input,
+        Profile::synthetic("EURUSD").unwrap(),
+        "whole source reference",
+        true,
+        64 * 1024 * 1024,
+        200000,
+    )
+    .unwrap();
+    assert_eq!(d.ticks, expected.ticks);
+    assert_eq!(fs::read(&f.input).unwrap(), csv.as_bytes());
+}

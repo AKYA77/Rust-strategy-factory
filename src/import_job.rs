@@ -178,6 +178,49 @@ pub fn status(root: &Path) -> Result<Progress> {
     Ok(p)
 }
 
+/// Reconstruct a complete bounded source for existing continuous replay loaders.
+/// Re-verify after status so a subsequently changed artifact cannot be exported.
+pub fn assemble(root: &Path) -> Result<data::Dataset> {
+    let p = status(root)?;
+    if !p.complete || p.events == 0 || p.chunks.is_empty() {
+        return Err("only a complete nonempty import can be assembled".into());
+    }
+    let mut ticks = Vec::with_capacity(p.events);
+    let class = if p.configuration.synthetic {
+        data::DataClass::SyntheticTestOnly
+    } else {
+        data::DataClass::RealStructurallyValid
+    };
+    for chunk in &p.chunks {
+        let d = native::read(&root.join(&chunk.file))?;
+        if data::hash(&d)? != chunk.dataset_hash
+            || d.profile != p.configuration.profile
+            || d.manifest.source != p.configuration.source
+            || d.manifest.archive_hash != p.configuration.archive_hash
+            || d.manifest.parser_version != p.configuration.parser
+            || d.manifest.class != class
+        {
+            return Err("assembled import chunk context mismatch".into());
+        }
+        ticks.extend(d.ticks);
+    }
+    if ticks.len() != p.events {
+        return Err("assembled import event count mismatch".into());
+    }
+    // Recompute ties, repeated quotes and gaps across chunk boundaries too.
+    let mut d = data::dataset(
+        p.configuration.profile,
+        ticks,
+        &p.configuration.source,
+        p.configuration.archive_hash,
+        p.configuration.synthetic,
+    )?;
+    d.manifest.parser_version = "normalized-csv-chunks-assembled-v1".into();
+    d.manifest.imported_at = p.started_at;
+    d.verify()?;
+    Ok(d)
+}
+
 #[derive(Deserialize)]
 struct Row {
     timestamp_ms: i64,
