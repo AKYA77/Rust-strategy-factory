@@ -1,0 +1,25 @@
+[Unit]
+Description=Rust Strategy Factory bounded historical research
+
+[Service]
+Type=exec
+WorkingDirectory=%h/.local/share/rust-strategy-factory
+ExecStart="%h/.local/share/rust-strategy-factory/current/rust-strategy-factory" research "%h/.local/share/rust-strategy-factory/config/research.json" "%h/.local/share/rust-strategy-factory/state/research.sqlite"
+Restart=on-failure
+RestartSec=310
+KillSignal=SIGINT
+TimeoutStopSec=300
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=%h/.local/share/rust-strategy-factory/state
+MemoryMax=6G
+CPUQuota=300%
+TasksMax=64
+LimitNOFILE=4096
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

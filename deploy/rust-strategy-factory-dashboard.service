@@ -1,0 +1,25 @@
+[Unit]
+Description=Rust Strategy Factory authenticated loopback dashboard
+
+[Service]
+Type=exec
+WorkingDirectory=%h/.local/share/rust-strategy-factory
+ExecStart="%h/.local/share/rust-strategy-factory/current/rust-strategy-factory" serve "%h/.local/share/rust-strategy-factory/state/research.sqlite" "%h/.local/share/rust-strategy-factory/config/admin.json" 3000
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=%h/.local/share/rust-strategy-factory/state
+MemoryMax=512M
+CPUQuota=50%
+TasksMax=32
+LimitNOFILE=4096
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

@@ -21,6 +21,8 @@ npm run test:browser
 
 Node and Chromium are development dependencies only. The production dashboard is embedded in the Rust executable. No external runtime service or secret is needed for CLI research.
 
+Local versioned installs, rollback, verified backups/new-path restores and non-root service templates are documented in [deployment operations](docs/RUNBOOKS/deployment.md). Run `python3 scripts/check-operations.py` after building debug and release binaries to exercise local operations; live VPS/systemd acceptance remains pending.
+
 ## Research and evidence
 
 Native `.rsf` storage supports lossless packing/unpacking and the same dataset identities; see [native storage](docs/RUNBOOKS/native-storage.md). This is an uncompressed interchange baseline; full-history streaming and codec selection remain unfinished.
