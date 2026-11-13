@@ -6,7 +6,7 @@ use argon2::{
 };
 use axum::{
     Json, Router,
-    extract::{DefaultBodyLimit, Path as Param, Request, State},
+    extract::{DefaultBodyLimit, Path as Param, Query, Request, State},
     http::{HeaderMap, StatusCode, header},
     middleware::{self, Next},
     response::{Html, IntoResponse, Response},
@@ -275,29 +275,121 @@ async fn overview(State(app): State<Arc<App>>) -> Response {
         ),
     }
 }
+#[derive(Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HistoryQuery {
+    before: Option<String>,
+    instrument: Option<String>,
+    limit: Option<usize>,
+}
+#[derive(Serialize)]
+struct HistoryPage {
+    rows: Vec<serde_json::Value>,
+    next_cursor: Option<String>,
+}
+fn experiment_page(
+    registry: &Registry,
+    before: Option<i64>,
+    instrument: Option<&str>,
+    limit: usize,
+) -> Result<HistoryPage> {
+    let mut sql = String::from(
+        "SELECT rowid,id,state,key_json,json_extract(result_json,'$.data_manifest'),json_extract(result_json,'$.strategy'),json_array_length(result_json,'$.tick_replay.trades'),CASE WHEN typeof(json_extract(result_json,'$.tick_replay.realized_micro_usd'))='integer' AND json_extract(result_json,'$.tick_replay.realized_micro_usd') BETWEEN -9007199254740991 AND 9007199254740991 THEN json_extract(result_json,'$.tick_replay.realized_micro_usd') ELSE NULL END FROM experiments WHERE 1=1",
+    );
+    let mut parameters = Vec::<rusqlite::types::Value>::new();
+    if let Some(before) = before {
+        sql.push_str(" AND rowid < ?");
+        parameters.push(before.into());
+    }
+    if let Some(instrument) = instrument {
+        sql.push_str(" AND json_extract(key_json,'$.instrument') = ?");
+        parameters.push(instrument.to_string().into());
+    }
+    sql.push_str(" ORDER BY rowid DESC LIMIT ?");
+    parameters.push(((limit + 1) as i64).into());
+    let mut query = registry
+        .connection
+        .prepare(&sql)
+        .map_err(|e| e.to_string())?;
+    let rows = query
+        .query_map(rusqlite::params_from_iter(parameters), |r| {
+            Ok((
+                r.get::<_, i64>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+                r.get::<_, Option<String>>(4)?,
+                r.get::<_, Option<String>>(5)?,
+                r.get::<_, Option<i64>>(6)?,
+                r.get::<_, Option<i64>>(7)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+    let mut records = Vec::new();
+    for row in rows {
+        let (cursor, id, state, key, manifest, strategy, trades, equity) =
+            row.map_err(|e| e.to_string())?;
+        records.push((
+            cursor,
+            serde_json::json!({"id":id,"state":state,
+            "key":serde_json::from_str::<serde_json::Value>(&key).map_err(|e|e.to_string())?,
+            "manifest":manifest.and_then(|v|serde_json::from_str::<serde_json::Value>(&v).ok()),
+            "strategy":strategy.and_then(|v|serde_json::from_str::<serde_json::Value>(&v).ok()),
+            "closed_trades":trades,"ending_micro_usd":equity}),
+        ));
+    }
+    let more = records.len() > limit;
+    records.truncate(limit);
+    // Decimal strings keep SQLite's full i64 rowid range exact in browser cursors.
+    let next_cursor = more.then(|| {
+        records
+            .last()
+            .expect("nonempty bounded history page")
+            .0
+            .to_string()
+    });
+    Ok(HistoryPage {
+        rows: records.into_iter().map(|(_, row)| row).collect(),
+        next_cursor,
+    })
+}
+async fn history(State(app): State<Arc<App>>, Query(query): Query<HistoryQuery>) -> Response {
+    let limit = query.limit.unwrap_or(25);
+    let before = match query.before {
+        None => None,
+        Some(value) => match value.parse::<i64>() {
+            Ok(n) if n > 0 && value.bytes().all(|b| b.is_ascii_digit()) => Some(n),
+            _ => return api_error(StatusCode::BAD_REQUEST, "invalid history cursor"),
+        },
+    };
+    if !(1..=100).contains(&limit)
+        || query
+            .instrument
+            .as_ref()
+            .is_some_and(|s| !crate::contracts::SYMBOLS.contains(&s.as_str()))
+    {
+        return api_error(
+            StatusCode::BAD_REQUEST,
+            "invalid history instrument or page size",
+        );
+    }
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match experiment_page(&registry, before, query.instrument.as_deref(), limit) {
+        Ok(page) => Json(page).into_response(),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "unable to read persisted experiment history",
+        ),
+    }
+}
 async fn experiments(State(app): State<Arc<App>>) -> Response {
     let Ok(registry) = app.registry.lock() else {
         return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
     };
-    let load = || -> Result<Vec<serde_json::Value>> {
-        let mut q=registry.connection.prepare("SELECT id,state,key_json,json_extract(result_json,'$.data_manifest'),json_extract(result_json,'$.strategy'),json_array_length(result_json,'$.tick_replay.trades'),CASE WHEN typeof(json_extract(result_json,'$.tick_replay.realized_micro_usd'))='integer' AND json_extract(result_json,'$.tick_replay.realized_micro_usd') BETWEEN -9007199254740991 AND 9007199254740991 THEN json_extract(result_json,'$.tick_replay.realized_micro_usd') ELSE NULL END FROM experiments ORDER BY rowid DESC LIMIT 100").map_err(|e|e.to_string())?;
-        let rows = q
-            .query_map([], |r| {
-                Ok((
-                    r.get::<_, String>(0)?,
-                    r.get::<_, String>(1)?,
-                    r.get::<_, String>(2)?,
-                    r.get::<_, Option<String>>(3)?,
-                    r.get::<_, Option<String>>(4)?,
-                    r.get::<_, Option<i64>>(5)?,
-                    r.get::<_, Option<i64>>(6)?,
-                ))
-            })
-            .map_err(|e| e.to_string())?;
-        rows.map(|row|{let (id,state,key,manifest,strategy,trades,equity)=row.map_err(|e|e.to_string())?;Ok(serde_json::json!({"id":id,"state":state,"key":serde_json::from_str::<serde_json::Value>(&key).map_err(|e|e.to_string())?,"manifest":manifest.and_then(|v|serde_json::from_str::<serde_json::Value>(&v).ok()),"strategy":strategy.and_then(|v|serde_json::from_str::<serde_json::Value>(&v).ok()),"closed_trades":trades,"ending_micro_usd":equity}))}).collect()
-    };
-    match load() {
-        Ok(v) => Json(v).into_response(),
+    match experiment_page(&registry, None, None, 100) {
+        Ok(page) => Json(page.rows).into_response(),
         Err(_) => api_error(
             StatusCode::INTERNAL_SERVER_ERROR,
             "unable to read persisted experiments",
@@ -461,6 +553,7 @@ pub async fn serve(database: &Path, auth_path: &Path, port: u16) -> Result<()> {
         .route("/api/logout", post(logout))
         .route("/api/overview", get(overview))
         .route("/api/experiments", get(experiments))
+        .route("/api/experiment-history", get(history))
         .route("/api/protocols", get(protocols))
         .route("/api/protocols/{id}", get(protocol_detail))
         .route("/api/experiments/{id}", get(detail))
@@ -478,4 +571,44 @@ pub async fn serve(database: &Path, auth_path: &Path, port: u16) -> Result<()> {
         })
         .await
         .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod history_tests {
+    use super::*;
+    #[test]
+    fn history_keeps_full_sqlite_cursor_range_and_empty_boundaries_exact() {
+        // Isolated SQL projection fixture, not a valid research/evidence registry.
+        let registry = Registry {
+            connection: rusqlite::Connection::open_in_memory().unwrap(),
+        };
+        registry
+            .connection
+            .execute_batch(
+                "CREATE TABLE experiments(id TEXT,key_json TEXT,state TEXT,result_json TEXT);",
+            )
+            .unwrap();
+        for (rowid, instrument) in [
+            (1, "EURUSD"),
+            (i64::MAX - 1, "GBPUSD"),
+            (i64::MAX, "EURUSD"),
+        ] {
+            registry.connection.execute("INSERT INTO experiments(rowid,id,key_json,state,result_json) VALUES(?1,?2,?3,'completed',?4)",
+                rusqlite::params![rowid,rowid.to_string(),serde_json::json!({"instrument":instrument}).to_string(),r#"{"tick_replay":{"realized_micro_usd":9007199254740992}}"#]).unwrap();
+        }
+        let first = experiment_page(&registry, None, Some("EURUSD"), 1).unwrap();
+        assert_eq!(first.rows.len(), 1);
+        assert_eq!(first.next_cursor.as_deref(), Some("9223372036854775807"));
+        assert_eq!(first.rows[0]["id"], "9223372036854775807");
+        assert!(first.rows[0]["ending_micro_usd"].is_null());
+        let last = experiment_page(&registry, Some(i64::MAX), Some("EURUSD"), 1).unwrap();
+        assert_eq!(last.rows[0]["id"], "1");
+        assert!(last.next_cursor.is_none());
+        let empty = experiment_page(&registry, Some(1), None, 25).unwrap();
+        assert!(empty.rows.is_empty());
+        assert!(empty.next_cursor.is_none());
+        let missing = experiment_page(&registry, None, Some("XAUUSD"), 25).unwrap();
+        assert!(missing.rows.is_empty());
+        assert!(missing.next_cursor.is_none());
+    }
 }

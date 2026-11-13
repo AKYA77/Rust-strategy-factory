@@ -66,7 +66,8 @@
     "declared-friction minimum-stop training hypotheses gated by actual rejection, bounded canonical proposals and exact comparable child replay; wider-spread refusal remains explicit",
     "independent exhaustive 192-case all-eight-profile sizing oracle covering sides, commissions, marked margin, small equities and explicit rational conversions",
     "bounded seeded training structural term removal, causal higher confirmation and scope-matched template crossover with alternating mutation classes, immutable lineage and actual losing-child replay",
-    "normalized Boolean arity enforcement after flatten/dedup with failing-before-fix regression and1000 seeded idempotence/JSON-roundtrip attempts"
+    "normalized Boolean arity enforcement after flatten/dedup with failing-before-fix regression and1000 seeded idempotence/JSON-roundtrip attempts",
+    "authenticated bounded cursor experiment-history pages with server-side symbol filters, full-i64 string cursors, legacy API compatibility and >100-record responsive/race/concurrent-insert browser coverage"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -74,9 +75,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Authenticated bounded cursor experiment-history pagination and server-side instrument filtering with >100-row browser acceptance; continue full queue.",
+  "next_action": "Reproducible local release install/update, verified backup/restore/rollback and non-root resource-limit systemd templates with isolated local acceptance; continue full queue.",
   "qualified_strategies": 0,
-  "tests_passed": 145,
+  "tests_passed": 146,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile against real Rust/SQLite/native input and ATR/MACD/higher protocol; auth/control/export/restart plus actual extreme-loss diagnostic guards, exact positive/negative safe-boundary currency and byte-identical raw download passed",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
