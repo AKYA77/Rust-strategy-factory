@@ -105,7 +105,7 @@ impl Facts {
         }
         Ok(())
     }
-    fn observe(d: &Dataset) -> Result<Self> {
+    pub(crate) fn observe(d: &Dataset) -> Result<Self> {
         if d.ticks.len() > 2_000_000 {
             return Err("catalog event budget exceeded".into());
         }

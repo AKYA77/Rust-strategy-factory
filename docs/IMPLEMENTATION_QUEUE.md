@@ -66,3 +66,5 @@ Correction lifecycle: immutable parent/reason receipts and bounded ancestry/cont
 Review journal: immutable five-area text evidence/receipt binding and explicit incomplete/rejected/assertions-recorded states now work through CLI and snapshots. Claims never grant approval. Next: discoverable bounded history, then independent typed evidence validation and review authority.
 
 Review history: indexed bounded receipt-scoped listing, validated reports, hash cursors and actual CLI/plan/append-stability tests now pass. SQL-only fixture timing is limited and not a research speed claim. Next critical step: typed calendar/coverage/quality validators and source/profile review authority, then review UI.
+
+Calendar evidence: receipt/data/declaration-bound mechanical open-session observations and unobserved-interval summaries now reuse existing coverage with actual oracle/CLI evidence. Schedules remain unapproved; nonempty intervals do not prove continuity. Next: raw normalized archive consistency, then independent authority/policy and review UI.
