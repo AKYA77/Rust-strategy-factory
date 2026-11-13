@@ -47,7 +47,9 @@
     "bounded lossless native uncompressed SoA artifact format with immutable publication, exact stream checksums, CLI/research loading and JSON-equivalent receipt reuse",
     "bounded canonical single-scalar rule parameter probes frozen before OOS with actual replay identities and declared-trial accounting",
     "typed closed higher-timeframe confirmations with strict hierarchy, causal publication joins, authoritative replay mask verification and bounded context caches",
-    "autonomous higher-confirmation regions and valid complex-graph verification allowance with nonzero replay regressions"
+    "autonomous higher-confirmation regions and valid complex-graph verification allowance with nonzero replay regressions",
+    "MACD and population Bollinger cross operators with explicit quantization, checked variance, centered arithmetic, independent fixtures and nonzero exact tick accounting",
+    "expanded MACD/band candidate regions and bounded signal-window parameter probes"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -55,9 +57,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Implement MACD/Bollinger operators and typed ATR stop policy, then dependence-aware/prespecified evidence gates and remaining full queue.",
+  "next_action": "Implement typed causal ATR stop policy with fixed placement risk and independent accounting; then evidence acceptance and remaining full implementation queue.",
   "qualified_strategies": 0,
-  "tests_passed": 105,
+  "tests_passed": 109,
   "benchmark": "docs/BENCHMARKS/2026-11-12-synthetic-replay.json",
   "browser_acceptance": "Chromium desktop/mobile against actual Rust HTTP server and SQLite; auth, CSRF/origin/host/body/rates, controls, receipts/export, restart/logout passed"
 }

@@ -4,7 +4,9 @@ Status: SOFTWARE_INCOMPLETE. Read AGENTS.md, PROJECT_STATE.json, ACCEPTANCE.md a
 
 ## Latest milestone
 
-105 Rust tests, formatting/Clippy, release build and Chromium desktop/mobile acceptance pass. HigherTimeframe rules now compile only actually closed/published higher candles with strict increasing hierarchy. Authoritative replay independently verifies higher-aware masks and next-event execution. Five focused tests cover causal joins, nonzero replay, prefix invariance, nested hierarchy/context/budgets, autonomous regions and a valid complex graph. An additional protocol integration replays actual higher-aware OOS trades. Chromium protocol setup submits a higher-aware plan. Signal version v2-htf binds the behavior into identities. See DECISIONS/0005-higher-timeframe-confirmations.md.
+109 Rust tests, formatting/Clippy, release build and Chromium desktop/mobile acceptance pass. MACD and population Bollinger crosses now compile through authoritative replay with explicit warmup/rounding, centered arithmetic and checked variance. Four focused tests verify independent rational/band fixtures, prefix and large-integer translation invariance, invalid/overflow refusal, autonomous variants and two nonzero exact tick trades ($4.998 each under the synthetic fixture assumptions). Indicator version v3 and rule-neighborhood version v2 bind semantics into evidence identities. Browser protocol setup includes MACD with higher-timeframe confirmation. See DECISIONS/0006-macd-and-bollinger.md.
+
+Higher-timeframe joins, strict hierarchy, autonomous confirmations and valid complex-graph verification remain tested; see DECISIONS/0005-higher-timeframe-confirmations.md.
 
 Bounded canonical parameter probes remain frozen in protocol v6, with all variants included in trial budgets and descriptive-only status. Real final execution and qualification remain blocked.
 
@@ -12,7 +14,7 @@ Previous verified foundations include chronological replay, initial executable-s
 
 ## Begin next
 
-Implement MACD/Bollinger operators and typed ATR stop policy with independent numerical fixtures, causal prefix checks and nonzero tick accounting. Continue dependence-aware inference, sufficient-sample/prespecified robustness acceptance and independent approval/coverage prerequisites before unlocking real final evaluation. Current protocols and pooled reset-fold statistics cannot issue validated status.
+Implement typed causal ATR stop policy with exact grid rounding, fixed placement reservations, pre-fill revalidation and independent numerical/replay fixtures. Continue dependence-aware inference, sufficient-sample/prespecified robustness acceptance and independent approval/coverage prerequisites before unlocking real final evaluation. Current protocols and pooled reset-fold statistics cannot issue validated status.
 
 Continue bounded mutation/improvement lineage, candidate-level net candle screening, Parquet/ZSTD and measured codec/native streaming work, source acquisition/import acceptance, worker pools/OS resource control, full dashboard operations, production deployment and final end-to-end acceptance. Follow the entire IMPLEMENTATION_QUEUE.md.
 

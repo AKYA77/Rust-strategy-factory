@@ -143,3 +143,137 @@ pub fn prior_extrema(
     }
     Ok((upper, lower))
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Macd {
+    pub line: Vec<Option<f64>>,
+    pub signal: Vec<Option<f64>>,
+    pub histogram: Vec<Option<f64>>,
+}
+fn floating_ema(values: &[Option<f64>], window: usize) -> Vec<Option<f64>> {
+    let (mut count, mut sum, mut state) = (0, 0.0, None);
+    let alpha = 2.0 / (window + 1) as f64;
+    values
+        .iter()
+        .map(|value| {
+            match value {
+                None => {
+                    count = 0;
+                    sum = 0.0;
+                    state = None;
+                }
+                Some(value) => {
+                    if let Some(previous) = state {
+                        state = Some(alpha * value + (1.0 - alpha) * previous);
+                    } else {
+                        count += 1;
+                        sum += value;
+                        if count == window {
+                            state = Some(sum / window as f64);
+                        }
+                    }
+                }
+            }
+            state
+        })
+        .collect()
+}
+/// SMA-seeded floating MACD, centered by exact integer subtraction for translation stability.
+/// Existing integer-mean EMA conventions remain unchanged; this method is explicitly separate.
+pub fn macd(values: &[i64], fast: usize, slow: usize, signal_window: usize) -> Result<Macd> {
+    if fast < 2 || slow <= fast || slow > 100_000 || !(2..=100_000).contains(&signal_window) {
+        return Err("invalid MACD windows".into());
+    }
+    let origin = values.first().copied().unwrap_or(0) as i128;
+    let centered = values
+        .iter()
+        .map(|value| Some((*value as i128 - origin) as f64))
+        .collect::<Vec<_>>();
+    let fast = floating_ema(&centered, fast);
+    let slow = floating_ema(&centered, slow);
+    let line = fast
+        .iter()
+        .zip(&slow)
+        .map(|(a, b)| match (a, b) {
+            (Some(a), Some(b)) => Some(a - b),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let signal = floating_ema(&line, signal_window);
+    let histogram = line
+        .iter()
+        .zip(&signal)
+        .map(|(a, b)| match (a, b) {
+            (Some(a), Some(b)) => Some(a - b),
+            _ => None,
+        })
+        .collect();
+    Ok(Macd {
+        line,
+        signal,
+        histogram,
+    })
+}
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Bands {
+    pub lower: i64,
+    pub middle: i64,
+    pub upper: i64,
+}
+/// Population variance uses checked exact centered integer sums. Final bands use
+/// sqrt and round half-up to whole price units; arithmetic overflow fails closed.
+pub fn bollinger(values: &[i64], window: usize, multiple_bps: u32) -> Result<Vec<Option<Bands>>> {
+    if !(2..=100_000).contains(&window) || !(1..=100_000).contains(&multiple_bps) {
+        return Err("invalid Bollinger parameters".into());
+    }
+    let origin = values.first().copied().unwrap_or(0) as i128;
+    let (mut sum, mut squares) = (0_i128, 0_i128);
+    let mut out = Vec::with_capacity(values.len());
+    let round = |delta: f64| -> Result<i64> {
+        if !delta.is_finite() {
+            return Err("nonfinite Bollinger band".into());
+        }
+        let level = origin
+            .checked_add((delta + 0.5).floor() as i128)
+            .ok_or("Bollinger band overflow")?;
+        i64::try_from(level).map_err(|_| "Bollinger band exceeds price representation".into())
+    };
+    for (i, value) in values.iter().enumerate() {
+        if i >= window {
+            let old = values[i - window] as i128 - origin;
+            sum = sum.checked_sub(old).ok_or("Bollinger sum overflow")?;
+            squares = squares
+                .checked_sub(old.checked_mul(old).ok_or("Bollinger square overflow")?)
+                .ok_or("Bollinger square sum overflow")?;
+        }
+        let delta = *value as i128 - origin;
+        sum = sum.checked_add(delta).ok_or("Bollinger sum overflow")?;
+        squares = squares
+            .checked_add(
+                delta
+                    .checked_mul(delta)
+                    .ok_or("Bollinger square overflow")?,
+            )
+            .ok_or("Bollinger square sum overflow")?;
+        if i + 1 < window {
+            out.push(None);
+            continue;
+        }
+        let numerator = (window as i128)
+            .checked_mul(squares)
+            .and_then(|n| sum.checked_mul(sum).and_then(|s| n.checked_sub(s)))
+            .ok_or("Bollinger variance overflow")?;
+        if numerator < 0 {
+            return Err("negative exact Bollinger variance".into());
+        }
+        let mean = sum as f64 / window as f64;
+        let deviation = (numerator as f64).sqrt() / window as f64;
+        let width = deviation * multiple_bps as f64 / 10000.0;
+        out.push(Some(Bands {
+            lower: round(mean - width)?,
+            middle: round(mean)?,
+            upper: round(mean + width)?,
+        }));
+    }
+    Ok(out)
+}

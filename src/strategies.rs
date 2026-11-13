@@ -65,6 +65,17 @@ pub enum Rule {
         timeframe: Timeframe,
         rule: Box<Rule>,
     },
+    MacdCross {
+        fast: usize,
+        slow: usize,
+        signal_window: usize,
+        above: bool,
+    },
+    BollingerCross {
+        window: usize,
+        multiple_bps: u32,
+        upper: bool,
+    },
 }
 impl Rule {
     fn validate_timeframes(&self, base: Timeframe) -> Result<()> {
@@ -141,6 +152,31 @@ impl Rule {
                 Rule::Rising { lookback } | Rule::Falling { lookback } => {
                     if !(1..=100_000).contains(lookback) {
                         return Err("invalid momentum lookback".into());
+                    }
+                    Ok(rule.clone())
+                }
+                Rule::MacdCross {
+                    fast,
+                    slow,
+                    signal_window,
+                    ..
+                } => {
+                    if *fast < 2
+                        || slow <= fast
+                        || *slow > 100_000
+                        || !(2..=100_000).contains(signal_window)
+                    {
+                        return Err("invalid MACD windows".into());
+                    }
+                    Ok(rule.clone())
+                }
+                Rule::BollingerCross {
+                    window,
+                    multiple_bps,
+                    ..
+                } => {
+                    if !(2..=100_000).contains(window) || !(1..=100_000).contains(multiple_bps) {
+                        return Err("invalid Bollinger parameters".into());
                     }
                     Ok(rule.clone())
                 }
@@ -279,6 +315,8 @@ enum Feature {
     PriorLow(usize),
     TrueRange,
     PriorRangeMean(usize),
+    MacdSign(usize, usize, usize),
+    Band(usize, u32, bool),
 }
 /// Caches share indicator arrays across an entire candidate batch. Limits count retained cells.
 pub struct Features<'a> {
@@ -339,6 +377,30 @@ impl<'a> Features<'a> {
             return Err("shared feature budget exceeded".into());
         }
         let values = match key {
+            Feature::MacdSign(fast, slow, signal) => {
+                crate::indicators::macd(&self.close, fast, slow, signal)?
+                    .histogram
+                    .into_iter()
+                    .map(|v| {
+                        v.map(|v| {
+                            let rounded = v.round();
+                            if rounded > 0.0 {
+                                1
+                            } else if rounded < 0.0 {
+                                -1
+                            } else {
+                                0
+                            }
+                        })
+                    })
+                    .collect()
+            }
+            Feature::Band(window, multiple, upper) => {
+                crate::indicators::bollinger(&self.close, window, multiple)?
+                    .into_iter()
+                    .map(|v| v.map(|v| if upper { v.upper } else { v.lower }))
+                    .collect()
+            }
             Feature::Mean(w) => sma(&self.close, w)?,
             Feature::Rsi(w) => crate::indicators::rsi(&self.close, w)?
                 .into_iter()
@@ -396,6 +458,21 @@ impl<'a> Features<'a> {
                     | Rule::BelowMean { window }
                     | Rule::CrossMean { window, .. } => {
                         out.insert(Feature::Mean(*window));
+                    }
+                    Rule::MacdCross {
+                        fast,
+                        slow,
+                        signal_window,
+                        ..
+                    } => {
+                        out.insert(Feature::MacdSign(*fast, *slow, *signal_window));
+                    }
+                    Rule::BollingerCross {
+                        window,
+                        multiple_bps,
+                        upper,
+                    } => {
+                        out.insert(Feature::Band(*window, *multiple_bps, *upper));
                     }
                     Rule::MeanTrend { fast, slow, .. } => {
                         out.insert(Feature::Mean(*fast));
@@ -460,6 +537,27 @@ impl<'a> Features<'a> {
             return Ok(mask.clone());
         }
         let result = match rule {
+            Rule::MacdCross {
+                fast,
+                slow,
+                signal_window,
+                above,
+            } => {
+                let key = Feature::MacdSign(*fast, *slow, *signal_window);
+                self.ensure(key.clone())?;
+                let values = &self.cache[&key];
+                Mask::from_bools((0..values.len()).map(|i|i>0 && matches!((values[i],values[i-1]),(Some(a),Some(b)) if if *above {a>0 && b<=0}else{a<0 && b>=0})))
+            }
+            Rule::BollingerCross {
+                window,
+                multiple_bps,
+                upper,
+            } => {
+                let key = Feature::Band(*window, *multiple_bps, *upper);
+                self.ensure(key.clone())?;
+                let bands = &self.cache[&key];
+                Mask::from_bools((0..bands.len()).map(|i|i>0 && matches!((bands[i],bands[i-1]),(Some(a),Some(b)) if if *upper {self.close[i]>a && self.close[i-1]<=b}else{self.close[i]<a && self.close[i-1]>=b})))
+            }
             Rule::HigherTimeframe { timeframe, rule } => {
                 let (data, base) = self
                     .context

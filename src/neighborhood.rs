@@ -2,7 +2,7 @@
 use crate::{Result, data, strategies::Rule};
 use serde_json::Value;
 use std::collections::BTreeSet;
-pub const VERSION: &str = "canonical-first-six-scalar-rule-neighbors-v1";
+pub const VERSION: &str = "canonical-first-six-scalar-rule-neighbors-v2";
 fn paths(value: &Value, prefix: &str, out: &mut Vec<String>) {
     match value {
         Value::Object(map) => {
@@ -10,7 +10,13 @@ fn paths(value: &Value, prefix: &str, out: &mut Vec<String>) {
                 let next = format!("{prefix}/{key}");
                 if matches!(
                     key.as_str(),
-                    "window" | "lookback" | "fast" | "slow" | "basis_points" | "multiple_bps"
+                    "window"
+                        | "lookback"
+                        | "fast"
+                        | "slow"
+                        | "signal_window"
+                        | "basis_points"
+                        | "multiple_bps"
                 ) && value.as_u64().is_some()
                 {
                     out.push(next);

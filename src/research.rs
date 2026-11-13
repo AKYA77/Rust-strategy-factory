@@ -252,11 +252,22 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
             | Rule::RsiCross { window, .. }
             | Rule::Donchian { window, .. }
             | Rule::ChannelEdge { window, .. }
-            | Rule::RangeExpansion { window, .. } => *window += shift,
+            | Rule::RangeExpansion { window, .. }
+            | Rule::BollingerCross { window, .. } => *window += shift,
             Rule::Rising { lookback } | Rule::Falling { lookback } => {
                 if *lookback > 1 {
                     *lookback += shift;
                 }
+            }
+            Rule::MacdCross {
+                fast,
+                slow,
+                signal_window,
+                ..
+            } => {
+                *fast += shift;
+                *slow += shift;
+                *signal_window += shift;
             }
             Rule::MeanTrend { fast, slow, .. } => {
                 *fast += shift;
@@ -291,6 +302,35 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
                     rule: Box::new(condition),
                 },
             ]);
+        }
+    }
+    if region % 7 == 6 {
+        let long = s.side == crate::contracts::Side::Long;
+        let extra = match candidate.family {
+            strategies::Family::Momentum
+            | strategies::Family::TrendFollowing
+            | strategies::Family::Confluence => Some(Rule::MacdCross {
+                fast: 12,
+                slow: 26,
+                signal_window: 9,
+                above: long,
+            }),
+            strategies::Family::MeanReversion | strategies::Family::RangeTrading => {
+                Some(Rule::BollingerCross {
+                    window: 20,
+                    multiple_bps: 20000,
+                    upper: !long,
+                })
+            }
+            strategies::Family::Breakout => Some(Rule::BollingerCross {
+                window: 20,
+                multiple_bps: 20000,
+                upper: long,
+            }),
+            _ => None,
+        };
+        if let Some(extra) = extra {
+            s.rule = Rule::All(vec![s.rule, extra]);
         }
     }
     s.stop_ticks += (region / 300) as i64 * 200;

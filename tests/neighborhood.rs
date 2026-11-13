@@ -72,6 +72,17 @@ fn invalid_windows_thresholds_and_fixed_session_fields_are_not_invented() {
             slow: 3,
             above: true,
         },
+        Rule::MacdCross {
+            fast: 2,
+            slow: 3,
+            signal_window: 2,
+            above: true,
+        },
+        Rule::BollingerCross {
+            window: 2,
+            multiple_bps: 100000,
+            upper: false,
+        },
         Rule::RsiCross {
             window: 2,
             basis_points: 10000,
@@ -87,6 +98,20 @@ fn invalid_windows_thresholds_and_fixed_session_fields_are_not_invented() {
             neighbor.canonical().unwrap();
         }
     }
+    let macd = neighborhood::rules(&Rule::MacdCross {
+        fast: 2,
+        slow: 3,
+        signal_window: 2,
+        above: true,
+    })
+    .unwrap();
+    assert!(macd.iter().any(|r| matches!(
+        r,
+        Rule::MacdCross {
+            signal_window: 3,
+            ..
+        }
+    )));
     assert!(
         neighborhood::rules(&Rule::UtcSession {
             start_hour: 1,

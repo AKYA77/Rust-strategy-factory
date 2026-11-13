@@ -172,7 +172,7 @@ fn bounds_reject_invalid_configuration_and_new_regions_are_not_repeats() {
     );
     let count = rust_strategy_factory::strategies::family_templates().len() as u64;
     let mut ids = std::collections::BTreeSet::new();
-    for region in [0, 1, 2, 3, 4, 5, 6, 299, 300, 301, 9999] {
+    for region in [0, 1, 2, 3, 4, 5, 6, 34, 299, 300, 301, 9999] {
         for slot in 0..count {
             let (_, s) = research::candidate_at(region * count + slot, 42).unwrap();
             assert!(ids.insert(s.identity().unwrap()));

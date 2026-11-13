@@ -2,7 +2,7 @@
 
 Historical strategy research and paper simulation in Rust. **SOFTWARE_INCOMPLETE.** No qualified strategies, approved broker profiles, real-data acceptance or full historical research readiness are claimed.
 
-The current implementation includes exact integer accounting, eight explicit synthetic instrument profiles, bounded normalized bid/ask import, closed UTC candles on seven timeframes, causal features, typed closed higher-timeframe confirmations and nine strategy families, market/stop/limit entry replay with fixed reservations and marked-margin checks, a durable single-worker research loop, immutable SQLite experiment evidence, chronological evaluation windows, frozen protocol execution, and an authenticated loopback dashboard.
+The current implementation includes exact integer accounting, eight explicit synthetic instrument profiles, bounded normalized bid/ask import, closed UTC candles on seven timeframes, causal features including MACD/Bollinger crosses, typed closed higher-timeframe confirmations and nine strategy families, market/stop/limit entry replay with fixed reservations and marked-margin checks, a durable single-worker research loop, immutable SQLite experiment evidence, chronological evaluation windows, frozen protocol execution, and an authenticated loopback dashboard.
 
 ## Development
 
