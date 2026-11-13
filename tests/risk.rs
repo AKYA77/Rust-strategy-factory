@@ -109,3 +109,99 @@ fn reservation_rejects_off_grid_prices_and_distance_without_rounding_a_request()
         assert!(risk::reserve(&p, &costs, invalid, 1000).is_err());
     }
 }
+
+#[test]
+fn all_eight_profiles_match_independent_exhaustive_grid_sizing_oracle() {
+    // Deliberately small volume domains allow exhaustive enumeration independent of
+    // the production binary search and contracts::size upper bound.
+    for symbol in rust_strategy_factory::contracts::SYMBOLS {
+        let mut p = Profile::synthetic(symbol).unwrap();
+        p.max_micro_lots = 1000;
+        let fx = match p.quote.as_str() {
+            "JPY" => Conversion {
+                usd_num: 1,
+                quote_den: 150,
+                as_of_ms: 0,
+            },
+            "CHF" => Conversion {
+                usd_num: 10,
+                quote_den: 9,
+                as_of_ms: 0,
+            },
+            "CAD" => Conversion {
+                usd_num: 5,
+                quote_den: 7,
+                as_of_ms: 0,
+            },
+            _ => Conversion::usd(),
+        };
+        let entry = if symbol == "XAUUSD" {
+            250000
+        } else if symbol == "USDJPY" {
+            150000
+        } else {
+            100000
+        };
+        for side in [Side::Long, Side::Short] {
+            for equity in [1_000i128, 100_000, 1_000_000, 20_000_000] {
+                for commission in [0i64, 333_333, 10_000_000] {
+                    let costs = Costs {
+                        commission_micro_usd_per_lot_per_fill: commission,
+                        ..Costs::default()
+                    };
+                    let friction = 4 * p.pip;
+                    let distance = 10 * p.pip;
+                    let mark = entry - side.sign() * friction;
+                    let request = Request {
+                        equity,
+                        entry,
+                        mark,
+                        side,
+                        stop_with_exit_slip: distance + 2 * p.pip,
+                        conversion: fx,
+                    };
+                    let mut expected = None;
+                    for volume in
+                        (p.min_micro_lots..=p.max_micro_lots).step_by(p.step_micro_lots as usize)
+                    {
+                        let ceil = |n: i128, d: i128| (n + d - 1) / d;
+                        let denominator = i128::from(p.price_scale) * i128::from(fx.quote_den);
+                        let factor = i128::from(p.contract_units)
+                            * i128::from(volume)
+                            * i128::from(fx.usd_num);
+                        let fee = ceil(i128::from(commission) * i128::from(volume), 1_000_000);
+                        let loss =
+                            ceil(i128::from(distance + 2 * p.pip) * factor, denominator) + 2 * fee;
+                        let marked =
+                            equity - ceil(i128::from(friction) * factor, denominator) - fee;
+                        let margin = ceil(
+                            i128::from(entry) * factor,
+                            denominator * i128::from(p.leverage),
+                        );
+                        if loss <= equity / 10 && margin <= marked {
+                            expected = Some((volume, loss, marked, margin, fee));
+                        }
+                    }
+                    let actual = risk::size(&p, &costs, request);
+                    match expected {
+                        None => assert!(actual.is_err(), "{symbol} {side:?} {equity} {commission}"),
+                        Some((volume, loss, marked, margin, fee)) => {
+                            let actual = actual.unwrap();
+                            assert_eq!(
+                                (
+                                    actual.volume,
+                                    actual.intended_loss_micro_usd,
+                                    actual.equity_after_entry_mark_micro_usd,
+                                    actual.initial_margin_micro_usd,
+                                    actual.entry_fee_micro_usd
+                                ),
+                                (volume, loss, marked, margin, fee),
+                                "{symbol} {side:?} {equity} {commission}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
