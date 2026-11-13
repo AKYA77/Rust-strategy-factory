@@ -11,6 +11,7 @@ fn main() {
         "rust-toolchain.toml",
         "src/contracts.rs",
         "src/data.rs",
+        "src/native.rs",
         "src/candles.rs",
         "src/indicators.rs",
         "src/strategies.rs",

@@ -4,7 +4,7 @@ Status: SOFTWARE_INCOMPLETE. Read AGENTS.md, PROJECT_STATE.json, ACCEPTANCE.md a
 
 ## Latest milestone
 
-93 Rust application tests pass, with formatting/Clippy, release build and Chromium desktop/mobile acceptance. SQLite schema6 now atomically reserves immutable OOS intervals before evaluation. Other protocols and dataset revisions cannot register overlapping work. Exact recovery remains allowed; range-set changes fail. Multi-range failures roll back completely. An actual two-thread/two-connection race proves that reservation and outside exposure cannot both succeed. An index supports same-instrument exposure lookup. Legacy global reservations stay conservative.
+97 Rust application tests pass, with formatting/Clippy, release build and Chromium desktop/mobile acceptance. SQLite schema6 now atomically reserves immutable OOS intervals before evaluation. Other protocols and dataset revisions cannot register overlapping work. Exact recovery remains allowed; range-set changes fail. Multi-range failures roll back completely. An actual two-thread/two-connection race proves that reservation and outside exposure cannot both succeed. An index supports same-instrument exposure lookup. Legacy global reservations stay conservative.
 
 Frozen protocol execution, immutable reports/reuse, instrument-scoped and cross-dataset final protection, chronological windows, conditional Hoeffding/Bonferroni diagnostics and initial executable-stop feasibility remain tested. Reports always return INSUFFICIENT_EVIDENCE, uncertainty assumptions remain unverified, real final execution stays blocked before reservation. No qualified strategies. Earlier invalid 30-tick fixture goldens are historical/superseded (see ACCEPTANCE.md).
 
@@ -15,6 +15,8 @@ Protocol v4 now binds exact OOS exit-year/UTC entry-session breakdowns and per-f
 Protocol v5 now binds fixed causal M1 regime labels. Trend and range compare the latest strictly prior closed candle with 20 preceding candles; gaps reset history and unknown warmup/gap/stale context remains counted. One bounded publication-summary classifier is shared across frozen candidates. Prefix/entry-quote invariance, ties, gap reset/recovery and expanded/downward cases pass. OOS regime counts reconcile with actual receipts. See DECISIONS/0004-causal-regime-labels.md.
 
 Selected-source review now records exact Git revisions/file hashes/licenses for Tickforge, Wickra and LZ4 Flex. Tickforge is unsuitable as the authoritative engine under our later-event/exact-account contract; Wickra is a possible numerical oracle requiring compatibility checks; LZ4 Flex remains an unmeasured codec candidate. No code copied/dependency added. See SOURCE_REUSE_MATRIX.md and SOURCE_REVIEW receipts. Network status was rechecked: custom provider/API domains remain unapplied.
+
+Native uncompressed SoA format now preserves exact event/provenance/profile identities through bounded checksummed artifacts, CLI packing/unpacking and research/protocol loading. Four native tests and actual CLI nonzero replay/cache equivalence pass. Chromium research fixture now loads native input. This is an interchange baseline; execution reconstructs current events. Parquet/ZSTD, compression comparisons, direct SoA/mmap and full-history streaming remain unfinished. See RUNBOOKS/native-storage.md.
 
 ## Begin next
 

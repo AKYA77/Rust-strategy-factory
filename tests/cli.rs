@@ -36,6 +36,41 @@ fn import_inspect_evaluate_and_overwrite_protection() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
+    let native = dir.join("dataset.rsf");
+    let restored = dir.join("restored.json");
+    assert!(
+        invoke(&[
+            "pack-native",
+            dataset.to_str().unwrap(),
+            native.to_str().unwrap()
+        ])
+        .status
+        .success()
+    );
+    assert!(
+        !invoke(&[
+            "pack-native",
+            dataset.to_str().unwrap(),
+            native.to_str().unwrap()
+        ])
+        .status
+        .success()
+    );
+    assert!(
+        invoke(&[
+            "unpack-native",
+            native.to_str().unwrap(),
+            restored.to_str().unwrap()
+        ])
+        .status
+        .success()
+    );
+    assert_eq!(fs::read(&dataset).unwrap(), fs::read(&restored).unwrap());
+    assert!(
+        invoke(&["inspect", native.to_str().unwrap()])
+            .status
+            .success()
+    );
     let d: Dataset = serde_json::from_slice(&fs::read(&dataset).unwrap()).unwrap();
     d.verify().unwrap();
     assert_eq!(
@@ -51,7 +86,7 @@ fn import_inspect_evaluate_and_overwrite_protection() {
     assert!(
         invoke(&[
             "evaluate",
-            dataset.to_str().unwrap(),
+            native.to_str().unwrap(),
             strategy.to_str().unwrap(),
             result.to_str().unwrap()
         ])
@@ -77,7 +112,12 @@ fn import_inspect_evaluate_and_overwrite_protection() {
     );
     let first: serde_json::Value = serde_json::from_slice(&first.stdout).unwrap();
     assert_eq!(first["reused"], false);
-    let second = invoke(&args);
+    let second = invoke(&[
+        "experiment",
+        native.to_str().unwrap(),
+        strategy.to_str().unwrap(),
+        registry.to_str().unwrap(),
+    ]);
     assert!(second.status.success());
     let second: serde_json::Value = serde_json::from_slice(&second.stdout).unwrap();
     assert_eq!(second["reused"], true);

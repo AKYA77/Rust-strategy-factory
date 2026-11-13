@@ -21,6 +21,13 @@ fn read_json<T: serde::de::DeserializeOwned>(path: &str) -> Result<T> {
     }
     serde_json::from_reader(std::io::BufReader::new(file)).map_err(|e| e.to_string())
 }
+fn read_dataset(path: &str) -> Result<Dataset> {
+    if Path::new(path).extension().is_some_and(|e| e == "rsf") {
+        rust_strategy_factory::native::read(Path::new(path))
+    } else {
+        read_json(path)
+    }
+}
 fn print<T: serde::Serialize>(value: &T) -> Result<()> {
     println!(
         "{}",
@@ -88,11 +95,11 @@ fn research_inputs(config_path: &str) -> Result<(Vec<research::Input>, research:
         }
     }
     if bytes > 128 * 1024 * 1024 {
-        return Err("loaded research JSON input files exceed 128 MiB budget; native full-history storage remains pending".into());
+        return Err("loaded research input files exceed 128 MiB budget; full-history streaming remains pending".into());
     }
     let mut inputs = Vec::new();
     for input in config.inputs {
-        let dataset: Dataset = read_json(
+        let dataset: Dataset = read_dataset(
             base.join(input.dataset)
                 .to_str()
                 .ok_or("non-UTF8 input path")?,
@@ -205,13 +212,23 @@ fn run(args: &[String]) -> Result<()> {
             print(&data.manifest)?;
             data.verify()
         }
+        ["pack-native", input, output] => {
+            let dataset = read_dataset(input)?;
+            rust_strategy_factory::native::write(Path::new(output), &dataset)?;
+            print(&dataset.manifest)
+        }
+        ["unpack-native", input, output] => {
+            let dataset = rust_strategy_factory::native::read(Path::new(input))?;
+            save(output, &dataset)?;
+            print(&dataset.manifest)
+        }
         ["inspect", path] => {
-            let d: Dataset = read_json(path)?;
+            let d: Dataset = read_dataset(path)?;
             d.verify()?;
             print(&d.manifest)
         }
         ["candles", path, tf] => {
-            let d: Dataset = read_json(path)?;
+            let d: Dataset = read_dataset(path)?;
             let tf: Timeframe = serde_json::from_value(serde_json::Value::String(tf.to_string()))
                 .map_err(|e| e.to_string())?;
             print(&candles::build(&d, tf)?)
@@ -234,7 +251,7 @@ fn run(args: &[String]) -> Result<()> {
             Ok(())
         }
         ["experiment", path, strategy_path, database] => {
-            let d: Dataset = read_json(path)?;
+            let d: Dataset = read_dataset(path)?;
             if d.profile.quote != "USD" {
                 return Err(
                     "non-USD evaluation requires explicit event-aligned conversions".into(),
@@ -307,7 +324,7 @@ fn run(args: &[String]) -> Result<()> {
             )?)
         }
         ["evaluate", path, strategy_path, output] => {
-            let d: Dataset = read_json(path)?;
+            let d: Dataset = read_dataset(path)?;
             if d.profile.quote != "USD" {
                 return Err("non-USD evaluation requires explicit event-aligned conversion series through the Rust API; no inferred rates".into());
             }
@@ -328,7 +345,7 @@ fn run(args: &[String]) -> Result<()> {
         }
         [] | ["--help"] | ["help"] => {
             println!(
-                "Rust Strategy Factory — historical research only; SOFTWARE_INCOMPLETE\n\nvalidate-protocol <input-config.json> <plan.json> <registry.sqlite>\nprotocol-report <registry.sqlite> <protocol-id>\nauth-init <new-auth.json> (password from stdin)\nserve <registry.sqlite> <auth.json> <port>\nprofiles\nfixture <symbol> <new-dataset.json>\ngenerate\nimport <normalized.csv> <profile.json> <source-url-or-description> <new-dataset.json> <real|synthetic>\ninspect <dataset.json>\ncandles <dataset.json> <M1|M5|M15|M30|H1|H4|D1>\nevaluate <dataset.json> <strategy.json> <new-result.json>\nexperiment <dataset.json> <strategy.json> <registry.sqlite>\nregistry-check <registry.sqlite>\nbackup <registry.sqlite> <new-backup.sqlite>\nresearch <config.json> <registry.sqlite> [max-steps]\nresearch-status <registry.sqlite> <run-id>\nresearch-control <registry.sqlite> <run-id> <running|paused|stopped>\n\nSynthetic profiles do not establish broker feasibility. No strategy qualification is implemented."
+                "Rust Strategy Factory — historical research only; SOFTWARE_INCOMPLETE\n\nvalidate-protocol <input-config.json> <plan.json> <registry.sqlite>\nprotocol-report <registry.sqlite> <protocol-id>\nauth-init <new-auth.json> (password from stdin)\nserve <registry.sqlite> <auth.json> <port>\nprofiles\nfixture <symbol> <new-dataset.json>\ngenerate\nimport <normalized.csv> <profile.json> <source-url-or-description> <new-dataset.json> <real|synthetic>\npack-native <dataset.json|dataset.rsf> <new-dataset.rsf>\nunpack-native <dataset.rsf> <new-dataset.json>\ninspect <dataset.json|dataset.rsf>\ncandles <dataset.json|dataset.rsf> <M1|M5|M15|M30|H1|H4|D1>\nevaluate <dataset.json|dataset.rsf> <strategy.json> <new-result.json>\nexperiment <dataset.json|dataset.rsf> <strategy.json> <registry.sqlite>\nregistry-check <registry.sqlite>\nbackup <registry.sqlite> <new-backup.sqlite>\nresearch <config.json> <registry.sqlite> [max-steps]\nresearch-status <registry.sqlite> <run-id>\nresearch-control <registry.sqlite> <run-id> <running|paused|stopped>\n\nSynthetic profiles do not establish broker feasibility. No strategy qualification is implemented."
             );
             Ok(())
         }

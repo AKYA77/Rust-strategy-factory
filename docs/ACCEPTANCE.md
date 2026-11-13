@@ -102,3 +102,9 @@ Protocol results always remain INSUFFICIENT_EVIDENCE. Fold accounts reset indepe
 ## Initial external source review
 
 Selected manifests/licenses/implementation files from Tickforge, Wickra and LZ4 Flex were actually retrieved at exact Git revisions. File hashes and sizes are retained in SOURCE_REVIEW/2026-11-12-initial.json; SOURCE_REUSE_MATRIX.md records concrete semantic/dependency observations and deferred decisions. No source implementation copied, runtime dependency added, upstream benchmark adopted or real-data performance claim made. The remaining requested frameworks/codecs are explicitly unreviewed. The unchanged application still passes all 93 Rust tests and required formatting/Clippy; its last release/browser acceptance passed at the causal-regime milestone.
+
+## Native lossless storage foundation
+
+97 Rust tests pass with formatting/Clippy, release build and actual Chromium acceptance. Four native tests cover all eight profiles/provenance, tied original order, complete u64 sequence range, chunk boundaries, no-overwrite publication/cleanup, malformed lengths, checksum/header/body corruption, truncation/trailing bytes and structural validation independent of checksums. The CLI test packs/unpacks exact JSON bytes, executes the independently calculated nonzero $2.8815 fixture trade via native input and reuses a JSON-created experiment without another attempt. Chromium research now loads native input before its normal real-service persistence/UI checks.
+
+This uncompressed SoA wrapper is a bounded foundation, not selected production storage or Parquet/ZSTD. It reconstructs the existing event representation; no compression, zero-copy/mmap, full-history throughput or real-data performance claim. Source/category metadata never promotes on encoding. Original archives, licensing and approval remain separate requirements. Production crash/disk-full acceptance remains pending.
