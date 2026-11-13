@@ -124,6 +124,7 @@ fn new_crosses_produce_actual_subsequent_quote_trades_with_independent_accountin
         },
     ] {
         let s = Strategy {
+            stop_policy: None,
             timeframe: Timeframe::M1,
             side: Side::Long,
             stop_ticks: 100,

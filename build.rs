@@ -17,6 +17,7 @@ fn main() {
         "src/strategies.rs",
         "src/orders.rs",
         "src/risk.rs",
+        "src/stops.rs",
         "src/tick_engine.rs",
         "src/screen.rs",
         "src/validation.rs",

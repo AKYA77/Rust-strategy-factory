@@ -1,18 +1,28 @@
-# ATR initial-stop design
+# Frozen ATR initial stops
 
-Status: PLANNED, not implemented or accepted. Continue implementation; this document is not an approval gate.
+Implemented in engine `ordered-l1-v6-frozen-atr-stops`, indicator version `causal-primitives-v4-outward-atr`. Software verification remains separate from research qualification.
 
-Add optional `stop_policy: {"Atr":{"window":14,"multiple_bps":20000}}` to Strategy; omit/skip None to preserve legacy fixed-stop concept serialization. Existing stop_ticks is the minimum distance floor under ATR, still the fixed distance when policy is absent. Validate policy/domain before computation.
+Optional strategy field:
 
-Use closed primary bid candles only. Seed Wilder ATR with ceil(sum first-window true ranges / window), then ceil((previous_atr*(window-1)+TR)/window), using checked i128 arithmetic. This explicitly quantized outward policy intentionally differs from an unrounded floating ATR. Multiply outward in basis points, round outward to the profile tick grid and apply strategy/profile distance floors. Insufficient warmup must reject/skip an entry explicitly; no fallback fake ATR. Distances beyond the existing one-million-tick grammar budget must reject the affected entry, rather than clamp silently or abort an earlier window due to a later bar. Prepare only the chronological feature prefix from decision0007. Preserve a constant prepared representation for legacy fixed stops to avoid allocating a per-candle array unnecessarily.
+```json
+{"stop_policy":{"Atr":{"window":14,"multiple_bps":20000}}}
+```
 
-Store the initial raw stop distance in risk::Reservation as an optional, backward-readable audit field. Every new reservation has Some(distance); historical None means unknown, never silently reconstructed. Pending orders freeze this distance and quantity at placement. Pre-fill risk/margin checks use the stored distance and current quotes/FX/cash; they never recompute ATR or resize quantity. Position SL/3R target derives from actual fill plus the frozen distance. Subsequent ATR changes do not trail/reprice an open position. Existing fees, marked equity, initial executable-stop distance checks, liquidity assumptions, expiry/cancellation ordering and uncapped losses remain unchanged. Version the engine for the new behavior and keep the benchmark engine tag dynamic.
+When present, stop_ticks is a minimum floor; it is not added to ATR. When absent, the original fixed stop and canonical serialization remain unchanged. Strategy/rule/policy JSON rejects unknown fields so a misspelled stop_policy cannot silently select a different model.
 
-Independent fixtures to implement:
+Only actually closed primary bid candles contribute. True range is max(high-low, abs(high-previous_close), abs(low-previous_close)); the first bar uses high-low. Seed Wilder ATR with ceil(sum first-window TR / window), then ceil((previous_atr*(window-1)+TR)/window), using checked i128 seed/recurrence arithmetic. This explicitly outward-quantized policy intentionally differs from an unrounded floating ATR and can accumulate upward rounding. It never uses floating monetary distances.
 
-- TR5,10,5,5, window2 gives outward ATR None,8,7,6. Tick5 and multiplier15000 with floor2 ticks gives distances None,15,15,10.
-- Core EUR test bars (bid100000 at0,100020 at60000,100040 at120000) seed ATR10 at the second closed candle. Window2/multiplier50000 and floor30 produces distance50. A subsequent quote entry100090/target100240 yields quantity19210 and net $2.8815 under the declared synthetic costs/profile.
-- Pending stop at publication120000: effective trigger100090, planned/fill entry100110, distance50. A downward quote99000 before the next publication raises later ATR to525 (new distance2625), but cancel_on_signal_false=false keeps the existing intent. Quote100070/ask100090 fills it unchanged; later bid100350 reaches target100260, quantity19210, net $2.8815. Reservation receipts must prove identical distance/quantity before/after fill.
-- Warmup, grid/floor/domain/overflow checks, future-prefix invariance, prepared-state serialization compatibility, generator/protocol/browser integration and fixed-stop regressions.
+Multiply outward in basis points, round outward to the profile tick grid and apply strategy/profile distance floors. Warmup remains unavailable; it never falls back to the floor. Values beyond the one-million-tick grammar/price representation budget reject the affected entry without clamping or aborting an earlier window. Preparation uses the causal prefix from decision0007. Legacy fixed stops retain a constant prepared representation. Preparation alone does not guarantee feasibility: the risk gate still enforces the minimum from the executable mark after entry friction.
 
-No qualifying status, real-data approval or production performance claim follows from implementing this policy.
+Every new risk reservation stores Some(raw stop distance) in price units, excluding adverse exit slip. Historical missing fields deserialize as None/unknown and are not silently reconstructed. Pending orders freeze this distance and quantity at placement. Pre-fill validation uses the stored distance and current quotes/FX/cash; it never recomputes ATR or resizes. Position SL and planned 3R target derive from actual fill and frozen distance. Later ATR does not trail or reprice an open position. Existing commissions, marked equity, expiry/cancellation order, L1 assumptions and uncapped losses remain in force. Off-grid risk prices/distances are rejected rather than rounded.
+
+Protocol v7 binds effective policies, frozen ATR window/multiplier probes and the robustness method version. Every derived case counts toward the trial budget before OOS execution. Every eleventh expanded autonomous region adds a typed ATR policy. Browser protocol setup also submits ATR together with MACD and higher confirmation. Reports remain INSUFFICIENT_EVIDENCE; probes remain descriptive and never use final data for adaptation.
+
+Verified independent fixtures:
+
+- TR5,10,5,5 with window2 gives ATR None,8,7,6. Tick5/multiplier15000/floor2 ticks gives distances None,15,15,10.
+- EUR closed-bar seed ATR10, multiplier50000/floor30 gives distance50. Entry100090/target100240, quantity19210, net $2.8815. Fixed50 replay matches; appended valid extreme future prices cannot change the earlier window.
+- Pending entry100110 freezes distance50/quantity19210. Later ATR rises to525 (new distance2625), but the existing intent fills unchanged and reaches target100260 for $2.8815. Both reservation receipts prove the same distance/quantity.
+- Warmup/excess-distance/domain failure, historical reservation deserialization, strict fields, autonomous/policy probes, actual frozen OOS replay/trial-budget inclusion and risk-grid rejection all pass. Fixed-stop regressions remain enabled.
+
+No broker/session/coverage approval, independent statistical qualification, full-history or production performance claim follows from these synthetic fixtures.

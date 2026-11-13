@@ -64,6 +64,7 @@ fn input(extra: bool) -> Input {
 }
 fn strategy() -> Strategy {
     Strategy {
+        stop_policy: None,
         timeframe: Timeframe::M1,
         side: Side::Long,
         stop_ticks: 50,

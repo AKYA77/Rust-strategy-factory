@@ -13,6 +13,8 @@ pub struct Reservation {
     pub initial_margin_micro_usd: i128,
     pub entry_fee_micro_usd: i128,
     pub equity_after_entry_mark_micro_usd: i128,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stop_distance_price_units: Option<i64>,
 }
 pub fn margin(p: &Profile, entry: i64, volume: i64, fx: Conversion) -> Result<i128> {
     p.validate()?;
@@ -52,6 +54,9 @@ pub fn reserve(p: &Profile, costs: &Costs, r: Request, volume: i64) -> Result<Re
         || r.entry <= 0
         || r.mark <= 0
         || r.stop_with_exit_slip <= 0
+        || r.entry % p.tick != 0
+        || r.mark % p.tick != 0
+        || r.stop_with_exit_slip % p.tick != 0
         || volume < p.min_micro_lots
         || volume > p.max_micro_lots
         || volume % p.step_micro_lots != 0
@@ -110,6 +115,7 @@ pub fn reserve(p: &Profile, costs: &Costs, r: Request, volume: i64) -> Result<Re
         initial_margin_micro_usd: initial_margin,
         entry_fee_micro_usd: fee,
         equity_after_entry_mark_micro_usd: marked,
+        stop_distance_price_units: Some(raw_stop),
     })
 }
 /// Monotone integer search accounts for fee rounding, post-fill equity and volume steps.

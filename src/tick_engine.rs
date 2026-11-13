@@ -259,17 +259,11 @@ fn replay_internal(
     if mask.len() != candles.len() || (0..visible).any(|i| mask.get(i) != expected.get(i)) {
         return Err("signals inconsistent with frozen strategy".into());
     }
-    let distance = strategy
-        .stop_ticks
-        .checked_mul(p.tick)
-        .ok_or("stop overflow")?;
+    let distances = crate::stops::prepare(&strategy, p, &candles[..visible])?;
     let slip = costs
         .slippage_pips
         .checked_mul(p.pip)
         .ok_or("slippage overflow")?;
-    if strategy.stop_ticks < p.min_stop_ticks {
-        return Err("stop below profile minimum".into());
-    }
     let mut balance = contracts::INITIAL_EQUITY;
     let mut marked = balance;
     let mut peak = balance;
@@ -382,6 +376,10 @@ fn replay_internal(
                 let mut preview = intent.order.clone();
                 let candidate = preview.on_quote(p, costs, *t)?;
                 if let Some(fill) = candidate {
+                    let distance = intent
+                        .reservation
+                        .stop_distance_price_units
+                        .ok_or("legacy pending reservation lacks frozen stop distance")?;
                     let request = crate::risk::Request {
                         equity: balance,
                         entry: fill.price,
@@ -477,12 +475,20 @@ fn replay_internal(
             }
             // New orders are placed after existing order processing; they cannot fill on publication.
             while candle_i < candles.len() && candles[candle_i].publication_sequence <= t.sequence {
+                let distance = distances.at(candle_i);
                 let wants = mask.get(candle_i)
                     && window.is_none_or(|w| w.contains(candles[candle_i].available_ms));
                 candle_i += 1;
                 if !wants || pending.is_some() || position.is_some() || closed_now || filled_now {
                     continue;
                 }
+                let crate::stops::Distance::Ready(distance) = distance else {
+                    rejections.push(Rejection {
+                        event: t.sequence,
+                        reason: distance.rejection().into(),
+                    });
+                    continue;
+                };
                 let placement = || -> Result<PendingEntry> {
                     let (offset_ticks, ttl, _) = plan.parameters();
                     let offset = offset_ticks
@@ -579,12 +585,20 @@ fn replay_internal(
         } else {
             // Market-only v1 concepts retain signal timing; sizing now includes marked entry costs.
             while candle_i < candles.len() && candles[candle_i].publication_sequence < t.sequence {
+                let distance = distances.at(candle_i);
                 let wants = mask.get(candle_i)
                     && window.is_none_or(|w| w.contains(candles[candle_i].available_ms));
                 candle_i += 1;
                 if !wants || position.is_some() || closed_now {
                     continue;
                 }
+                let crate::stops::Distance::Ready(distance) = distance else {
+                    rejections.push(Rejection {
+                        event: t.sequence,
+                        reason: distance.rejection().into(),
+                    });
+                    continue;
+                };
                 let entry =
                     crate::orders::market_from_effective(p, costs, bid, ask, strategy.side)?;
                 let sizing = crate::risk::size(

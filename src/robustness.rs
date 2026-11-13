@@ -9,7 +9,7 @@ use crate::{
     validation::Observation,
 };
 use serde::{Deserialize, Serialize};
-pub const VERSION: &str = "fixed-cost-stop-rule-neighborhood-v2";
+pub const VERSION: &str = "fixed-cost-stop-rule-neighborhood-v3-atr";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Case {
     pub name: String,
@@ -48,6 +48,48 @@ pub fn cases(strategy: &Strategy, costs: &Costs) -> Result<Vec<Case>> {
                 strategy: neighbor.canonical()?,
                 costs: costs.clone(),
             });
+        }
+    }
+    if let Some(crate::stops::Policy::Atr {
+        window,
+        multiple_bps,
+    }) = &strategy.stop_policy
+    {
+        let step = (*window / 10).max(1);
+        for (name, next) in [
+            ("atr-window-lower", window.saturating_sub(step)),
+            ("atr-window-higher", window + step),
+        ] {
+            let mut neighbor = strategy.clone();
+            neighbor.stop_policy = Some(crate::stops::Policy::Atr {
+                window: next,
+                multiple_bps: *multiple_bps,
+            });
+            if let Ok(neighbor) = neighbor.canonical() {
+                cases.push(Case {
+                    name: name.into(),
+                    strategy: neighbor,
+                    costs: costs.clone(),
+                });
+            }
+        }
+        let step = (*multiple_bps / 10).max(1);
+        for (name, next) in [
+            ("atr-multiple-lower", multiple_bps.saturating_sub(step)),
+            ("atr-multiple-higher", multiple_bps + step),
+        ] {
+            let mut neighbor = strategy.clone();
+            neighbor.stop_policy = Some(crate::stops::Policy::Atr {
+                window: *window,
+                multiple_bps: next,
+            });
+            if let Ok(neighbor) = neighbor.canonical() {
+                cases.push(Case {
+                    name: name.into(),
+                    strategy: neighbor,
+                    costs: costs.clone(),
+                });
+            }
         }
     }
     for (i, rule) in crate::neighborhood::rules(&strategy.rule)?

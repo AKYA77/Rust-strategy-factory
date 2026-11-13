@@ -339,6 +339,12 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
             s.rule = Rule::All(vec![s.rule, extra]);
         }
     }
+    if region % 11 == 10 {
+        s.stop_policy = Some(crate::stops::Policy::Atr {
+            window: 14,
+            multiple_bps: 20000,
+        });
+    }
     s.stop_ticks += (region / 300) as i64 * 200;
     s.entry = match region % 3 {
         0 => None,

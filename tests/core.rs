@@ -33,6 +33,7 @@ fn sample(last_bid: i64, last_ask: i64, last_ms: i64) -> data::Dataset {
 }
 fn strategy(side: Side) -> Strategy {
     Strategy {
+        stop_policy: None,
         timeframe: Timeframe::M1,
         side,
         entry: None,

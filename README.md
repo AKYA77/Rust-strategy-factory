@@ -2,7 +2,7 @@
 
 Historical strategy research and paper simulation in Rust. **SOFTWARE_INCOMPLETE.** No qualified strategies, approved broker profiles, real-data acceptance or full historical research readiness are claimed.
 
-The current implementation includes exact integer accounting, eight explicit synthetic instrument profiles, bounded normalized bid/ask import, closed UTC candles on seven timeframes, causal features including MACD/Bollinger crosses, typed closed higher-timeframe confirmations and nine strategy families, market/stop/limit entry replay with fixed reservations and marked-margin checks, a durable single-worker research loop, immutable SQLite experiment evidence, chronological evaluation windows, frozen protocol execution, and an authenticated loopback dashboard.
+The current implementation includes exact integer accounting, eight explicit synthetic instrument profiles, bounded normalized bid/ask import, closed UTC candles on seven timeframes, causal features including MACD/Bollinger crosses, typed closed higher-timeframe confirmations and nine strategy families, market/stop/limit entry replay with fixed reservations, typed outward ATR initial stops and marked-margin checks, a durable single-worker research loop, immutable SQLite experiment evidence, chronological evaluation windows, frozen protocol execution, and an authenticated loopback dashboard.
 
 ## Development
 
@@ -47,3 +47,5 @@ Prices, volume and money use exact integers. Initial equity is $20, intended ris
 CSV headers are exactly `timestamp_ms,sequence,bid,ask`. Prices are decimal strings, timestamps UTC milliseconds and sequence numbers strictly increase in original event order. Timestamp ties are retained; import never sorts or repairs events. Parse failures reject the import; structurally invalid streams are quarantined. Output paths must be new. Non-USD conversion requires explicit event-aligned prior-only rates. UTC continuous research candles publish only after a subsequent real event proves closure; unfinished final candles and fabricated gap candles are excluded. Broker/DST calendars remain unapproved.
 
 See the [master directive](docs/MASTER_BLUEPRINT.md), [acceptance history](docs/ACCEPTANCE.md), [project state](docs/PROJECT_STATE.json), [complete unfinished queue](docs/IMPLEMENTATION_QUEUE.md), and [next action](docs/NEXT_ACTION.md). Synthetic benchmark receipts in `docs/BENCHMARKS` describe their specific source versions and workloads; they do not establish real-data throughput. The experimental first-hit index remains disabled in replay.
+
+Optional ATR stop_policy uses stop_ticks as a minimum floor and freezes the distance at pending placement. Unknown strategy/rule fields are rejected. See [ATR policy and exact fixtures](docs/DECISIONS/0008-atr-initial-stops.md).

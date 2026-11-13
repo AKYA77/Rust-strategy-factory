@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub enum Rule {
     AboveMean {
         window: usize,
@@ -280,6 +281,7 @@ impl EntryPlan {
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Strategy {
     pub timeframe: Timeframe,
     pub side: Side,
@@ -287,11 +289,16 @@ pub struct Strategy {
     pub rule: Rule,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entry: Option<EntryPlan>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stop_policy: Option<crate::stops::Policy>,
 }
 impl Strategy {
     pub fn canonical(&self) -> Result<Self> {
         if let Some(plan) = &self.entry {
             plan.validate()?;
+        }
+        if let Some(policy) = &self.stop_policy {
+            policy.validate()?;
         }
         if self.stop_ticks <= 0 || self.stop_ticks > 1_000_000 {
             return Err("stop distance out of bounds".into());
@@ -848,6 +855,7 @@ pub fn family_templates() -> Vec<Candidate> {
                         out.push(Candidate {
                             family,
                             strategy: Strategy {
+                                stop_policy: None,
                                 timeframe,
                                 side,
                                 stop_ticks,

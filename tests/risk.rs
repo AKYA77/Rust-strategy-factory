@@ -79,3 +79,33 @@ fn protective_distance_is_measured_from_executable_mark_including_minimum_grid()
     stricter.min_stop_ticks = 11;
     assert!(risk::reserve(&stricter, &Costs::default(), r, 1000).is_err());
 }
+
+#[test]
+fn reservation_rejects_off_grid_prices_and_distance_without_rounding_a_request() {
+    let mut p = Profile::synthetic("EURUSD").unwrap();
+    p.tick = 5;
+    let costs = Costs::default();
+    let r = request();
+    assert_eq!(
+        risk::reserve(&p, &costs, r, 1000)
+            .unwrap()
+            .stop_distance_price_units,
+        Some(50)
+    );
+    for invalid in [
+        Request {
+            entry: r.entry + 1,
+            ..r
+        },
+        Request {
+            mark: r.mark + 1,
+            ..r
+        },
+        Request {
+            stop_with_exit_slip: r.stop_with_exit_slip + 1,
+            ..r
+        },
+    ] {
+        assert!(risk::reserve(&p, &costs, invalid, 1000).is_err());
+    }
+}

@@ -50,6 +50,7 @@ fn plan() -> Plan {
         ],
         holdout: span("2025-10-02T00:00:00Z", "2026-01-02T00:00:00Z"),
         candidates: vec![Strategy {
+            stop_policy: None,
             timeframe: Timeframe::M1,
             side: Side::Long,
             stop_ticks: 100,
@@ -474,6 +475,40 @@ fn frozen_protocol_replays_actual_higher_timeframe_candidates() {
             > 0
     );
     assert_eq!(result.report.candidates[0].failed_windows, 0);
+    registry.integrity().unwrap();
+    drop(registry);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn frozen_protocol_executes_atr_stops_and_includes_all_policy_probes_in_trial_budget() {
+    let dir = dir();
+    let mut registry = Registry::open(&dir.join("state.sqlite")).unwrap();
+    let input = input();
+    let mut plan = plan();
+    plan.candidates[0].stop_policy = Some(rust_strategy_factory::stops::Policy::Atr {
+        window: 2,
+        multiple_bps: 15000,
+    });
+    let expected = rust_strategy_factory::robustness::cases(&plan.candidates[0], &plan.costs)
+        .unwrap()
+        .len();
+    let mut insufficient = plan.clone();
+    insufficient.trial_budget = expected as u64;
+    assert!(insufficient.canonical().is_err());
+    let report = science::execute(
+        &mut registry,
+        &input,
+        &plan,
+        "atr-policy-version",
+        &science::Budget::default(),
+    )
+    .unwrap()
+    .report;
+    assert_eq!(report.status, "INSUFFICIENT_EVIDENCE");
+    assert_eq!(report.candidates[0].robustness.len(), expected);
+    assert_eq!(report.candidates[0].failed_windows, 0);
+    assert!(report.candidates[0].pooled_oos_reset_fold_stats.closed > 0);
     registry.integrity().unwrap();
     drop(registry);
     std::fs::remove_dir_all(dir).unwrap();

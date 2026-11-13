@@ -41,6 +41,7 @@ fn fixture(symbol: &str) -> Dataset {
 }
 fn execute(d: &Dataset) -> usize {
     let s = Strategy {
+        stop_policy: None,
         timeframe: Timeframe::M1,
         side: Side::Long,
         entry: None,

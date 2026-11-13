@@ -29,6 +29,7 @@ fn run(tail: Vec<Tick>, side: Side, entry: EntryPlan) -> tick_engine::Replay {
     )
     .unwrap();
     let s = Strategy {
+        stop_policy: None,
         timeframe: Timeframe::M1,
         side,
         stop_ticks: 50,

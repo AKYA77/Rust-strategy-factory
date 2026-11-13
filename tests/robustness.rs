@@ -7,6 +7,7 @@ use rust_strategy_factory::{
 };
 fn strategy(stop_ticks: i64) -> Strategy {
     Strategy {
+        stop_policy: None,
         timeframe: Timeframe::M1,
         side: Side::Long,
         stop_ticks,

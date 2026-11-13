@@ -304,3 +304,52 @@ pub fn bollinger(values: &[i64], window: usize, multiple_bps: u32) -> Result<Vec
     }
     Ok(out)
 }
+
+/// Explicit outward-quantized Wilder ATR, including the current closed candle.
+/// Seed and every recurrence round upward to price units; no floating monetary distance.
+pub fn atr_outward(candles: &[crate::candles::Candle], window: usize) -> Result<Vec<Option<i64>>> {
+    if !(2..=100_000).contains(&window) {
+        return Err("invalid ATR lookback".into());
+    }
+    let mut out = Vec::with_capacity(candles.len());
+    let mut sum = 0_i128;
+    let mut state: Option<i128> = None;
+    for (i, candle) in candles.iter().enumerate() {
+        let c = &candle.bid;
+        if c.low <= 0
+            || c.high < c.low
+            || c.open < c.low
+            || c.open > c.high
+            || c.close < c.low
+            || c.close > c.high
+        {
+            return Err("invalid ATR candle".into());
+        }
+        let mut tr = c.high as i128 - c.low as i128;
+        if i > 0 {
+            let previous = candles[i - 1].bid.close as i128;
+            tr = tr
+                .max((c.high as i128 - previous).abs())
+                .max((c.low as i128 - previous).abs());
+        }
+        let numerator = if let Some(previous) = state {
+            Some(
+                previous
+                    .checked_mul((window - 1) as i128)
+                    .and_then(|n| n.checked_add(tr))
+                    .ok_or("ATR recurrence overflow")?,
+            )
+        } else {
+            sum = sum.checked_add(tr).ok_or("ATR seed overflow")?;
+            (i + 1 >= window).then_some(sum)
+        };
+        state = numerator.map(|n| n / window as i128 + i128::from(n % window as i128 != 0));
+        out.push(
+            state
+                .map(i64::try_from)
+                .transpose()
+                .map_err(|_| "ATR exceeds price representation")?,
+        );
+    }
+    Ok(out)
+}

@@ -51,7 +51,10 @@
     "MACD and population Bollinger cross operators with explicit quantization, checked variance, centered arithmetic, independent fixtures and nonzero exact tick accounting",
     "expanded MACD/band candidate regions and bounded signal-window parameter probes",
     "exclusive-end feature compilation and recursive higher-context truncation preventing valid future numerical failures from changing earlier windows",
-    "serialized mask backing/padding validation and truthful compiled benchmark engine metadata"
+    "serialized mask backing/padding validation and truthful compiled benchmark engine metadata",
+    "typed outward integer Wilder ATR initial stops with causal grid rounding, explicit warmup/budget rejection and constant legacy fixed-stop preparation",
+    "frozen protective distance in risk reservation receipts, unchanged pending quantity/distance through volatility changes and pre-fill validation",
+    "ATR autonomous/protocol/browser integration and frozen policy-parameter probes with trial accounting; strict strategy fields and risk price grids"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -59,9 +62,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Implement typed causal ATR stop policy with fixed placement risk and independent accounting; then evidence acceptance and remaining full implementation queue.",
+  "next_action": "Optimize proven mask-prefix verification and measure the current sequential baseline; then diagnostics/improvement lineage, evidence acceptance and remaining full queue.",
   "qualified_strategies": 0,
-  "tests_passed": 111,
+  "tests_passed": 119,
   "benchmark": "docs/BENCHMARKS/2026-11-12-synthetic-replay.json",
   "browser_acceptance": "Chromium desktop/mobile against actual Rust HTTP server and SQLite; auth, CSRF/origin/host/body/rates, controls, receipts/export, restart/logout passed"
 }
