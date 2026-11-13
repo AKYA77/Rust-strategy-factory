@@ -9,7 +9,7 @@ use crate::{
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-pub const VERSION: &str = "training-proposals-v3-friction-stop";
+pub const VERSION: &str = "training-proposals-v4-structural-diversity";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Options {
@@ -266,9 +266,24 @@ pub fn diagnose(registry: &mut Registry, parent_id: &str, options: &Options) -> 
                 })
                 .collect::<Result<Vec<_>>>()?;
             candidates.sort_by(|a, b| a.0.cmp(&b.0));
+            // Alternate scalar/stop and structural hypotheses to avoid a small
+            // child budget being consumed entirely by one mutation class.
+            let structural = crate::exploration::cases(&strategy, &costs, options.seed)?;
+            let mut mixed = Vec::new();
+            let mut scalar = candidates.into_iter().map(|(_, case)| case);
+            let mut structural = structural.into_iter();
+            loop {
+                let a = scalar.next();
+                let b = structural.next();
+                if a.is_none() && b.is_none() {
+                    break;
+                }
+                mixed.extend(a);
+                mixed.extend(b);
+            }
             let mut seen = BTreeSet::from([strategy.identity()?]);
             seen.extend(report.proposals.iter().map(|p| p.concept_id.clone()));
-            for (_, case) in candidates {
+            for case in mixed {
                 let concept_id = case.strategy.identity()?;
                 if report.proposals.len() >= options.max_children {
                     break;
@@ -279,7 +294,7 @@ pub fn diagnose(registry: &mut Registry, parent_id: &str, options: &Options) -> 
                         concept_id,
                         strategy: case.strategy,
                         operator: case.name,
-                        rationale: "Bounded training neighborhood probe; performance effect unknown".into(),
+                        rationale: "Bounded training parameter/structure hypothesis; performance effect unknown; donor templates are not independently confirmed".into(),
                         status: "UNEVALUATED".into(),
                     });
                 }

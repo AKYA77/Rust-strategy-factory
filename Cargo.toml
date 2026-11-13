@@ -36,3 +36,7 @@ blake3 = "1.8"
 [[bench]]
 name = "mask_prefix"
 harness = false
+
+[[bench]]
+name = "exploration"
+harness = false

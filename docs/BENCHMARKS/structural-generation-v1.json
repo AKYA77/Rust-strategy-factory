@@ -1,0 +1,65 @@
+{
+  "cache": "warm template pool; generation/canonicalization/hash/dedup and output-identity checks included",
+  "class": "COMPONENT_GENERATION_NOT_RESEARCH_THROUGHPUT",
+  "compute_revision": "compute-blake3:5574421e98000587aae2fd15f1e60ae3e30e2de3c2cbc188a9c7b5838a02351a",
+  "limitations": "No market data or tick simulations; uniqueness means canonical concepts only, not independent signals or useful diversity. No A/B speed or discovery-quality claim.",
+  "measurements": [
+    {
+      "elapsed_ns": 5646705,
+      "generated": 695,
+      "ordered_workload_hash": "446b95ab545d7496bb18b3a6e450a4a5bec2c5518b8c0634c62b1935b2884b10",
+      "parent_calls": 100,
+      "repetition": 0
+    },
+    {
+      "elapsed_ns": 5471173,
+      "generated": 695,
+      "ordered_workload_hash": "446b95ab545d7496bb18b3a6e450a4a5bec2c5518b8c0634c62b1935b2884b10",
+      "parent_calls": 100,
+      "repetition": 1
+    },
+    {
+      "elapsed_ns": 5480703,
+      "generated": 695,
+      "ordered_workload_hash": "446b95ab545d7496bb18b3a6e450a4a5bec2c5518b8c0634c62b1935b2884b10",
+      "parent_calls": 100,
+      "repetition": 2
+    },
+    {
+      "elapsed_ns": 5424231,
+      "generated": 695,
+      "ordered_workload_hash": "446b95ab545d7496bb18b3a6e450a4a5bec2c5518b8c0634c62b1935b2884b10",
+      "parent_calls": 100,
+      "repetition": 3
+    },
+    {
+      "elapsed_ns": 6724270,
+      "generated": 695,
+      "ordered_workload_hash": "446b95ab545d7496bb18b3a6e450a4a5bec2c5518b8c0634c62b1935b2884b10",
+      "parent_calls": 100,
+      "repetition": 4
+    }
+  ],
+  "method": "bounded-seeded-rule-structure-v1",
+  "operation": "100 seeded bounded structural rule proposals for one synthetic M1 long parent",
+  "parent": {
+    "rule": {
+      "All": [
+        {
+          "AboveMean": {
+            "window": 20
+          }
+        },
+        {
+          "Rising": {
+            "lookback": 5
+          }
+        }
+      ]
+    },
+    "side": "Long",
+    "stop_ticks": 100,
+    "timeframe": "M1"
+  },
+  "unique_concepts_across_seeds": 56
+}

@@ -937,3 +937,53 @@ fn declared_floor_is_not_a_wide_spread_guarantee() {
     drop(r);
     std::fs::remove_dir_all(d).unwrap();
 }
+
+#[test]
+fn structural_dropout_executes_a_real_child_and_small_budgets_keep_mutation_classes() {
+    let d = dir();
+    let mut r = Registry::open(&d.join("state.sqlite")).unwrap();
+    let mut s = strategy();
+    s.rule = Rule::All(vec![s.rule, Rule::Falling { lookback: 1 }]);
+    let parent = evaluate(&mut r, &s, 100300);
+    assert_eq!(parent.result["screen"]["signals"], 0);
+    let report = improvement::diagnose(
+        &mut r,
+        &parent.experiment_id,
+        &Options {
+            max_children: 16,
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .report;
+    let child = report
+        .proposals
+        .iter()
+        .find(|p| p.strategy.identity().unwrap() == strategy().identity().unwrap())
+        .unwrap();
+    assert!(child.operator.starts_with("structural-drop-term-"));
+    assert_eq!(child.status, "UNEVALUATED");
+    let result = evaluate(&mut r, &child.strategy, 100300);
+    assert_eq!(
+        result.result["tick_replay"]["trades"][0]["net_micro_usd"],
+        -5_958_200i64
+    );
+    // A nonzero trade can lose; structure proposals are not accepted improvements.
+    assert_eq!(report.status, "TRAINING_ONLY_UNEVALUATED");
+    let small = improvement::diagnose(
+        &mut r,
+        &parent.experiment_id,
+        &Options {
+            max_children: 2,
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .report;
+    assert_eq!(small.proposals.len(), 2);
+    assert!(!small.proposals[0].operator.starts_with("structural-"));
+    assert!(small.proposals[1].operator.starts_with("structural-"));
+    r.integrity().unwrap();
+    drop(r);
+    std::fs::remove_dir_all(d).unwrap();
+}

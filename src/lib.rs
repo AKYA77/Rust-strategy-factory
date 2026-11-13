@@ -39,3 +39,5 @@ pub mod improvement;
 pub mod training_review;
 
 pub mod training_diagnostics;
+
+pub mod exploration;
