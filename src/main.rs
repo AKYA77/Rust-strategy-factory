@@ -129,6 +129,40 @@ fn research_driver(config_path: &str, database: &str) -> Result<research::Driver
         research::compute_revision()?,
     )
 }
+/// Signal listeners run independently of synchronous replay; only the main
+/// coordinator exits, at its existing post-experiment checkpoint boundary.
+fn checkpoint_shutdown() -> Result<(
+    tokio::runtime::Runtime,
+    std::sync::Arc<std::sync::atomic::AtomicBool>,
+)> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .map_err(|e| e.to_string())?;
+    let requested = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let flag = requested.clone();
+    #[cfg(unix)]
+    runtime.block_on(async {
+        use tokio::signal::unix::{SignalKind, signal};
+        // Register both streams before publishing the coordinator's readiness line.
+        let mut interrupt = signal(SignalKind::interrupt()).map_err(|e| e.to_string())?;
+        let mut terminate = signal(SignalKind::terminate()).map_err(|e| e.to_string())?;
+        tokio::spawn(async move {
+            tokio::select! {_ = interrupt.recv() => {}, _ = terminate.recv() => {}}
+            flag.store(true, std::sync::atomic::Ordering::Release);
+        });
+        Ok::<(), String>(())
+    })?;
+    #[cfg(not(unix))]
+    runtime.spawn(async move {
+        if tokio::signal::ctrl_c().await.is_ok() {
+            flag.store(true, std::sync::atomic::Ordering::Release);
+        }
+    });
+    Ok((runtime, requested))
+}
+
 fn run(args: &[String]) -> Result<()> {
     match args
         .iter()
@@ -353,6 +387,7 @@ fn run(args: &[String]) -> Result<()> {
                 .map(|s| s.parse::<u64>().map_err(|_| "invalid step budget"))
                 .transpose()?
                 .unwrap_or(u64::MAX);
+            let (_signal_runtime, shutdown) = checkpoint_shutdown()?;
             let mut driver = research_driver(config, database)?;
             driver.acquire(chrono::Utc::now().timestamp_millis())?;
             println!(
@@ -360,7 +395,7 @@ fn run(args: &[String]) -> Result<()> {
                 serde_json::json!({"run_id":driver.id,"worker_count":1,"queue_capacity":1,"state":"coordinator_started"})
             );
             let mut completed = 0;
-            while completed < max_steps {
+            while completed < max_steps && !shutdown.load(std::sync::atomic::Ordering::Acquire) {
                 if driver.step(chrono::Utc::now().timestamp_millis())? {
                     completed += 1;
                 } else {

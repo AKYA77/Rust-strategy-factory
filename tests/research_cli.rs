@@ -129,3 +129,136 @@ fn independent_rust_process_runs_pauses_resumes_and_stops_at_durable_checkpoints
     );
     fs::remove_dir_all(dir).unwrap();
 }
+
+#[cfg(unix)]
+#[test]
+fn signals_release_the_coordinator_and_restart_running_or_paused_state_immediately() {
+    struct Cleanup(std::path::PathBuf);
+    impl Drop for Cleanup {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+    let binary = env!("CARGO_BIN_EXE_rust-strategy-factory");
+    for signal in ["-INT", "-TERM"] {
+        for paused in [false, true] {
+            let dir = std::env::temp_dir().join(format!(
+                "factory-cli-signal-{}-{signal}-{paused}",
+                std::process::id()
+            ));
+            fs::create_dir(&dir).unwrap();
+            let _cleanup = Cleanup(dir.clone());
+            let dataset = dir.join("input.json");
+            let config = dir.join("config.json");
+            let database = dir.join("state.sqlite");
+            assert!(
+                Command::new(binary)
+                    .args(["fixture", "EURUSD", dataset.to_str().unwrap()])
+                    .output()
+                    .unwrap()
+                    .status
+                    .success()
+            );
+            fs::write(&config,serde_json::to_vec(&serde_json::json!({"limits":{"lease_ms":300000,"feature_cells":1000000,"improvement_children":2},"inputs":[{"dataset":"input.json"}]})).unwrap()).unwrap();
+            let process = Command::new(binary)
+                .args([
+                    "research",
+                    config.to_str().unwrap(),
+                    database.to_str().unwrap(),
+                ])
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap();
+            let mut guard = ChildGuard(process);
+            let mut stdout = BufReader::new(guard.0.stdout.take().unwrap());
+            let mut line = String::new();
+            stdout.read_line(&mut line).unwrap();
+            let started: serde_json::Value = serde_json::from_str(&line).unwrap();
+            let id = started["run_id"].as_str().unwrap();
+            if paused {
+                assert!(
+                    Command::new(binary)
+                        .args(["research-control", database.to_str().unwrap(), id, "paused"])
+                        .output()
+                        .unwrap()
+                        .status
+                        .success()
+                );
+            }
+            assert!(
+                Command::new("kill")
+                    .args([signal, &guard.0.id().to_string()])
+                    .output()
+                    .unwrap()
+                    .status
+                    .success()
+            );
+            let mut exited = None;
+            for _ in 0..1000 {
+                exited = guard.0.try_wait().unwrap();
+                if exited.is_some() {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            assert!(
+                exited
+                    .expect("signal must finish at a bounded checkpoint")
+                    .success(),
+                "{signal} paused={paused}"
+            );
+            let status = Command::new(binary)
+                .args(["research-status", database.to_str().unwrap(), id])
+                .output()
+                .unwrap();
+            assert!(status.status.success());
+            let status: serde_json::Value = serde_json::from_slice(&status.stdout).unwrap();
+            assert_eq!(status["state"], if paused { "paused" } else { "running" });
+            assert_eq!(status["active"], false);
+            let integrity = Command::new(binary)
+                .args(["registry-check", database.to_str().unwrap()])
+                .output()
+                .unwrap();
+            assert!(integrity.status.success());
+            let counts: serde_json::Value = serde_json::from_slice(&integrity.stdout).unwrap();
+            assert_eq!(
+                counts["running"], 0,
+                "signal exit must not leave a claimed experiment"
+            );
+            if paused {
+                assert!(
+                    Command::new(binary)
+                        .args([
+                            "research-control",
+                            database.to_str().unwrap(),
+                            id,
+                            "running"
+                        ])
+                        .output()
+                        .unwrap()
+                        .status
+                        .success()
+                );
+            }
+            // No 300-second lease wait: the same run reclaims its released coordinator immediately.
+            let resumed = Command::new(binary)
+                .args([
+                    "research",
+                    config.to_str().unwrap(),
+                    database.to_str().unwrap(),
+                    "1",
+                ])
+                .output()
+                .unwrap();
+            assert!(
+                resumed.status.success(),
+                "{}",
+                String::from_utf8_lossy(&resumed.stderr)
+            );
+            let first = resumed.stdout.split(|b| *b == b'\n').next().unwrap();
+            let restarted: serde_json::Value = serde_json::from_slice(first).unwrap();
+            assert_eq!(restarted["run_id"], started["run_id"]);
+        }
+    }
+}
