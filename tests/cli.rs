@@ -73,6 +73,49 @@ fn import_inspect_evaluate_and_overwrite_protection() {
     );
     let d: Dataset = serde_json::from_slice(&fs::read(&dataset).unwrap()).unwrap();
     d.verify().unwrap();
+    let compressed = dir.join("coverage.rsfz");
+    let parquet = dir.join("coverage.parquet");
+    for args in [
+        vec![
+            "compress-native",
+            native.to_str().unwrap(),
+            compressed.to_str().unwrap(),
+        ],
+        vec![
+            "pack-parquet",
+            compressed.to_str().unwrap(),
+            parquet.to_str().unwrap(),
+        ],
+    ] {
+        let out = invoke(&args);
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+    let mut reports = Vec::new();
+    for path in [&dataset, &native, &compressed, &parquet] {
+        let bytes = fs::read(path).unwrap();
+        let out = invoke(&["coverage", path.to_str().unwrap(), "0", "121000", "59999"]);
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(report["events"], 4);
+        assert_eq!(report["latest"]["sequence"], "3");
+        assert_eq!(report["gap_count"], 2);
+        assert_eq!(fs::read(path).unwrap(), bytes);
+        reports.push(report);
+    }
+    assert!(reports.windows(2).all(|pair| pair[0] == pair[1]));
+    assert!(
+        !invoke(&["coverage", dataset.to_str().unwrap(), "0", "0", "1"])
+            .status
+            .success()
+    );
     assert_eq!(
         d.manifest.archive_hash,
         blake3::hash(&fs::read(&csv).unwrap()).to_hex().to_string()
