@@ -23,3 +23,5 @@ Protocol v4 adds OOS receipt breakdowns by exit year and six-hour UTC entry bin.
 Protocol v5 adds fixed causal entry-regime counts from strictly prior closed M1 context. Unknown warmup/gap/stale labels stay visible. These are descriptive trend/range bins, not evidence of comprehensive regime stability. See [recipe and causal tests](../DECISIONS/0004-causal-regime-labels.md).
 
 Protocol v6 adds at most six deterministic single-scalar rule neighbors to the frozen OOS probes. Every derived case counts toward trial_budget. This bounded canonical prefix is not exhaustive parameter stability or an adaptive optimizer. See the rule-neighborhood extension in [probe policy](../DECISIONS/0003-frozen-robustness-probes.md).
+
+Engine v5/signal v3 bound feature arithmetic to each evaluation end, including nested higher contexts. Valid later prices cannot cause earlier indicator failures; parent dataset integrity remains mandatory. See [scope invariants](../DECISIONS/0007-feature-evaluation-scopes.md).

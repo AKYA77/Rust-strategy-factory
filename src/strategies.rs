@@ -568,7 +568,14 @@ impl<'a> Features<'a> {
                 let used =
                     (1 + self.cache.len() + self.signals.len()).saturating_mul(self.close.len());
                 let remaining = self.max_cells.saturating_sub(used);
-                let higher = crate::candles::build(data, *timeframe)?;
+                let mut higher = crate::candles::build(data, *timeframe)?;
+                let visible = self.candles.last().map_or(0, |last| {
+                    higher.partition_point(|h| {
+                        (h.available_ms, h.publication_sequence)
+                            <= (last.available_ms, last.publication_sequence)
+                    })
+                });
+                higher.truncate(visible);
                 let mut features = Features::with_context(&higher, remaining, data, *timeframe)?;
                 let mask = features.signal(rule)?;
                 Mask::from_bools(self.candles.iter().map(|c| {

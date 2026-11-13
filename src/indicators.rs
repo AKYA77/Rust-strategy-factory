@@ -85,13 +85,40 @@ impl Mask {
         }
         Self { words, len }
     }
+    pub fn len(&self) -> usize {
+        self.len
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+    pub fn validate(&self) -> Result<()> {
+        if self.words.len() != self.len.div_ceil(64) {
+            return Err("invalid signal mask backing length".into());
+        }
+        let bits = self.len % 64;
+        if bits > 0
+            && self
+                .words
+                .last()
+                .is_some_and(|word| word & (!0_u64 << bits) != 0)
+        {
+            return Err("nonzero signal mask padding".into());
+        }
+        Ok(())
+    }
     pub fn count(&self) -> usize {
         self.words.iter().map(|w| w.count_ones() as usize).sum()
     }
     pub fn get(&self, i: usize) -> bool {
-        i < self.len && self.words[i / 64] & (1 << (i % 64)) != 0
+        i < self.len
+            && self
+                .words
+                .get(i / 64)
+                .is_some_and(|word| word & (1 << (i % 64)) != 0)
     }
     pub fn combine(&self, other: &Self, and: bool) -> Result<Self> {
+        self.validate()?;
+        other.validate()?;
         if self.len != other.len {
             return Err("incompatible signal masks".into());
         }

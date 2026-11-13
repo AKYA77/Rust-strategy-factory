@@ -152,10 +152,16 @@ fn evaluate_internal(
         Claim::Acquired(lease) => {
             let compute = || -> Result<serde_json::Value> {
                 let c = candles::build(d, strategy.timeframe)?;
+                let visible = evaluation.map_or(c.len(), |e| {
+                    c.partition_point(|c| c.available_ms < e.window.end_exclusive_ms)
+                });
                 let mut features =
-                    Features::with_context(&c, feature_cells, d, strategy.timeframe)?;
+                    Features::with_context(&c[..visible], feature_cells, d, strategy.timeframe)?;
                 let mut screen = strategies::screen(&mut features, strategy)?;
-                let mask = features.signal(&strategy.rule)?;
+                let prefix = features.signal(&strategy.rule)?;
+                let mask = crate::indicators::Mask::from_bools(
+                    (0..c.len()).map(|i| i < visible && prefix.get(i)),
+                );
                 if let Some(e) = evaluation {
                     screen.signals = c
                         .iter()
@@ -168,7 +174,7 @@ fn evaluate_internal(
                     } else {
                         strategies::ScreenStatus::ScreenUncertain
                     };
-                    screen.version = "conservative-window-signals-v2".into();
+                    screen.version = "conservative-window-signals-v3-feature-scope".into();
                 }
                 if !screen.requires_tick_verification {
                     return Ok(

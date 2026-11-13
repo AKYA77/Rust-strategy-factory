@@ -4,7 +4,9 @@ Status: SOFTWARE_INCOMPLETE. Read AGENTS.md, PROJECT_STATE.json, ACCEPTANCE.md a
 
 ## Latest milestone
 
-109 Rust tests, formatting/Clippy, release build and Chromium desktop/mobile acceptance pass. MACD and population Bollinger crosses now compile through authoritative replay with explicit warmup/rounding, centered arithmetic and checked variance. Four focused tests verify independent rational/band fixtures, prefix and large-integer translation invariance, invalid/overflow refusal, autonomous variants and two nonzero exact tick trades ($4.998 each under the synthetic fixture assumptions). Indicator version v3 and rule-neighborhood version v2 bind semantics into evidence identities. Browser protocol setup includes MACD with higher-timeframe confirmation. See DECISIONS/0006-macd-and-bollinger.md.
+111 Rust tests, formatting/Clippy, release build and Chromium desktop/mobile acceptance pass. Engine v5 and signal v3 now scope feature compilation to the exclusive evaluation end and recursively to each higher context's last published event. Valid future numerical overflow can no longer fail an earlier window or change its signals/trades. Mask backing length/padding is validated before prefix comparison. Two regressions preserve the earlier $4.998 trade despite valid 8e18 later quotes and reject malformed masks without panics. Benchmark metadata now uses the compiled engine constant; no new benchmark measurement is claimed. See DECISIONS/0007-feature-evaluation-scopes.md.
+
+MACD/Bollinger crosses and expanded regions remain verified; see DECISIONS/0006-macd-and-bollinger.md.
 
 Higher-timeframe joins, strict hierarchy, autonomous confirmations and valid complex-graph verification remain tested; see DECISIONS/0005-higher-timeframe-confirmations.md.
 
@@ -14,7 +16,7 @@ Previous verified foundations include chronological replay, initial executable-s
 
 ## Begin next
 
-Implement typed causal ATR stop policy with exact grid rounding, fixed placement reservations, pre-fill revalidation and independent numerical/replay fixtures. Continue dependence-aware inference, sufficient-sample/prespecified robustness acceptance and independent approval/coverage prerequisites before unlocking real final evaluation. Current protocols and pooled reset-fold statistics cannot issue validated status.
+Implement typed causal ATR stop policy following the explicitly PLANNED design/independent fixtures in DECISIONS/0008-atr-initial-stops.md. It is not implemented yet. Preserve fixed-placement distance/quantity, causal preparation, exact grid rounding and pre-fill revalidation. Continue dependence-aware inference, sufficient-sample/prespecified robustness acceptance and independent approval/coverage prerequisites before unlocking real final evaluation. Current protocols and pooled reset-fold statistics cannot issue validated status.
 
 Continue bounded mutation/improvement lineage, candidate-level net candle screening, Parquet/ZSTD and measured codec/native streaming work, source acquisition/import acceptance, worker pools/OS resource control, full dashboard operations, production deployment and final end-to-end acceptance. Follow the entire IMPLEMENTATION_QUEUE.md.
 

@@ -49,7 +49,9 @@
     "typed closed higher-timeframe confirmations with strict hierarchy, causal publication joins, authoritative replay mask verification and bounded context caches",
     "autonomous higher-confirmation regions and valid complex-graph verification allowance with nonzero replay regressions",
     "MACD and population Bollinger cross operators with explicit quantization, checked variance, centered arithmetic, independent fixtures and nonzero exact tick accounting",
-    "expanded MACD/band candidate regions and bounded signal-window parameter probes"
+    "expanded MACD/band candidate regions and bounded signal-window parameter probes",
+    "exclusive-end feature compilation and recursive higher-context truncation preventing valid future numerical failures from changing earlier windows",
+    "serialized mask backing/padding validation and truthful compiled benchmark engine metadata"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -59,7 +61,7 @@
   ],
   "next_action": "Implement typed causal ATR stop policy with fixed placement risk and independent accounting; then evidence acceptance and remaining full implementation queue.",
   "qualified_strategies": 0,
-  "tests_passed": 109,
+  "tests_passed": 111,
   "benchmark": "docs/BENCHMARKS/2026-11-12-synthetic-replay.json",
   "browser_acceptance": "Chromium desktop/mobile against actual Rust HTTP server and SQLite; auth, CSRF/origin/host/body/rates, controls, receipts/export, restart/logout passed"
 }

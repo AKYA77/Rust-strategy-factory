@@ -245,13 +245,18 @@ fn replay_internal(
     if candles != crate::candles::build(data, strategy.timeframe)? {
         return Err("candles inconsistent with dataset/timeframe".into());
     }
+    mask.validate()?;
+    let visible = window.map_or(candles.len(), |w| {
+        candles.partition_point(|c| c.available_ms < w.end_exclusive_ms)
+    });
     let mut features = crate::strategies::Features::with_context(
-        candles,
-        candles.len().saturating_mul(128),
+        &candles[..visible],
+        visible.saturating_mul(128),
         data,
         strategy.timeframe,
     )?;
-    if *mask != features.signal(&strategy.rule)? {
+    let expected = features.signal(&strategy.rule)?;
+    if mask.len() != candles.len() || (0..visible).any(|i| mask.get(i) != expected.get(i)) {
         return Err("signals inconsistent with frozen strategy".into());
     }
     let distance = strategy

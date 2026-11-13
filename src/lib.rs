@@ -12,9 +12,9 @@ pub mod storage;
 pub mod tick_index;
 pub mod validation;
 
-pub const ENGINE_VERSION: &str = "ordered-l1-v4-protective-feasibility";
+pub const ENGINE_VERSION: &str = "ordered-l1-v5-causal-feature-scopes";
 pub const INDICATOR_VERSION: &str = "causal-primitives-v3-macd-bands";
-pub const SIGNAL_VERSION: &str = "closed-publication-next-event-v2-htf";
+pub const SIGNAL_VERSION: &str = "closed-publication-next-event-v3-scoped-features";
 pub mod dashboard;
 pub mod research;
 pub mod science;

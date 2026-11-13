@@ -258,3 +258,177 @@ fn independent_window_uses_parent_dataset_identity_and_cannot_repeat_retuned_hol
     drop(registry);
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn valid_future_numeric_overflow_cannot_change_an_earlier_window_or_higher_features() {
+    fn history(extra: bool) -> Input {
+        let mut ticks = (0..180)
+            .flat_map(|i| {
+                let phase = i % 40;
+                let level = if phase < 20 {
+                    0
+                } else if phase < 30 {
+                    (phase - 19) * 200
+                } else {
+                    (40 - phase) * 200
+                };
+                [
+                    Tick {
+                        timestamp_ms: i * 60000,
+                        sequence: (i * 2) as u64,
+                        bid: 100000 + level,
+                        ask: 100020 + level,
+                    },
+                    Tick {
+                        timestamp_ms: i * 60000 + 1000,
+                        sequence: (i * 2 + 1) as u64,
+                        bid: 100010 + level,
+                        ask: 100030 + level,
+                    },
+                ]
+            })
+            .collect::<Vec<_>>();
+        if extra {
+            for minute in 200..212 {
+                ticks.push(Tick {
+                    timestamp_ms: minute * 60000,
+                    sequence: ticks.len() as u64,
+                    bid: 8_000_000_000_000_000_000,
+                    ask: 8_000_000_000_000_000_020,
+                });
+            }
+        }
+        let n = ticks.len();
+        Input {
+            dataset: data::dataset(
+                Profile::synthetic("EURUSD").unwrap(),
+                ticks,
+                "SYNTHETIC_TEST_ONLY future numeric boundary",
+                "generated".into(),
+                true,
+            )
+            .unwrap(),
+            conversions: vec![Conversion::usd(); n],
+        }
+    }
+    let base = history(false);
+    let future = history(true);
+    future.dataset.verify().unwrap();
+    let mut s = strategy();
+    s.stop_ticks = 100;
+    s.rule = Rule::BollingerCross {
+        window: 20,
+        multiple_bps: 20000,
+        upper: true,
+    };
+    let all = candles::build(&future.dataset, Timeframe::M1).unwrap();
+    assert!(
+        Features::with_context(&all, 100000, &future.dataset, Timeframe::M1)
+            .unwrap()
+            .signal(&s.rule)
+            .unwrap_err()
+            .contains("overflow")
+    );
+    let window = Interval {
+        start_ms: 0,
+        end_exclusive_ms: 60 * 60000,
+    };
+    let dir = std::env::temp_dir().join(format!("factory-feature-window-{}", std::process::id()));
+    std::fs::create_dir(&dir).unwrap();
+    let mut registry = Registry::open(&dir.join("state.sqlite")).unwrap();
+    let evaluation = Evaluation {
+        window: window.clone(),
+        stage: Stage::TickVerification,
+        protocol_hash: "causal-feature-regression".into(),
+    };
+    let a = research::evaluate_window(
+        &mut registry,
+        &base,
+        &s,
+        &Costs::default(),
+        "causal-features",
+        100000,
+        &evaluation,
+    )
+    .unwrap();
+    let b = research::evaluate_window(
+        &mut registry,
+        &future,
+        &s,
+        &Costs::default(),
+        "causal-features",
+        100000,
+        &evaluation,
+    )
+    .unwrap();
+    assert_eq!(a.outcome, "completed");
+    assert_eq!(b.outcome, "completed");
+    assert_eq!(
+        a.result["tick_replay"]["trades"],
+        b.result["tick_replay"]["trades"]
+    );
+    assert_eq!(
+        b.result["tick_replay"]["trades"][0]["net_micro_usd"],
+        4_998_000
+    );
+    assert_eq!(a.result["screen"]["signals"], b.result["screen"]["signals"]);
+    let rule = Rule::HigherTimeframe {
+        timeframe: Timeframe::M5,
+        rule: Box::new(Rule::BollingerCross {
+            window: 5,
+            multiple_bps: 20000,
+            upper: true,
+        }),
+    };
+    assert!(
+        Features::with_context(&all, 100000, &future.dataset, Timeframe::M1)
+            .unwrap()
+            .signal(&rule)
+            .is_err()
+    );
+    let n = all.partition_point(|c| c.available_ms < window.end_exclusive_ms);
+    let actual = Features::with_context(&all[..n], 100000, &future.dataset, Timeframe::M1)
+        .unwrap()
+        .signal(&rule)
+        .unwrap();
+    let prior = candles::build(&base.dataset, Timeframe::M1).unwrap();
+    let expected = Features::with_context(&prior[..n], 100000, &base.dataset, Timeframe::M1)
+        .unwrap()
+        .signal(&rule)
+        .unwrap();
+    assert_eq!(actual, expected);
+    registry.integrity().unwrap();
+    drop(registry);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn malformed_serialized_masks_fail_validation_without_index_panics() {
+    use rust_strategy_factory::indicators::Mask;
+    let input = input(false);
+    let s = strategy();
+    let c = candles::build(&input.dataset, Timeframe::M1).unwrap();
+    let window = Interval {
+        start_ms: 0,
+        end_exclusive_ms: 121001,
+    };
+    for value in [
+        serde_json::json!({"words":[],"len":c.len()}),
+        serde_json::json!({"words":[u64::MAX],"len":c.len()}),
+    ] {
+        let malformed: Mask = serde_json::from_value(value).unwrap();
+        assert!(malformed.validate().is_err());
+        assert!(
+            tick_engine::replay_window(
+                &input.dataset,
+                &c,
+                &malformed,
+                &s,
+                &Costs::default(),
+                &input.conversions,
+                &window
+            )
+            .is_err()
+        );
+    }
+}
