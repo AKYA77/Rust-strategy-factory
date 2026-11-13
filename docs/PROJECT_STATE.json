@@ -86,7 +86,8 @@
     "Authenticated read-only registry audit failure monitoring with separate proof/indexed blocked states, explicit no-marker limitations and actual desktop/mobile/service-restart acceptance",
     "Read-only bounded provenance-bound observed coverage API/CLI across JSON/native/RSFZ/Parquet with exact event sequence strings, scoped partial/empty UTC months, explicit adjacent gaps/detail truncation and no completeness/classification promotion",
     "Bounded checkpointed local normalized import API/CLI with exact source/configuration binding, separate WAL ledger, immutable native chunks, cross-chunk ordering, verified orphan reuse and nonadvancing failures; actual separate-process/writer/CSV/corruption acceptance and measured recovery overhead",
-    "Verified completed import assembly/no-overwrite native export with cross-chunk diagnostics, preserved source/class and distinct parser identity, whole nonzero authoritative replay equivalence and actual SIGKILL initialization/resume exact-source recovery"
+    "Verified completed import assembly/no-overwrite native export with cross-chunk diagnostics, preserved source/class and distinct parser identity, whole nonzero authoritative replay equivalence and actual SIGKILL initialization/resume exact-source recovery",
+    "Append-only bounded local dataset observation catalog with source/profile/archive/parser/class identities, independently observed counters, exact sequence strings, immutable hashed receipts, reimport reuse, revision separation, read-only cursor inventory and CLI/refusal/quota fixtures; declared classification never grants approval"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -94,9 +95,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Implement immutable bounded provenance catalog/revision inventory and coverage lifecycle; preserve source/calendar/quality approvals as pending, then continue scientific/operations queue and experimental indexed lifecycle.",
+  "next_action": "Continue source revision/correction links and explicit approval/coverage lifecycle, catalog/import/backup UI and independent qualification/scientific/operations queue; catalog inventory is not source or research approval.",
   "qualified_strategies": 0,
-  "tests_passed": 204,
+  "tests_passed": 210,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks; persisted proof/indexed failure monitoring, restart and read-only API",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
@@ -105,10 +106,10 @@
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43518442861,
-    "sha": "6dfb4bcd80a7159256e97071e42d749d09b583e4",
+    "run_id": 43519773789,
+    "sha": "ecb97a5aa5f695329a8d14c30f144eef1b1b8645",
     "conclusion": "success",
-    "verification": "Exact public commit/success summary retrieved; assembly/export/SIGKILL follow-up verification follows publication"
+    "verification": "Exact public commit/success summary retrieved; catalog milestone hosted verification follows publication"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
   "vps_acceptance": "VPS_PERFORMANCE_PENDING",

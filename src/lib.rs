@@ -53,3 +53,5 @@ pub mod parquet_store;
 pub mod coverage;
 
 pub mod import_job;
+
+pub mod catalog;
