@@ -153,7 +153,7 @@ fn receipt(
         reason: reason.into(),
     }
 }
-fn protective(entry: i64, side: Side, distance: i64) -> Result<(i64, i64)> {
+pub(crate) fn protective(entry: i64, side: Side, distance: i64) -> Result<(i64, i64)> {
     let stop = entry
         .checked_sub(side.sign().checked_mul(distance).ok_or("stop overflow")?)
         .ok_or("stop overflow")?;

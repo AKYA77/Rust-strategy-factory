@@ -51,3 +51,7 @@ harness = false
 [[bench]]
 name = "storage_pipeline"
 harness = false
+
+[[bench]]
+name = "candidate_screen"
+harness = false

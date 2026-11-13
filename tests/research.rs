@@ -123,6 +123,21 @@ fn completed_experiment_before_cursor_commit_is_reused_without_new_simulation() 
     .unwrap();
     assert!(!completed.reused);
     assert_eq!(completed.outcome, "completed");
+    assert_eq!(
+        completed.result["candidate_screen_audit"]["candidate_rejected"],
+        false
+    );
+    assert_eq!(
+        completed.result["candidate_screen_audit"]["qualification_evidence"],
+        false
+    );
+    assert_eq!(
+        completed.result["candidate_screen_audit"]["actual_closed_trades"],
+        completed.result["tick_replay"]["trades"]
+            .as_array()
+            .unwrap()
+            .len()
+    );
     assert!(
         !completed.result["tick_replay"]["trades"]
             .as_array()

@@ -15,6 +15,7 @@ pub mod validation;
 pub const ENGINE_VERSION: &str = "ordered-l1-v6-frozen-atr-stops";
 pub const INDICATOR_VERSION: &str = "causal-primitives-v4-outward-atr";
 pub const SIGNAL_VERSION: &str = "closed-publication-next-event-v3-scoped-features";
+pub mod candidate_screen;
 pub mod dashboard;
 pub mod research;
 pub mod science;

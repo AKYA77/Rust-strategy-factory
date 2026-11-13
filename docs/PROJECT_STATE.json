@@ -72,7 +72,8 @@
     "graceful Unix SIGINT/SIGTERM research checkpoint exits with coordinator lease release and preserved running/paused state; four process signal/state combinations restart immediately",
     "authenticated paginated immutable training diagnosis/review lineage, verified raw detail/export, tamper refusal and desktop/mobile extreme-integer evidence display with fixed detail-hash overflow",
     "bounded single-frame ZSTD/native wrapper with exact native restoration, original dataset identities, caps/checksums/window/trailing-frame/structural refusal, compressed CLI/research/protocol reuse, reviewed pinned source and installed notice verification",
-    "bounded Parquet/ZSTD exact integer/provenance cold storage, allocation/schema/page preflight, full-u64 roundtrip and actual CLI/research/protocol reuse; same-corpus synthetic storage/current-pipeline equality/IO/resource comparison"
+    "bounded Parquet/ZSTD exact integer/provenance cold storage, allocation/schema/page preflight, full-u64 roundtrip and actual CLI/research/protocol reuse; same-corpus synthetic storage/current-pipeline equality/IO/resource comparison",
+    "Bounded hypothetical USD market-entry M1 cash estimates with exact risk/fees/net-win accounting, explicit collision/gap/deadline/unsupported/partial uncertainty, conservative persisted shadow policy, configurable library-level deterministic audit selection and actual tick-disagreement receipts; no execution skipping"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -80,9 +81,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Integrated candidate-level M1 net estimates/uncertainty, configurable promotion and deterministic rejected-candidate tick auditing, followed by measured batching/sparse shared masks and full replay-index equivalence.",
+  "next_action": "Bind selectable screening execution policy into complete experiment/review identities; add safe candidate failure proofs and calibrated rejected-candidate tick audits, batched/shared sparse screens and measured full-accounting indexed replay equivalence. Current M1 model is shadow-only.",
   "qualified_strategies": 0,
-  "tests_passed": 156,
+  "tests_passed": 164,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile against actual Rust/SQLite/native input: auth/control/export/restart, >100-history paging and filter/race, actual immutable training lineage/review and exact extreme-loss training exports",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
@@ -91,14 +92,15 @@
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43439338399,
-    "sha": "801b1581069ffdaceae1ae1a512b66cae9f4669f",
+    "run_id": 43445407459,
+    "sha": "10fc9483e7150a2de1a21eb14b5485a142b0781c",
     "conclusion": "success",
-    "verification": "github.com exact commit/success summary fetched; new code hosted result pending publication"
+    "verification": "Exact public commit/success summary retrieved; candidate-screen milestone hosted result pending publication"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
   "vps_acceptance": "VPS_PERFORMANCE_PENDING",
   "repository_visibility": "public per owner; unchanged",
   "storage_pipeline_benchmark": "docs/BENCHMARKS/storage-pipeline-v1.json",
-  "source_access": "Fresh Dukascopy/HistData info requests403; additive domain proposal save failed draft_not_editable, not applied; real sample acceptance pending"
+  "source_access": "Fresh Dukascopy/HistData info requests403; additive domain proposal save failed draft_not_editable, not applied; real sample acceptance pending",
+  "candidate_screen_benchmark": "docs/BENCHMARKS/candidate-screen-v1.json"
 }

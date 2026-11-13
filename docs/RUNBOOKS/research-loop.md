@@ -1,6 +1,6 @@
 # Standalone research loop
 
-The Rust process runs without Codex or an LLM. Current scope is training research with one bounded worker and one in-flight task. It does not issue independently validated qualifications. Candle screening currently rejects only proven absence of signals; conditional barrier bounds and tick receipt audits preserve uncertainty and do not establish net strategy win rates.
+The Rust process runs without Codex or an LLM. Current scope is training research with one bounded worker and one in-flight task. It does not issue independently validated qualifications. Candle screening rejects only proven absence of signals. Signaled receipts now include bounded hypothetical USD M1 cash estimates and conservative shadow-policy comparisons with actual ticks; uncertainty/unsupported/partial cases stay explicit. Every signaled candidate still runs ticks. See [candidate screening](candidate-screening.md) for assumptions, limits and remaining policy work.
 
 Build with `cargo build --locked --release`. For a synthetic development exercise, from the repository root:
 

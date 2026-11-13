@@ -187,6 +187,15 @@ fn evaluate_internal(
                         serde_json::json!({"screen":screen,"tick_replay":null,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation}),
                     );
                 }
+                // Diagnostic-only: failure/uncertainty must never suppress authoritative replay.
+                let candle_estimate = crate::candidate_screen::estimate(
+                    d,
+                    &c,
+                    &mask,
+                    strategy,
+                    costs,
+                    evaluation.map(|e| &e.window),
+                );
                 let replay = if let Some(e) = evaluation {
                     tick_engine::replay_window(
                         d,
@@ -201,8 +210,19 @@ fn evaluate_internal(
                     tick_engine::replay(d, &c, &mask, strategy, costs, &input.conversions)?
                 };
                 let screen_audit = crate::screen::audit_replay(d, costs, &replay)?;
+                let candidate_screen_audit = match candle_estimate {
+                    Ok(estimate) => crate::candidate_screen::compare(
+                        &estimate,
+                        &replay,
+                        &id,
+                        &Default::default(),
+                    )?,
+                    Err(error) => serde_json::json!({"version":crate::candidate_screen::VERSION,
+                        "status":"unavailable", "error":error, "promotes_to_tick":true,
+                        "candidate_rejected":false,"qualification_evidence":false}),
+                };
                 Ok(
-                    serde_json::json!({"screen":screen,"screen_audit":screen_audit,"tick_replay":replay,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation}),
+                    serde_json::json!({"screen":screen,"screen_audit":screen_audit,"candidate_screen_audit":candidate_screen_audit,"tick_replay":replay,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation}),
                 )
             };
             let (outcome, result) = match compute() {
