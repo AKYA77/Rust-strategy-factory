@@ -123,3 +123,69 @@ fn invalid_windows_thresholds_and_fixed_session_fields_are_not_invented() {
     );
     assert!(neighborhood::rules(&Rule::AboveMean { window: 0 }).is_err());
 }
+
+#[test]
+fn flattened_boolean_rules_must_remain_within_the_canonical_arity_budget() {
+    let leaves = |start, end| {
+        (start..=end)
+            .map(|lookback| Rule::Rising { lookback })
+            .collect::<Vec<_>>()
+    };
+    for conjunction in [true, false] {
+        let combine = |v| {
+            if conjunction {
+                Rule::All(v)
+            } else {
+                Rule::Any(v)
+            }
+        };
+        let over = combine(vec![combine(leaves(1, 8)), combine(leaves(9, 10))]);
+        assert!(
+            over.canonical().is_err(),
+            "canonicalization must refuse an oversized flattened node"
+        );
+        let overlapping = combine(vec![combine(leaves(1, 8)), combine(leaves(1, 8))]);
+        let canonical = overlapping.canonical().unwrap();
+        assert_eq!(canonical, combine(leaves(1, 8)));
+        assert_eq!(canonical.canonical().unwrap(), canonical);
+    }
+}
+
+#[test]
+fn seeded_nested_boolean_normalization_is_idempotent_when_accepted() {
+    fn next(seed: &mut u64) -> u64 {
+        *seed = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        *seed
+    }
+    fn generate(seed: &mut u64, depth: usize) -> Rule {
+        let n = next(seed);
+        if depth == 0 || n.is_multiple_of(3) {
+            return Rule::Rising {
+                lookback: (n % 20 + 1) as usize,
+            };
+        }
+        let items = (0..(n % 3 + 1))
+            .map(|_| generate(seed, depth - 1))
+            .collect();
+        if n & 1 == 0 {
+            Rule::All(items)
+        } else {
+            Rule::Any(items)
+        }
+    }
+    let mut seed = 42;
+    let mut accepted = 0;
+    for _ in 0..1000 {
+        let rule = generate(&mut seed, 4);
+        if let Ok(canonical) = rule.canonical() {
+            assert_eq!(canonical.canonical().unwrap(), canonical);
+            let restored: Rule =
+                serde_json::from_str(&serde_json::to_string(&canonical).unwrap()).unwrap();
+            assert_eq!(restored.canonical().unwrap(), canonical);
+            accepted += 1;
+        }
+    }
+    assert!(accepted > 100);
+}

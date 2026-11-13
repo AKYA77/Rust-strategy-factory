@@ -123,6 +123,9 @@ impl Rule {
                     }
                     v.sort();
                     v.dedup();
+                    if v.len() > 8 {
+                        return Err("normalized Boolean arity out of bounds".into());
+                    }
                     if is_all {
                         for item in &v {
                             let opposite = match item {
