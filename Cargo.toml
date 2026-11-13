@@ -67,3 +67,7 @@ harness = false
 [[bench]]
 name = "batch"
 harness = false
+
+[[bench]]
+name = "indexed_replay"
+harness = false

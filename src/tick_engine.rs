@@ -169,6 +169,7 @@ pub(crate) fn protective(entry: i64, side: Side, distance: i64) -> Result<(i64, 
     }
     Ok((stop, target))
 }
+pub(crate) const FILL_ASSUMPTION: &str = "L1 full-fill research assumption; no historical depth/queue verification; target limit at requested price; deadline cancels protective orders; USD-per-quote marks supplied explicitly";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Replay {
     pub version: String,
@@ -189,7 +190,7 @@ pub struct Replay {
     pub entry_receipts: Vec<EntryReceipt>,
     pub evaluation_window: Option<crate::validation::Interval>,
 }
-fn signed_delta(side: Side, exit: i64, entry: i64) -> Result<i64> {
+pub(crate) fn signed_delta(side: Side, exit: i64, entry: i64) -> Result<i64> {
     exit.checked_sub(entry)
         .and_then(|d| d.checked_mul(side.sign()))
         .ok_or("price delta overflow".into())
@@ -225,7 +226,13 @@ pub fn replay_window(
         Some(window),
     )
 }
-fn replay_internal(
+pub(crate) struct PreparedReplay {
+    pub strategy: Strategy,
+    pub distances: crate::stops::Prepared,
+    pub slip: i64,
+    pub visible: usize,
+}
+pub(crate) fn prepare_replay(
     data: &Dataset,
     candles: &[Candle],
     mask: &Mask,
@@ -233,7 +240,10 @@ fn replay_internal(
     costs: &Costs,
     conversions: &[Conversion],
     window: Option<&crate::validation::Interval>,
-) -> Result<Replay> {
+) -> Result<PreparedReplay> {
+    if let Some(window) = window {
+        window.validate()?;
+    }
     data.verify()?;
     costs.validate()?;
     let strategy = strategy.canonical()?;
@@ -264,6 +274,29 @@ fn replay_internal(
         .slippage_pips
         .checked_mul(p.pip)
         .ok_or("slippage overflow")?;
+    Ok(PreparedReplay {
+        strategy,
+        distances,
+        slip,
+        visible,
+    })
+}
+fn replay_internal(
+    data: &Dataset,
+    candles: &[Candle],
+    mask: &Mask,
+    strategy: &Strategy,
+    costs: &Costs,
+    conversions: &[Conversion],
+    window: Option<&crate::validation::Interval>,
+) -> Result<Replay> {
+    let PreparedReplay {
+        strategy,
+        distances,
+        slip,
+        ..
+    } = prepare_replay(data, candles, mask, strategy, costs, conversions, window)?;
+    let p = &data.profile;
     let mut balance = contracts::INITIAL_EQUITY;
     let mut marked = balance;
     let mut peak = balance;
@@ -663,10 +696,23 @@ fn replay_internal(
         peak = peak.max(marked);
         drawdown = drawdown.max(peak - marked);
     }
-    Ok(Replay { version: crate::ENGINE_VERSION.into(), strategy_id: strategy.identity()?, dataset_id: data.manifest.content_hash.clone(),
-        profile_id: data.manifest.profile_hash.clone(), cost_id: crate::data::hash(costs)?,
+    Ok(Replay {
+        version: crate::ENGINE_VERSION.into(),
+        strategy_id: strategy.identity()?,
+        dataset_id: data.manifest.content_hash.clone(),
+        profile_id: data.manifest.profile_hash.clone(),
+        cost_id: crate::data::hash(costs)?,
         conversion_id: crate::data::hash(&conversions)?,
-        fill_assumption: "L1 full-fill research assumption; no historical depth/queue verification; target limit at requested price; deadline cancels protective orders; USD-per-quote marks supplied explicitly".into(),
-        initial_micro_usd: contracts::INITIAL_EQUITY, realized_micro_usd: balance, final_marked_micro_usd: marked,
-        maximum_drawdown_micro_usd: drawdown, trades, rejections, unresolved: position, pending_entry: pending, entry_receipts, evaluation_window:window.cloned() })
+        fill_assumption: FILL_ASSUMPTION.into(),
+        initial_micro_usd: contracts::INITIAL_EQUITY,
+        realized_micro_usd: balance,
+        final_marked_micro_usd: marked,
+        maximum_drawdown_micro_usd: drawdown,
+        trades,
+        rejections,
+        unresolved: position,
+        pending_entry: pending,
+        entry_receipts,
+        evaluation_window: window.cloned(),
+    })
 }
