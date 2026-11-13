@@ -154,6 +154,43 @@ fn import_inspect_evaluate_and_overwrite_protection() {
         serde_json::from_slice(&compressed_result.stdout).unwrap();
     assert_eq!(compressed_result["reused"], true);
     assert_eq!(compressed_result["experiment_id"], first["experiment_id"]);
+    let parquet = dir.join("dataset.parquet");
+    let parquet_json = dir.join("parquet-restored.json");
+    assert!(
+        invoke(&[
+            "pack-parquet",
+            compressed.to_str().unwrap(),
+            parquet.to_str().unwrap()
+        ])
+        .status
+        .success()
+    );
+    assert!(
+        invoke(&[
+            "unpack-parquet",
+            parquet.to_str().unwrap(),
+            parquet_json.to_str().unwrap()
+        ])
+        .status
+        .success()
+    );
+    let original: Dataset = serde_json::from_slice(&fs::read(&dataset).unwrap()).unwrap();
+    let restored: Dataset = serde_json::from_slice(&fs::read(&parquet_json).unwrap()).unwrap();
+    assert_eq!(original.ticks, restored.ticks);
+    let parquet_result = invoke(&[
+        "experiment",
+        parquet.to_str().unwrap(),
+        strategy.to_str().unwrap(),
+        registry.to_str().unwrap(),
+    ]);
+    assert!(
+        parquet_result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&parquet_result.stderr)
+    );
+    let parquet_result: serde_json::Value = serde_json::from_slice(&parquet_result.stdout).unwrap();
+    assert_eq!(parquet_result["reused"], true);
+    assert_eq!(parquet_result["experiment_id"], first["experiment_id"]);
     let diagnosis = invoke(&[
         "diagnose",
         registry.to_str().unwrap(),
@@ -183,7 +220,7 @@ fn import_inspect_evaluate_and_overwrite_protection() {
     assert_eq!(counts["completed"], 1);
     assert_eq!(counts["attempts"], 1);
     let review_config = dir.join("review-input.json");
-    fs::write(&review_config,serde_json::to_vec(&serde_json::json!({"inputs":[{"dataset":compressed.file_name().unwrap().to_str().unwrap()}],"limits":{"feature_cells":4_000_000}})).unwrap()).unwrap();
+    fs::write(&review_config,serde_json::to_vec(&serde_json::json!({"inputs":[{"dataset":parquet.file_name().unwrap().to_str().unwrap()}],"limits":{"feature_cells":4_000_000}})).unwrap()).unwrap();
     let review = invoke(&[
         "review-training",
         review_config.to_str().unwrap(),

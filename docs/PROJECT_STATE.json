@@ -71,7 +71,8 @@
     "Python3.11+ content-addressed local install/update/rollback with verified activation, staged native backup/new-path offline restore, refusal/preservation acceptance and statically verified non-root systemd resource-limit templates",
     "graceful Unix SIGINT/SIGTERM research checkpoint exits with coordinator lease release and preserved running/paused state; four process signal/state combinations restart immediately",
     "authenticated paginated immutable training diagnosis/review lineage, verified raw detail/export, tamper refusal and desktop/mobile extreme-integer evidence display with fixed detail-hash overflow",
-    "bounded single-frame ZSTD/native wrapper with exact native restoration, original dataset identities, caps/checksums/window/trailing-frame/structural refusal, compressed CLI/research/protocol reuse, reviewed pinned source and installed notice verification"
+    "bounded single-frame ZSTD/native wrapper with exact native restoration, original dataset identities, caps/checksums/window/trailing-frame/structural refusal, compressed CLI/research/protocol reuse, reviewed pinned source and installed notice verification",
+    "bounded Parquet/ZSTD exact integer/provenance cold storage, allocation/schema/page preflight, full-u64 roundtrip and actual CLI/research/protocol reuse; same-corpus synthetic storage/current-pipeline equality/IO/resource comparison"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -79,9 +80,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Comparable bounded Parquet/ZSTD baseline and same-corpus cold/warm native/RSFZ comparison; full-history streaming, approved source/profile evidence and complete queue remain pending.",
+  "next_action": "Integrated candidate-level M1 net estimates/uncertainty, configurable promotion and deterministic rejected-candidate tick auditing, followed by measured batching/sparse shared masks and full replay-index equivalence.",
   "qualified_strategies": 0,
-  "tests_passed": 151,
+  "tests_passed": 156,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile against actual Rust/SQLite/native input: auth/control/export/restart, >100-history paging and filter/race, actual immutable training lineage/review and exact extreme-loss training exports",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
@@ -90,12 +91,14 @@
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43434456007,
-    "sha": "ea0c6cca4634b4ba791d0a8343cc9b8476b1d3c3",
+    "run_id": 43439338399,
+    "sha": "801b1581069ffdaceae1ae1a512b66cae9f4669f",
     "conclusion": "success",
-    "verification": "github.com summary fetched; exact commit/success markers observed; logs not read"
+    "verification": "github.com exact commit/success summary fetched; new code hosted result pending publication"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
   "vps_acceptance": "VPS_PERFORMANCE_PENDING",
-  "repository_visibility": "public per owner; unchanged"
+  "repository_visibility": "public per owner; unchanged",
+  "storage_pipeline_benchmark": "docs/BENCHMARKS/storage-pipeline-v1.json",
+  "source_access": "Fresh Dukascopy/HistData info requests403; additive domain proposal save failed draft_not_editable, not applied; real sample acceptance pending"
 }

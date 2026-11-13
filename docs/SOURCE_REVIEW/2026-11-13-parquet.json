@@ -1,0 +1,445 @@
+{
+  "date": "2026-11-13",
+  "scope": "PINNED_PACKAGE_LICENSE_AND_SELECTED_READER_WRITER_REVIEW_NOT_FULL_SECURITY_AUDIT",
+  "packages": [
+    {
+      "name": "ahash",
+      "version": "0.8.12",
+      "declared_license": "MIT OR Apache-2.0",
+      "registry_archive_sha256_verified": "5a15f179cd60c4584b8a8c596927aadc462e27f2ca70c04e0071964a73ba7a75",
+      "repository": "https://github.com/tkaitchuck/ahash",
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "sha256": "4ddbacdfae8fa9049a0f47b8f479a5e09536687917415f5c993c9c5438cbdbcd",
+          "bytes": 3277
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "bytes": 10847
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "0444c6991eead6822f7b9102e654448d51624431119546492e8b231db42c48bb",
+          "bytes": 1057
+        }
+      ]
+    },
+    {
+      "name": "const-random",
+      "version": "0.1.18",
+      "declared_license": "MIT OR Apache-2.0",
+      "registry_archive_sha256_verified": "87e00182fe74b066627d63b85fd550ac2998d4b0bd86bfed477a0ae4c7c71359",
+      "repository": "https://github.com/tkaitchuck/constrandom",
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "sha256": "82f9f48e8116cf79bc1429fe5907e7c545a989db6bf240a0cc1a2963586562e8",
+          "bytes": 919
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "bytes": 10847
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "ff8f68cb076caf8cefe7a6430d4ac086ce6af2ca8ce2c4e5a2004d4552ef52a2",
+          "bytes": 1060
+        }
+      ]
+    },
+    {
+      "name": "const-random-macro",
+      "version": "0.1.16",
+      "declared_license": "MIT OR Apache-2.0",
+      "registry_archive_sha256_verified": "f9d839f2a20b0aee515dc581a6172f2321f96cab76c1a38a4c584a194955390e",
+      "repository": "https://github.com/tkaitchuck/constrandom",
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "sha256": "a56e17787441fdf7de892b488d64d31447276599b67baa7e035cc913559ce527",
+          "bytes": 1097
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "bytes": 10847
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "ff8f68cb076caf8cefe7a6430d4ac086ce6af2ca8ce2c4e5a2004d4552ef52a2",
+          "bytes": 1060
+        }
+      ]
+    },
+    {
+      "name": "crunchy",
+      "version": "0.2.4",
+      "declared_license": "MIT",
+      "registry_archive_sha256_verified": "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5",
+      "repository": "https://github.com/eira-fransham/crunchy",
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "sha256": "830244f7c63478a57e214ef9ca2b76d6c7e6fd3d30bfe1cadcf58dc1942ff019",
+          "bytes": 1111
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "3eab77734a181b2a2e8418af9004f960f715f04aac4d76a26cf774f63a7b13d1",
+          "bytes": 1082
+        }
+      ]
+    },
+    {
+      "name": "getrandom",
+      "version": "0.2.17",
+      "declared_license": "MIT OR Apache-2.0",
+      "registry_archive_sha256_verified": "ff2abc00be7fca6ebc474524697ae276ad847ad0a6b3faa4bcb027e9a4614ad0",
+      "repository": "https://github.com/rust-random/getrandom",
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "sha256": "032d84ffe843860402ec2339ae4179be20fd6f432109e595a3fa83be54893ec7",
+          "bytes": 2823
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "aaff376532ea30a0cd5330b9502ad4a4c8bf769c539c87ffe78819d188a18ebf",
+          "bytes": 10849
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "42fa16951ce7f24b5a467a40e5b449a1d41e662f97ca779864f053f39e097737",
+          "bytes": 1130
+        }
+      ]
+    },
+    {
+      "name": "half",
+      "version": "2.7.1",
+      "declared_license": "MIT OR Apache-2.0",
+      "registry_archive_sha256_verified": "6ea2d84b969582b4b1864a92dc5d27cd2b77b622a8d79306834f1be5ba20d84b",
+      "repository": "https://github.com/VoidStarKat/half-rs",
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "sha256": "cb0325b14b6e12ea7c027da7084877327b91368efc7a3c9cfac1c19c0fd4061d",
+          "bytes": 2616
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+          "bytes": 10173
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "508a77d2e7b51d98adeed32648ad124b7b30241a8e70b2e72c99f92d8e5874d1",
+          "bytes": 1036
+        }
+      ]
+    },
+    {
+      "name": "hashbrown",
+      "version": "0.17.1",
+      "declared_license": "MIT OR Apache-2.0",
+      "registry_archive_sha256_verified": "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a",
+      "repository": "https://github.com/rust-lang/hashbrown",
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "sha256": "afcb0e62d498f756bd4ddf69785c8282d01ee4fa40016158c7eac12ceb302f8c",
+          "bytes": 3847
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "bytes": 10847
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "ff8f68cb076caf8cefe7a6430d4ac086ce6af2ca8ce2c4e5a2004d4552ef52a2",
+          "bytes": 1060
+        }
+      ]
+    },
+    {
+      "name": "libm",
+      "version": "0.2.16",
+      "declared_license": "MIT",
+      "registry_archive_sha256_verified": "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981",
+      "repository": "https://github.com/rust-lang/compiler-builtins",
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "sha256": "a2d94f9cbaa4a177bacde9737bfcc7b2ed9de5bddadafe507923a5b5748f9bd7",
+          "bytes": 1455
+        },
+        {
+          "path": "LICENSE.txt",
+          "sha256": "3823dda7cf046602f4b4e77ec8e227863dc4736037cc85bb33d9f19febe16bb7",
+          "bytes": 14088
+        }
+      ]
+    },
+    {
+      "name": "num-bigint",
+      "version": "0.5.1",
+      "declared_license": "MIT OR Apache-2.0",
+      "registry_archive_sha256_verified": "93e7820bc0a80a0238e650327316f929ba18d5be054b647490a3a6a339f3e7c0",
+      "repository": "https://github.com/rust-num/num-bigint",
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "sha256": "3413270c8dd1a2adfa18f752411edb104c1cd5542d7359f2302eddbf2ccc1505",
+          "bytes": 3393
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "bytes": 10847
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "name": "num-integer",
+      "version": "0.1.47",
+      "declared_license": "MIT OR Apache-2.0",
+      "registry_archive_sha256_verified": "7ce2d95d4b3734dc35aa2f45e1aa22cd416814592a4f9d9205e11affd5b8e10b",
+      "repository": "https://github.com/rust-num/num-integer",
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "sha256": "a0fc4aee99b0663bb80ce2fc8052491b7e28872765711266faddb2ed0474cb96",
+          "bytes": 1622
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+          "bytes": 10847
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb",
+          "bytes": 1071
+        }
+      ]
+    },
+    {
+      "name": "parquet",
+      "version": "60.1.0",
+      "declared_license": "Apache-2.0",
+      "registry_archive_sha256_verified": "806eaa0f1c0436dcb43bee8e6a82bf2efff90521a60172f8281cb9ef577b43a4",
+      "repository": "https://github.com/apache/arrow-rs",
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "sha256": "9a7008b193f8be403c7b98c95a917c6f0d12a2ea40eb113e6f2a167218dc2f14",
+          "bytes": 16935
+        },
+        {
+          "path": "LICENSE.txt",
+          "sha256": "03548525ec3706de58e48ef6e3c455582557a0ad3b54a2da9a3819add35dfb72",
+          "bytes": 11577
+        },
+        {
+          "path": "NOTICE.txt",
+          "sha256": "e5b198d7f809311723889814d99a92f808c69e89a847efa7a7b65270f5fdeae6",
+          "bytes": 470
+        },
+        {
+          "path": "src/file/serialized_reader.rs",
+          "sha256": "70a3054148fba0d15ea79f2bd9e3051274a813321da059127efe1690189ba659",
+          "bytes": 134187
+        },
+        {
+          "path": "src/file/writer.rs",
+          "sha256": "7e590eb657c0cf68ff73cbb78002854d0853e42d7957039eba40af6b1d288944",
+          "bytes": 107657
+        },
+        {
+          "path": "src/file/metadata/mod.rs",
+          "sha256": "c939dc703a62e5341425204bc3776ea54caced601ffccb8d3afca7ad5a34d7b7",
+          "bytes": 81894
+        },
+        {
+          "path": "src/parquet_thrift.rs",
+          "sha256": "521ab8206e37f5d5b9e480c6dc9d9bdde80b671d7d7319705587e3d3b86b022d",
+          "bytes": 45221
+        },
+        {
+          "path": "src/compression.rs",
+          "sha256": "e91064ede3d68dfe30541a7935d2558bc2d878f27f8082fb2717cace01aa3004",
+          "bytes": 33720
+        }
+      ]
+    },
+    {
+      "name": "seq-macro",
+      "version": "0.3.6",
+      "declared_license": "MIT OR Apache-2.0",
+      "registry_archive_sha256_verified": "1bc711410fbe7399f390ca1c3b60ad0f53f80e95c5eb935e52268a0e2cd49acc",
+      "repository": "https://github.com/dtolnay/seq-macro",
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "sha256": "f5eba9db2eb619a616a3fd1bec4a02bc2cd3acaa88cf0f549c645606bdcca39e",
+          "bytes": 1677
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+          "bytes": 9723
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+          "bytes": 1023
+        }
+      ]
+    },
+    {
+      "name": "tiny-keccak",
+      "version": "2.0.2",
+      "declared_license": "CC0-1.0",
+      "registry_archive_sha256_verified": "2c9d3793400a45f954c52e73d068316d76b6f4e36977e3fcebb13a2721e80237",
+      "repository": null,
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "sha256": "e8591a61b0fca0a73e34485db425e0fba0130a1ef31365e4b46ff16a7cdcb37a",
+          "bytes": 1989
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+          "bytes": 7048
+        }
+      ]
+    },
+    {
+      "name": "twox-hash",
+      "version": "2.1.5",
+      "declared_license": "MIT",
+      "registry_archive_sha256_verified": "86a801b3cea342a06d468c8710662aa29e5e05e4f5c0d62f00bbb7f2ad7941c2",
+      "repository": "https://github.com/shepmaster/twox-hash",
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "sha256": "4328ba632874f6bdea89bc93ddfd432f635361578c76cdd4e1820818cd32cc3e",
+          "bytes": 2081
+        },
+        {
+          "path": "LICENSE.txt",
+          "sha256": "f59bcb1c02654665f78a5f290bae76b6358137675f6459f51e6d474a4623d8ea",
+          "bytes": 1080
+        }
+      ]
+    },
+    {
+      "name": "zerocopy",
+      "version": "0.8.63",
+      "declared_license": "BSD-2-Clause OR Apache-2.0 OR MIT",
+      "registry_archive_sha256_verified": "e5fe1f8f1b06191a00962174c61aa5005e0bb391a6d80d07e24d115c01a92ed8",
+      "repository": "https://github.com/google/zerocopy",
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "sha256": "73182670f07c89a4b463e6369da7a6b8f87bf5a838627103bb606bd7b4e0a88d",
+          "bytes": 13636
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "9d185ac6703c4b0453974c0d85e9eee43e6941009296bb1f5eb0b54e2329e9f3",
+          "bytes": 11350
+        },
+        {
+          "path": "LICENSE-BSD",
+          "sha256": "83c1763356e822adde0a2cae748d938a73fdc263849ccff6b27776dff213bd32",
+          "bytes": 1275
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "1a2f5c12ddc934d58956aa5dbdd3255fe55fd957633ab7d0d39e4f0daa73f7df",
+          "bytes": 1060
+        }
+      ]
+    },
+    {
+      "name": "zerocopy-derive",
+      "version": "0.8.63",
+      "declared_license": "BSD-2-Clause OR Apache-2.0 OR MIT",
+      "registry_archive_sha256_verified": "863ad3ac83293fb4d740aedbfdc9240dd8d1a50c1099acd76ce80ce7c7230c7f",
+      "repository": "https://github.com/google/zerocopy",
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "sha256": "f8b9128d66324adf3b6af5542fae833e3d370533f5a782ca785874f706209d16",
+          "bytes": 4362
+        },
+        {
+          "path": "LICENSE-APACHE",
+          "sha256": "9d185ac6703c4b0453974c0d85e9eee43e6941009296bb1f5eb0b54e2329e9f3",
+          "bytes": 11350
+        },
+        {
+          "path": "LICENSE-BSD",
+          "sha256": "83c1763356e822adde0a2cae748d938a73fdc263849ccff6b27776dff213bd32",
+          "bytes": 1275
+        },
+        {
+          "path": "LICENSE-MIT",
+          "sha256": "1a2f5c12ddc934d58956aa5dbdd3255fe55fd957633ab7d0d39e4f0daa73f7df",
+          "bytes": 1060
+        }
+      ]
+    },
+    {
+      "name": "zstd",
+      "version": "0.14.4",
+      "declared_license": "BSD-3-Clause",
+      "registry_archive_sha256_verified": "ad5020ab8f27bfc0024ad0a07aed6bf022a16208f479686fbed4fdd0c85eb0b3",
+      "repository": "https://github.com/gyscos/zstd-rs",
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "sha256": "8dd17f1ba072fb0d12cc2f688b87cbbd3e66445a0c7cf16a6f43aeb20367f500",
+          "bytes": 3201
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "ce4868c8e4ebe47a7d4b3c93dbf6b802033e5ae2fa7638098173f80836daac60",
+          "bytes": 1501
+        }
+      ]
+    },
+    {
+      "name": "zstd-safe",
+      "version": "8.3.0",
+      "declared_license": "BSD-3-Clause",
+      "registry_archive_sha256_verified": "5a9ea9cc2576c2fcc104e9cec04f46e3ede564f4fbc206831e4ef7e859a4140d",
+      "repository": "https://github.com/gyscos/zstd-rs",
+      "files": [
+        {
+          "path": "Cargo.toml",
+          "sha256": "ca8308442bc352bc329daed4c90dd6a88b27b0a271afecbcb1d4bf0bb3964850",
+          "bytes": 2281
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "ce4868c8e4ebe47a7d4b3c93dbf6b802033e5ae2fa7638098173f80836daac60",
+          "bytes": 1501
+        }
+      ]
+    }
+  ],
+  "decision": "Parquet60.1.0 pinned with default-features=false and zstd only, no Arrow runtime. Use four required INT64 columns, explicit UTC-millis/unsigned-sequence logical annotations, ZSTD3/plain/no dictionary and bounded row groups. Metadata/footer and data-page sizes must be preflighted before upstream allocation. Existing RSFZ stays pinned to zstd0.13.3; Parquet adds zstd0.14.4 with shared zstd-sys C package. Codec comparison and dependency/binary cost must be measured; no automatic production selection.",
+  "unsafe_native_boundary": "Application remains safe Rust. Parquet/zerocopy/hash implementations and shared ZSTD C form third-party boundaries; selected review is not a vulnerability or formal memory-safety audit."
+}

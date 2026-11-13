@@ -25,7 +25,7 @@ Local versioned installs, rollback, verified backups/new-path restores and non-r
 
 ## Research and evidence
 
-Native `.rsf` storage supports lossless packing/unpacking and the same dataset identities; see [native storage](docs/RUNBOOKS/native-storage.md). A bounded lossless `.rsfz` ZSTD wrapper now adds exact native restoration and shared CLI/research/protocol identities; see [compressed native storage](docs/RUNBOOKS/compressed-native.md). Parquet comparison, full-history streaming and production codec selection remain unfinished.
+Native `.rsf` storage supports lossless packing/unpacking and the same dataset identities; see [native storage](docs/RUNBOOKS/native-storage.md). A bounded lossless `.rsfz` ZSTD wrapper now adds exact native restoration and shared CLI/research/protocol identities; see [compressed native storage](docs/RUNBOOKS/compressed-native.md). A strict [Parquet/ZSTD cold baseline](docs/RUNBOOKS/parquet-storage.md) and same-corpus synthetic pipeline comparison now work. Full-history streaming, approved real-corpus comparison and production codec selection remain unfinished.
 
 Training-only deterministic diagnostics persist bounded unevaluated child proposals; see [training improvement](docs/RUNBOOKS/training-improvement.md). Scientific/OOS/final receipts cannot authorize adaptation. Explicit bounded reviews replay comparable parent/children and retain immutable evaluation edges; opt-in bounded one-worker jobs retain scheduling/recovery state. Individual child checkpoints preserve pause/restart recovery; full improvement acceptance remains unfinished.
 

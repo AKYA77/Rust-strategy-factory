@@ -7,6 +7,8 @@ license = "MIT"
 description = "Deterministic historical strategy research; no live trading"
 
 [dependencies]
+parquet = { version = "=60.1.0", default-features = false, features = ["zstd"] }
+bytes = "1"
 zstd = { version = "=0.13.3", default-features = false }
 axum = "0.8"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "sync"] }
@@ -44,4 +46,8 @@ harness = false
 
 [[bench]]
 name = "compressed"
+harness = false
+
+[[bench]]
+name = "storage_pipeline"
 harness = false

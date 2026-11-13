@@ -37,7 +37,7 @@ with tempfile.TemporaryDirectory(prefix='factory-operations-') as directory:
     first = operate('install', args.release)['release']
     assert first == digest(args.release)
     notices = prefix / 'releases' / first / 'THIRD_PARTY_NOTICES.txt'
-    assert notices.read_bytes() == (root / 'docs/THIRD_PARTY_NOTICES/zstd.txt').read_bytes()
+    assert notices.read_bytes() == b'\n\n'.join(p.read_bytes() for p in sorted((root / 'docs/THIRD_PARTY_NOTICES').glob('*.txt')))
     saved_notices = notices.read_bytes()
     notices.write_bytes(saved_notices + b'tamper')
     operate('status', success=False)
@@ -106,6 +106,15 @@ with tempfile.TemporaryDirectory(prefix='factory-operations-') as directory:
     output = prefix / 'state/refused.sqlite'
     operate('restore', invalid, output, success=False)
     assert not output.exists()
+    incomplete = base / 'incomplete-package'
+    (incomplete / 'scripts').mkdir(parents=True)
+    (incomplete / 'docs/THIRD_PARTY_NOTICES').mkdir(parents=True)
+    shutil.copyfile(root / 'scripts/operate.py', incomplete / 'scripts/operate.py')
+    shutil.copyfile(root / 'docs/THIRD_PARTY_NOTICES/zstd.txt', incomplete / 'docs/THIRD_PARTY_NOTICES/zstd.txt')
+    incomplete_prefix = base / 'incomplete-install'
+    command(sys.executable, incomplete / 'scripts/operate.py', '--prefix', incomplete_prefix,
+            'install', args.release, success=False)
+    assert not (incomplete_prefix / 'current').exists()
     units_verified = False
     if shutil.which('systemd-analyze'):
         # Validate populated user-unit copies, without installing or starting a service.

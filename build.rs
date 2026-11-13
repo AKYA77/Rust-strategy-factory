@@ -13,6 +13,8 @@ fn main() {
         "src/data.rs",
         "src/native.rs",
         "src/compressed.rs",
+        "src/parquet_store.rs",
+        "src/parquet_guard.rs",
         "src/candles.rs",
         "src/indicators.rs",
         "src/strategies.rs",

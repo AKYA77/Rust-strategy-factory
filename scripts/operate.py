@@ -127,8 +127,11 @@ def install(prefix, source):
             version = json.loads(run(binary, 'version'))
             if not isinstance(version, dict) or not isinstance(version.get('compute_revision'), str) or not isinstance(version.get('engine'), str):
                 raise ValueError('unsupported binary version response')
-            notices = Path(__file__).resolve().parent.parent / 'docs/THIRD_PARTY_NOTICES/zstd.txt'
-            shutil.copyfile(notices, staging / 'THIRD_PARTY_NOTICES.txt')
+            notice_root = Path(__file__).resolve().parent.parent / 'docs/THIRD_PARTY_NOTICES'
+            notices = sorted(notice_root.glob('*.txt'))
+            if not {'parquet.txt', 'zstd.txt'}.issubset({p.name for p in notices}):
+                raise ValueError('third-party notice bundle is incomplete')
+            (staging / 'THIRD_PARTY_NOTICES.txt').write_bytes(b'\n\n'.join(p.read_bytes() for p in notices))
             metadata = {'format': 2, 'sha256': release, 'version': version,
                         'notices_sha256': digest(staging / 'THIRD_PARTY_NOTICES.txt')}
             with (staging / 'THIRD_PARTY_NOTICES.txt').open('rb') as stream:

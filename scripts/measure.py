@@ -58,7 +58,7 @@ report = {
     "peak_rss_kib_linux": usage.ru_maxrss,
     "filesystem_input_blocks": usage.ru_inblock,
     "filesystem_output_blocks": usage.ru_oublock,
-    "limitations": "Read the benchmark result class: component masks and synthetic replays are different workloads. CPU/RSS/I/O cover this entire child process, excluding compilation, not individual trials. No real/full-history or decode/compression measured. Source fingerprint v2 covers build.rs, toolchain, Cargo manifests, src and benches; per-file digests are authoritative when the checkout is dirty. The rustc probe describes this measurement environment; compiled compute identity is in the result."
+    "limitations": "Read the benchmark result class: component masks and synthetic replays are different workloads. CPU/RSS/I/O cover this entire child process, excluding compilation, not individual trials. The child report defines which storage/decoding/replay operations were measured; this wrapper supplies no real/full-history acceptance. Source fingerprint v2 covers build.rs, toolchain, Cargo manifests, src and benches; per-file digests are authoritative when the checkout is dirty. The rustc probe describes this measurement environment; compiled compute identity is in the result."
 }
 with open(resources, "x") as target:
     json.dump(report, target, indent=2)

@@ -43,3 +43,5 @@ pub mod training_diagnostics;
 pub mod exploration;
 
 pub mod compressed;
+
+pub mod parquet_store;

@@ -13,7 +13,7 @@ cargo build --locked
 python3 scripts/check-operations.py
 ```
 
-Distribute `docs/THIRD_PARTY_NOTICES/zstd.txt` with the installer; new releases copy and verify the added codec stack notices. Historical format1 release manifests remain readable. This is not a completed audit of every pre-existing dependency.
+Distribute all required files under `docs/THIRD_PARTY_NOTICES/` with the installer; new releases copy and verify the added codec/Parquet stack notices. Historical format1 release manifests remain readable. This is not a completed audit of every pre-existing dependency.
 
 The operations acceptance uses real release/debug binaries in disposable directories, including a path with spaces. It checks content-addressed installation, repeat install, upgrade/rollback, checksum tampering, preservation, actual synthetic experiment/diagnosis state, verified backup/new-path restore, no-overwrite and invalid/sidecar refusal. It also validates populated user-unit copies with systemd-analyze when present. It never starts systemd or deploys a host. The alternate debug build is an installation-test artifact, not a production recommendation; a profile change changes compute identity.
 
