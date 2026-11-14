@@ -161,6 +161,7 @@ fn register(registry: &mut Registry, config: &Configuration) -> Result<String> {
             params![id, body],
         )
         .map_err(|e| e.to_string())?;
+        crate::search_control::register(&tx, &id, "running")?;
     }
     tx.commit().map_err(|e| e.to_string())?;
     Ok(id)
@@ -272,6 +273,7 @@ fn read(connection: &Connection, id: &str) -> Result<SearchSnapshot> {
     if jobs.len() != cursor {
         return Err("corpus search queue/cursor mismatch".into());
     }
+    crate::search_control::read(connection, id)?;
     Ok((config, cursor, state, attempt, expiry, jobs))
 }
 
@@ -409,11 +411,13 @@ pub fn requeue_errors(
         }
         slots.push(record.slot.to_string());
     }
-    tx.execute(
-        "UPDATE corpus_searches SET state='running',token=NULL,expires_ms=NULL WHERE id=?1",
-        [id],
-    )
-    .map_err(|e| e.to_string())?;
+    crate::search_control::transition(
+        &tx,
+        id,
+        "running",
+        crate::search_control::Cause::OperatorRequeue,
+        chrono::Utc::now().timestamp_millis(),
+    )?;
     tx.commit().map_err(|e| e.to_string())?;
     Ok(
         serde_json::json!({"search_id":id,"requeued_slots":slots,"state":"running","qualification_granted":false,"limitations":"Explicit bounded requeue under unchanged keys; original errors remain immutable. Child leases and committed results are never reset. Start an operator process to execute queued work."}),
@@ -445,9 +449,10 @@ pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
         *counts.entry(job.state.clone()).or_default() += 1;
     }
     let recent:Vec<_>=jobs.iter().rev().take(32).map(|j|serde_json::json!({"candidate_index":j.definition.slot.to_string(),"family":j.definition.family,"experiment_id":j.definition.key.identity().ok(),"state":j.state,"error":j.error})).collect();
+    let control = crate::search_control::status(&tx, id)?;
     tx.commit().map_err(|e| e.to_string())?;
     Ok(
-        serde_json::json!({"search_id":id,"state":state,"generated_slots":cursor.to_string(),"maximum_candidates":config.maximum_candidates.to_string(),"attempt":attempt.to_string(),"lease_active":expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"slot_states":counts,"recent_slots":recent,"requeue_records":history.len().to_string(),"retry_eligible_slots":retry_eligible.to_string(),"retry_capacity":retry_capacity.to_string(),"maximum_requeues_per_slot":3,"recent_requeues":recent_requeues,"qualification_granted":false,"limitations":"Generated slots are not new tick simulations; canonical duplicates can share immutable experiment receipts. Synthetic USD training search only."}),
+        serde_json::json!({"control":control,"search_id":id,"state":state,"generated_slots":cursor.to_string(),"maximum_candidates":config.maximum_candidates.to_string(),"attempt":attempt.to_string(),"lease_active":expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"slot_states":counts,"recent_slots":recent,"requeue_records":history.len().to_string(),"retry_eligible_slots":retry_eligible.to_string(),"retry_capacity":retry_capacity.to_string(),"maximum_requeues_per_slot":3,"recent_requeues":recent_requeues,"qualification_granted":false,"limitations":"Generated slots are not new tick simulations; canonical duplicates can share immutable experiment receipts. Synthetic USD training search only."}),
     )
 }
 pub(crate) fn integrity(registry: &Registry) -> Result<()> {
@@ -478,6 +483,7 @@ pub(crate) fn integrity(registry: &Registry) -> Result<()> {
     if count > 10000 || bytes > 40 * 1024 * 1024 {
         return Err("persisted requeue quota exceeded".into());
     }
+    crate::search_control::integrity(&tx)?;
     for id in ids {
         let (_, cursor, _, _, _, _) = read(&tx, &id)?;
         requeue_history(&tx, &id, cursor)?;
@@ -485,21 +491,20 @@ pub(crate) fn integrity(registry: &Registry) -> Result<()> {
     tx.commit().map_err(|e| e.to_string())
 }
 pub fn control(registry: &mut Registry, id: &str, state: &str) -> Result<()> {
-    if !["running", "paused", "stopped"].contains(&state) {
-        return Err("invalid corpus search control".into());
-    }
-    let n = registry
+    let tx = registry
         .connection
-        .execute(
-            "UPDATE corpus_searches SET token=CASE WHEN state=?2 AND ?2='running' THEN token ELSE NULL END,expires_ms=CASE WHEN state=?2 AND ?2='running' THEN expires_ms ELSE NULL END,state=?2 WHERE id=?1 AND state IN ('running','paused')",
-            params![id, state],
-        )
+        .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(|e| e.to_string())?;
-    if n != 1 {
-        return Err("unknown or terminal corpus search".into());
-    }
-    Ok(())
+    crate::search_control::transition(
+        &tx,
+        id,
+        state,
+        crate::search_control::Cause::Operator,
+        chrono::Utc::now().timestamp_millis(),
+    )?;
+    tx.commit().map_err(|e| e.to_string())
 }
+
 fn admit(registry: &mut Registry, lease: &Lease, config: &Configuration) -> Result<()> {
     let (_, cursor, _, _, _, jobs) = read(&registry.connection, &lease.id)?;
     if jobs
@@ -663,17 +668,21 @@ pub fn step(database: &Path, run: SearchRun<'_>, limits: CorpusBatchLimits) -> R
         }
         let (cursor,remaining):(usize,usize)=tx.query_row("SELECT cursor,(SELECT count(*) FROM corpus_search_jobs WHERE search_id=?1 AND state IN ('queued','pending')) FROM corpus_searches WHERE id=?1",[&id],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|e|e.to_string())?;
         if errored {
-            tx.execute(
-                "UPDATE corpus_searches SET state='paused' WHERE id=?1",
-                [&id],
-            )
-            .map_err(|e| e.to_string())?;
+            crate::search_control::transition(
+                &tx,
+                &id,
+                "paused",
+                crate::search_control::Cause::WorkerError,
+                chrono::Utc::now().timestamp_millis(),
+            )?;
         } else if cursor == config.maximum_candidates && remaining == 0 {
-            tx.execute(
-                "UPDATE corpus_searches SET state='exhausted' WHERE id=?1",
-                [&id],
-            )
-            .map_err(|e| e.to_string())?;
+            crate::search_control::transition(
+                &tx,
+                &id,
+                "exhausted",
+                crate::search_control::Cause::Exhausted,
+                chrono::Utc::now().timestamp_millis(),
+            )?;
         }
         tx.commit().map_err(|e| e.to_string())?;
         let status = status(&registry, &id)?;
@@ -752,6 +761,234 @@ mod tests {
             maximum_candidates: 4,
             queue_width: 2,
         }
+    }
+    #[test]
+    fn pause_intent_epochs_and_backup_preserve_operator_override() {
+        let (root, spec) = fixture("intent");
+        let costs = Costs::default();
+        let mut registry = Registry::open(&root.join("state.sqlite")).unwrap();
+        let id = register(
+            &mut registry,
+            &configuration(&run(&root, &spec, &costs)).unwrap(),
+        )
+        .unwrap();
+        let lease = claim(&mut registry, &id, 100, 1000).unwrap().unwrap();
+        {
+            let tx = registry
+                .connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .unwrap();
+            crate::search_control::transition(
+                &tx,
+                &id,
+                "paused",
+                crate::search_control::Cause::WorkerError,
+                110,
+            )
+            .unwrap();
+            tx.commit().unwrap();
+        }
+        let worker = status(&registry, &id).unwrap();
+        assert_eq!(worker["control"]["pause_origin"], "worker_error");
+        assert_eq!(worker["control"]["epoch"], "1");
+        control(&mut registry, &id, "paused").unwrap();
+        let paused = status(&registry, &id).unwrap();
+        assert_eq!(paused["control"]["pause_origin"], "operator");
+        assert_eq!(paused["control"]["epoch"], "2");
+        control(&mut registry, &id, "paused").unwrap();
+        assert_eq!(
+            status(&registry, &id).unwrap()["control"],
+            paused["control"]
+        );
+        let backup = root.join("backup.sqlite");
+        registry.backup(&backup).unwrap();
+        let restored = Registry::open(&backup).unwrap();
+        assert_eq!(
+            status(&restored, &id).unwrap()["control"],
+            paused["control"]
+        );
+        restored.integrity().unwrap();
+        drop(restored);
+        control(&mut registry, &id, "running").unwrap();
+        assert!(fence(&registry.connection, &lease, 120).is_err());
+        assert_eq!(status(&registry, &id).unwrap()["control"]["epoch"], "3");
+        assert!(status(&registry, &id).unwrap()["control"]["pause_origin"].is_null());
+        registry.integrity().unwrap();
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn full_control_history_is_explicit_and_never_blocks_stop() {
+        let (root, spec) = fixture("history-cap");
+        let costs = Costs::default();
+        let mut registry = Registry::open(&root.join("state.sqlite")).unwrap();
+        let id = register(
+            &mut registry,
+            &configuration(&run(&root, &spec, &costs)).unwrap(),
+        )
+        .unwrap();
+        for _ in 0..70 {
+            control(&mut registry, &id, "paused").unwrap();
+            control(&mut registry, &id, "running").unwrap();
+        }
+        control(&mut registry, &id, "stopped").unwrap();
+        let snapshot = status(&registry, &id).unwrap();
+        assert_eq!(snapshot["control"]["epoch"], "141");
+        assert_eq!(snapshot["control"]["journaled_transitions"], "128");
+        assert_eq!(snapshot["control"]["omitted_transitions"], "13");
+        assert_eq!(snapshot["control"]["history_complete"], false);
+        assert!(control(&mut registry, &id, "running").is_err());
+        assert!(
+            registry
+                .connection
+                .execute("DELETE FROM corpus_search_transitions", [])
+                .is_err()
+        );
+        assert!(
+            registry
+                .connection
+                .execute("UPDATE corpus_search_transitions SET epoch=999", [])
+                .is_err()
+        );
+        registry.integrity().unwrap();
+        registry.connection.execute_batch("DROP TRIGGER search_transition_no_delete;DELETE FROM corpus_search_transitions WHERE epoch=128;").unwrap();
+        assert!(status(&registry, &id).is_err());
+        assert!(registry.integrity().is_err());
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn schema10_pauses_migrate_unknown_and_current_missing_heads_are_not_repaired() {
+        let (root, spec) = fixture("legacy-intent");
+        let costs = Costs::default();
+        let database = root.join("state.sqlite");
+        let mut registry = Registry::open(&database).unwrap();
+        let id = register(
+            &mut registry,
+            &configuration(&run(&root, &spec, &costs)).unwrap(),
+        )
+        .unwrap();
+        control(&mut registry, &id, "paused").unwrap();
+        registry.connection.execute_batch("DROP TABLE corpus_search_transitions;DROP TABLE corpus_search_runtime;PRAGMA user_version=10;").unwrap();
+        drop(registry);
+        let mut registry = Registry::open(&database).unwrap();
+        let legacy = status(&registry, &id).unwrap();
+        assert_eq!(legacy["control"]["pause_origin"], "legacy_unknown");
+        assert_eq!(legacy["control"]["epoch"], "0");
+        assert!(legacy["control"]["paused_at_ms"].is_null());
+        control(&mut registry, &id, "paused").unwrap();
+        assert_eq!(
+            status(&registry, &id).unwrap()["control"]["pause_origin"],
+            "operator"
+        );
+        registry.integrity().unwrap();
+        registry
+            .connection
+            .execute_batch("DROP TABLE corpus_search_runtime;")
+            .unwrap();
+        drop(registry);
+        let registry = Registry::open(&database).unwrap();
+        assert!(status(&registry, &id).is_err());
+        assert!(registry.integrity().is_err());
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn migration_revokes_inflight_coordinators_without_changing_search_keys() {
+        let (root, spec) = fixture("migration-lease");
+        let costs = Costs::default();
+        let database = root.join("state.sqlite");
+        let mut registry = Registry::open(&database).unwrap();
+        let config = configuration(&run(&root, &spec, &costs)).unwrap();
+        let id = register(&mut registry, &config).unwrap();
+        let old = claim(&mut registry, &id, 100, 1000).unwrap().unwrap();
+        registry.connection.execute_batch("DROP TABLE corpus_search_transitions;DROP TABLE corpus_search_runtime;PRAGMA user_version=10;").unwrap();
+        drop(registry);
+        let registry = Registry::open(&database).unwrap();
+        assert!(fence(&registry.connection, &old, 110).is_err());
+        let snapshot = status(&registry, &id).unwrap();
+        assert_eq!(snapshot["state"], "running");
+        assert_eq!(snapshot["control"]["epoch"], "0");
+        assert_eq!(data::hash(&config).unwrap(), id);
+        assert_eq!(snapshot["attempt"], "1");
+        assert_eq!(snapshot["lease_active"], false);
+        registry.integrity().unwrap();
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn racing_operator_pause_always_overrides_fenced_worker_error_publication() {
+        let (root, spec) = fixture("origin-race");
+        let costs = Costs::default();
+        let database = root.join("state.sqlite");
+        let mut registry = Registry::open(&database).unwrap();
+        let id = register(
+            &mut registry,
+            &configuration(&run(&root, &spec, &costs)).unwrap(),
+        )
+        .unwrap();
+        let lease = claim(&mut registry, &id, 100, 1000).unwrap().unwrap();
+        drop(registry);
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+        let worker = {
+            let path = database.clone();
+            let id = id.clone();
+            let barrier = barrier.clone();
+            std::thread::spawn(move || {
+                let mut registry = Registry::open(&path).unwrap();
+                barrier.wait();
+                let tx = registry
+                    .connection
+                    .transaction_with_behavior(TransactionBehavior::Immediate)
+                    .unwrap();
+                if fence(&tx, &lease, 110).is_ok() {
+                    crate::search_control::transition(
+                        &tx,
+                        &id,
+                        "paused",
+                        crate::search_control::Cause::WorkerError,
+                        110,
+                    )
+                    .unwrap();
+                    tx.commit().unwrap();
+                }
+            })
+        };
+        let mut registry = Registry::open(&database).unwrap();
+        barrier.wait();
+        control(&mut registry, &id, "paused").unwrap();
+        worker.join().unwrap();
+        assert_eq!(
+            status(&registry, &id).unwrap()["control"]["pause_origin"],
+            "operator"
+        );
+        registry.integrity().unwrap();
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn epoch_fence_rejects_old_nonce_even_if_token_columns_are_restored() {
+        let (root, spec) = fixture("epoch-fence");
+        let costs = Costs::default();
+        let mut registry = Registry::open(&root.join("state.sqlite")).unwrap();
+        let id = register(
+            &mut registry,
+            &configuration(&run(&root, &spec, &costs)).unwrap(),
+        )
+        .unwrap();
+        let lease = claim(&mut registry, &id, 100, 1000).unwrap().unwrap();
+        control(&mut registry, &id, "paused").unwrap();
+        control(&mut registry, &id, "running").unwrap();
+        registry
+            .connection
+            .execute(
+                "UPDATE corpus_searches SET token=?2,attempt=?3,expires_ms=1000 WHERE id=?1",
+                params![id, lease.token, lease.attempt],
+            )
+            .unwrap();
+        assert!(fence(&registry.connection, &lease, 120).is_err());
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
     }
     #[test]
     fn replaced_coordinators_and_controls_fence_progress_without_clearing_new_tokens() {

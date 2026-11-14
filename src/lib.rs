@@ -80,3 +80,5 @@ pub mod operator_config;
 pub mod result_artifact;
 
 pub mod disk;
+
+mod search_control;

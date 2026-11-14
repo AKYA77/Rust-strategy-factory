@@ -118,7 +118,7 @@ impl Registry {
         let version: i64 = connection
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .map_err(db_err)?;
-        if version > 10 {
+        if version > 11 {
             return Err("database schema newer than supported".into());
         }
         if version == 0 {
@@ -255,6 +255,7 @@ impl Registry {
                 .map_err(db_err)?;
         }
         crate::corpus_search::initialize(&connection)?;
+        crate::search_control::initialize(&mut connection, version < 11)?;
         crate::corpus_fleet::initialize(&connection)?;
         Ok(Self { connection })
     }

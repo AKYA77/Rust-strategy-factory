@@ -1526,6 +1526,8 @@ fn corpus_search_worker_errors_pause_without_becoming_completed_evidence() {
     )
     .unwrap();
     assert_eq!(progress.status["state"], "paused");
+    assert_eq!(progress.status["control"]["pause_origin"], "worker_error");
+    assert_eq!(progress.status["control"]["epoch"], "1");
     assert_eq!(progress.status["slot_states"]["error"], 2);
     assert_eq!(progress.status["qualification_granted"], false);
     assert_eq!(progress.status["lease_active"], false);
@@ -1545,6 +1547,7 @@ fn corpus_search_worker_errors_pause_without_becoming_completed_evidence() {
     let mut registry = Registry::open(&db).unwrap();
     let snapshot = corpus_search::status(&registry, id).unwrap();
     assert_eq!(snapshot["requeue_records"], "1");
+    assert!(snapshot["control"]["pause_origin"].is_null());
     assert_eq!(snapshot["slot_states"]["queued"], 1);
     assert_eq!(snapshot["slot_states"]["error"], 1);
     assert_eq!(snapshot["generated_slots"], "2");

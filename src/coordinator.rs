@@ -20,6 +20,7 @@ pub(crate) struct Lease {
     pub token: String,
     pub attempt: i64,
     kind: Kind,
+    epoch: Option<i64>,
 }
 pub(crate) fn claim(
     registry: &mut Registry,
@@ -52,6 +53,10 @@ pub(crate) fn claim(
     let attempt = attempt
         .checked_add(1)
         .ok_or("coordinator attempt overflow")?;
+    let epoch = match kind {
+        Kind::Search => Some(crate::search_control::read(&tx, id)?.epoch),
+        Kind::Fleet => None,
+    };
     let token: String = tx
         .query_row("SELECT lower(hex(randomblob(32)))", [], |r| r.get(0))
         .map_err(|e| e.to_string())?;
@@ -66,12 +71,17 @@ pub(crate) fn claim(
         token,
         attempt,
         kind,
+        epoch,
     }))
 }
 pub(crate) fn fence(connection: &Connection, lease: &Lease, now: i64) -> Result<()> {
     let table = lease.kind.table();
     let valid:bool=connection.query_row(&format!("SELECT EXISTS(SELECT 1 FROM {table} WHERE id=?1 AND token=?2 AND attempt=?3 AND expires_ms>?4 AND state='running')"),params![lease.id,lease.token,lease.attempt,now],|r|r.get(0)).map_err(|e|e.to_string())?;
-    if !valid {
+    if !valid
+        || lease.epoch.is_some_and(|epoch| {
+            crate::search_control::read(connection, &lease.id).map_or(true, |h| h.epoch != epoch)
+        })
+    {
         return Err("coordinator expired, controlled or fenced".into());
     }
     Ok(())
