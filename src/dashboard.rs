@@ -999,6 +999,33 @@ async fn generated_search_status(
         ),
     }
 }
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RequeueRequest {
+    maximum_slots: usize,
+}
+async fn generated_search_requeue(
+    State(app): State<Arc<App>>,
+    Param(id): Param<String>,
+    Json(body): Json<RequeueRequest>,
+) -> Response {
+    if !catalog_id(&id) || !(1..=32).contains(&body.maximum_slots) {
+        return api_error(
+            StatusCode::BAD_REQUEST,
+            "invalid search identity or requeue bound",
+        );
+    }
+    let Ok(mut registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match crate::corpus_search::requeue_errors(&mut registry, &id, body.maximum_slots) {
+        Ok(value) => Json(value).into_response(),
+        Err(_) => api_error(
+            StatusCode::CONFLICT,
+            "requeue unavailable; inspect paused state, coordinator lease, queue capacity and bounded retry budget",
+        ),
+    }
+}
 async fn generated_search_control(
     State(app): State<Arc<App>>,
     Param(id): Param<String>,
@@ -1355,6 +1382,10 @@ pub async fn serve_with_reviews(
         .route("/api/resources", get(resource_status))
         .route("/api/corpus-searches", get(generated_searches))
         .route("/api/corpus-searches/{id}", get(generated_search_status))
+        .route(
+            "/api/corpus-searches/{id}/requeue",
+            post(generated_search_requeue),
+        )
         .route(
             "/api/corpus-searches/{id}/control",
             post(generated_search_control),

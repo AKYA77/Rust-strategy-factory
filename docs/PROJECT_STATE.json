@@ -127,7 +127,8 @@
     "Run and scientific-protocol histories now have authenticated bounded keyset APIs and desktop/mobile newer/older/newest navigation beyond100 records. Pages preserve exact cursor/counter strings, verify protocol definitions, survive concurrent inserts and reject stale delayed responses; controls retain the selected page. Overview can omit redundant run statuses. Two Rust tests and a fourth actual Chromium suite cover129-record/exact-integer/integrity cases and105+ record browser workflows; all four browser suites pass.",
     "Receipt-hash-bound trade APIs and next/previous controls now expose all trades beyond500 with exact full-u64 IDs and unchanged full exports. Request ownership guards prevent late experiment/trade responses from replacing current selections or exports. Equity charts process every exact-safe increment and render at most1002 chronological extrema without argument-spread limits. Focused Rust and actual Chromium tests cover650 replayed trades, cross-receipt cursors, stale responses and a200000-trade display component; stored receipts still load fully before slicing.",
     "Corpus sessions now optionally stop before new rounds on process RSS or host-memory reserve pressure, preserve explicit admission observations and refuse unknown observations. A bounded Linux resource module, resource-status CLI and authenticated read-only dashboard cards expose exact process/host/parallelism observations without claiming hard OS or worker-process enforcement. Actual pressure/no-registration/resume tests, five Chromium suites, release and local operations checks pass; seven reversible rebuild checks bind resource source and restore original identities.",
-    "A bounded synthetic USD search now freezes generated candidate slots and execution keys, drains/replenishes durable batches through existing pools, fences coordinator publication by token/attempt/expiry, recovers committed child receipts without extra attempts, preserves verified backups and exposes CLI plus authenticated desktop/mobile controls/exact snapshots. Worker errors pause explicitly; slot counts never mean new simulations. Search/slot/body quotas and actual-read operator config caps apply. Six browser suites, release/operations and eight reversible source-identity checks pass;10 added Rust tests cover parity, corruption, coordinator/crash/signal and control recovery."
+    "A bounded synthetic USD search now freezes generated candidate slots and execution keys, drains/replenishes durable batches through existing pools, fences coordinator publication by token/attempt/expiry, recovers committed child receipts without extra attempts, preserves verified backups and exposes CLI plus authenticated desktop/mobile controls/exact snapshots. Worker errors pause explicitly; slot counts never mean new simulations. Search/slot/body quotas and actual-read operator config caps apply. Six browser suites, release/operations and eight reversible source-identity checks pass;10 added Rust tests cover parity, corruption, coordinator/crash/signal and control recovery.",
+    "Generated error slots now support explicit paused/inactive-coordinator requeue under unchanged keys, bounded by frozen queue capacity and three events per slot. Atomic hash-chained stored-error history survives backups/VACUUM and rejects mutation/prefix forgery; child leases and terminal results are never reset. CLI and authenticated dashboard controls expose exact history and start no process. Five new Rust tests cover race/capacity/lease/cached-result recovery; six browser suites, release/operations and eight reversible identity checks pass."
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -135,19 +136,19 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Implement bounded explicit error retry/requeue with immutable prior-error history for generated slots, preserving frozen keys, coordinator/child lease fencing, quotas and completed-result immutability. Connect CLI/dashboard controls and test crash/concurrent requeue cases; then continue fair multi-corpus scheduling, artifact retention and full scientific/financial/resource acceptance.",
+  "next_action": "Implement a durable fair multi-corpus research coordinator that rotates one bounded search round per supported input, freezes input/search identities, isolates blocked sources and checkpoints rotation under coordinator fencing. Connect bounded CLI/status/control workflows and test restart, fairness, source-failure isolation and scalar receipt parity; continue artifact retention and full scientific/financial/OS acceptance.",
   "qualified_strategies": 0,
-  "tests_passed": 282,
+  "tests_passed": 287,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
-  "browser_acceptance": "Six actual Chromium suites cover existing dashboard/scientific evidence, independent data review, corpus recovery/resources, run/protocol pagination,650-trade full-u64 paging/exact exports/bounded charts, and generated corpus search controls/snapshots/replenishment/restart/corruption refusal on desktop/mobile.",
+  "browser_acceptance": "Six actual Chromium suites cover existing dashboard/scientific evidence, independent data review, corpus recovery/resources, run/protocol pagination,650-trade full-u64 paging/exact exports/bounded charts, and generated corpus search controls/snapshots/replenishment/restart/corruption refusal on desktop/mobile. Generated error requeue additionally verifies CSRF/state/budget guards, exact prior-error export and preserved active child leases without extra attempts.",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
   "component_benchmark": "docs/BENCHMARKS/v6-prefix-component.json",
   "generation_component_benchmark": "docs/BENCHMARKS/structural-generation-v1.json",
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43615055866,
-    "sha": "570731c155196047f49bb3007058208cfdb10242",
+    "run_id": 43617818621,
+    "sha": "f09f6bceeb07789b9b2d6ced4134b68075261efc",
     "conclusion": "success"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
@@ -174,5 +175,6 @@
   "corpus_inventory_source_snapshot": "74a3cfdd83e3b85bca9707cbb64e5d4d7afb36fc; later compute-input enumeration is a build-identity change, not a new performance measurement",
   "corpus_workers_benchmark": "docs/BENCHMARKS/corpus-workers-v1.json; optimized complete synthetic sessions1/2/4 workers with exact receipt parity; limited warm-cache evidence, no production default selected",
   "resource_compute_identity_verification": "docs/VERIFICATION/resource-compute-identity-v1.json",
-  "corpus_search_compute_identity_verification": "docs/VERIFICATION/corpus-search-compute-identity-v1.json"
+  "corpus_search_compute_identity_verification": "docs/VERIFICATION/corpus-search-compute-identity-v1.json",
+  "corpus_requeue_compute_identity_verification": "docs/VERIFICATION/corpus-requeue-compute-identity-v1.json"
 }

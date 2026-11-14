@@ -1,0 +1,64 @@
+{
+  "class": "SYNTHETIC_DEVELOPMENT_REBUILD_ONLY",
+  "baseline_identity": "compute-blake3:d0a267f759c5cdce42bf4d9de5d68a38f18d28e967bb3a389c336bf45de87687",
+  "checks": [
+    {
+      "path": "src/catalog.rs",
+      "original_sha256": "442346f5b54f51b19a525a78d098a4c990d26a5a5137a28ed5f70f4f6afcabb4",
+      "probe_sha256": "f4a1427608481142d01d2c2570bfe08fa8150d248e781926c1b9fa9554f3e7de",
+      "identity_changed": true,
+      "identity": "compute-blake3:3239ca47409c010a353cd4bf11a1305a019097ab46b355b2f2f4835a101e94c6"
+    },
+    {
+      "path": "src/machine_evidence.rs",
+      "original_sha256": "de9880308735c1e1e76c52b974abed0f2fefb0ae50c43ba72f8c8b62568c2cd8",
+      "probe_sha256": "2e7f7220c36615aac42d7c83c1cecf45ade60617dd57d25b4d2958673be028f3",
+      "identity_changed": true,
+      "identity": "compute-blake3:88c3c4084ff960abc7ff47eea0dccb1094ad4ccecccb1ae94a70ec8fbdb84d59"
+    },
+    {
+      "path": "src/review_authority.rs",
+      "original_sha256": "3bed8b89c4b8c378c48d9aad978d8a3a6ae9935d52f039dd3180b758264326b9",
+      "probe_sha256": "f3815075a3728a836f3ee43f333f627da06815cfe501424f7f14346130f20811",
+      "identity_changed": true,
+      "identity": "compute-blake3:556f988a5013262ac152855fb60db77bd584137ff825ebc4ff7661b2f38d94ec"
+    },
+    {
+      "path": "src/data_approval.rs",
+      "original_sha256": "fd8b5629d9f1b0c16646e6e80702e533b1b537fcffad067bafbf4ca21ae62a22",
+      "probe_sha256": "ff386c3af8518ea3da54bd22a6d41ae4a81124b886ebac0134548e242be97418",
+      "identity_changed": true,
+      "identity": "compute-blake3:4c2f57f1a37863a30f7f13b5afedcd44331205b2761dd77eda77ae073fe752a5"
+    },
+    {
+      "path": "src/corpus.rs",
+      "original_sha256": "ccc1008b8dde025546f040aa11a51948fc7e2d65625d9d5ea3886f6557f14c75",
+      "probe_sha256": "123ded74044f6d74c020c5bfe02771cfff8fe84a0dcc01948b4fcac0e2917a00",
+      "identity_changed": true,
+      "identity": "compute-blake3:443eb84f1db266619e22a8348dc71a6489d588f0a9a0932cffae201fa7aa1518"
+    },
+    {
+      "path": "src/resource.rs",
+      "original_sha256": "22c267f32bc733adabcf34f4c16b807950c731bd706dff69619a9963cc0080b6",
+      "probe_sha256": "fbb0a95d4ce42a0416ea6ef0dd08e764229b9b31d80d2db1c297a9358923845c",
+      "identity_changed": true,
+      "identity": "compute-blake3:84036a27fe3765d941aa6ea52910ad7c5ba4bfeffd9dc951e44195d25cfd10dc"
+    },
+    {
+      "path": "src/corpus_search.rs",
+      "original_sha256": "643aeaf2285211eacccaf4d6f843e907b1d188b22a6ff2e60aae9b81e03ca9f6",
+      "probe_sha256": "ec31f92ef32456c8724ab35dc13e826afdb23fb2712dd441fa4ce1996bb97006",
+      "identity_changed": true,
+      "identity": "compute-blake3:a4e7dddab07b0baf569a792a0988cb13d332bfcd10e1ecfcccc74699564c178f"
+    },
+    {
+      "path": "web/style.css",
+      "original_sha256": "3eb7533d2cca6724ed0b2cb44aa1599f6737a96ea2fb4e20d221d16a87110fb8",
+      "probe_sha256": "8ab1af60327076fea02c5497c685bff0843036ae9db50ff4f87a54069063dee5",
+      "identity_changed": false,
+      "identity": "compute-blake3:d0a267f759c5cdce42bf4d9de5d68a38f18d28e967bb3a389c336bf45de87687"
+    }
+  ],
+  "all_original_bytes_and_identity_restored": true,
+  "limitations": "Actual debug rebuild source fingerprint checks only; no market data, simulations, throughput or scientific eligibility. CSS changes stay outside compute identity. No background processes or external services."
+}

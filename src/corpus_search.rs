@@ -16,7 +16,8 @@ pub(crate) fn initialize(connection: &Connection) -> Result<()> {
     CREATE TRIGGER IF NOT EXISTS corpus_search_definition_immutable BEFORE UPDATE OF id,configuration ON corpus_searches BEGIN SELECT RAISE(ABORT,'search definition immutable');END;
     CREATE TRIGGER IF NOT EXISTS corpus_search_job_immutable BEFORE UPDATE OF search_id,slot,body,hash ON corpus_search_jobs BEGIN SELECT RAISE(ABORT,'search job immutable');END;
     CREATE TRIGGER IF NOT EXISTS corpus_search_no_delete BEFORE DELETE ON corpus_searches BEGIN SELECT RAISE(ABORT,'search immutable');END;
-    CREATE TRIGGER IF NOT EXISTS corpus_search_job_no_delete BEFORE DELETE ON corpus_search_jobs BEGIN SELECT RAISE(ABORT,'search job immutable');END;").map_err(|e|e.to_string())
+    CREATE TRIGGER IF NOT EXISTS corpus_search_job_no_delete BEFORE DELETE ON corpus_search_jobs BEGIN SELECT RAISE(ABORT,'search job immutable');END;").map_err(|e|e.to_string())?;
+    connection.execute_batch("CREATE TABLE IF NOT EXISTS corpus_search_requeues(event_id INTEGER PRIMARY KEY,search_id TEXT NOT NULL,slot INTEGER NOT NULL,sequence INTEGER NOT NULL CHECK(sequence BETWEEN 1 AND 3),body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=4096),hash TEXT NOT NULL CHECK(length(hash)=64),UNIQUE(search_id,slot,sequence),FOREIGN KEY(search_id,slot) REFERENCES corpus_search_jobs(search_id,slot));CREATE TRIGGER IF NOT EXISTS corpus_search_requeue_no_update BEFORE UPDATE ON corpus_search_requeues BEGIN SELECT RAISE(ABORT,'requeue history immutable');END;CREATE TRIGGER IF NOT EXISTS corpus_search_requeue_no_delete BEFORE DELETE ON corpus_search_requeues BEGIN SELECT RAISE(ABORT,'requeue history immutable');END;").map_err(|e|e.to_string())
 }
 pub struct SearchRun<'a> {
     pub base: &'a Path,
@@ -130,6 +131,17 @@ fn register(registry: &mut Registry, config: &Configuration) -> Result<String> {
         .connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(|e| e.to_string())?;
+    let stored_bytes: Option<usize> = tx
+        .query_row(
+            "SELECT length(CAST(configuration AS BLOB)) FROM corpus_searches WHERE id=?1",
+            [&id],
+            |r| r.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+    if stored_bytes.is_some_and(|n| n > 1024 * 1024) {
+        return Err("stored corpus search definition exceeds metadata cap".into());
+    }
     let previous: Option<String> = tx
         .query_row(
             "SELECT configuration FROM corpus_searches WHERE id=?1",
@@ -201,16 +213,17 @@ fn release(registry: &Registry, lease: &Lease) -> Result<()> {
     registry.connection.execute("UPDATE corpus_searches SET token=NULL,expires_ms=NULL WHERE id=?1 AND token=?2 AND attempt=?3",params![lease.id,lease.token,lease.attempt]).map_err(|e|e.to_string())?;
     Ok(())
 }
-type SearchRow = (String, usize, String, i64, Option<i64>);
+type SearchRow = (Option<String>, usize, String, i64, Option<i64>);
 type SearchSnapshot = (Configuration, usize, String, i64, Option<i64>, Vec<Job>);
 fn read(connection: &Connection, id: &str) -> Result<SearchSnapshot> {
     let (body, cursor, state, attempt, expiry): SearchRow = connection
         .query_row(
-            "SELECT configuration,cursor,state,attempt,expires_ms FROM corpus_searches WHERE id=?1",
+            "SELECT CASE WHEN length(CAST(configuration AS BLOB))<=1048576 THEN configuration ELSE NULL END,cursor,state,attempt,expires_ms FROM corpus_searches WHERE id=?1",
             [id],
             |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
         )
         .map_err(|e| e.to_string())?;
+    let body = body.ok_or("corpus search definition exceeds metadata cap")?;
     if body.len() > 1024 * 1024 {
         return Err("corpus search definition budget exceeded".into());
     }
@@ -223,6 +236,10 @@ fn read(connection: &Connection, id: &str) -> Result<SearchSnapshot> {
         || cursor > config.maximum_candidates
     {
         return Err("corpus search identity/cursor integrity failure".into());
+    }
+    let (rows,bytes):(usize,usize)=connection.query_row("SELECT count(*),coalesce(sum(length(CAST(body AS BLOB))),0) FROM corpus_search_jobs WHERE search_id=?1",[id],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|e|e.to_string())?;
+    if rows != cursor || bytes > 16 * 1024 * 1024 {
+        return Err("corpus search persisted queue budget/cursor mismatch".into());
     }
     config.source_key.identity()?;
     config.costs.validate()?;
@@ -277,10 +294,163 @@ fn read(connection: &Connection, id: &str) -> Result<SearchSnapshot> {
             error,
         });
     }
+    if jobs
+        .iter()
+        .filter(|j| j.state == "queued" || j.state == "pending")
+        .count()
+        > config.queue_width
+    {
+        return Err("corpus search active queue exceeds frozen width".into());
+    }
     if jobs.len() != cursor {
         return Err("corpus search queue/cursor mismatch".into());
     }
     Ok((config, cursor, state, attempt, expiry, jobs))
+}
+
+const REQUEUE_VERSION: &str = "corpus-search-error-requeue-v1";
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RequeueRecord {
+    version: String,
+    search_id: String,
+    slot: usize,
+    sequence: usize,
+    at_ms: i64,
+    prior_error: String,
+    previous_hash: String,
+}
+fn requeue_history(
+    connection: &Connection,
+    id: &str,
+    slots: usize,
+) -> Result<Vec<(RequeueRecord, String)>> {
+    let mut query=connection.prepare("SELECT slot,sequence,body,hash FROM corpus_search_requeues WHERE search_id=?1 ORDER BY event_id").map_err(|e|e.to_string())?;
+    let rows = query
+        .query_map([id], |r| {
+            Ok((
+                r.get::<_, usize>(0)?,
+                r.get::<_, usize>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+    let mut result = Vec::new();
+    let mut heads = std::collections::BTreeMap::<usize, (usize, String)>::new();
+    for row in rows {
+        let (slot, sequence, body, hash) = row.map_err(|e| e.to_string())?;
+        if result.len() >= 10000 || body.len() > 4096 {
+            return Err("requeue history budget exceeded".into());
+        }
+        let record: RequeueRecord = serde_json::from_str(&body).map_err(|e| e.to_string())?;
+        let previous = heads.get(&slot);
+        let expected_sequence = previous.map_or(1, |(n, _)| n + 1);
+        let expected_hash = previous.map_or("", |(_, hash)| hash.as_str());
+        if record.version != REQUEUE_VERSION
+            || record.search_id != id
+            || record.slot != slot
+            || slot >= slots
+            || record.sequence != sequence
+            || sequence != expected_sequence
+            || sequence > 3
+            || record.prior_error.chars().count() > 512
+            || record.previous_hash != expected_hash
+            || chrono::DateTime::from_timestamp_millis(record.at_ms).is_none()
+            || data::hash(&record)? != hash
+        {
+            return Err("requeue history integrity mismatch".into());
+        }
+        heads.insert(slot, (sequence, hash.clone()));
+        result.push((record, hash));
+    }
+    Ok(result)
+}
+/// Requeue only uncommitted error slots under the same frozen keys. Child leases
+/// and terminal results remain untouched; an operator process must run the work.
+pub fn requeue_errors(
+    registry: &mut Registry,
+    id: &str,
+    maximum_slots: usize,
+) -> Result<serde_json::Value> {
+    if !(1..=32).contains(&maximum_slots) {
+        return Err("requeue request must contain1..32 slots".into());
+    }
+    let tx = registry
+        .connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|e| e.to_string())?;
+    let (config, cursor, state, _, expiry, jobs) = read(&tx, id)?;
+    if state != "paused" || expiry.is_some_and(|t| t > chrono::Utc::now().timestamp_millis()) {
+        return Err("requeue requires a paused search without an active coordinator".into());
+    }
+    let history = requeue_history(&tx, id, cursor)?;
+    let mut heads = std::collections::BTreeMap::<usize, (usize, String)>::new();
+    for (record, hash) in history {
+        heads.insert(record.slot, (record.sequence, hash));
+    }
+    let active = jobs
+        .iter()
+        .filter(|j| j.state == "queued" || j.state == "pending")
+        .count();
+    let capacity = config.queue_width.saturating_sub(active).min(maximum_slots);
+    if capacity == 0 {
+        return Err("no retry queue capacity; reconcile pending slots first".into());
+    }
+    let eligible: Vec<_> = jobs
+        .iter()
+        .filter(|j| j.state == "error" && heads.get(&j.definition.slot).map_or(0, |(n, _)| *n) < 3)
+        .take(capacity)
+        .collect();
+    if eligible.is_empty() {
+        return Err("no eligible error slots; bounded requeue budget may be exhausted".into());
+    }
+    let (count,size):(usize,usize)=tx.query_row("SELECT count(*),coalesce(sum(length(CAST(body AS BLOB))),0) FROM corpus_search_requeues",[],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|e|e.to_string())?;
+    let mut incoming = Vec::new();
+    let mut bytes = 0usize;
+    for job in eligible {
+        let prior_error = job
+            .error
+            .clone()
+            .ok_or("error slot lacks prior error evidence")?;
+        let previous = heads.get(&job.definition.slot);
+        let record = RequeueRecord {
+            version: REQUEUE_VERSION.into(),
+            search_id: id.into(),
+            slot: job.definition.slot,
+            sequence: previous.map_or(1, |(n, _)| n + 1),
+            at_ms: chrono::Utc::now().timestamp_millis(),
+            prior_error,
+            previous_hash: previous.map_or_else(String::new, |(_, h)| h.clone()),
+        };
+        let body = serde_json::to_string(&record).map_err(|e| e.to_string())?;
+        if body.len() > 4096 {
+            return Err("requeue record exceeds metadata budget".into());
+        }
+        bytes += body.len();
+        incoming.push((record, body));
+    }
+    if count + incoming.len() > 10000 || size + bytes > 40 * 1024 * 1024 {
+        return Err("global requeue history quota reached".into());
+    }
+    let mut slots = Vec::new();
+    for (record, body) in incoming {
+        tx.execute("INSERT INTO corpus_search_requeues(search_id,slot,sequence,body,hash) VALUES(?1,?2,?3,?4,?5)",params![id,record.slot,record.sequence,body,data::hash(&record)?]).map_err(|e|e.to_string())?;
+        let n=tx.execute("UPDATE corpus_search_jobs SET state='queued',error=NULL WHERE search_id=?1 AND slot=?2 AND state='error'",params![id,record.slot]).map_err(|e|e.to_string())?;
+        if n != 1 {
+            return Err("error slot changed during requeue".into());
+        }
+        slots.push(record.slot.to_string());
+    }
+    tx.execute(
+        "UPDATE corpus_searches SET state='running',token=NULL,expires_ms=NULL WHERE id=?1",
+        [id],
+    )
+    .map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(
+        serde_json::json!({"search_id":id,"requeued_slots":slots,"state":"running","qualification_granted":false,"limitations":"Explicit bounded requeue under unchanged keys; original errors remain immutable. Child leases and committed results are never reset. Start an operator process to execute queued work."}),
+    )
 }
 pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
     let tx = registry
@@ -288,6 +458,21 @@ pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
         .unchecked_transaction()
         .map_err(|e| e.to_string())?;
     let (config, cursor, state, attempt, expiry, jobs) = read(&tx, id)?;
+    let history = requeue_history(&tx, id, cursor)?;
+    let retry_counts: std::collections::BTreeMap<usize, usize> =
+        history.iter().map(|(r, _)| (r.slot, r.sequence)).collect();
+    let retry_eligible = jobs
+        .iter()
+        .filter(|j| {
+            j.state == "error" && retry_counts.get(&j.definition.slot).copied().unwrap_or(0) < 3
+        })
+        .count();
+    let retry_capacity = config.queue_width.saturating_sub(
+        jobs.iter()
+            .filter(|j| j.state == "queued" || j.state == "pending")
+            .count(),
+    );
+    let recent_requeues:Vec<_>=history.iter().rev().take(32).map(|(record,hash)|serde_json::json!({"candidate_index":record.slot.to_string(),"requeue_number":record.sequence,"at_ms":record.at_ms,"prior_error":record.prior_error,"hash":hash})).collect();
     let mut counts = std::collections::BTreeMap::<String, usize>::new();
     for job in &jobs {
         *counts.entry(job.state.clone()).or_default() += 1;
@@ -295,7 +480,7 @@ pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
     let recent:Vec<_>=jobs.iter().rev().take(32).map(|j|serde_json::json!({"candidate_index":j.definition.slot.to_string(),"family":j.definition.family,"experiment_id":j.definition.key.identity().ok(),"state":j.state,"error":j.error})).collect();
     tx.commit().map_err(|e| e.to_string())?;
     Ok(
-        serde_json::json!({"search_id":id,"state":state,"generated_slots":cursor.to_string(),"maximum_candidates":config.maximum_candidates.to_string(),"attempt":attempt.to_string(),"lease_active":expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"slot_states":counts,"recent_slots":recent,"qualification_granted":false,"limitations":"Generated slots are not new tick simulations; canonical duplicates can share immutable experiment receipts. Synthetic USD training search only."}),
+        serde_json::json!({"search_id":id,"state":state,"generated_slots":cursor.to_string(),"maximum_candidates":config.maximum_candidates.to_string(),"attempt":attempt.to_string(),"lease_active":expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"slot_states":counts,"recent_slots":recent,"requeue_records":history.len().to_string(),"retry_eligible_slots":retry_eligible.to_string(),"retry_capacity":retry_capacity.to_string(),"maximum_requeues_per_slot":3,"recent_requeues":recent_requeues,"qualification_granted":false,"limitations":"Generated slots are not new tick simulations; canonical duplicates can share immutable experiment receipts. Synthetic USD training search only."}),
     )
 }
 pub(crate) fn integrity(registry: &Registry) -> Result<()> {
@@ -322,8 +507,13 @@ pub(crate) fn integrity(registry: &Registry) -> Result<()> {
     if ids.len() > 64 || jobs > 4096 || bytes > 16 * 1024 * 1024 {
         return Err("corpus search persisted quotas exceeded".into());
     }
+    let (count,bytes):(usize,usize)=tx.query_row("SELECT count(*),coalesce(sum(length(CAST(body AS BLOB))),0) FROM corpus_search_requeues",[],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|e|e.to_string())?;
+    if count > 10000 || bytes > 40 * 1024 * 1024 {
+        return Err("persisted requeue quota exceeded".into());
+    }
     for id in ids {
-        read(&tx, &id)?;
+        let (_, cursor, _, _, _, _) = read(&tx, &id)?;
+        requeue_history(&tx, &id, cursor)?;
     }
     tx.commit().map_err(|e| e.to_string())
 }
@@ -727,6 +917,248 @@ mod tests {
             .unwrap();
         assert!(status(&registry, &id).is_err());
         assert!(registry.integrity().is_err());
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    fn failed_slots(
+        name: &str,
+        slots: usize,
+    ) -> (
+        std::path::PathBuf,
+        crate::corpus::Specification,
+        Costs,
+        String,
+    ) {
+        let (root, spec) = fixture(name);
+        let costs = Costs::default();
+        let mut search = run(&root, &spec, &costs);
+        search.maximum_candidates = slots;
+        search.queue_width = slots;
+        let config = configuration(&search).unwrap();
+        let mut registry = Registry::open(&root.join("state.sqlite")).unwrap();
+        let id = register(&mut registry, &config).unwrap();
+        let lease = claim(
+            &mut registry,
+            &id,
+            chrono::Utc::now().timestamp_millis(),
+            60000,
+        )
+        .unwrap()
+        .unwrap();
+        admit(&mut registry, &lease, &config).unwrap();
+        release(&registry, &lease).unwrap();
+        registry.connection.execute("UPDATE corpus_search_jobs SET state='error',error='fixture worker interruption' WHERE search_id=?1",[&id]).unwrap();
+        control(&mut registry, &id, "paused").unwrap();
+        registry.integrity().unwrap();
+        drop(registry);
+        (root, spec, costs, id)
+    }
+    #[test]
+    fn requeue_budget_retains_prior_errors_in_immutable_verified_history_and_backups() {
+        let (root, _spec, _costs, id) = failed_slots("requeue-budget", 1);
+        let db = root.join("state.sqlite");
+        let mut registry = Registry::open(&db).unwrap();
+        for number in 1..=3 {
+            let result = requeue_errors(&mut registry, &id, 1).unwrap();
+            assert_eq!(result["requeued_slots"], serde_json::json!(["0"]));
+            let snapshot = status(&registry, &id).unwrap();
+            assert_eq!(snapshot["requeue_records"], number.to_string());
+            assert_eq!(snapshot["lease_active"], false);
+            assert_eq!(snapshot["qualification_granted"], false);
+            registry
+                .connection
+                .execute(
+                    "UPDATE corpus_search_jobs SET state='error',error=?2 WHERE search_id=?1",
+                    params![id, format!("fixture subsequent interruption {number}")],
+                )
+                .unwrap();
+            control(&mut registry, &id, "paused").unwrap();
+        }
+        let before = status(&registry, &id).unwrap();
+        registry.connection.execute_batch("VACUUM").unwrap();
+        assert_eq!(status(&registry, &id).unwrap(), before);
+        assert_eq!(before["retry_eligible_slots"], "0");
+        assert!(requeue_errors(&mut registry, &id, 1).is_err());
+        assert_eq!(status(&registry, &id).unwrap(), before);
+        assert!(
+            registry
+                .connection
+                .execute(
+                    "DELETE FROM corpus_search_requeues WHERE search_id=?1",
+                    [&id]
+                )
+                .is_err()
+        );
+        assert!(
+            registry
+                .connection
+                .execute(
+                    "UPDATE corpus_search_requeues SET hash=?2 WHERE search_id=?1",
+                    params![id, "0".repeat(64)]
+                )
+                .is_err()
+        );
+        let backup = root.join("backup.sqlite");
+        registry.backup(&backup).unwrap();
+        let restored = Registry::open(&backup).unwrap();
+        assert_eq!(status(&restored, &id).unwrap(), before);
+        restored.integrity().unwrap();
+        drop(restored);
+        registry
+            .connection
+            .execute_batch("DROP TRIGGER corpus_search_requeue_no_update")
+            .unwrap();
+        let body:String=registry.connection.query_row("SELECT body FROM corpus_search_requeues WHERE search_id=?1 AND slot=0 AND sequence=1",[&id],|r|r.get(0)).unwrap();
+        let mut record: RequeueRecord = serde_json::from_str(&body).unwrap();
+        record.prior_error = "mechanically hash-consistent forgery".into();
+        registry.connection.execute("UPDATE corpus_search_requeues SET body=?2,hash=?3 WHERE search_id=?1 AND slot=0 AND sequence=1",params![id,serde_json::to_string(&record).unwrap(),data::hash(&record).unwrap()]).unwrap();
+        assert!(status(&registry, &id).is_err());
+        assert!(registry.integrity().is_err());
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn concurrent_requeue_requests_have_one_atomic_winner() {
+        let (root, _spec, _costs, id) = failed_slots("requeue-race", 1);
+        let db = root.join("state.sqlite");
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+        let handles: Vec<_> = (0..2)
+            .map(|_| {
+                let db = db.clone();
+                let id = id.clone();
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    let mut registry = Registry::open(&db).unwrap();
+                    barrier.wait();
+                    requeue_errors(&mut registry, &id, 1).is_ok()
+                })
+            })
+            .collect();
+        assert_eq!(
+            handles
+                .into_iter()
+                .filter_map(|h| h.join().unwrap().then_some(()))
+                .count(),
+            1
+        );
+        let registry = Registry::open(&db).unwrap();
+        let snapshot = status(&registry, &id).unwrap();
+        assert_eq!(snapshot["requeue_records"], "1");
+        assert_eq!(snapshot["slot_states"]["queued"], 1);
+        assert_eq!(snapshot["generated_slots"], "1");
+        registry.integrity().unwrap();
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn requeue_preserves_active_child_leases_and_yields_busy_without_spinning() {
+        let (root, spec, costs, id) = failed_slots("requeue-child", 1);
+        let db = root.join("state.sqlite");
+        let mut registry = Registry::open(&db).unwrap();
+        let (_, _, _, _, _, jobs) = read(&registry.connection, &id).unwrap();
+        let experiment = registry.register(&jobs[0].definition.key).unwrap();
+        let now = chrono::Utc::now().timestamp_millis();
+        let child = match registry.claim(&experiment, now, 60000).unwrap() {
+            crate::storage::Claim::Acquired(lease) => lease,
+            _ => panic!("fresh child lease"),
+        };
+        requeue_errors(&mut registry, &id, 1).unwrap();
+        registry
+            .validate_lease(&child, chrono::Utc::now().timestamp_millis())
+            .unwrap();
+        let mut search = run(&root, &spec, &costs);
+        search.maximum_candidates = 1;
+        search.queue_width = 1;
+        let limits = CorpusBatchLimits {
+            workers: 1,
+            max_parallel_candles: 10000,
+            max_parallel_feature_cells: 1000000,
+            max_parallel_receipts: 10000,
+            max_new_chunks: 64,
+            lease_ms: 60000,
+        };
+        let progress = step(&db, search, limits).unwrap();
+        assert_eq!(progress.kind, "held-or-busy");
+        assert_eq!(progress.status["slot_states"]["pending"], 1);
+        registry
+            .validate_lease(&child, chrono::Utc::now().timestamp_millis())
+            .unwrap();
+        assert_eq!(registry.counts().unwrap().attempts, 1);
+        registry.integrity().unwrap();
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn requeue_of_published_child_receipts_recovers_without_new_attempts() {
+        let (root, spec) = fixture("requeue-published");
+        let costs = Costs::default();
+        let mut search = run(&root, &spec, &costs);
+        search.maximum_candidates = 2;
+        let config = configuration(&search).unwrap();
+        let db = root.join("state.sqlite");
+        let mut registry = Registry::open(&db).unwrap();
+        let id = register(&mut registry, &config).unwrap();
+        let lease = claim(
+            &mut registry,
+            &id,
+            chrono::Utc::now().timestamp_millis(),
+            60000,
+        )
+        .unwrap()
+        .unwrap();
+        admit(&mut registry, &lease, &config).unwrap();
+        let (_, _, _, _, _, jobs) = read(&registry.connection, &id).unwrap();
+        let runs: Vec<_> = jobs
+            .iter()
+            .map(|j| CorpusRun {
+                base: &root,
+                spec: &spec,
+                strategy: &j.definition.strategy,
+                costs: &costs,
+                budget: config.budget,
+            })
+            .collect();
+        let limits = CorpusBatchLimits {
+            workers: 2,
+            max_parallel_candles: 20000,
+            max_parallel_feature_cells: 2000000,
+            max_parallel_receipts: 20000,
+            max_new_chunks: 64,
+            lease_ms: 60000,
+        };
+        tick_engine::execute_corpus_batch(&db, &runs, limits).unwrap();
+        let attempts = registry.counts().unwrap().attempts;
+        release(&registry, &lease).unwrap();
+        registry.connection.execute("UPDATE corpus_search_jobs SET state='error',error='worker interrupted after child publication' WHERE search_id=?1",[&id]).unwrap();
+        control(&mut registry, &id, "paused").unwrap();
+        let requeued = requeue_errors(&mut registry, &id, 2).unwrap();
+        assert_eq!(requeued["requeued_slots"].as_array().unwrap().len(), 2);
+        drop(registry);
+        let recovered = step(&db, search, limits).unwrap();
+        assert_eq!(recovered.kind, "exhausted");
+        assert_eq!(recovered.status["requeue_records"], "2");
+        assert_eq!(recovered.status["slot_states"]["completed"], 2);
+        let registry = Registry::open(&db).unwrap();
+        assert_eq!(registry.counts().unwrap().attempts, attempts);
+        registry.integrity().unwrap();
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn requeue_respects_frozen_width_when_other_slots_are_pending() {
+        let (root, _spec, _costs, id) = failed_slots("requeue-capacity", 2);
+        let mut registry = Registry::open(&root.join("state.sqlite")).unwrap();
+        registry.connection.execute("UPDATE corpus_search_jobs SET state='pending',error=NULL WHERE search_id=?1 AND slot=1",[&id]).unwrap();
+        let result = requeue_errors(&mut registry, &id, 32).unwrap();
+        assert_eq!(result["requeued_slots"], serde_json::json!(["0"]));
+        let snapshot = status(&registry, &id).unwrap();
+        assert_eq!(snapshot["slot_states"]["queued"], 1);
+        assert_eq!(snapshot["slot_states"]["pending"], 1);
+        assert_eq!(snapshot["retry_capacity"], "0");
+        control(&mut registry, &id, "paused").unwrap();
+        assert!(requeue_errors(&mut registry, &id, 32).is_err());
+        assert_eq!(status(&registry, &id).unwrap()["requeue_records"], "1");
+        registry.integrity().unwrap();
         drop(registry);
         std::fs::remove_dir_all(root).unwrap();
     }

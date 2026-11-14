@@ -1530,6 +1530,31 @@ fn corpus_search_worker_errors_pause_without_becoming_completed_evidence() {
     assert_eq!(progress.status["qualification_granted"], false);
     assert_eq!(progress.status["lease_active"], false);
     Registry::open(&db).unwrap().integrity().unwrap();
+    let id = progress.status["search_id"].as_str().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args(["corpus-search-requeue", db.to_str().unwrap(), id, "1"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let queued: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(queued["requeued_slots"].as_array().unwrap().len(), 1);
+    let mut registry = Registry::open(&db).unwrap();
+    let snapshot = corpus_search::status(&registry, id).unwrap();
+    assert_eq!(snapshot["requeue_records"], "1");
+    assert_eq!(snapshot["slot_states"]["queued"], 1);
+    assert_eq!(snapshot["slot_states"]["error"], 1);
+    assert_eq!(snapshot["generated_slots"], "2");
+    corpus_search::control(&mut registry, id, "stopped").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args(["corpus-search-requeue", db.to_str().unwrap(), id, "1"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    registry.integrity().unwrap();
 }
 
 fn corpus_search_fixture(f: &Fixture) -> std::path::PathBuf {
