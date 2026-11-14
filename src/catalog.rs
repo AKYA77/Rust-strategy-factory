@@ -357,7 +357,9 @@ impl Catalog {
                 .map_err(db)?;
             let has_reviews:bool=source.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='catalog_reviews')",[],|r|r.get(0)).map_err(db)?;
             let has_machine = crate::machine_evidence::exists(&source)?;
-            if tables != 1 + i64::from(has_reviews) + i64::from(has_machine)
+            let has_decisions = crate::data_approval::exists(&source)?;
+            if tables
+                != 1 + i64::from(has_reviews) + i64::from(has_machine) + i64::from(has_decisions)
                 || columns != 3
                 || all_columns != 3
                 || count > 10000
@@ -440,6 +442,7 @@ impl Catalog {
                     }
                 }
                 crate::machine_evidence::copy(&source, &write)?;
+                crate::data_approval::copy(&source, &write)?;
                 write.commit().map_err(db)?;
             }
             source.commit().map_err(db)?;
@@ -528,6 +531,7 @@ impl Catalog {
         }
         if create {
             crate::machine_evidence::initialize(&c)?;
+            crate::data_approval::initialize(&c)?;
         }
         Ok(Self { connection: c })
     }
