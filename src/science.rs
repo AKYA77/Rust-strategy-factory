@@ -25,11 +25,16 @@ pub struct Plan {
     pub trial_budget: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uncertainty_block_ms: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub robustness_policy: Option<crate::robustness::ProbePolicy>,
 }
 impl Plan {
     pub fn canonical(&self) -> Result<Self> {
         if let Some(ms) = self.uncertainty_block_ms {
             crate::uncertainty::validate_block_ms(ms)?;
+        }
+        if let Some(policy) = &self.robustness_policy {
+            policy.validate()?;
         }
         self.training.validate()?;
         self.holdout.validate()?;
@@ -148,6 +153,8 @@ pub struct CandidateEvidence {
     pub uncertainty: Option<crate::uncertainty::Diagnostic>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub block_uncertainty: Option<crate::uncertainty::BlockDiagnostic>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub robustness_assessment: Option<crate::robustness::ProbeAssessment>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub robustness: Vec<crate::robustness::EvidenceSet>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -174,6 +181,10 @@ fn definition(plan: &Plan, input: &Input, revision: &str) -> Result<serde_json::
     let mut value = serde_json::json!({"version":"frozen-chronological-protocol-v7","neighborhood_method":crate::neighborhood::VERSION,"regime_method":crate::regimes::VERSION,"breakdown_method":crate::diagnostics::VERSION,"robustness_method":crate::robustness::VERSION,"robustness_cases":plan.candidates.iter().map(|s|crate::robustness::cases(s,&plan.costs)).collect::<Result<Vec<_>>>()?,"uncertainty_method":crate::uncertainty::VERSION,"plan":plan,"dataset_hash":input.dataset.manifest.content_hash,"dataset_identity":data::dataset_identity(&input.dataset.manifest)?,"profile_hash":input.dataset.manifest.profile_hash,"conversions_hash":data::hash(&input.conversions)?,"revision":revision,"engine":crate::ENGINE_VERSION,"indicators":crate::INDICATOR_VERSION,"signals":crate::SIGNAL_VERSION});
     if plan.uncertainty_block_ms.is_some() {
         value["block_uncertainty_method"] = serde_json::json!(crate::uncertainty::BLOCK_VERSION);
+    }
+    if plan.robustness_policy.is_some() {
+        value["robustness_assessment_method"] =
+            serde_json::json!(crate::robustness::ASSESSMENT_VERSION);
     }
     Ok(value)
 }
@@ -419,6 +430,21 @@ pub fn execute(
                 reused: result.reused,
             });
         }
+        let robustness =
+            crate::robustness::execute(registry, input, strategy, &plan, &id, revision, budget)?;
+        let robustness_assessment = plan
+            .robustness_policy
+            .as_ref()
+            .map(|policy| {
+                crate::robustness::assess_probes(
+                    strategy,
+                    &plan.costs,
+                    plan.folds.len(),
+                    &robustness,
+                    policy,
+                )
+            })
+            .transpose()?;
         candidates.push(CandidateEvidence {
             concept_id: strategy.identity()?,
             experiments,
@@ -426,9 +452,8 @@ pub fn execute(
             unresolved_oos_positions: unresolved,
             failed_windows: failed,
             breakdown: Some(breakdown),
-            robustness: crate::robustness::execute(
-                registry, input, strategy, &plan, &id, revision, budget,
-            )?,
+            robustness,
+            robustness_assessment,
             block_uncertainty: plan
                 .uncertainty_block_ms
                 .map(|ms| crate::uncertainty::diagnose_blocks(&observations, plan.trial_budget, ms))

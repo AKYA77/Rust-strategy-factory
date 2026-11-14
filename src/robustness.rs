@@ -190,3 +190,147 @@ pub fn execute(
     }
     Ok(evidence)
 }
+
+pub const ASSESSMENT_VERSION: &str = "frozen-descriptive-probe-policy-v1";
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ProbePolicy {
+    pub minimum_resolved_per_probe: usize,
+    pub minimum_net_win_rate_bps: u16,
+    pub minimum_sum_net_micro_usd: i128,
+    pub maximum_consecutive_losses: usize,
+}
+impl ProbePolicy {
+    pub fn validate(&self) -> Result<()> {
+        if !(1..=1_000_000).contains(&self.minimum_resolved_per_probe)
+            || !(5000..=10000).contains(&self.minimum_net_win_rate_bps)
+            || self.minimum_sum_net_micro_usd < 0
+            || self.maximum_consecutive_losses > 5
+        {
+            return Err("invalid frozen robustness policy".into());
+        }
+        Ok(())
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ProbeDecision {
+    pub case_name: String,
+    pub state: String,
+    pub reasons: Vec<String>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ProbeAssessment {
+    pub method: String,
+    pub policy: ProbePolicy,
+    pub state: String,
+    pub cases: Vec<ProbeDecision>,
+    pub qualification_granted: bool,
+    pub limitations: String,
+}
+/// A prespecified descriptive decision over every frozen OOS probe. It cannot
+/// promote a candidate or replace full-period/annual/scientific/source gates.
+pub fn assess_probes(
+    strategy: &Strategy,
+    costs: &Costs,
+    folds: usize,
+    evidence: &[EvidenceSet],
+    policy: &ProbePolicy,
+) -> Result<ProbeAssessment> {
+    policy.validate()?;
+    if !(1..=16).contains(&folds) || evidence.len() > 32 {
+        return Err("invalid robustness evidence budget".into());
+    }
+    let expected = cases(strategy, costs)?;
+    let mut observed = std::collections::BTreeMap::new();
+    for e in evidence {
+        let Some(case) = expected.iter().find(|c| c.name == e.case.name) else {
+            return Err("unexpected robustness case".into());
+        };
+        if e.method != VERSION
+            || e.status != "DESCRIPTIVE_ONLY"
+            || data::hash(&e.case)? != data::hash(case)?
+            || e.concept_id != case.strategy.identity()?
+            || e.cost_hash != data::hash(&case.costs)?
+            || observed.insert(e.case.name.clone(), e).is_some()
+        {
+            return Err("robustness evidence identity mismatch or duplicate".into());
+        }
+        let stats = &e.pooled_reset_fold_stats;
+        if e.failed_windows > folds
+            || e.unresolved_positions > folds
+            || stats.closed > 1_000_000
+            || stats
+                .wins
+                .checked_add(stats.losses)
+                .and_then(|n| n.checked_add(stats.breakeven))
+                != Some(stats.closed)
+            || stats.maximum_losing_streak > stats.losses
+        {
+            return Err("inconsistent robustness statistics".into());
+        }
+    }
+    let mut decisions = Vec::new();
+    for case in expected {
+        let mut reasons = Vec::new();
+        let mut state = "UNKNOWN";
+        if let Some(e) = observed.get(&case.name) {
+            let complete = e.experiments.len() == folds
+                && e.failed_windows == 0
+                && e.experiments.iter().enumerate().all(|(i, x)| {
+                    x.outcome == "completed"
+                        && x.phase == format!("robustness-{}-fold-{i}-out-of-sample", case.name)
+                        && crate::machine_evidence::hex(&x.experiment_id)
+                })
+                && e.experiments
+                    .iter()
+                    .map(|x| &x.experiment_id)
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len()
+                    == folds;
+            if !complete {
+                reasons.push("incomplete-or-failed-fold-evidence".into());
+            }
+            if e.unresolved_positions > 0 {
+                reasons.push("unresolved-positions".into());
+            }
+            if complete && e.unresolved_positions == 0 {
+                let s = &e.pooled_reset_fold_stats;
+                if s.closed < policy.minimum_resolved_per_probe {
+                    reasons.push("insufficient-resolved-trades".into());
+                }
+                if s.closed == 0
+                    || (s.wins as u128) * 10000
+                        < (s.closed as u128) * u128::from(policy.minimum_net_win_rate_bps)
+                {
+                    reasons.push("net-win-rate-below-policy".into());
+                }
+                if s.sum_net_micro_usd < policy.minimum_sum_net_micro_usd {
+                    reasons.push("reset-fold-net-sum-below-policy".into());
+                }
+                if s.maximum_losing_streak > policy.maximum_consecutive_losses {
+                    reasons.push("losing-streak-above-policy".into());
+                }
+                state = if reasons.is_empty() {
+                    "PASS_DECLARED_PROBES"
+                } else {
+                    "REJECTED"
+                };
+            }
+        } else {
+            reasons.push("missing-frozen-case".into());
+        }
+        decisions.push(ProbeDecision {
+            case_name: case.name,
+            state: state.into(),
+            reasons,
+        });
+    }
+    let state = if decisions.iter().any(|d| d.state == "REJECTED") {
+        "REJECTED"
+    } else if decisions.iter().any(|d| d.state == "UNKNOWN") {
+        "UNKNOWN"
+    } else {
+        "PASS_DECLARED_PROBES"
+    };
+    Ok(ProbeAssessment{method:ASSESSMENT_VERSION.into(),policy:policy.clone(),state:state.into(),cases:decisions,qualification_granted:false,limitations:"Descriptive frozen reset-fold probe policy only; annual/full-period equity, source coverage, dependence/multiplicity, broader stability and independent qualification remain separate gates.".into()})
+}

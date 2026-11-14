@@ -36,6 +36,7 @@ fn span(start: &str, end: &str) -> Interval {
 fn plan() -> Plan {
     Plan {
         uncertainty_block_ms: None,
+        robustness_policy: None,
         training: span("2025-01-01T00:00:00Z", "2025-03-01T00:00:00Z"),
         folds: vec![
             Fold {
@@ -556,5 +557,51 @@ fn frozen_time_blocks_bind_protocol_identity_and_preserve_conditional_status() {
     assert!(science::execute(&mut registry, &input, &p, "block-build", &budget).is_err());
     p.uncertainty_block_ms = Some(0);
     assert!(p.canonical().is_err());
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn robustness_policy_is_frozen_before_oos_and_survives_reopen() {
+    let directory = dir();
+    let path = directory.join("policy.sqlite");
+    let mut registry = Registry::open(&path).unwrap();
+    let input = input();
+    let mut p = plan();
+    p.robustness_policy = Some(rust_strategy_factory::robustness::ProbePolicy {
+        minimum_resolved_per_probe: 1,
+        minimum_net_win_rate_bps: 5000,
+        minimum_sum_net_micro_usd: 0,
+        maximum_consecutive_losses: 5,
+    });
+    let budget = science::Budget {
+        feature_cells: 100000,
+        ..Default::default()
+    };
+    let first = science::execute(&mut registry, &input, &p, "policy-build", &budget).unwrap();
+    let assessment = first.report.candidates[0]
+        .robustness_assessment
+        .clone()
+        .unwrap();
+    assert!(!assessment.qualification_granted);
+    assert_eq!(
+        assessment.cases.len(),
+        first.report.candidates[0].robustness.len()
+    );
+    assert_eq!(first.report.status, "INSUFFICIENT_EVIDENCE");
+    drop(registry);
+    let mut registry = Registry::open(&path).unwrap();
+    let again = science::execute(&mut registry, &input, &p, "policy-build", &budget).unwrap();
+    assert!(again.reused);
+    assert_eq!(
+        again.report.candidates[0].robustness_assessment,
+        Some(assessment)
+    );
+    p.robustness_policy
+        .as_mut()
+        .unwrap()
+        .minimum_resolved_per_probe = 2;
+    assert!(science::execute(&mut registry, &input, &p, "policy-build", &budget).is_err());
+    p.robustness_policy = None;
+    assert!(science::execute(&mut registry, &input, &p, "policy-build", &budget).is_err());
     std::fs::remove_dir_all(directory).unwrap();
 }
