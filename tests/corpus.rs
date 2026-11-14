@@ -240,3 +240,43 @@ fn native_caller_cap_precedes_allocation_and_consumed_file_fingerprint_matches()
             .contains("budget")
     );
 }
+
+#[test]
+fn chunk_visitor_preserves_state_and_stops_before_invalid_or_failed_callbacks() {
+    let f = Fixture::new("visitor", "EURUSD", 7);
+    let mut stream = candles::Stream::new(f.data.profile.clone(), Timeframe::M1).unwrap();
+    let mut candles = Vec::new();
+    let mut count = 0;
+    corpus::visit_chunks(&f.root, &f.spec, |_, d| {
+        count += d.ticks.len();
+        for tick in &d.ticks {
+            if let Some(c) = stream.push(*tick)? {
+                candles.push(c);
+            }
+        }
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(count, f.data.ticks.len());
+    assert_eq!(candles, candles::build(&f.data, Timeframe::M1).unwrap());
+    let mut bad = f.spec.clone();
+    bad.chunks[1].file_hash = "0".repeat(64);
+    let mut visited = Vec::new();
+    assert!(
+        corpus::visit_chunks(&f.root, &bad, |i, _| {
+            visited.push(i);
+            Ok(())
+        })
+        .is_err()
+    );
+    assert_eq!(visited, vec![0]);
+    visited.clear();
+    assert!(
+        corpus::visit_chunks(&f.root, &f.spec, |i, _| {
+            visited.push(i);
+            Err("consumer failure".into())
+        })
+        .is_err()
+    );
+    assert_eq!(visited, vec![0]);
+}

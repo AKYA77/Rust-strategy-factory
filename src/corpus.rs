@@ -149,21 +149,8 @@ pub fn inspect(base: &Path, spec: &Specification) -> Result<Report> {
     let mut repeats = 0;
     let mut gaps = 0;
     let mut peak = 0;
-    for chunk in &spec.chunks {
-        let (d, file_hash) = native::read_bounded(&base.join(&chunk.path), spec.max_chunk_events)?;
-        if file_hash != chunk.file_hash
-            || data::dataset_identity(&d.manifest)? != chunk.dataset_identity
-        {
-            return Err("corpus artifact revision/fingerprint mismatch".into());
-        }
-        if let Some(p) = &profile {
-            if p != &d.profile
-                || source.as_deref() != Some(d.manifest.source.as_str())
-                || class != Some(d.manifest.class)
-            {
-                return Err("corpus profile/source/class mismatch".into());
-            }
-        } else {
+    visit_chunks(base, spec, |_, d| {
+        if profile.is_none() {
             for tf in Timeframe::ALL {
                 streams.push(candles::Stream::new(d.profile.clone(), tf)?);
             }
@@ -193,8 +180,8 @@ pub fn inspect(base: &Path, spec: &Specification) -> Result<Report> {
             events.push(tick)?;
             previous = Some(*tick);
         }
-        // d drops here, before the next chunk is decoded. No concatenated quote array.
-    }
+        Ok(())
+    })?;
     let candles = Timeframe::ALL
         .into_iter()
         .zip(candle_hashes)
@@ -250,4 +237,49 @@ pub fn describe(paths: &[std::path::PathBuf], max_chunk_events: usize) -> Result
     }
     spec.identity()?;
     Ok(spec)
+}
+
+/// Visit verified chunks without concatenating quotes. Callbacks may retain
+/// bounded feature/account state across boundaries. A later failure preserves
+/// the already visited prefix; callers must publish results only on success.
+pub fn visit_chunks(
+    base: &Path,
+    spec: &Specification,
+    mut visit: impl FnMut(usize, &crate::data::Dataset) -> Result<()>,
+) -> Result<()> {
+    spec.identity()?;
+    let mut context: Option<(Profile, String, DataClass)> = None;
+    let mut previous: Option<Tick> = None;
+    for (index, chunk) in spec.chunks.iter().enumerate() {
+        let (dataset, fingerprint) =
+            native::read_bounded(&base.join(&chunk.path), spec.max_chunk_events)?;
+        if fingerprint != chunk.file_hash
+            || data::dataset_identity(&dataset.manifest)? != chunk.dataset_identity
+        {
+            return Err("corpus artifact revision/fingerprint mismatch".into());
+        }
+        if let Some((profile, source, class)) = &context {
+            if profile != &dataset.profile
+                || source != &dataset.manifest.source
+                || class != &dataset.manifest.class
+            {
+                return Err("corpus profile/source/class mismatch".into());
+            }
+        } else {
+            context = Some((
+                dataset.profile.clone(),
+                dataset.manifest.source.clone(),
+                dataset.manifest.class,
+            ));
+        }
+        let first = dataset.ticks[0];
+        if previous
+            .is_some_and(|p| first.timestamp_ms < p.timestamp_ms || first.sequence <= p.sequence)
+        {
+            return Err("corpus cross-chunk timestamp/sequence order invalid".into());
+        }
+        visit(index, &dataset)?;
+        previous = dataset.ticks.last().copied();
+    }
+    Ok(())
 }

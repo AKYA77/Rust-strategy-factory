@@ -100,7 +100,8 @@
     "Operator-provisioned independent scoped Argon2id review authority, keyed authenticated immutable approval/rejection/revocation chains, stale-head fencing, exact live artifact/scope data gates, revision/synthetic/expiry refusal and preserved snapshot authentication",
     "Optional authenticated independent-review dashboard with server-selected artifact paths, paginated durable decisions/exact exports, separate reviewer credentials and stale-head/synthetic refusal, explicit current-artifact gates and authority reload with bounded blocking work",
     "Bounded ordered multi-native-chunk corpus creation/inspection with exact consumed-byte/provenance bindings, cross-boundary event validation, seven incremental candle states sharing the authoritative publication transition and canonical event/candle fingerprints",
-    "Compiled compute identity explicitly binds all new import/coverage/catalog/machine-evidence/review-authority/approval/corpus source modules; actual reversible rebuilds verify five data modules change identity and CSS-only changes do not, with CI regression coverage"
+    "Compiled compute identity explicitly binds all new import/coverage/catalog/machine-evidence/review-authority/approval/corpus source modules; actual reversible rebuilds verify five data modules change identity and CSS-only changes do not, with CI regression coverage",
+    "Shared verified bounded chunk visitor integrated into corpus inspection, with persistent causal consumer state and invalid-artifact/consumer-failure prefix refusal tests"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -110,7 +111,7 @@
   ],
   "next_action": "Integrate bounded corpus traversal with checkpointed causal feature/indicator processing and authoritative account replay; preserve full receipt equivalence and recovery. Current corpus inventory/candles are not full strategy/replay streaming.",
   "qualified_strategies": 0,
-  "tests_passed": 236,
+  "tests_passed": 237,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks; persisted proof/indexed failure monitoring, restart and read-only API; optional authenticated catalog pagination/exact exports/full-u64 desktop/mobile and corrupt-state refusal; independent review actual Rust/SQLite workflow covers credentials/CSRF/origin, paginated history/exact export, synthetic refusal, revocation/stale head, changed files, current authority failure, desktop/mobile and restart",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
