@@ -1,0 +1,319 @@
+{
+  "artifacts": 33,
+  "batch_component": [
+    {
+      "calls": 25,
+      "closed_candles": 6825,
+      "elapsed_ms": 144.42135000000002,
+      "events_per_call": 65536,
+      "mode": "frozen_batch",
+      "repetition": 0
+    },
+    {
+      "calls": 25,
+      "closed_candles": 6825,
+      "elapsed_ms": 155.66054100000002,
+      "events_per_call": 65536,
+      "mode": "shared_transition_batch",
+      "repetition": 0
+    },
+    {
+      "calls": 25,
+      "closed_candles": 6825,
+      "elapsed_ms": 155.1112,
+      "events_per_call": 65536,
+      "mode": "shared_transition_batch",
+      "repetition": 1
+    },
+    {
+      "calls": 25,
+      "closed_candles": 6825,
+      "elapsed_ms": 169.697605,
+      "events_per_call": 65536,
+      "mode": "frozen_batch",
+      "repetition": 1
+    },
+    {
+      "calls": 25,
+      "closed_candles": 6825,
+      "elapsed_ms": 144.42825000000002,
+      "events_per_call": 65536,
+      "mode": "frozen_batch",
+      "repetition": 2
+    },
+    {
+      "calls": 25,
+      "closed_candles": 6825,
+      "elapsed_ms": 156.446406,
+      "events_per_call": 65536,
+      "mode": "shared_transition_batch",
+      "repetition": 2
+    },
+    {
+      "calls": 25,
+      "closed_candles": 6825,
+      "elapsed_ms": 155.945448,
+      "events_per_call": 65536,
+      "mode": "shared_transition_batch",
+      "repetition": 3
+    },
+    {
+      "calls": 25,
+      "closed_candles": 6825,
+      "elapsed_ms": 144.629098,
+      "events_per_call": 65536,
+      "mode": "frozen_batch",
+      "repetition": 3
+    },
+    {
+      "calls": 25,
+      "closed_candles": 6825,
+      "elapsed_ms": 145.36787,
+      "events_per_call": 65536,
+      "mode": "frozen_batch",
+      "repetition": 4
+    },
+    {
+      "calls": 25,
+      "closed_candles": 6825,
+      "elapsed_ms": 155.743408,
+      "events_per_call": 65536,
+      "mode": "shared_transition_batch",
+      "repetition": 4
+    }
+  ],
+  "class": "SYNTHETIC_TEST_ONLY ordered corpus/candle inventory and batch-candle component",
+  "compute_revision": "compute-blake3:faaa7c02e9778a831dbccf3f6039bf7fbbd894d99289101cd4472f9e48cbfe39",
+  "corpus_identity": "1c1c7bebfaceb575d8ba47780f32c9c65c468c800053b5cf8d8b7e827d4276a6",
+  "engine": "ordered-l1-v6-frozen-atr-stops",
+  "events": 2162688,
+  "limitations": "Five warm-file scans, one synthetic instrument. Whole-child resource receipt includes bounded per-chunk fixture creation, independent event-hash oracle, batch comparison and all scans. It is not per-scan RSS, physical-cold/full market-history acceptance, acquisition, tick replay, candidate screening or research throughput. No corpus concatenation; the retained sample during setup/component is one65536-event chunk. No general speedup claim.",
+  "native_bytes": 69238841,
+  "ordered_chunk_scans": [
+    {
+      "candle_summary_hash": "723b0ae35df3a11603c000e30a6ec3b6b0152ab727ab205522732a77289c7d1d",
+      "candles": [
+        {
+          "closed_candles": 9012,
+          "content_hash": "75562334db3810fab659254ec3840dc07a4006a1175c4f2f7bc828d6c82bbd63",
+          "timeframe": "M1"
+        },
+        {
+          "closed_candles": 1803,
+          "content_hash": "11ff0b738f0433bafc5cb646e681a4386097ae9fb3032f682a6fcd8c86b3f47b",
+          "timeframe": "M5"
+        },
+        {
+          "closed_candles": 601,
+          "content_hash": "a965e3aa55680ff1371833d7964cbbfa79a982cb208cf1e41329194cb1944852",
+          "timeframe": "M15"
+        },
+        {
+          "closed_candles": 301,
+          "content_hash": "922f7837ed8db294444d554f209043ba33548afb741f7cf67662b5f5b886f9ad",
+          "timeframe": "M30"
+        },
+        {
+          "closed_candles": 151,
+          "content_hash": "9206b81f80e54f2bb1be75af56015c7ce7efa9b14dfdfc28090ec1fca079ba3d",
+          "timeframe": "H1"
+        },
+        {
+          "closed_candles": 38,
+          "content_hash": "c8673c7a66fb55a026f825375f9166ca9c2c80a6813230525dcf0801329934f0",
+          "timeframe": "H4"
+        },
+        {
+          "closed_candles": 7,
+          "content_hash": "d28be6a0dba1e9c77e2c74de8e8739e9d6e5d27f7cdfb1f38dd3b906d88fab31",
+          "timeframe": "D1"
+        }
+      ],
+      "events": 2162688,
+      "max_resident_chunk_events": 65536,
+      "ordered_events_hash": "b4c2f7fe9d041c3fe0bf9c6db3660a8854e18bba07d140decfee41b23226e776",
+      "repetition": 0,
+      "wall_ms": 1305.818862
+    },
+    {
+      "candle_summary_hash": "723b0ae35df3a11603c000e30a6ec3b6b0152ab727ab205522732a77289c7d1d",
+      "candles": [
+        {
+          "closed_candles": 9012,
+          "content_hash": "75562334db3810fab659254ec3840dc07a4006a1175c4f2f7bc828d6c82bbd63",
+          "timeframe": "M1"
+        },
+        {
+          "closed_candles": 1803,
+          "content_hash": "11ff0b738f0433bafc5cb646e681a4386097ae9fb3032f682a6fcd8c86b3f47b",
+          "timeframe": "M5"
+        },
+        {
+          "closed_candles": 601,
+          "content_hash": "a965e3aa55680ff1371833d7964cbbfa79a982cb208cf1e41329194cb1944852",
+          "timeframe": "M15"
+        },
+        {
+          "closed_candles": 301,
+          "content_hash": "922f7837ed8db294444d554f209043ba33548afb741f7cf67662b5f5b886f9ad",
+          "timeframe": "M30"
+        },
+        {
+          "closed_candles": 151,
+          "content_hash": "9206b81f80e54f2bb1be75af56015c7ce7efa9b14dfdfc28090ec1fca079ba3d",
+          "timeframe": "H1"
+        },
+        {
+          "closed_candles": 38,
+          "content_hash": "c8673c7a66fb55a026f825375f9166ca9c2c80a6813230525dcf0801329934f0",
+          "timeframe": "H4"
+        },
+        {
+          "closed_candles": 7,
+          "content_hash": "d28be6a0dba1e9c77e2c74de8e8739e9d6e5d27f7cdfb1f38dd3b906d88fab31",
+          "timeframe": "D1"
+        }
+      ],
+      "events": 2162688,
+      "max_resident_chunk_events": 65536,
+      "ordered_events_hash": "b4c2f7fe9d041c3fe0bf9c6db3660a8854e18bba07d140decfee41b23226e776",
+      "repetition": 1,
+      "wall_ms": 1277.525753
+    },
+    {
+      "candle_summary_hash": "723b0ae35df3a11603c000e30a6ec3b6b0152ab727ab205522732a77289c7d1d",
+      "candles": [
+        {
+          "closed_candles": 9012,
+          "content_hash": "75562334db3810fab659254ec3840dc07a4006a1175c4f2f7bc828d6c82bbd63",
+          "timeframe": "M1"
+        },
+        {
+          "closed_candles": 1803,
+          "content_hash": "11ff0b738f0433bafc5cb646e681a4386097ae9fb3032f682a6fcd8c86b3f47b",
+          "timeframe": "M5"
+        },
+        {
+          "closed_candles": 601,
+          "content_hash": "a965e3aa55680ff1371833d7964cbbfa79a982cb208cf1e41329194cb1944852",
+          "timeframe": "M15"
+        },
+        {
+          "closed_candles": 301,
+          "content_hash": "922f7837ed8db294444d554f209043ba33548afb741f7cf67662b5f5b886f9ad",
+          "timeframe": "M30"
+        },
+        {
+          "closed_candles": 151,
+          "content_hash": "9206b81f80e54f2bb1be75af56015c7ce7efa9b14dfdfc28090ec1fca079ba3d",
+          "timeframe": "H1"
+        },
+        {
+          "closed_candles": 38,
+          "content_hash": "c8673c7a66fb55a026f825375f9166ca9c2c80a6813230525dcf0801329934f0",
+          "timeframe": "H4"
+        },
+        {
+          "closed_candles": 7,
+          "content_hash": "d28be6a0dba1e9c77e2c74de8e8739e9d6e5d27f7cdfb1f38dd3b906d88fab31",
+          "timeframe": "D1"
+        }
+      ],
+      "events": 2162688,
+      "max_resident_chunk_events": 65536,
+      "ordered_events_hash": "b4c2f7fe9d041c3fe0bf9c6db3660a8854e18bba07d140decfee41b23226e776",
+      "repetition": 2,
+      "wall_ms": 1295.2300599999999
+    },
+    {
+      "candle_summary_hash": "723b0ae35df3a11603c000e30a6ec3b6b0152ab727ab205522732a77289c7d1d",
+      "candles": [
+        {
+          "closed_candles": 9012,
+          "content_hash": "75562334db3810fab659254ec3840dc07a4006a1175c4f2f7bc828d6c82bbd63",
+          "timeframe": "M1"
+        },
+        {
+          "closed_candles": 1803,
+          "content_hash": "11ff0b738f0433bafc5cb646e681a4386097ae9fb3032f682a6fcd8c86b3f47b",
+          "timeframe": "M5"
+        },
+        {
+          "closed_candles": 601,
+          "content_hash": "a965e3aa55680ff1371833d7964cbbfa79a982cb208cf1e41329194cb1944852",
+          "timeframe": "M15"
+        },
+        {
+          "closed_candles": 301,
+          "content_hash": "922f7837ed8db294444d554f209043ba33548afb741f7cf67662b5f5b886f9ad",
+          "timeframe": "M30"
+        },
+        {
+          "closed_candles": 151,
+          "content_hash": "9206b81f80e54f2bb1be75af56015c7ce7efa9b14dfdfc28090ec1fca079ba3d",
+          "timeframe": "H1"
+        },
+        {
+          "closed_candles": 38,
+          "content_hash": "c8673c7a66fb55a026f825375f9166ca9c2c80a6813230525dcf0801329934f0",
+          "timeframe": "H4"
+        },
+        {
+          "closed_candles": 7,
+          "content_hash": "d28be6a0dba1e9c77e2c74de8e8739e9d6e5d27f7cdfb1f38dd3b906d88fab31",
+          "timeframe": "D1"
+        }
+      ],
+      "events": 2162688,
+      "max_resident_chunk_events": 65536,
+      "ordered_events_hash": "b4c2f7fe9d041c3fe0bf9c6db3660a8854e18bba07d140decfee41b23226e776",
+      "repetition": 3,
+      "wall_ms": 1275.426311
+    },
+    {
+      "candle_summary_hash": "723b0ae35df3a11603c000e30a6ec3b6b0152ab727ab205522732a77289c7d1d",
+      "candles": [
+        {
+          "closed_candles": 9012,
+          "content_hash": "75562334db3810fab659254ec3840dc07a4006a1175c4f2f7bc828d6c82bbd63",
+          "timeframe": "M1"
+        },
+        {
+          "closed_candles": 1803,
+          "content_hash": "11ff0b738f0433bafc5cb646e681a4386097ae9fb3032f682a6fcd8c86b3f47b",
+          "timeframe": "M5"
+        },
+        {
+          "closed_candles": 601,
+          "content_hash": "a965e3aa55680ff1371833d7964cbbfa79a982cb208cf1e41329194cb1944852",
+          "timeframe": "M15"
+        },
+        {
+          "closed_candles": 301,
+          "content_hash": "922f7837ed8db294444d554f209043ba33548afb741f7cf67662b5f5b886f9ad",
+          "timeframe": "M30"
+        },
+        {
+          "closed_candles": 151,
+          "content_hash": "9206b81f80e54f2bb1be75af56015c7ce7efa9b14dfdfc28090ec1fca079ba3d",
+          "timeframe": "H1"
+        },
+        {
+          "closed_candles": 38,
+          "content_hash": "c8673c7a66fb55a026f825375f9166ca9c2c80a6813230525dcf0801329934f0",
+          "timeframe": "H4"
+        },
+        {
+          "closed_candles": 7,
+          "content_hash": "d28be6a0dba1e9c77e2c74de8e8739e9d6e5d27f7cdfb1f38dd3b906d88fab31",
+          "timeframe": "D1"
+        }
+      ],
+      "events": 2162688,
+      "max_resident_chunk_events": 65536,
+      "ordered_events_hash": "b4c2f7fe9d041c3fe0bf9c6db3660a8854e18bba07d140decfee41b23226e776",
+      "repetition": 4,
+      "wall_ms": 1293.479547
+    }
+  ]
+}

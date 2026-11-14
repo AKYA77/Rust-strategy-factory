@@ -1,5 +1,6 @@
 use crate::{
     Result,
+    contracts::Profile,
     data::{Dataset, Tick},
 };
 use serde::{Deserialize, Serialize};
@@ -89,20 +90,72 @@ pub fn build(data: &Dataset, tf: Timeframe) -> Result<Vec<Candle>> {
     data.verify()?;
     let mut out = Vec::new();
     let mut current = new(data.ticks[0], tf)?;
-    for t in &data.ticks[1..] {
-        if t.timestamp_ms >= current.available_ms {
-            current.available_ms = t.timestamp_ms;
-            current.publication_sequence = t.sequence;
-            out.push(current);
-            current = new(*t, tf)?;
-        } else {
-            current.bid.push(t.bid);
-            current.ask.push(t.ask);
-            current.events += 1;
+    for tick in &data.ticks[1..] {
+        if let Some(candle) = advance(&mut current, *tick, tf)? {
+            out.push(candle);
         }
     }
     Ok(out)
 }
+// The same publication transition is used by materialized and chunked inputs.
+#[inline]
+fn advance(current: &mut Candle, tick: Tick, tf: Timeframe) -> Result<Option<Candle>> {
+    if tick.timestamp_ms >= current.available_ms {
+        let next = new(tick, tf)?;
+        let mut closed = std::mem::replace(current, next);
+        closed.available_ms = tick.timestamp_ms;
+        closed.publication_sequence = tick.sequence;
+        Ok(Some(closed))
+    } else {
+        let events = current
+            .events
+            .checked_add(1)
+            .ok_or("candle event count overflow")?;
+        current.bid.push(tick.bid);
+        current.ask.push(tick.ask);
+        current.events = events;
+        Ok(None)
+    }
+}
+/// O(1) retained candle state. Chunk boundaries never finalize candles or reset
+/// warmup. A final unfinished bucket is deliberately never emitted.
+pub struct Stream {
+    profile: Profile,
+    timeframe: Timeframe,
+    current: Option<Candle>,
+    previous: Option<Tick>,
+}
+impl Stream {
+    pub fn new(profile: Profile, timeframe: Timeframe) -> Result<Self> {
+        profile.validate()?;
+        Ok(Self {
+            profile,
+            timeframe,
+            current: None,
+            previous: None,
+        })
+    }
+    pub fn push(&mut self, tick: Tick) -> Result<Option<Candle>> {
+        tick.validate(&self.profile)?;
+        if chrono::DateTime::from_timestamp_millis(tick.timestamp_ms).is_none()
+            || self
+                .previous
+                .is_some_and(|p| tick.timestamp_ms < p.timestamp_ms || tick.sequence <= p.sequence)
+        {
+            return Err("stream candle timestamp/event order invalid".into());
+        }
+        // Commit state only after every fallible transition succeeds.
+        let result = if let Some(current) = &mut self.current {
+            advance(current, tick, self.timeframe)?
+        } else {
+            self.current = Some(new(tick, self.timeframe)?);
+            None
+        };
+        self.previous = Some(tick);
+        Ok(result)
+    }
+}
+
 /// Last completed higher timeframe candle actually available at this event.
 pub fn available(candles: &[Candle], timestamp_ms: i64, sequence: u64) -> Option<&Candle> {
     let n = candles

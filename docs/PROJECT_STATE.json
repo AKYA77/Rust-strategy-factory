@@ -98,7 +98,8 @@
     "Machine evidence revalidation recomputes raw archive and declared calendar reports against exact catalog receipt rather than trusting supplied hashes",
     "Immutable persisted recomputed machine archive/calendar evidence with exact artifact bindings, explicit source revalidation, revision isolation, bounded admission and verified catalog snapshot preservation",
     "Operator-provisioned independent scoped Argon2id review authority, keyed authenticated immutable approval/rejection/revocation chains, stale-head fencing, exact live artifact/scope data gates, revision/synthetic/expiry refusal and preserved snapshot authentication",
-    "Optional authenticated independent-review dashboard with server-selected artifact paths, paginated durable decisions/exact exports, separate reviewer credentials and stale-head/synthetic refusal, explicit current-artifact gates and authority reload with bounded blocking work"
+    "Optional authenticated independent-review dashboard with server-selected artifact paths, paginated durable decisions/exact exports, separate reviewer credentials and stale-head/synthetic refusal, explicit current-artifact gates and authority reload with bounded blocking work",
+    "Bounded ordered multi-native-chunk corpus creation/inspection with exact consumed-byte/provenance bindings, cross-boundary event validation, seven incremental candle states sharing the authoritative publication transition and canonical event/candle fingerprints"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -106,9 +107,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Implement bounded-memory multi-chunk corpus traversal and incremental candles using the authoritative candle model; preserve exact event order/provenance, fail on corruption and avoid claiming full research streaming before engine integration.",
+  "next_action": "Integrate bounded corpus traversal with checkpointed causal feature/indicator processing and authoritative account replay; preserve full receipt equivalence and recovery. Current corpus inventory/candles are not full strategy/replay streaming.",
   "qualified_strategies": 0,
-  "tests_passed": 231,
+  "tests_passed": 236,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks; persisted proof/indexed failure monitoring, restart and read-only API; optional authenticated catalog pagination/exact exports/full-u64 desktop/mobile and corrupt-state refusal; independent review actual Rust/SQLite workflow covers credentials/CSRF/origin, paginated history/exact export, synthetic refusal, revocation/stale head, changed files, current authority failure, desktop/mobile and restart",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
@@ -117,8 +118,8 @@
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43584467552,
-    "sha": "b3553ee0eaa0efe9200515287c9ec6107e153cd1",
+    "run_id": 43585198745,
+    "sha": "b98e51b01cf7e342fa7476d4dcc06dcf2e7be1dc",
     "conclusion": "success"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
@@ -137,5 +138,8 @@
   "audit_health_component_benchmark": "docs/BENCHMARKS/audit-health-v1.json",
   "import_cost_benchmark": "docs/BENCHMARKS/import-job-v1.json",
   "dependency_archive_inventory": "docs/SOURCE_REVIEW/2026-11-13-linux-lock-check.json",
-  "real_data_matrix": "docs/REAL_DATA_MATRIX.json"
+  "real_data_matrix": "docs/REAL_DATA_MATRIX.json",
+  "corpus_inventory_benchmark": "docs/BENCHMARKS/corpus-v3.json",
+  "corpus_inventory_resources": "docs/BENCHMARKS/corpus-v3-resources.json",
+  "corpus_batch_transition_tradeoff": "Final five-pair synthetic component median about1.5% overhead vs frozen batch; retained for one checked publication transition. Negative v1/v2 receipts and exact source reconstruction patches retained. No replay/full-history throughput claim."
 }

@@ -1,0 +1,63 @@
+--- a/src/candles.rs
++++ b/src/candles.rs
+@@ -89,8 +89,8 @@
+ pub fn build(data: &Dataset, tf: Timeframe) -> Result<Vec<Candle>> {
+     data.verify()?;
+     let mut out = Vec::new();
+-    let mut current = new(data.ticks[0], tf)?;
+-    for tick in &data.ticks[1..] {
++    let mut current = None;
++    for tick in &data.ticks {
+         if let Some(candle) = advance(&mut current, *tick, tf)? {
+             out.push(candle);
+         }
+@@ -98,22 +98,24 @@
+     Ok(out)
+ }
+ // The same publication transition is used by materialized and chunked inputs.
+-#[inline]
+-fn advance(current: &mut Candle, tick: Tick, tf: Timeframe) -> Result<Option<Candle>> {
+-    if tick.timestamp_ms >= current.available_ms {
++fn advance(current: &mut Option<Candle>, tick: Tick, tf: Timeframe) -> Result<Option<Candle>> {
++    let Some(c) = current else {
++        *current = Some(new(tick, tf)?);
++        return Ok(None);
++    };
++    if tick.timestamp_ms >= c.available_ms {
+         let next = new(tick, tf)?;
+-        let mut closed = std::mem::replace(current, next);
+-        closed.available_ms = tick.timestamp_ms;
+-        closed.publication_sequence = tick.sequence;
+-        Ok(Some(closed))
++        c.available_ms = tick.timestamp_ms;
++        c.publication_sequence = tick.sequence;
++        Ok(current.replace(next))
+     } else {
+-        let events = current
++        let events = c
+             .events
+             .checked_add(1)
+             .ok_or("candle event count overflow")?;
+-        current.bid.push(tick.bid);
+-        current.ask.push(tick.ask);
+-        current.events = events;
++        c.bid.push(tick.bid);
++        c.ask.push(tick.ask);
++        c.events = events;
+         Ok(None)
+     }
+ }
+@@ -145,12 +147,7 @@
+             return Err("stream candle timestamp/event order invalid".into());
+         }
+         // Commit state only after every fallible transition succeeds.
+-        let result = if let Some(current) = &mut self.current {
+-            advance(current, tick, self.timeframe)?
+-        } else {
+-            self.current = Some(new(tick, self.timeframe)?);
+-            None
+-        };
++        let result = advance(&mut self.current, tick, self.timeframe)?;
+         self.previous = Some(tick);
+         Ok(result)
+     }

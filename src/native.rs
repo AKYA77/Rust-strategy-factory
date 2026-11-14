@@ -98,8 +98,37 @@ pub fn read(path: &Path) -> Result<Dataset> {
     let length = file.metadata().map_err(io)?.len();
     decode(BufReader::new(file), length)
 }
+/// Enforce the caller's event cap before allocating rows, and fingerprint the
+/// exact consumed bytes on the same descriptor used for checksum validation.
+pub fn read_bounded(path: &Path, max_events: usize) -> Result<(Dataset, String)> {
+    let file = File::open(path).map_err(io)?;
+    let length = file.metadata().map_err(io)?.len();
+    struct Fingerprint<R> {
+        reader: R,
+        hash: blake3::Hasher,
+    }
+    impl<R: Read> Read for Fingerprint<R> {
+        fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+            let n = self.reader.read(buffer)?;
+            self.hash.update(&buffer[..n]);
+            Ok(n)
+        }
+    }
+    let mut reader = Fingerprint {
+        reader: BufReader::new(file),
+        hash: blake3::Hasher::new(),
+    };
+    let dataset = decode_bounded(&mut reader, length, max_events)?;
+    Ok((dataset, reader.hash.finalize().to_hex().to_string()))
+}
 /// Decode the exact verified byte sequence, shared by bounded compressed storage.
-pub(crate) fn decode(mut reader: impl Read, length: u64) -> Result<Dataset> {
+pub(crate) fn decode(reader: impl Read, length: u64) -> Result<Dataset> {
+    decode_bounded(reader, length, MAX_EVENTS)
+}
+fn decode_bounded(mut reader: impl Read, length: u64, max_events: usize) -> Result<Dataset> {
+    if max_events == 0 || max_events > MAX_EVENTS {
+        return Err("invalid native caller event budget".into());
+    }
     let mut h = [0u8; 20];
     reader.read_exact(&mut h).map_err(io)?;
     if &h[..8] != MAGIC {
@@ -107,7 +136,7 @@ pub(crate) fn decode(mut reader: impl Read, length: u64) -> Result<Dataset> {
     }
     let count = u64::from_le_bytes(h[8..16].try_into().unwrap());
     let metadata = u32::from_le_bytes(h[16..20].try_into().unwrap()) as usize;
-    if count == 0 || count > MAX_EVENTS as u64 || metadata == 0 || metadata > MAX_META {
+    if count == 0 || count > max_events as u64 || metadata == 0 || metadata > MAX_META {
         return Err("native header exceeds event/metadata budget".into());
     }
     let expected = 52 + metadata as u64 + count * 32;

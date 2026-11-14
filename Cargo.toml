@@ -83,3 +83,7 @@ harness = false
 [[bench]]
 name = "import_job"
 harness = false
+
+[[bench]]
+name = "corpus"
+harness = false

@@ -66,3 +66,5 @@ pub mod machine_evidence;
 
 pub mod data_approval;
 pub mod review_authority;
+
+pub mod corpus;

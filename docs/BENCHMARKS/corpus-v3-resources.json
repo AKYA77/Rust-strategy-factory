@@ -1,0 +1,278 @@
+{
+  "exit_code": 0,
+  "recorded_at_utc": "2026-11-14T10:35:58.098368+00:00",
+  "source_fingerprint_version": 2,
+  "source_manifest": [
+    {
+      "path": "Cargo.lock",
+      "sha256": "d6a244857aabf550ea6850c8428bed5a8b36e2b50509a31e7b6e25ba465d156f"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "1ec0ccf3398db7a68f833f144dc22f067ce154eaf871d28bd7345a129dd02c04"
+    },
+    {
+      "path": "benches/audit_health.rs",
+      "sha256": "01dc705f77b97c1b19b75e7ac8d65d00a5fafbc90c190fcd560adb442b537f97"
+    },
+    {
+      "path": "benches/batch.rs",
+      "sha256": "ec4500753b666a66a5fcb86ebb1007bdf94908b9ff2b389e756f3ffcd7ba19cf"
+    },
+    {
+      "path": "benches/candidate_screen.rs",
+      "sha256": "2a712200dc4f8c40ff84c3b5c2bb7f52899418cafe0ae3e5a99c677b78c0a786"
+    },
+    {
+      "path": "benches/compressed.rs",
+      "sha256": "0b288a2e70fc3a90107efe918c887b91e9a924443f07e2b76dabe2b8fb0b83b3"
+    },
+    {
+      "path": "benches/corpus.rs",
+      "sha256": "ed7bf5eba03bb4ac1b051d035f0ecca1bda2cbd870ad100ff367328d63aa33b1"
+    },
+    {
+      "path": "benches/exploration.rs",
+      "sha256": "6161971b8a5ef5fd7cb8cae5ff783cb2c03eff40e1c0f16708e59f170e724132"
+    },
+    {
+      "path": "benches/import_job.rs",
+      "sha256": "f02822cbf22995b4d5a0275143f5b60d55e8ab33ad9512a4ff3b60fa9bf097d3"
+    },
+    {
+      "path": "benches/indexed_factory.rs",
+      "sha256": "5a90e64c77ee3c4881adddd19c17e26307f0fd86e76b8c384b1a3d83c7680e4e"
+    },
+    {
+      "path": "benches/indexed_replay.rs",
+      "sha256": "c78322706a16996e95dfd92a8e3bd23b10b2a40cd8098db572c4d9c72a9987ce"
+    },
+    {
+      "path": "benches/mask_prefix.rs",
+      "sha256": "b5f595ad8d299941a6d8822ef41df8b6a150aaa7c9b733158186ce108afc71d9"
+    },
+    {
+      "path": "benches/proof_screen.rs",
+      "sha256": "689e2e5afd25c7052cc460b827da465826abb71f0e7616fed9e0524b051c9137"
+    },
+    {
+      "path": "benches/replay.rs",
+      "sha256": "89d83308cd0449a643fbe075be3321aa6d2fe8fc9df5ee91a8ed6802cb50dd72"
+    },
+    {
+      "path": "benches/sparse_mask.rs",
+      "sha256": "80c38f9d349047abec904a9b91a335cc8365371d2d631fb2e5c850c7fbfdf132"
+    },
+    {
+      "path": "benches/storage_pipeline.rs",
+      "sha256": "97211507ad7e2234a5293929f55913426d4c91d2a656bc4636edd548d9eb6fc9"
+    },
+    {
+      "path": "build.rs",
+      "sha256": "0588761d40e8132f2f01d728af2dad20010fb72cd62711ebf8aee24931c2d75f"
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "sha256": "6b1cf8341d9a08d76c6deb1e9df90a0b208d0ef0d00ee05e0173e9cd4f0f425d"
+    },
+    {
+      "path": "src/archive_evidence.rs",
+      "sha256": "248fd2b94ff35dce8054aedbaf02d47f283ddaf0dda31c947183d621f05fa894"
+    },
+    {
+      "path": "src/calendar_evidence.rs",
+      "sha256": "c9a3144942047ad6daee91e54c5dddaed6c5164460144f54f9dd836307bbb075"
+    },
+    {
+      "path": "src/candidate_screen.rs",
+      "sha256": "78e1c584dab3820a15042515e105b8af07e407b2f6e869698882e892479b4154"
+    },
+    {
+      "path": "src/candles.rs",
+      "sha256": "affc42620e4e48fd1fe4f5f373490a917b68753bde2e0fa5e092321814dcd71f"
+    },
+    {
+      "path": "src/catalog.rs",
+      "sha256": "442346f5b54f51b19a525a78d098a4c990d26a5a5137a28ed5f70f4f6afcabb4"
+    },
+    {
+      "path": "src/compressed.rs",
+      "sha256": "f40cb7055ba513d0d1ed4dc6294b5606278409b27bc19a424c1ca4ae3f998a19"
+    },
+    {
+      "path": "src/contracts.rs",
+      "sha256": "fa758839f646f724f9d1dba79fdfab59cfb785e073b50c7415671dfad07e919a"
+    },
+    {
+      "path": "src/corpus.rs",
+      "sha256": "29ca99a524c3cdac7ad19928b99705df625eeb1d0d42dbec9798890e92192ee2"
+    },
+    {
+      "path": "src/coverage.rs",
+      "sha256": "c435228e3142d8df2a6c55443574c9630b6e00f9c538ad555d5e8b096173cdde"
+    },
+    {
+      "path": "src/dashboard.rs",
+      "sha256": "e4927e09cba492aab4dad25b39333829c9567070cc7c9365b9a3c3cd821ac190"
+    },
+    {
+      "path": "src/data.rs",
+      "sha256": "d45098609bec90737e3e8052ac76e6e84febb0e6a50175a0031db4da914d894f"
+    },
+    {
+      "path": "src/data_approval.rs",
+      "sha256": "fd8b5629d9f1b0c16646e6e80702e533b1b537fcffad067bafbf4ca21ae62a22"
+    },
+    {
+      "path": "src/data_review.rs",
+      "sha256": "f946eec47dc268a3add7abe03d78f4ff2a0330d8b2a4dc7e15dbaee96bd618fe"
+    },
+    {
+      "path": "src/diagnostics.rs",
+      "sha256": "b7f88560d541044d2a1df4b506d6f33a66df2001273c2cab96c6a2b7675dbbda"
+    },
+    {
+      "path": "src/exploration.rs",
+      "sha256": "136060adc7f88bb1463586c5537764e235eb427f616671a33873c7cbdd66d99a"
+    },
+    {
+      "path": "src/import_job.rs",
+      "sha256": "454b1fac614def9dae904d3e7bdea72e92f5fc5f1c783ccebf67b7a9e3e046df"
+    },
+    {
+      "path": "src/improvement.rs",
+      "sha256": "a835f00e3c76ccdc673a99fd49314bae6e6f0c29dce3f018edbb8a9661cfe78e"
+    },
+    {
+      "path": "src/indexed_policy.rs",
+      "sha256": "cb49f3327a18dc80f8f89c7e2d62a30bb5efdd2e025be26783c2edac443c3226"
+    },
+    {
+      "path": "src/indexed_replay.rs",
+      "sha256": "bc1d50534c4006416f601c03fbab6e06959de1461470019acd9ca2a3fa43fce6"
+    },
+    {
+      "path": "src/indicators.rs",
+      "sha256": "976328ff05106e322dc577616c99fe354f4210a67e7048515f04f7bc0c5ee7bf"
+    },
+    {
+      "path": "src/lib.rs",
+      "sha256": "a5eaef5702206ab0a6e9b103971293c84b7aaf02c799bf78d65976bc2899b37e"
+    },
+    {
+      "path": "src/machine_evidence.rs",
+      "sha256": "de9880308735c1e1e76c52b974abed0f2fefb0ae50c43ba72f8c8b62568c2cd8"
+    },
+    {
+      "path": "src/main.rs",
+      "sha256": "ea5cee0934d33ed2c62ec1796cc86340c3861ffdce89aa10c768df24a4af9cc6"
+    },
+    {
+      "path": "src/native.rs",
+      "sha256": "7365c1028885d573ac5bf1e967600a16694a4888a86a55a0b9d26707a7035e79"
+    },
+    {
+      "path": "src/neighborhood.rs",
+      "sha256": "573763ee2fd9152f834d21342cd1e133fe71bbc8c86950631c011050aac8553e"
+    },
+    {
+      "path": "src/orders.rs",
+      "sha256": "c4ac379cba45b4a36a9b8ce57211a38da5311600140c5f8176a01506360ee11b"
+    },
+    {
+      "path": "src/parquet_guard.rs",
+      "sha256": "2a161530c621cc2dab2a0d83ad32d478c24d9a6f4ec2fcd157662a8bb07df50f"
+    },
+    {
+      "path": "src/parquet_store.rs",
+      "sha256": "39ea78a24eeb74a00b1e36ec857334da2d2f54a7c113fdb3fe5e78a5db8edcea"
+    },
+    {
+      "path": "src/proof_screen.rs",
+      "sha256": "2e31ee41e2fbc7484b7df8a76ebd67da82f8542f13e0f1bc44d38add48a4a947"
+    },
+    {
+      "path": "src/regimes.rs",
+      "sha256": "6c313c2e38829ba1d6444264fe11fcdd0f93a70f6f1040ffdf1dc2b89060f5ae"
+    },
+    {
+      "path": "src/research.rs",
+      "sha256": "3166fbca86e1bd811a2b62741d8493c7be428df9e8baeba0be52f342a8c8ca84"
+    },
+    {
+      "path": "src/review_authority.rs",
+      "sha256": "3bed8b89c4b8c378c48d9aad978d8a3a6ae9935d52f039dd3180b758264326b9"
+    },
+    {
+      "path": "src/risk.rs",
+      "sha256": "d45a12bb784a823ee86793bae920bd5dc7a0b6eab5ecf483332eb180a116a8d1"
+    },
+    {
+      "path": "src/robustness.rs",
+      "sha256": "41fc84d9f8df97d801b7ee31a250e10883183c8e74fc877de8061da2adde82f7"
+    },
+    {
+      "path": "src/science.rs",
+      "sha256": "5e81fd45377c431852118dfb7bb308f38cded57db90bf640da8a54e121f0f0d1"
+    },
+    {
+      "path": "src/screen.rs",
+      "sha256": "fe54e8de406fbe2d8aff39cea72e16ed3aab7da4647e027fb5855f820a09aae1"
+    },
+    {
+      "path": "src/stops.rs",
+      "sha256": "c6ea9066fa4132732b32925a30f0cca8db28c933d11e7461966c53419a06e17b"
+    },
+    {
+      "path": "src/storage.rs",
+      "sha256": "312c457d851b74f115aded1befea36077a37de5769c4553bf465bf45cb41754e"
+    },
+    {
+      "path": "src/strategies.rs",
+      "sha256": "4ce733312975f2cea0fadee3b6765922565d86fc552c00a356fbc92b88740d41"
+    },
+    {
+      "path": "src/tick_engine.rs",
+      "sha256": "379a9b392751ef55bcb5c7dcbac8a91a1642c0806928d02a3cf8522e5ae65849"
+    },
+    {
+      "path": "src/tick_index.rs",
+      "sha256": "4d06d187c2d625dcb1aaf4e022ebea6d6517f4a269cb29a67e1a3f6a16562cd3"
+    },
+    {
+      "path": "src/training_diagnostics.rs",
+      "sha256": "ae2478fa304cc0e3a3522172aad8c6a2a24b473a887783d6ad99adf02c1e2c21"
+    },
+    {
+      "path": "src/training_review.rs",
+      "sha256": "37ad74b2237e6d540190a90c53b2d0a11a262ec5eac0383c722da055f73f6625"
+    },
+    {
+      "path": "src/uncertainty.rs",
+      "sha256": "13104823df04a04d03048b1071c98ff49afa8703b35713ffc76f8cd4d7a0caf9"
+    },
+    {
+      "path": "src/validation.rs",
+      "sha256": "ffe2fedebdb7bbceb42d10299fed149cb3b355ce3a4efb34d97478446dc04f33"
+    }
+  ],
+  "git_base_revision": "b98e51b01cf7e342fa7476d4dcc06dcf2e7be1dc",
+  "source_dirty_at_measurement": true,
+  "measurement_script_sha256": "355f5dbe5a8a52c195b0314bf5f327916e8f080d3d4e8b4463dfb0555a732541",
+  "rustc_vv_probe": "rustc 1.100.0 (0ef1bc386 2026-11-09)\nbinary: rustc\ncommit-hash: 0ef1bc386059596dada8fb65b50425aab2ea637a\ncommit-date: 2026-11-09\nhost: x86_64-unknown-linux-gnu\nrelease: 1.100.0\nLLVM version: 23.1.5",
+  "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+  "cpu_features": "fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext cpuid_fault vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx512_bf16 clzero xsaveerptr arat npt nrip_save tsc_scale vmcb_clean flushbyasid pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm arch_capabilities",
+  "affinity_cpu_count": 3,
+  "cgroup_cpu_max": "200000 100000",
+  "cgroup_memory_max": "8589934592",
+  "host_mem_available": "MemAvailable:    9368460 kB",
+  "source_inputs_sha256": "cf71eb75ee85d1329bed5243aa4749413e6daaa9d5065b695c36d88450575627",
+  "executable_sha256": "4d7af981cda6a328540a8a993c01a42d3c180e9635fb9e535eac76f46e80044e",
+  "wall_seconds_whole_benchmark": 9.601743336000254,
+  "user_cpu_seconds": 9.219656,
+  "system_cpu_seconds": 0.295967,
+  "peak_rss_kib_linux": 14472,
+  "filesystem_input_blocks": 0,
+  "filesystem_output_blocks": 135496,
+  "limitations": "Read the benchmark result class: component masks and synthetic replays are different workloads. CPU/RSS/I/O cover this entire child process, excluding compilation, not individual trials. The child report defines which storage/decoding/replay operations were measured; this wrapper supplies no real/full-history acceptance. Source fingerprint v2 covers build.rs, toolchain, Cargo manifests, src and benches; per-file digests are authoritative when the checkout is dirty. The rustc probe describes this measurement environment; compiled compute identity is in the result."
+}
