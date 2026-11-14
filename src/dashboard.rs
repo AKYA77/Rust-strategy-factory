@@ -256,7 +256,15 @@ fn audit_health(registry: &Registry) -> Result<serde_json::Value> {
         serde_json::json!({"proof_blocked":proof,"indexed_blocked":indexed,"scope":"registry-local persisted failure markers; absence does not establish audit coverage or qualification"}),
     )
 }
-async fn overview(State(app): State<Arc<App>>) -> Response {
+#[derive(Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OverviewQuery {
+    runs: Option<bool>,
+}
+async fn overview(
+    State(app): State<Arc<App>>,
+    Query(overview_query): Query<OverviewQuery>,
+) -> Response {
     let Ok(registry) = app.registry.lock() else {
         return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
     };
@@ -269,6 +277,11 @@ async fn overview(State(app): State<Arc<App>>) -> Response {
             .query_map([], |r| r.get::<_, String>(0))
             .map_err(|e| e.to_string())?;
         let runs = ids
+            .take(if overview_query.runs.unwrap_or(true) {
+                100
+            } else {
+                0
+            })
             .map(|id| {
                 research::status(
                     &registry,
@@ -895,6 +908,130 @@ async fn corpus_control(
         ),
     }
 }
+
+#[derive(Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LedgerQuery {
+    before: Option<String>,
+    limit: Option<usize>,
+}
+fn ledger_page(
+    registry: &Registry,
+    before: Option<i64>,
+    limit: usize,
+    runs: bool,
+) -> Result<HistoryPage> {
+    if !(1..=100).contains(&limit) || before.is_some_and(|n| n <= 0) {
+        return Err("invalid ledger page bounds".into());
+    }
+    let tx = registry
+        .connection
+        .unchecked_transaction()
+        .map_err(|e| e.to_string())?;
+    let table = if runs {
+        "research_runs"
+    } else {
+        "scientific_protocols"
+    };
+    let columns = if runs {
+        "rowid,id,NULL,NULL,0"
+    } else {
+        "rowid,id,definition_json,definition_hash,report_json IS NOT NULL"
+    };
+    let mut sql = format!("SELECT {columns} FROM {table}");
+    let mut params = Vec::<rusqlite::types::Value>::new();
+    if let Some(before) = before {
+        sql.push_str(" WHERE rowid < ?");
+        params.push(before.into());
+    }
+    sql.push_str(" ORDER BY rowid DESC LIMIT ?");
+    params.push(((limit + 1) as i64).into());
+    let mut records = {
+        let mut q = tx.prepare(&sql).map_err(|e| e.to_string())?;
+        q.query_map(rusqlite::params_from_iter(params), |r| {
+            Ok((
+                r.get::<_, i64>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, Option<String>>(2)?,
+                r.get::<_, Option<String>>(3)?,
+                r.get::<_, bool>(4)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?
+    };
+    let more = records.len() > limit;
+    records.truncate(limit);
+    let next_cursor = if more {
+        records.last().map(|r| r.0.to_string())
+    } else {
+        None
+    };
+    let mut rows = Vec::new();
+    for (_, id, definition, hash, report_ready) in records {
+        if !catalog_id(&id) {
+            return Err("invalid ledger record identity".into());
+        }
+        if runs {
+            let status = research::status(registry, &id, chrono::Utc::now().timestamp_millis())?;
+            let mut value = serde_json::to_value(status).map_err(|e| e.to_string())?;
+            for field in ["cursor", "executed", "reused", "rejected", "failed"] {
+                value[field] = serde_json::Value::String(value[field].to_string());
+            }
+            for field in ["queued", "completed", "failed", "child_receipt_links"] {
+                value["improvements"][field] =
+                    serde_json::Value::String(value["improvements"][field].to_string());
+            }
+            rows.push(value);
+        } else {
+            let definition = definition.ok_or("missing protocol definition")?;
+            if definition.len() > 8 * 1024 * 1024 {
+                return Err("protocol definition exceeds page budget".into());
+            }
+            let definition: serde_json::Value =
+                serde_json::from_str(&definition).map_err(|e| e.to_string())?;
+            if hash.as_deref() != Some(id.as_str()) || crate::data::hash(&definition)? != id {
+                return Err("protocol definition integrity failure".into());
+            }
+            rows.push(serde_json::json!({"id":id,"report_ready":report_ready}));
+        }
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(HistoryPage { rows, next_cursor })
+}
+fn ledger_response(app: &App, query: LedgerQuery, runs: bool) -> Response {
+    let before = match query.before {
+        None => None,
+        Some(v) => match v.parse::<i64>() {
+            Ok(n) if n > 0 && v.bytes().all(|b| b.is_ascii_digit()) => Some(n),
+            _ => return api_error(StatusCode::BAD_REQUEST, "invalid ledger cursor"),
+        },
+    };
+    let limit = query.limit.unwrap_or(25);
+    if !(1..=100).contains(&limit) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid ledger page size");
+    }
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match ledger_page(&registry, before, limit, runs) {
+        Ok(page) => Json(page).into_response(),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "unable to verify persisted ledger page",
+        ),
+    }
+}
+async fn protocol_history(
+    State(app): State<Arc<App>>,
+    Query(query): Query<LedgerQuery>,
+) -> Response {
+    ledger_response(&app, query, false)
+}
+async fn run_history(State(app): State<Arc<App>>, Query(query): Query<LedgerQuery>) -> Response {
+    ledger_response(&app, query, true)
+}
 async fn protocols(State(app): State<Arc<App>>) -> Response {
     let Ok(registry) = app.registry.lock() else {
         return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
@@ -1064,6 +1201,8 @@ pub async fn serve_with_reviews(
         .route("/api/training-reviews", get(reviews))
         .route("/api/training-reviews/{id}", get(review_detail))
         .route("/api/protocols", get(protocols))
+        .route("/api/protocol-history", get(protocol_history))
+        .route("/api/run-history", get(run_history))
         .route("/api/corpus/{id}/status", get(corpus_status))
         .route("/api/corpus/{id}/control", post(corpus_control))
         .route("/api/protocols/{id}", get(protocol_detail))
@@ -1216,5 +1355,93 @@ mod training_lineage_tests {
         assert!(training_page(&registry, &parent.experiment_id, None, 2, false).is_err());
         drop(registry);
         std::fs::remove_dir_all(directory).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod ledger_page_tests {
+    use super::*;
+    #[test]
+    fn bounded_run_and_protocol_pages_keep_exact_cursors_across_inserts() {
+        for runs in [false, true] {
+            let root = std::env::temp_dir().join(format!(
+                "factory-ledger-pages-{}-{runs}",
+                std::process::id()
+            ));
+            std::fs::create_dir(&root).unwrap();
+            let registry = Registry::open(&root.join("registry.sqlite")).unwrap();
+            let insert = |index: i64| {
+                let value = serde_json::json!({"synthetic_page_fixture":index});
+                let id = crate::data::hash(&value).unwrap();
+                let row = 9007199254740993i64 + index;
+                if runs {
+                    registry.connection.execute("INSERT INTO research_runs(rowid,id,configuration,cursor,executed) VALUES(?1,?2,'{}',9007199254740993,9007199254740993)",rusqlite::params![row,id]).unwrap();
+                } else {
+                    registry.connection.execute("INSERT INTO scientific_protocols(rowid,id,definition_json,definition_hash) VALUES(?1,?2,?3,?2)",rusqlite::params![row,id,value.to_string()]).unwrap();
+                }
+                id
+            };
+            let expected: std::collections::BTreeSet<_> = (0..129).map(insert).collect();
+            let first = ledger_page(&registry, None, 25, runs).unwrap();
+            assert_eq!(first.next_cursor.as_deref(), Some("9007199254741097"));
+            if runs {
+                assert_eq!(first.rows[0]["cursor"], "9007199254740993");
+                assert_eq!(first.rows[0]["executed"], "9007199254740993");
+            }
+            let mut seen: Vec<_> = first
+                .rows
+                .iter()
+                .map(|r| r["id"].as_str().unwrap().to_owned())
+                .collect();
+            let mut cursor = first.next_cursor;
+            let added = insert(999);
+            assert!(!seen.contains(&added));
+            while let Some(before) = cursor {
+                let page = ledger_page(&registry, Some(before.parse().unwrap()), 25, runs).unwrap();
+                assert!(page.rows.len() <= 25);
+                seen.extend(
+                    page.rows
+                        .iter()
+                        .map(|r| r["id"].as_str().unwrap().to_owned()),
+                );
+                cursor = page.next_cursor;
+            }
+            assert_eq!(seen.len(), 129);
+            assert_eq!(
+                seen.into_iter().collect::<std::collections::BTreeSet<_>>(),
+                expected
+            );
+            assert_eq!(
+                ledger_page(&registry, None, 25, runs).unwrap().rows[0]["id"],
+                added
+            );
+            assert!(ledger_page(&registry, None, 0, runs).is_err());
+            assert!(ledger_page(&registry, None, 101, runs).is_err());
+            assert!(ledger_page(&registry, Some(0), 25, runs).is_err());
+            registry.integrity().unwrap();
+            drop(registry);
+            std::fs::remove_dir_all(root).unwrap();
+        }
+    }
+    #[test]
+    fn protocol_page_refuses_corrupted_definition_identity() {
+        let root =
+            std::env::temp_dir().join(format!("factory-ledger-corrupt-{}", std::process::id()));
+        std::fs::create_dir(&root).unwrap();
+        let registry = Registry::open(&root.join("state.sqlite")).unwrap();
+        let value = serde_json::json!({"synthetic_fixture":1});
+        let id = crate::data::hash(&value).unwrap();
+        registry.connection.execute("INSERT INTO scientific_protocols(id,definition_json,definition_hash) VALUES(?1,?2,?1)",rusqlite::params![id,value.to_string()]).unwrap();
+        assert_eq!(
+            ledger_page(&registry, None, 25, false).unwrap().rows.len(),
+            1
+        );
+        registry
+            .connection
+            .execute("UPDATE scientific_protocols SET definition_json='{}'", [])
+            .unwrap();
+        assert!(ledger_page(&registry, None, 25, false).is_err());
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
     }
 }
