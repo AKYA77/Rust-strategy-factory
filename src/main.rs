@@ -522,6 +522,29 @@ fn run(args: &[String]) -> Result<()> {
             )?;
             save(output, &candles)
         }
+        [
+            "corpus-signals",
+            specification,
+            strategy,
+            candles,
+            cells,
+            output,
+        ] => {
+            let path = Path::new(specification);
+            let spec = rust_strategy_factory::corpus::load(path)?;
+            let strategy: Strategy = read_json(strategy)?;
+            let mask = rust_strategy_factory::corpus::signals(
+                path.parent().unwrap_or(Path::new(".")),
+                &spec,
+                &strategy,
+                candles.parse().map_err(|_| "invalid candle budget")?,
+                cells.parse().map_err(|_| "invalid feature budget")?,
+            )?;
+            save(
+                output,
+                &serde_json::json!({"corpus_identity":spec.identity()?,"strategy_identity":strategy.identity()?,"signals":mask,"limitations":"Causal primary-frame signals only; no account replay or qualification."}),
+            )
+        }
         ["corpus-inspect", specification] => {
             let path = Path::new(specification);
             print(&rust_strategy_factory::corpus::inspect(

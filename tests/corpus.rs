@@ -332,3 +332,27 @@ fn bounded_candle_context_matches_all_batch_frames_and_refuses_partial_outputs()
     let actual: Vec<candles::Candle> = serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
     assert_eq!(actual, candles::build(&f.data, Timeframe::M1).unwrap());
 }
+
+#[test]
+fn corpus_primary_signals_equal_batch_compilation_and_enforce_feature_budget() {
+    use rust_strategy_factory::strategies::{Features, Rule, Strategy};
+    let f = Fixture::new("signals", "EURUSD", 2);
+    let strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+    let candles = candles::build(&f.data, Timeframe::M1).unwrap();
+    let expected = Features::new(&candles, 10000)
+        .unwrap()
+        .signal(&strategy.rule)
+        .unwrap();
+    let actual = corpus::signals(&f.root, &f.spec, &strategy, 100, 10000).unwrap();
+    assert_eq!(
+        serde_json::to_value(actual).unwrap(),
+        serde_json::to_value(expected).unwrap()
+    );
+    assert!(corpus::signals(&f.root, &f.spec, &strategy, 100, 1).is_err());
+    let mut higher = strategy;
+    higher.rule = Rule::HigherTimeframe {
+        timeframe: Timeframe::H1,
+        rule: Box::new(Rule::AboveMean { window: 2 }),
+    };
+    assert!(corpus::signals(&f.root, &f.spec, &higher, 100, 10000).is_err());
+}

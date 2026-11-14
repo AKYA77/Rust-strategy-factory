@@ -315,3 +315,18 @@ pub fn candle_context(
     })?;
     Ok(output)
 }
+
+/// Compile bounded causal primary-frame signals using the existing feature
+/// engine. Higher-timeframe rules still require verified multi-frame context
+/// and are refused by Features::new rather than silently approximated.
+pub fn signals(
+    base: &Path,
+    spec: &Specification,
+    strategy: &crate::strategies::Strategy,
+    max_candles: usize,
+    feature_cells: usize,
+) -> Result<crate::indicators::Mask> {
+    let strategy = strategy.canonical()?;
+    let candles = candle_context(base, spec, strategy.timeframe, max_candles)?;
+    crate::strategies::Features::new(&candles, feature_cells)?.signal(&strategy.rule)
+}
