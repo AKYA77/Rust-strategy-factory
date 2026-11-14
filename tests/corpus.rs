@@ -581,3 +581,110 @@ fn registered_corpus_identity_binds_exact_artifacts_policy_and_budgets() {
         .is_err()
     );
 }
+
+#[test]
+fn source_bound_account_steps_reopen_and_match_complete_replay() {
+    use rust_strategy_factory::{
+        storage::{Claim, Registry},
+        strategies::Strategy,
+        tick_engine::{self, CorpusBudget, CorpusRun, Costs},
+    };
+    let f = Fixture::new("resume-steps", "EURUSD", 7);
+    let costs = Costs::default();
+    let strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+    let budget = CorpusBudget {
+        max_candles: 100,
+        feature_cells: 10000,
+        max_receipts: 1000,
+    };
+    let key = tick_engine::corpus_key(&f.root, &f.spec, &strategy, &costs, budget).unwrap();
+    let path = f.root.join("resume.sqlite");
+    let mut r = Registry::open(&path).unwrap();
+    let id = r.register(&key).unwrap();
+    let Claim::Acquired(first) = r.claim(&id, 0, 10).unwrap() else {
+        panic!()
+    };
+    let run = || CorpusRun {
+        base: &f.root,
+        spec: &f.spec,
+        strategy: &strategy,
+        costs: &costs,
+        budget,
+    };
+    assert!(
+        tick_engine::advance_corpus(&mut r, &first, run(), 1, || 1)
+            .unwrap()
+            .is_none()
+    );
+    drop(r);
+    let mut r = Registry::open(&path).unwrap();
+    let Claim::Acquired(lease) = r.claim(&id, 10, 10000).unwrap() else {
+        panic!()
+    };
+    assert!(tick_engine::advance_corpus(&mut r, &first, run(), 1, || 11).is_err());
+    let mut result = None;
+    for _ in 0..f.spec.chunks.len() {
+        result = tick_engine::advance_corpus(&mut r, &lease, run(), 1, || 11).unwrap();
+        if result.is_some() {
+            break;
+        }
+    }
+    let reference =
+        tick_engine::replay_corpus(&f.root, &f.spec, &strategy, &costs, budget).unwrap();
+    assert_eq!(
+        serde_json::to_value(result.unwrap()).unwrap(),
+        serde_json::to_value(reference).unwrap()
+    );
+    assert_eq!(
+        r.replay_checkpoint(&id).unwrap().unwrap().0.cursor as usize,
+        f.spec.chunks.len()
+    );
+}
+#[test]
+fn hash_consistent_but_fabricated_account_checkpoint_is_not_trusted() {
+    use rust_strategy_factory::{
+        storage::{Claim, Registry},
+        strategies::Strategy,
+        tick_engine::{self, CorpusBudget, CorpusRun, Costs},
+    };
+    let f = Fixture::new("forged-account", "EURUSD", 7);
+    let costs = Costs::default();
+    let strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+    let budget = CorpusBudget {
+        max_candles: 100,
+        feature_cells: 10000,
+        max_receipts: 1000,
+    };
+    let mut r = Registry::open(&f.root.join("forged.sqlite")).unwrap();
+    let id = r
+        .register(&tick_engine::corpus_key(&f.root, &f.spec, &strategy, &costs, budget).unwrap())
+        .unwrap();
+    let Claim::Acquired(lease) = r.claim(&id, 0, 10000).unwrap() else {
+        panic!()
+    };
+    r.save_replay_checkpoint(
+        &lease,
+        1,
+        0,
+        1,
+        serde_json::json!({"account":{"balance":999999999}}),
+    )
+    .unwrap();
+    assert!(
+        tick_engine::advance_corpus(
+            &mut r,
+            &lease,
+            CorpusRun {
+                base: &f.root,
+                spec: &f.spec,
+                strategy: &strategy,
+                costs: &costs,
+                budget
+            },
+            1,
+            || 2
+        )
+        .is_err()
+    );
+    assert_eq!(r.replay_checkpoint(&id).unwrap().unwrap().0.cursor, 1);
+}

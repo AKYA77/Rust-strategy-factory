@@ -109,7 +109,8 @@
     "Single authoritative serializable account event transition shared by ordinary and bounded synthetic USD corpus replay, with full receipt parity and state round-trip checks",
     "Registry-fenced immutable experiment/configuration-bound checkpoint history with cursor CAS, integrity validation, restart/backup preservation and stale/expired/terminal refusal",
     "Registered corpus identities now bind exact ordered artifacts, canonical strategy, costs, budgets, profile, engine and compiled source revision; duplicate registration reuses one frozen identity and changed budgets separate runs.",
-    "Replay workers can now validate lease token, attempt, expiry and running state before expensive resume preparation; write transactions retain their independent fencing. Tests cover forged attempts, exact expiry and completed tasks."
+    "Replay workers can now validate lease token, attempt, expiry and running state before expensive resume preparation; write transactions retain their independent fencing. Tests cover forged attempts, exact expiry and completed tasks.",
+    "Registered synthetic USD corpus runs now advance bounded new chunk batches, persist exact account/cursor/source state, revalidate saved prefixes on resume and match complete uninterrupted receipts after lease replacement/reopen. Hash-consistent fabricated account states refuse without advancement. Prefix recomputation is correctness-first and has no fast-seek performance claim."
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -117,9 +118,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Connect registered corpus replay to bounded source-bound account checkpoint steps, prefix validation and restart recovery; retain transactional fencing for every write.",
+  "next_action": "Atomically publish completed registered corpus receipts, then add operator CLI, durable controls, history and bounded recovery diagnostics.",
   "qualified_strategies": 0,
-  "tests_passed": 245,
+  "tests_passed": 247,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks; persisted proof/indexed failure monitoring, restart and read-only API; optional authenticated catalog pagination/exact exports/full-u64 desktop/mobile and corrupt-state refusal; independent review actual Rust/SQLite workflow covers credentials/CSRF/origin, paginated history/exact export, synthetic refusal, revocation/stale head, changed files, current authority failure, desktop/mobile and restart",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",

@@ -861,6 +861,46 @@ pub fn corpus_key(
         stage: crate::storage::Stage::TickVerification,
     })
 }
+pub struct CorpusRun<'a> {
+    pub base: &'a std::path::Path,
+    pub spec: &'a crate::corpus::Specification,
+    pub strategy: &'a Strategy,
+    pub costs: &'a Costs,
+    pub budget: CorpusBudget,
+}
+struct ResumeControl<'a> {
+    registry: &'a mut crate::storage::Registry,
+    lease: &'a crate::storage::Lease,
+    max_new_chunks: usize,
+    clock: &'a mut dyn FnMut() -> i64,
+}
+/// Resume validation recomputes the saved prefix before accepting stored state.
+/// This bounds memory and detects semantic forgery, but is not a fast seek resume.
+pub fn advance_corpus(
+    registry: &mut crate::storage::Registry,
+    lease: &crate::storage::Lease,
+    run: CorpusRun<'_>,
+    max_new_chunks: usize,
+    mut clock: impl FnMut() -> i64,
+) -> Result<Option<Replay>> {
+    if !(1..=64).contains(&max_new_chunks) {
+        return Err("corpus step must process1..64 new chunks".into());
+    }
+    registry.validate_lease(lease, clock())?;
+    let expected = corpus_key(run.base, run.spec, run.strategy, run.costs, run.budget)?;
+    if registry.experiment_key(&lease.experiment_id)?.as_ref() != Some(&expected) {
+        return Err("registered corpus inputs or build differ".into());
+    }
+    replay_corpus_internal(
+        run,
+        Some(ResumeControl {
+            registry,
+            lease,
+            max_new_chunks,
+            clock: &mut clock,
+        }),
+    )
+}
 pub fn replay_corpus(
     base: &std::path::Path,
     spec: &crate::corpus::Specification,
@@ -868,6 +908,29 @@ pub fn replay_corpus(
     costs: &Costs,
     budget: CorpusBudget,
 ) -> Result<Replay> {
+    replay_corpus_internal(
+        CorpusRun {
+            base,
+            spec,
+            strategy,
+            costs,
+            budget,
+        },
+        None,
+    )?
+    .ok_or_else(|| "unexpected incomplete corpus replay".into())
+}
+fn replay_corpus_internal(
+    run: CorpusRun<'_>,
+    mut control: Option<ResumeControl<'_>>,
+) -> Result<Option<Replay>> {
+    let CorpusRun {
+        base,
+        spec,
+        strategy,
+        costs,
+        budget,
+    } = run;
     let CorpusBudget {
         max_candles,
         feature_cells,
@@ -901,10 +964,29 @@ pub fn replay_corpus(
         window: None,
         slip,
     };
+    let saved = if let Some(c) = &control {
+        c.registry.replay_checkpoint(&c.lease.experiment_id)?
+    } else {
+        None
+    };
+    let old_cursor = saved.as_ref().map_or(0, |(r, _)| r.cursor);
+    if old_cursor < 0 || old_cursor as usize > spec.chunks.len() {
+        return Err("checkpoint cursor outside corpus".into());
+    }
+    let stop = control.as_ref().map_or(spec.chunks.len(), |c| {
+        (old_cursor as usize)
+            .saturating_add(c.max_new_chunks)
+            .min(spec.chunks.len())
+    });
+    let mut events = 0u64;
+    let mut boundary = 0usize;
     let mut state = AccountState::initial();
     let mut previous = None;
     let mut conversions = crate::corpus::SequenceHash::new();
-    crate::corpus::visit_chunks(base, spec, |_, dataset| {
+    crate::corpus::visit_chunks(base, spec, |index, dataset| {
+        if index >= stop {
+            return Ok(());
+        }
         for tick in &dataset.ticks {
             let fx = Conversion::usd();
             state.advance(tick, fx, previous, &context)?;
@@ -917,12 +999,35 @@ pub fn replay_corpus(
             {
                 return Err("corpus replay receipt budget exceeded".into());
             }
+            events += 1;
             conversions.push(&fx)?;
             previous = Some(tick.timestamp_ms);
         }
+        boundary = index + 1;
+        if boundary == old_cursor as usize {
+            let actual = serde_json::json!({"version":"corpus-account-state-v1","corpus":spec.identity()?,"account":state,"previous_ms":previous,"events":events});
+            if saved.as_ref().is_none_or(|(r, _)| r.state != actual) {
+                return Err("checkpoint account state differs from verified source prefix".into());
+            }
+        }
         Ok(())
     })?;
-    Ok(Replay {
+    if let Some(c) = &mut control {
+        if boundary > old_cursor as usize {
+            let payload = serde_json::json!({"version":"corpus-account-state-v1","corpus":spec.identity()?,"account":state,"previous_ms":previous,"events":events});
+            c.registry.save_replay_checkpoint(
+                c.lease,
+                (c.clock)(),
+                old_cursor,
+                boundary as i64,
+                payload,
+            )?;
+        }
+        if boundary < spec.chunks.len() {
+            return Ok(None);
+        }
+    }
+    Ok(Some(Replay {
         version: crate::ENGINE_VERSION.into(),
         strategy_id: strategy.identity()?,
         dataset_id: observed.ordered_events_hash,
@@ -940,7 +1045,7 @@ pub fn replay_corpus(
         pending_entry: state.pending,
         entry_receipts: state.entry_receipts,
         evaluation_window: None,
-    })
+    }))
 }
 
 #[cfg(test)]
