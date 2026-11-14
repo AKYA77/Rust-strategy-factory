@@ -94,7 +94,8 @@
     "Immutable receipt-bound five-area text evidence journal with pending/rejected/recorded-assertion states, evidence hashes, source receipt conflict refusal and validated snapshot/legacy upgrade/CLI recovery; no approval authority",
     "Bounded receipt-scoped review history CLI/API with stable hash cursors, verified returned reports and expression-index lookup; functional insert/cursor/plan tests and scoped SQL-only comparison",
     "Typed exact-receipt declared-calendar observations reusing verified coverage, bounded in/out-session and empty-interval diagnostics with unapproved assumptions and point-oracle/CLI evidence",
-    "Typed normalized archive consistency evidence reuses exact consumed-byte importer and full quote comparison against catalog receipt; rejects changed bytes/quotes/partial chunks and retains declared class without authenticity/approval grant"
+    "Typed normalized archive consistency evidence reuses exact consumed-byte importer and full quote comparison against catalog receipt; rejects changed bytes/quotes/partial chunks and retains declared class without authenticity/approval grant",
+    "Machine evidence revalidation recomputes raw archive and declared calendar reports against exact catalog receipt rather than trusting supplied hashes"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -102,7 +103,7 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Implement machine-evidence admission/revalidation against exact receipts and raw source inputs, then trusted independent source/profile/calendar review authority; human assertions and consistency reports alone never authorize research.",
+  "next_action": "Persist revalidated machine-evidence admission separately from human assertions and implement trusted review authority; continue legitimate alternative-source discovery without repeated denied requests.",
   "qualified_strategies": 0,
   "tests_passed": 220,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
@@ -132,5 +133,6 @@
   "indexed_factory_performance_status": "INCONCLUSIVE; lower synthetic median but3/5 paired regressions; no default/autonomous promotion",
   "audit_health_component_benchmark": "docs/BENCHMARKS/audit-health-v1.json",
   "import_cost_benchmark": "docs/BENCHMARKS/import-job-v1.json",
-  "dependency_archive_inventory": "docs/SOURCE_REVIEW/2026-11-13-linux-lock-check.json"
+  "dependency_archive_inventory": "docs/SOURCE_REVIEW/2026-11-13-linux-lock-check.json",
+  "real_data_matrix": "docs/REAL_DATA_MATRIX.json"
 }

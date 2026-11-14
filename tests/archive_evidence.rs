@@ -29,6 +29,43 @@ fn consumed_archive_and_full_quote_consistency_survive_chunk_export_without_appr
     let r = archive_evidence::assess(&archive, &d, &entry).unwrap();
     assert_eq!(r.evidence.declared_class, DataClass::SyntheticTestOnly);
     assert_eq!(r.evidence.events, 2);
+    let declaration = || rust_strategy_factory::calendar_evidence::Declaration {
+        reference: "unapproved fixture".into(),
+        scope: rust_strategy_factory::validation::Interval {
+            start_ms: 0,
+            end_exclusive_ms: 1001,
+        },
+        open: vec![],
+    };
+    let calendar =
+        rust_strategy_factory::calendar_evidence::assess(&d, &entry, declaration()).unwrap();
+    let mut claim = rust_strategy_factory::machine_evidence::Claim {
+        catalog_hash: entry.hash.clone(),
+        archive_report_hash: r.hash.clone(),
+        calendar_report_hash: calendar.hash,
+    };
+    assert!(
+        rust_strategy_factory::machine_evidence::revalidate(
+            &archive,
+            &d,
+            &entry,
+            declaration(),
+            &claim
+        )
+        .is_ok()
+    );
+    claim.archive_report_hash = "f".repeat(64);
+    assert!(
+        rust_strategy_factory::machine_evidence::revalidate(
+            &archive,
+            &d,
+            &entry,
+            declaration(),
+            &claim
+        )
+        .is_err()
+    );
+
     assert_eq!(r.evidence.catalog_hash, entry.hash);
     let dataset = root.join("dataset.json");
     fs::write(&dataset, serde_json::to_vec(&d).unwrap()).unwrap();

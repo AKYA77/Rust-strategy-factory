@@ -61,3 +61,5 @@ pub mod data_review;
 pub mod calendar_evidence;
 
 pub mod archive_evidence;
+
+pub mod machine_evidence;
