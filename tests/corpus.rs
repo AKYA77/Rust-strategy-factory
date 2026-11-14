@@ -757,3 +757,54 @@ fn registered_corpus_driver_yields_publishes_once_and_reuses_exact_receipt() {
     assert_eq!(r.counts().unwrap().attempts, before);
     r.integrity().unwrap();
 }
+
+#[test]
+fn separate_cli_processes_resume_registered_corpus_and_reuse_completion() {
+    let f = Fixture::new("cli-step", "EURUSD", 7);
+    let spec = f.root.join("spec.json");
+    let strategy = f.root.join("strategy.json");
+    let db = f.root.join("cli.sqlite");
+    fs::write(&spec, serde_json::to_vec(&f.spec).unwrap()).unwrap();
+    fs::write(
+        &strategy,
+        r#"{"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}}"#,
+    )
+    .unwrap();
+    let call = || {
+        let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args([
+                "corpus-step",
+                spec.to_str().unwrap(),
+                strategy.to_str().unwrap(),
+                db.to_str().unwrap(),
+                "100",
+                "10000",
+                "1000",
+                "1",
+                "60000",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()
+    };
+    let first = call();
+    assert_eq!(first["Pending"]["cursor"], 1);
+    let mut complete = None;
+    for _ in 0..f.spec.chunks.len() {
+        let v = call();
+        if !v["Completed"].is_null() {
+            complete = Some(v);
+            break;
+        }
+    }
+    let done = complete.unwrap();
+    assert_eq!(done["Completed"]["cached"], false);
+    let cached = call();
+    assert_eq!(cached["Completed"]["cached"], true);
+    assert_eq!(cached["Completed"]["result"], done["Completed"]["result"]);
+}
