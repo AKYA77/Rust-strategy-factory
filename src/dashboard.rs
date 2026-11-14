@@ -961,6 +961,25 @@ async fn trades(
         ),
     }
 }
+async fn resource_status() -> Response {
+    match crate::resource::observe() {
+        Ok(snapshot) => {
+            let mut value = serde_json::json!(snapshot);
+            for field in [
+                "process_rss_bytes",
+                "host_available_memory_bytes",
+                "available_parallelism",
+            ] {
+                value[field] = serde_json::Value::String(value[field].to_string());
+            }
+            Json(value).into_response()
+        }
+        Err(_) => api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "resource observations unavailable",
+        ),
+    }
+}
 async fn corpus_status(State(app): State<Arc<App>>, Param(id): Param<String>) -> Response {
     if !catalog_id(&id) {
         return api_error(StatusCode::BAD_REQUEST, "invalid corpus identity");
@@ -1276,6 +1295,7 @@ pub async fn serve_with_reviews(
         .route("/api/session", get(session_info))
         .route("/api/logout", post(logout))
         .route("/api/overview", get(overview))
+        .route("/api/resources", get(resource_status))
         .route("/api/catalog", get(catalog_page))
         .route("/api/catalog/{id}", get(catalog_detail))
         .route("/api/data-review/{id}", get(data_review_state))

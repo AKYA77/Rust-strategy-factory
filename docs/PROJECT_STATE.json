@@ -125,7 +125,8 @@
     "Scientific plans optionally freeze1\u201390-day exit-time blocks and a versioned weighted Hoeffding/Bonferroni sensitivity diagnostic allowing arbitrary within-block dependence. Reports retain exact squared block-size sums/effective counts and explicitly unverified cross-block/conditional-size assumptions. Independent formula, clustered-success, empty-data, immutable reuse, retrospective retuning refusal and legacy hash tests pass. This does not implement or grant final qualification.",
     "Scientific plans can now preregister bounded robustness thresholds for resolved samples, net-win rate, reset-fold net sum and losing streak. Every frozen probe is checked for matching identities and complete fold evidence; missing/failed/unresolved cases remain UNKNOWN, exact threshold failures are REJECTED, and complete declared-policy passes never grant qualification. Boundary/forgery/overflow/legacy/reopen and retrospective-policy-change tests pass. CLI/browser acceptance enables both scientific extensions.",
     "Run and scientific-protocol histories now have authenticated bounded keyset APIs and desktop/mobile newer/older/newest navigation beyond100 records. Pages preserve exact cursor/counter strings, verify protocol definitions, survive concurrent inserts and reject stale delayed responses; controls retain the selected page. Overview can omit redundant run statuses. Two Rust tests and a fourth actual Chromium suite cover129-record/exact-integer/integrity cases and105+ record browser workflows; all four browser suites pass.",
-    "Receipt-hash-bound trade APIs and next/previous controls now expose all trades beyond500 with exact full-u64 IDs and unchanged full exports. Request ownership guards prevent late experiment/trade responses from replacing current selections or exports. Equity charts process every exact-safe increment and render at most1002 chronological extrema without argument-spread limits. Focused Rust and actual Chromium tests cover650 replayed trades, cross-receipt cursors, stale responses and a200000-trade display component; stored receipts still load fully before slicing."
+    "Receipt-hash-bound trade APIs and next/previous controls now expose all trades beyond500 with exact full-u64 IDs and unchanged full exports. Request ownership guards prevent late experiment/trade responses from replacing current selections or exports. Equity charts process every exact-safe increment and render at most1002 chronological extrema without argument-spread limits. Focused Rust and actual Chromium tests cover650 replayed trades, cross-receipt cursors, stale responses and a200000-trade display component; stored receipts still load fully before slicing.",
+    "Corpus sessions now optionally stop before new rounds on process RSS or host-memory reserve pressure, preserve explicit admission observations and refuse unknown observations. A bounded Linux resource module, resource-status CLI and authenticated read-only dashboard cards expose exact process/host/parallelism observations without claiming hard OS or worker-process enforcement. Actual pressure/no-registration/resume tests, five Chromium suites, release and local operations checks pass; seven reversible rebuild checks bind resource source and restore original identities."
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -133,19 +134,19 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Batch configurable checkpoint RSS/host-memory backpressure for corpus sessions, bounded Linux resource observation/CLI status and authenticated dashboard resource panels. Keep hard OS/cgroup enforcement, integrated autonomous search pools and full scientific qualification explicitly unfinished.",
+  "next_action": "Implement the bounded durable generated-corpus backlog and token/attempt/expiry-fenced coordinator described in DECISIONS/0010-durable-corpus-backlog.md, then connect existing parallel rounds, controls, pressure checks and crash recovery. Preserve scalar receipt parity and separate generated slots from actual simulations; full scientific/financial qualification and OS/VPS acceptance remain unfinished.",
   "qualified_strategies": 0,
-  "tests_passed": 269,
+  "tests_passed": 272,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
-  "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks; persisted proof/indexed failure monitoring, restart and read-only API; optional authenticated catalog pagination/exact exports/full-u64 desktop/mobile and corrupt-state refusal; independent review actual Rust/SQLite workflow covers credentials/CSRF/origin, paginated history/exact export, synthetic refusal, revocation/stale head, changed files, current authority failure, desktop/mobile and restart",
+  "browser_acceptance": "Five actual Chromium suites: dashboard/scientific controls and immutable evidence, independent data review, corpus recovery, exact cursor run/protocol pages beyond100 and complete650-trade desktop/mobile pagination/full-u64 exports, stale-response protection and bounded chart component. Authenticated exact resource observation cards and read-only API also pass.",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
   "component_benchmark": "docs/BENCHMARKS/v6-prefix-component.json",
   "generation_component_benchmark": "docs/BENCHMARKS/structural-generation-v1.json",
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43602831136,
-    "sha": "6a3424516637ffc30f92eeb885cdfce3878b77c6",
+    "run_id": 43613578691,
+    "sha": "295c3bb344cd26bd9713ae7a62c6192da81f9c50",
     "conclusion": "success"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
@@ -169,5 +170,7 @@
   "corpus_inventory_resources": "docs/BENCHMARKS/corpus-v3-resources.json",
   "corpus_batch_transition_tradeoff": "Final five-pair synthetic component median about1.5% overhead vs frozen batch; retained for one checked publication transition. Negative v1/v2 receipts and exact source reconstruction patches retained. No replay/full-history throughput claim.",
   "data_compute_identity_verification": "docs/VERIFICATION/data-compute-identity-v1.json",
-  "corpus_inventory_source_snapshot": "74a3cfdd83e3b85bca9707cbb64e5d4d7afb36fc; later compute-input enumeration is a build-identity change, not a new performance measurement"
+  "corpus_inventory_source_snapshot": "74a3cfdd83e3b85bca9707cbb64e5d4d7afb36fc; later compute-input enumeration is a build-identity change, not a new performance measurement",
+  "corpus_workers_benchmark": "docs/BENCHMARKS/corpus-workers-v1.json; optimized complete synthetic sessions1/2/4 workers with exact receipt parity; limited warm-cache evidence, no production default selected",
+  "resource_compute_identity_verification": "docs/VERIFICATION/resource-compute-identity-v1.json"
 }

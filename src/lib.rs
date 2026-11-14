@@ -68,3 +68,5 @@ pub mod data_approval;
 pub mod review_authority;
 
 pub mod corpus;
+
+pub mod resource;

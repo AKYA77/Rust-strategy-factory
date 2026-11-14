@@ -1274,3 +1274,69 @@ fn batch_cli_sigterm_finishes_one_bounded_round_and_remains_resumable() {
         "complete"
     );
 }
+
+#[test]
+#[cfg(target_os = "linux")]
+fn corpus_resource_pressure_exits_before_claim_and_resumes_after_policy_change() {
+    let f = Fixture::new("resource-guard", "EURUSD", 7);
+    let config = corpus_batch_fixture(&f);
+    let db = f.root.join("guard.sqlite");
+    let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&config).unwrap()).unwrap();
+    let run = || {
+        let output = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args([
+                "corpus-batch",
+                config.to_str().unwrap(),
+                db.to_str().unwrap(),
+                "100",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap()
+    };
+    value["resource_guard"] =
+        serde_json::json!({"maximum_process_rss_bytes":1,"minimum_host_available_memory_bytes":0});
+    fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+    let held = run();
+    assert_eq!(held["stop_reason"], "resource-pressure");
+    assert_eq!(held["rounds"], 0);
+    assert_eq!(held["admission_observation"]["allowed"], false);
+    assert!(!db.exists());
+    value["resource_guard"] = serde_json::json!({"maximum_process_rss_bytes":u64::MAX,"minimum_host_available_memory_bytes":u64::MAX});
+    fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+    let held = run();
+    assert_eq!(held["stop_reason"], "resource-pressure");
+    assert_eq!(
+        held["admission_observation"]["reasons"][0],
+        "host-memory-below-reserve"
+    );
+    assert!(!db.exists());
+    value["resource_guard"] = serde_json::json!({"maximum_process_rss_bytes":u64::MAX,"minimum_host_available_memory_bytes":0});
+    fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+    let done = run();
+    assert_eq!(done["stop_reason"], "complete");
+    assert_eq!(done["admission_observation"]["allowed"], true);
+    assert!(
+        done["admission_observation"]["observed"]["process_rss_bytes"]
+            .as_u64()
+            .unwrap()
+            > 0
+    );
+    rust_strategy_factory::storage::Registry::open(&db)
+        .unwrap()
+        .integrity()
+        .unwrap();
+    let status = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .arg("resource-status")
+        .output()
+        .unwrap();
+    assert!(status.status.success());
+    let status: serde_json::Value = serde_json::from_slice(&status.stdout).unwrap();
+    assert!(status["available_parallelism"].as_u64().unwrap() > 0);
+    assert!(status["process_rss_bytes"].as_u64().unwrap() > 0);
+}

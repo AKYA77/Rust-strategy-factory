@@ -14,9 +14,9 @@ def build():
     return json.loads(subprocess.check_output([str(exe),'version'],cwd=root))['compute_revision']
 base=build()
 records=[]
-# These inputs cover admission, permissions, eligibility and streaming paths.
+# These inputs cover admission, permissions, eligibility, streaming and resource paths.
 # Changing a comment deliberately exercises byte-level source fingerprinting.
-for name in ['src/catalog.rs','src/machine_evidence.rs','src/review_authority.rs','src/data_approval.rs','src/corpus.rs','web/style.css']:
+for name in ['src/catalog.rs','src/machine_evidence.rs','src/review_authority.rs','src/data_approval.rs','src/corpus.rs','src/resource.rs','web/style.css']:
     path=root/name
     original=path.read_bytes()
     changed=(original+b'\n/* reversible compute identity fixture */\n') if name.endswith('.css') else (original+b'\n// reversible compute identity fixture\n')
