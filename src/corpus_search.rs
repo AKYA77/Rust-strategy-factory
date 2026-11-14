@@ -54,12 +54,7 @@ struct Job {
     state: String,
     error: Option<String>,
 }
-#[derive(Clone)]
-struct Lease {
-    id: String,
-    token: String,
-    attempt: i64,
-}
+type Lease = crate::coordinator::Lease;
 #[derive(Serialize)]
 pub struct Step {
     pub kind: String,
@@ -171,47 +166,19 @@ fn register(registry: &mut Registry, config: &Configuration) -> Result<String> {
     Ok(id)
 }
 fn claim(registry: &mut Registry, id: &str, now: i64, duration: i64) -> Result<Option<Lease>> {
-    let expiry = now.checked_add(duration).ok_or("search lease overflow")?;
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
-    let (state, old, until, attempt): (String, Option<String>, Option<i64>, i64) = tx
-        .query_row(
-            "SELECT state,token,expires_ms,attempt FROM corpus_searches WHERE id=?1",
-            [id],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
-        )
-        .map_err(|e| e.to_string())?;
-    if state != "running" || old.is_some() && until.is_some_and(|t| t > now) {
-        return Ok(None);
-    }
-    let attempt = attempt.checked_add(1).ok_or("search attempt overflow")?;
-    let token: String = tx
-        .query_row("SELECT lower(hex(randomblob(32)))", [], |r| r.get(0))
-        .map_err(|e| e.to_string())?;
-    tx.execute(
-        "UPDATE corpus_searches SET token=?2,expires_ms=?3,attempt=?4 WHERE id=?1",
-        params![id, token, expiry, attempt],
+    crate::coordinator::claim(
+        registry,
+        crate::coordinator::Kind::Search,
+        id,
+        now,
+        duration,
     )
-    .map_err(|e| e.to_string())?;
-    tx.commit().map_err(|e| e.to_string())?;
-    Ok(Some(Lease {
-        id: id.into(),
-        token,
-        attempt,
-    }))
 }
 fn fence(connection: &Connection, lease: &Lease, now: i64) -> Result<()> {
-    let valid:bool=connection.query_row("SELECT EXISTS(SELECT 1 FROM corpus_searches WHERE id=?1 AND token=?2 AND attempt=?3 AND expires_ms>?4 AND state='running')",params![lease.id,lease.token,lease.attempt,now],|r|r.get(0)).map_err(|e|e.to_string())?;
-    if !valid {
-        return Err("corpus search coordinator expired, controlled or fenced".into());
-    }
-    Ok(())
+    crate::coordinator::fence(connection, lease, now)
 }
 fn release(registry: &Registry, lease: &Lease) -> Result<()> {
-    registry.connection.execute("UPDATE corpus_searches SET token=NULL,expires_ms=NULL WHERE id=?1 AND token=?2 AND attempt=?3",params![lease.id,lease.token,lease.attempt]).map_err(|e|e.to_string())?;
-    Ok(())
+    crate::coordinator::release(registry, lease)
 }
 type SearchRow = (Option<String>, usize, String, i64, Option<i64>);
 type SearchSnapshot = (Configuration, usize, String, i64, Option<i64>, Vec<Job>);
@@ -733,6 +700,9 @@ pub fn step(database: &Path, run: SearchRun<'_>, limits: CorpusBatchLimits) -> R
     }
 }
 
+pub fn identity(run: &SearchRun<'_>) -> Result<String> {
+    data::hash(&configuration(run)?)
+}
 pub fn list(registry: &Registry) -> Result<Vec<serde_json::Value>> {
     let ids = {
         let mut query = registry

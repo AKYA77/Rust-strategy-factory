@@ -14,4 +14,6 @@ API/CLI tests cover full scalar receipt parity, drain-before-replenish/reopen, c
 
 Bounded explicit error requeue and immutable prior-error history are now implemented; see0011-bounded-error-requeue.md.
 
-Remaining: automatic supervised retry policy, fair multi-corpus scheduling, larger artifact/retention lifecycle, representative generated-search worker measurements/adaptive selection, live OS resource enforcement, real/full-history conversion and complete scientific qualification. Exhausted means the declared candidate budget is spent; it never means independently qualified or all research finished.
+Durable bounded multi-corpus rotation is now implemented; see0012-multi-corpus-rotation.md.
+
+Remaining: automatic supervised retry policy, CPU-time fairness, larger artifact/retention lifecycle, representative generated-search worker measurements/adaptive selection, live OS resource enforcement, real/full-history conversion and complete scientific qualification. Exhausted means the declared candidate budget is spent; it never means independently qualified or all research finished.

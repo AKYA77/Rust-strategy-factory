@@ -1787,3 +1787,256 @@ fn generated_search_sigterm_exits_at_a_round_boundary_and_restarts() {
         "exhausted"
     );
 }
+
+fn corpus_fleet_fixture(first: &Fixture, second: &Fixture) -> std::path::PathBuf {
+    let one = corpus_search_fixture(first);
+    let two = corpus_search_fixture(second);
+    let file = first.root.join("fleet.json");
+    fs::write(&file,serde_json::to_vec(&serde_json::json!({"sources":[{"name":"first","config":one},{"name":"second","config":two}],"coordinator_lease_ms":60000})).unwrap()).unwrap();
+    file
+}
+#[test]
+fn multi_corpus_fleet_rotates_after_each_round_and_preserves_full_scalar_receipts() {
+    use rust_strategy_factory::{corpus_fleet, operator_config, storage::Registry, tick_engine};
+    let first = Fixture::new("fleet-parity", "EURUSD", 7);
+    let second = Fixture::new("fleet-parity", "XAUUSD", 7);
+    let file = corpus_fleet_fixture(&first, &second);
+    let db = first.root.join("fleet.sqlite");
+    let id = corpus_fleet::register_file(&file, &db).unwrap();
+    let mut exhausted = false;
+    for visit in 0..40 {
+        let result = corpus_fleet::step(&db, &id).unwrap();
+        assert_eq!(
+            result.visit.as_ref().unwrap()["source_index"],
+            (visit % 2).to_string()
+        );
+        assert_eq!(
+            result.status["next_source_index"],
+            ((visit + 1) % 2).to_string()
+        );
+        assert_eq!(result.status["lease_active"], false);
+        if result.kind == "exhausted" {
+            exhausted = true;
+            break;
+        }
+    }
+    assert!(exhausted);
+    let registry = Registry::open(&db).unwrap();
+    let before = registry.counts().unwrap().attempts;
+    for config in [
+        first.root.join("search.json"),
+        second.root.join("search.json"),
+    ] {
+        let loaded = operator_config::load_search(&config).unwrap();
+        for slot in 0..4 {
+            let (_, strategy) = rust_strategy_factory::research::candidate_at(slot, 42).unwrap();
+            let key = tick_engine::corpus_key(
+                &loaded.base,
+                &loaded.specification,
+                &strategy,
+                &loaded.costs,
+                loaded.file.budget,
+            )
+            .unwrap();
+            let result = registry.result(&key.identity().unwrap()).unwrap().unwrap();
+            assert_eq!(
+                result.result["tick_replay"],
+                serde_json::to_value(
+                    tick_engine::replay_corpus(
+                        &loaded.base,
+                        &loaded.specification,
+                        &strategy,
+                        &loaded.costs,
+                        loaded.file.budget
+                    )
+                    .unwrap()
+                )
+                .unwrap()
+            );
+        }
+    }
+    registry.integrity().unwrap();
+    drop(registry);
+    assert_eq!(corpus_fleet::step(&db, &id).unwrap().kind, "exhausted");
+    assert_eq!(
+        Registry::open(&db).unwrap().counts().unwrap().attempts,
+        before
+    );
+}
+#[test]
+fn missing_corpus_is_isolated_while_other_input_finishes_then_restores() {
+    use rust_strategy_factory::{corpus_fleet, storage::Registry};
+    let first = Fixture::new("fleet-blocked", "EURUSD", 7);
+    let second = Fixture::new("fleet-blocked", "XAUUSD", 7);
+    let file = corpus_fleet_fixture(&first, &second);
+    let db = first.root.join("fleet.sqlite");
+    let id = corpus_fleet::register_file(&file, &db).unwrap();
+    corpus_fleet::step(&db, &id).unwrap();
+    let artifact = std::path::Path::new(&second.spec.chunks[0].path);
+    let saved = second.root.join("temporarily-unavailable.rsf");
+    fs::rename(artifact, &saved).unwrap();
+    let blocked = corpus_fleet::step(&db, &id).unwrap();
+    assert_eq!(blocked.visit.as_ref().unwrap()["kind"], "blocked");
+    assert_eq!(blocked.status["next_source_index"], "0");
+    let mut held = false;
+    for _ in 0..40 {
+        let step = corpus_fleet::step(&db, &id).unwrap();
+        if step.kind == "no-ready-sources" {
+            held = true;
+            assert_eq!(step.status["state"], "paused");
+            assert_eq!(step.status["sources"][0]["last_kind"], "exhausted");
+            assert_eq!(step.status["sources"][1]["last_kind"], "blocked");
+            break;
+        }
+    }
+    assert!(held);
+    fs::rename(&saved, artifact).unwrap();
+    let mut registry = Registry::open(&db).unwrap();
+    corpus_fleet::control(&mut registry, &id, "running").unwrap();
+    drop(registry);
+    let mut done = false;
+    for _ in 0..40 {
+        if corpus_fleet::step(&db, &id).unwrap().kind == "exhausted" {
+            done = true;
+            break;
+        }
+    }
+    assert!(done);
+    let registry = Registry::open(&db).unwrap();
+    assert!(
+        corpus_fleet::status(&registry, &id).unwrap()["sources"][1]["last_obstacle"]
+            .as_str()
+            .is_some()
+    );
+    registry.integrity().unwrap();
+}
+#[test]
+fn fleet_backup_rotation_and_terminal_control_are_durable() {
+    use rust_strategy_factory::{corpus_fleet, storage::Registry};
+    let first = Fixture::new("fleet-backup", "EURUSD", 7);
+    let second = Fixture::new("fleet-backup", "XAUUSD", 7);
+    let file = corpus_fleet_fixture(&first, &second);
+    let db = first.root.join("original.sqlite");
+    let backup = first.root.join("backup.sqlite");
+    let id = corpus_fleet::register_file(&file, &db).unwrap();
+    corpus_fleet::step(&db, &id).unwrap();
+    let mut registry = Registry::open(&db).unwrap();
+    corpus_fleet::control(&mut registry, &id, "paused").unwrap();
+    let before = corpus_fleet::status(&registry, &id).unwrap();
+    registry.backup(&backup).unwrap();
+    let mut restored = Registry::open(&backup).unwrap();
+    assert_eq!(corpus_fleet::status(&restored, &id).unwrap(), before);
+    corpus_fleet::control(&mut restored, &id, "running").unwrap();
+    drop(restored);
+    let resumed = corpus_fleet::step(&backup, &id).unwrap();
+    assert_eq!(resumed.visit.unwrap()["source_index"], "1");
+    assert_eq!(corpus_fleet::status(&registry, &id).unwrap(), before);
+    corpus_fleet::control(&mut registry, &id, "stopped").unwrap();
+    assert!(corpus_fleet::control(&mut registry, &id, "running").is_err());
+    assert_eq!(corpus_fleet::step(&db, &id).unwrap().kind, "held");
+    registry.integrity().unwrap();
+}
+
+#[test]
+fn fleet_source_identity_changes_block_one_input_but_runtime_worker_changes_do_not() {
+    use rust_strategy_factory::{corpus_fleet, corpus_search, storage::Registry};
+    let first = Fixture::new("fleet-config", "EURUSD", 7);
+    let second = Fixture::new("fleet-config", "XAUUSD", 7);
+    let file = corpus_fleet_fixture(&first, &second);
+    let db = first.root.join("fleet.sqlite");
+    let id = corpus_fleet::register_file(&file, &db).unwrap();
+    corpus_fleet::step(&db, &id).unwrap();
+    corpus_fleet::step(&db, &id).unwrap();
+    let config = first.root.join("search.json");
+    let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&config).unwrap()).unwrap();
+    value["limits"]["workers"] = serde_json::json!(1);
+    fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+    let same = corpus_fleet::step(&db, &id).unwrap();
+    assert_eq!(same.visit.unwrap()["kind"], "advanced");
+    corpus_fleet::step(&db, &id).unwrap();
+    value["seed"] = serde_json::json!(43);
+    fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+    let changed = corpus_fleet::step(&db, &id).unwrap();
+    assert_eq!(changed.visit.as_ref().unwrap()["kind"], "blocked");
+    assert!(
+        changed.visit.unwrap()["obstacle"]
+            .as_str()
+            .unwrap()
+            .contains("frozen")
+    );
+    let other = corpus_fleet::step(&db, &id).unwrap();
+    assert_ne!(other.visit.unwrap()["kind"], "blocked");
+    let registry = Registry::open(&db).unwrap();
+    assert_eq!(corpus_search::list(&registry).unwrap().len(), 2);
+    registry.integrity().unwrap();
+}
+#[test]
+fn fleet_duplicate_inputs_and_global_resource_pressure_do_not_start_searches() {
+    use rust_strategy_factory::{corpus_fleet, corpus_search, storage::Registry};
+    let first = Fixture::new("fleet-bounds", "EURUSD", 7);
+    let config = corpus_search_fixture(&first);
+    let file = first.root.join("fleet.json");
+    let db = first.root.join("fleet.sqlite");
+    let mut value = serde_json::json!({"sources":[{"name":"one","config":config},{"name":"duplicate","config":config}],"coordinator_lease_ms":60000});
+    fs::write(&file, serde_json::to_vec(&value).unwrap()).unwrap();
+    assert!(corpus_fleet::register_file(&file, &db).is_err());
+    assert!(!db.exists());
+    value["sources"].as_array_mut().unwrap().pop();
+    value["resource_guard"] =
+        serde_json::json!({"maximum_process_rss_bytes":1,"minimum_host_available_memory_bytes":0});
+    fs::write(&file, serde_json::to_vec(&value).unwrap()).unwrap();
+    let id = corpus_fleet::register_file(&file, &db).unwrap();
+    let blocked = corpus_fleet::step(&db, &id).unwrap();
+    assert_eq!(blocked.kind, "resource-pressure");
+    assert_eq!(blocked.status["visits"], "0");
+    assert_eq!(blocked.status["attempt"], "0");
+    let registry = Registry::open(&db).unwrap();
+    assert!(corpus_search::list(&registry).unwrap().is_empty());
+    assert_eq!(registry.counts().unwrap().registered, 0);
+    registry.integrity().unwrap();
+}
+#[test]
+fn fleet_cli_restarts_at_next_input_and_stops_with_terminal_budget() {
+    let first = Fixture::new("fleet-cli", "EURUSD", 7);
+    let second = Fixture::new("fleet-cli", "XAUUSD", 7);
+    let file = corpus_fleet_fixture(&first, &second);
+    let db = first.root.join("fleet.sqlite");
+    let initialized = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-fleet-init",
+            file.to_str().unwrap(),
+            db.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(initialized.status.success());
+    let initialized: serde_json::Value = serde_json::from_slice(&initialized.stdout).unwrap();
+    let id = initialized["fleet_id"].as_str().unwrap();
+    let call = |maximum: &str| {
+        let output = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args(["corpus-fleet", db.to_str().unwrap(), id, maximum])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap()
+    };
+    let one = call("1");
+    assert_eq!(one["last"]["visit"]["source_index"], "0");
+    let two = call("1");
+    assert_eq!(two["last"]["visit"]["source_index"], "1");
+    assert_eq!(two["last"]["status"]["next_source_index"], "0");
+    assert_eq!(call("100")["stop_reason"], "exhausted");
+    let status = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args(["corpus-fleet-status", db.to_str().unwrap(), id])
+        .output()
+        .unwrap();
+    assert!(status.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&status.stdout).unwrap()["state"],
+        "exhausted"
+    );
+}

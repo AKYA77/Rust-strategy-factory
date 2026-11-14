@@ -72,3 +72,7 @@ pub mod corpus;
 pub mod resource;
 
 pub mod corpus_search;
+
+mod coordinator;
+pub mod corpus_fleet;
+pub mod operator_config;

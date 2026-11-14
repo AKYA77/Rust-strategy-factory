@@ -961,6 +961,60 @@ async fn trades(
         ),
     }
 }
+async fn corpus_fleets(State(app): State<Arc<App>>) -> Response {
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match crate::corpus_fleet::list(&registry) {
+        Ok(rows) => Json(rows).into_response(),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "multi-corpus inventory unavailable",
+        ),
+    }
+}
+async fn corpus_fleet_status(State(app): State<Arc<App>>, Param(id): Param<String>) -> Response {
+    if !catalog_id(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid multi-corpus identity");
+    }
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    let exists: std::result::Result<bool, _> = registry.connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM corpus_fleets WHERE id=?1)",
+        [&id],
+        |r| r.get(0),
+    );
+    if matches!(exists, Ok(false)) {
+        return api_error(StatusCode::NOT_FOUND, "multi-corpus coordinator not found");
+    }
+    match crate::corpus_fleet::status(&registry, &id) {
+        Ok(value) => Json(value).into_response(),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "multi-corpus rotation integrity unavailable",
+        ),
+    }
+}
+async fn corpus_fleet_control(
+    State(app): State<Arc<App>>,
+    Param(id): Param<String>,
+    Json(body): Json<Control>,
+) -> Response {
+    if !catalog_id(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid multi-corpus identity");
+    }
+    let Ok(mut registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match crate::corpus_fleet::control(&mut registry, &id, &body.state) {
+        Ok(()) => Json(serde_json::json!({"ok":true})).into_response(),
+        Err(_) => api_error(
+            StatusCode::BAD_REQUEST,
+            "invalid multi-corpus control transition",
+        ),
+    }
+}
 async fn generated_searches(State(app): State<Arc<App>>) -> Response {
     let Ok(registry) = app.registry.lock() else {
         return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
@@ -1380,6 +1434,12 @@ pub async fn serve_with_reviews(
         .route("/api/logout", post(logout))
         .route("/api/overview", get(overview))
         .route("/api/resources", get(resource_status))
+        .route("/api/corpus-fleets", get(corpus_fleets))
+        .route("/api/corpus-fleets/{id}", get(corpus_fleet_status))
+        .route(
+            "/api/corpus-fleets/{id}/control",
+            post(corpus_fleet_control),
+        )
         .route("/api/corpus-searches", get(generated_searches))
         .route("/api/corpus-searches/{id}", get(generated_search_status))
         .route(

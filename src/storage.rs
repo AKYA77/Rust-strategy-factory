@@ -249,6 +249,7 @@ impl Registry {
         connection.execute_batch("CREATE TABLE IF NOT EXISTS replay_checkpoints(experiment_id TEXT NOT NULL REFERENCES experiments(id),cursor INTEGER NOT NULL CHECK(cursor>0),body BLOB NOT NULL CHECK(typeof(body)='blob' AND length(body)<=4194304),hash TEXT NOT NULL CHECK(length(hash)=64),PRIMARY KEY(experiment_id,cursor));CREATE TRIGGER IF NOT EXISTS replay_checkpoint_no_update BEFORE UPDATE ON replay_checkpoints BEGIN SELECT RAISE(ABORT,'checkpoint immutable');END;CREATE TRIGGER IF NOT EXISTS replay_checkpoint_no_delete BEFORE DELETE ON replay_checkpoints BEGIN SELECT RAISE(ABORT,'checkpoint immutable');END;").map_err(db_err)?;
         connection.execute_batch("CREATE TABLE IF NOT EXISTS corpus_controls(experiment_id TEXT PRIMARY KEY REFERENCES experiments(id),state TEXT NOT NULL CHECK(state IN ('running','paused','stopped')));").map_err(db_err)?;
         crate::corpus_search::initialize(&connection)?;
+        crate::corpus_fleet::initialize(&connection)?;
         Ok(Self { connection })
     }
     /// Atomically reserve OOS time across dataset aliases before any competing registration.
@@ -763,6 +764,7 @@ impl Registry {
             return Err("registry foreign key integrity mismatch".into());
         }
         crate::corpus_search::integrity(self)?;
+        crate::corpus_fleet::integrity(self)?;
         Ok(())
     }
     /// SQLite online backup includes committed WAL contents. Destination must be new.

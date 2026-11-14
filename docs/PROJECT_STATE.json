@@ -128,7 +128,8 @@
     "Receipt-hash-bound trade APIs and next/previous controls now expose all trades beyond500 with exact full-u64 IDs and unchanged full exports. Request ownership guards prevent late experiment/trade responses from replacing current selections or exports. Equity charts process every exact-safe increment and render at most1002 chronological extrema without argument-spread limits. Focused Rust and actual Chromium tests cover650 replayed trades, cross-receipt cursors, stale responses and a200000-trade display component; stored receipts still load fully before slicing.",
     "Corpus sessions now optionally stop before new rounds on process RSS or host-memory reserve pressure, preserve explicit admission observations and refuse unknown observations. A bounded Linux resource module, resource-status CLI and authenticated read-only dashboard cards expose exact process/host/parallelism observations without claiming hard OS or worker-process enforcement. Actual pressure/no-registration/resume tests, five Chromium suites, release and local operations checks pass; seven reversible rebuild checks bind resource source and restore original identities.",
     "A bounded synthetic USD search now freezes generated candidate slots and execution keys, drains/replenishes durable batches through existing pools, fences coordinator publication by token/attempt/expiry, recovers committed child receipts without extra attempts, preserves verified backups and exposes CLI plus authenticated desktop/mobile controls/exact snapshots. Worker errors pause explicitly; slot counts never mean new simulations. Search/slot/body quotas and actual-read operator config caps apply. Six browser suites, release/operations and eight reversible source-identity checks pass;10 added Rust tests cover parity, corruption, coordinator/crash/signal and control recovery.",
-    "Generated error slots now support explicit paused/inactive-coordinator requeue under unchanged keys, bounded by frozen queue capacity and three events per slot. Atomic hash-chained stored-error history survives backups/VACUUM and rejects mutation/prefix forgery; child leases and terminal results are never reset. CLI and authenticated dashboard controls expose exact history and start no process. Five new Rust tests cover race/capacity/lease/cached-result recovery; six browser suites, release/operations and eight reversible identity checks pass."
+    "Generated error slots now support explicit paused/inactive-coordinator requeue under unchanged keys, bounded by frozen queue capacity and three events per slot. Atomic hash-chained stored-error history survives backups/VACUUM and rejects mutation/prefix forgery; child leases and terminal results are never reset. CLI and authenticated dashboard controls expose exact history and start no process. Five new Rust tests cover race/capacity/lease/cached-result recovery; six browser suites, release/operations and eight reversible identity checks pass.",
+    "A durable synthetic USD fleet freezes up to eight ordered search identities and rotates one bounded round per input behind shared coordinator fencing. Returned source failures are isolated, saved rotation survives restart/backups, committed child receipts recover without new attempts, and full receipts match scalar replay. CLI and authenticated desktop/mobile controls expose exact redacted counters/obstacles; no-ready cycles pause without spinning and terminal stops remain irreversible. Nine added Rust tests cover parity, identity/resource/corruption/control and recovery boundaries. Seven Chromium suites, release/operations and eleven reversible source-identity checks pass. Visits do not imply equal CPU time or new simulations."
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -136,19 +137,19 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Implement a durable fair multi-corpus research coordinator that rotates one bounded search round per supported input, freezes input/search identities, isolates blocked sources and checkpoints rotation under coordinator fencing. Connect bounded CLI/status/control workflows and test restart, fairness, source-failure isolation and scalar receipt parity; continue artifact retention and full scientific/financial/OS acceptance.",
+  "next_action": "Implement immutable file-backed large result receipts with bounded verified reads, atomic no-overwrite publication, unchanged public receipt identities and backup/restore portability. Preserve failed/rejected evidence and validate corruption, incomplete publication, duplicate completion, lease fencing and dashboard exact exports; continue hard resource/supervision and scientific/financial acceptance.",
   "qualified_strategies": 0,
-  "tests_passed": 287,
+  "tests_passed": 296,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
-  "browser_acceptance": "Six actual Chromium suites cover existing dashboard/scientific evidence, independent data review, corpus recovery/resources, run/protocol pagination,650-trade full-u64 paging/exact exports/bounded charts, and generated corpus search controls/snapshots/replenishment/restart/corruption refusal on desktop/mobile. Generated error requeue additionally verifies CSRF/state/budget guards, exact prior-error export and preserved active child leases without extra attempts.",
+  "browser_acceptance": "Six actual Chromium suites cover existing dashboard/scientific evidence, independent data review, corpus recovery/resources, run/protocol pagination,650-trade full-u64 paging/exact exports/bounded charts, and generated corpus search controls/snapshots/replenishment/restart/corruption refusal on desktop/mobile. Generated error requeue additionally verifies CSRF/state/budget guards, exact prior-error export and preserved active child leases without extra attempts. Seventh actual Chromium suite verifies frozen multi-corpus rotation, returned-source-error isolation/restoration, controls, exact redacted export, desktop/mobile/restart and corrupt-state refusal.",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
   "component_benchmark": "docs/BENCHMARKS/v6-prefix-component.json",
   "generation_component_benchmark": "docs/BENCHMARKS/structural-generation-v1.json",
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43617818621,
-    "sha": "f09f6bceeb07789b9b2d6ced4134b68075261efc",
+    "run_id": 43620665796,
+    "sha": "0b2590c526b2eec3f6c147cba846d0c8a61e33c1",
     "conclusion": "success"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",

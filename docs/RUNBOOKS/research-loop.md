@@ -72,3 +72,15 @@ A session returns its bounded round count, stop reason and final search snapshot
 `corpus-search-requeue REGISTRY SEARCH_ID MAXIMUM_SLOTS` explicitly requeues eligible execution-error slots under their existing keys. Require paused state, no active coordinator lease and free frozen queue capacity. A request is1–32 slots, with at most three requeues per slot. The command/API resumes durable control state but starts no worker. Child leases and committed results remain immutable; an active child can cause held-or-busy until it yields/expires. The same build/source/configuration is still required for execution.
 
 Status snapshots include exact requeue counts, eligible slots/capacity and recent stored prior-error records. Requeue events are not new financial trials or new strategies. Deterministic budget/source failures are not repaired by retry; changing frozen execution inputs requires a new search identity. See [bounded history policy](../DECISIONS/0011-bounded-error-requeue.md).
+
+## Multi-corpus bounded sessions
+
+Prepare one existing `corpus-search` JSON operator configuration per synthetic USD input. Register an ordered fleet configuration, for example:
+
+```json
+{"sources":[{"name":"EURUSD fixture","config":"eur-search.json"},{"name":"Gold fixture","config":"gold-search.json"}],"coordinator_lease_ms":60000}
+```
+
+Paths resolve relative to the fleet file and are stored canonically. Run `corpus-fleet-init fleet.json registry.sqlite`, retain its fleet ID, then `corpus-fleet registry.sqlite ID 100` for at most100 bounded input visits. Use `corpus-fleet-status registry.sqlite ID` to inspect the persisted next input and latest obstacles. No process runs after the command exits. SIGINT/SIGTERM requests exit at a visit boundary; filesystem stalls and OS enforcement are separate limits.
+
+A missing or identity-changed source blocks only that input. Restore original source/configuration before resuming; do not edit financial parameters to bypass the frozen identity. One no-progress cycle pauses rotation. Inspect child search state and explicitly requeue eligible errors through the existing bounded mechanism when necessary, then `corpus-fleet-control registry.sqlite ID running`. Parent pause/stop controls do not reset or stop independent child leases. Permanent stop and all-budget exhaustion cannot be resumed. Dashboard input-rotation controls start no workers; exact snapshots redact local references/tokens. See DECISIONS/0012-multi-corpus-rotation.md for quotas and acceptance limits.
