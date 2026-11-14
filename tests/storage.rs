@@ -674,3 +674,26 @@ fn lease_snapshot_validation_checks_attempt_expiry_and_terminal_state() {
     drop(r);
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn checkpoint_worker_yield_allows_immediate_reclaim_and_fences_prior_token() {
+    let dir = directory();
+    let mut r = Registry::open(&dir.join("yield.sqlite")).unwrap();
+    let id = r.register(&key()).unwrap();
+    let Claim::Acquired(first) = r.claim(&id, 0, 10000).unwrap() else {
+        panic!()
+    };
+    r.save_replay_checkpoint(&first, 1, 0, 1, json!({"fixture":true}))
+        .unwrap();
+    r.yield_lease(&first, 2).unwrap();
+    assert!(r.validate_lease(&first, 2).is_err());
+    let Claim::Acquired(next) = r.claim(&id, 2, 10000).unwrap() else {
+        panic!()
+    };
+    assert_eq!(next.attempt, first.attempt + 1);
+    assert!(r.yield_lease(&first, 3).is_err());
+    assert_eq!(r.replay_checkpoint(&id).unwrap().unwrap().0.cursor, 1);
+    r.integrity().unwrap();
+    drop(r);
+    std::fs::remove_dir_all(dir).unwrap();
+}

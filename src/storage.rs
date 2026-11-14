@@ -920,3 +920,23 @@ impl Registry {
         Ok(digest)
     }
 }
+
+impl Registry {
+    /// Yield after a committed checkpoint. Attempts and immutable evidence remain.
+    pub fn yield_lease(&mut self, lease: &Lease, now_ms: i64) -> Result<()> {
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(db_err)?;
+        let n=tx.execute("UPDATE experiments SET state='queued',token=NULL,expires_ms=NULL WHERE id=?1 AND state='running' AND token=?2 AND attempt=?3 AND expires_ms>?4",params![lease.experiment_id,lease.token,lease.attempt,now_ms]).map_err(db_err)?;
+        if n != 1 {
+            return Err("cannot yield stale, expired or terminal lease".into());
+        }
+        tx.execute(
+            "INSERT INTO events(experiment_id,at_ms,action,attempt) VALUES(?1,?2,'yielded',?3)",
+            params![lease.experiment_id, now_ms, lease.attempt],
+        )
+        .map_err(db_err)?;
+        tx.commit().map_err(db_err)
+    }
+}
