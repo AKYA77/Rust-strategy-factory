@@ -118,7 +118,8 @@
     "Corpus recovery status now reads a consistent registry snapshot and verifies checkpoint history before returning cursor/hash/control/attempt metadata. CLI and authenticated read-only dashboard API expose no lease token or full account state; bounds and redaction tests pass.",
     "Corpus execution now rejects invalid step/lease budgets before registration, reports non-completed terminal outcomes explicitly and validates cached completed receipt identities against the frozen run. Failed tasks cannot be mislabeled successful cache hits.",
     "Actual binary-process tests preserve committed corpus checkpoints after SIGKILL while waiting for a SQLite writer, and restore paused corpus backups into independently resumable jobs without changing the original registry. This covers one crash point, not exhaustive power-loss or disk-full faults.",
-    "A bounded corpus batch API now preflights at most256 unique frozen jobs, starts1\u201316 connection-owning workers, enforces worst-case concurrent candle/feature/receipt caps, preserves input-order per-job outcomes and reports worker startup/panic failures for resumable retry. Parallel complete receipts match scalar replay; aggregate overcommit and duplicate jobs refuse before registry creation, and a failed job does not lose another job's checkpoint. Declared object caps are not measured RSS or OS enforcement."
+    "A bounded corpus batch API now preflights at most256 unique frozen jobs, starts1\u201316 connection-owning workers, enforces worst-case concurrent candle/feature/receipt caps, preserves input-order per-job outcomes and reports worker startup/panic failures for resumable retry. Parallel complete receipts match scalar replay; aggregate overcommit and duplicate jobs refuse before registry creation, and a failed job does not lose another job's checkpoint. Declared object caps are not measured RSS or OS enforcement.",
+    "corpus-batch now executes bounded1\u201310000-round sessions from a strict1 MiB config, resumes multiple frozen jobs across processes, exits instead of spinning on held/busy/terminal work and handles SIGINT/SIGTERM at bounded round boundaries. Actual process tests verify pause/resume, completion/cache reuse and SIGTERM under writer contention followed by successful restart."
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -126,9 +127,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Expose bounded multiworker corpus rounds through a resumable operator batch CLI with safe signal boundaries, then run integrated release/browser/operations acceptance and connect corpus controls to dashboard.",
+  "next_action": "Connect verified corpus recovery status and pause/resume/stop controls to the authenticated dashboard; run integrated release/browser/operations acceptance and continue scientific/resource requirements.",
   "qualified_strategies": 0,
-  "tests_passed": 257,
+  "tests_passed": 259,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks; persisted proof/indexed failure monitoring, restart and read-only API; optional authenticated catalog pagination/exact exports/full-u64 desktop/mobile and corrupt-state refusal; independent review actual Rust/SQLite workflow covers credentials/CSRF/origin, paginated history/exact export, synthetic refusal, revocation/stale head, changed files, current authority failure, desktop/mobile and restart",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",

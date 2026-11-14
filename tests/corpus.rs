@@ -1144,3 +1144,133 @@ fn corpus_workers_report_job_failures_without_losing_other_checkpoints() {
     ));
     Registry::open(&db).unwrap().integrity().unwrap();
 }
+
+fn corpus_batch_fixture(f: &Fixture) -> std::path::PathBuf {
+    let spec = f.root.join("corpus.json");
+    fs::write(&spec, serde_json::to_vec(&f.spec).unwrap()).unwrap();
+    let config = f.root.join("batch.json");
+    fs::write(&config,serde_json::to_vec(&serde_json::json!({"specification":"corpus.json","strategies":[{"timeframe":"M1","side":"Long","stop_ticks":90,"rule":{"AboveMean":{"window":2}}},{"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}}],"budget":{"max_candles":100,"feature_cells":10000,"max_receipts":1000},"limits":{"workers":2,"max_parallel_candles":200,"max_parallel_feature_cells":20000,"max_parallel_receipts":2000,"max_new_chunks":1,"lease_ms":60000}})).unwrap()).unwrap();
+    config
+}
+#[test]
+fn batch_cli_resumes_multiple_jobs_across_processes_and_stops_when_paused() {
+    use rust_strategy_factory::storage::Registry;
+    let f = Fixture::new("batch-cli", "EURUSD", 7);
+    let config = corpus_batch_fixture(&f);
+    let db = f.root.join("batch.sqlite");
+    let call = |rounds: &str| {
+        let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args([
+                "corpus-batch",
+                config.to_str().unwrap(),
+                db.to_str().unwrap(),
+                rounds,
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()
+    };
+    let first = call("1");
+    assert_eq!(first["stop_reason"], "round-limit");
+    assert_eq!(first["rounds"], 1);
+    let ids: Vec<_> = first["last"]["jobs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|j| {
+            j["Ok"]["Pending"]["experiment_id"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        })
+        .collect();
+    let mut r = Registry::open(&db).unwrap();
+    for id in &ids {
+        r.set_corpus_control(id, "paused", 1).unwrap();
+    }
+    drop(r);
+    let held = call("100");
+    assert_eq!(held["rounds"], 1);
+    assert_eq!(held["stop_reason"], "held-busy-or-terminal");
+    let mut r = Registry::open(&db).unwrap();
+    for id in &ids {
+        assert_eq!(r.replay_checkpoint(id).unwrap().unwrap().0.cursor, 1);
+        r.set_corpus_control(id, "running", 2).unwrap();
+    }
+    drop(r);
+    let done = call("100");
+    assert_eq!(done["stop_reason"], "complete");
+    assert_eq!(done["rounds"], f.spec.chunks.len() - 1);
+    let cached = call("100");
+    assert_eq!(cached["rounds"], 1);
+    assert!(
+        cached["last"]["jobs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|j| j["Ok"]["Completed"]["cached"] == true)
+    );
+}
+#[test]
+#[cfg(unix)]
+fn batch_cli_sigterm_finishes_one_bounded_round_and_remains_resumable() {
+    use rust_strategy_factory::storage::Registry;
+    use std::io::BufRead;
+    let f = Fixture::new("batch-signal", "EURUSD", 7);
+    let config = corpus_batch_fixture(&f);
+    let db = f.root.join("signal.sqlite");
+    drop(Registry::open(&db).unwrap());
+    let lock = rusqlite::Connection::open(&db).unwrap();
+    lock.execute_batch("BEGIN IMMEDIATE").unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-batch",
+            config.to_str().unwrap(),
+            db.to_str().unwrap(),
+            "10000",
+        ])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut ready = String::new();
+    std::io::BufReader::new(child.stderr.take().unwrap())
+        .read_line(&mut ready)
+        .unwrap();
+    assert!(ready.contains("corpus batch ready"));
+    assert!(
+        Command::new("kill")
+            .args(["-TERM", &child.id().to_string()])
+            .status()
+            .unwrap()
+            .success()
+    );
+    std::thread::sleep(std::time::Duration::from_millis(20));
+    lock.execute_batch("ROLLBACK").unwrap();
+    drop(lock);
+    let out = child.wait_with_output().unwrap();
+    assert!(out.status.success());
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(report["stop_reason"], "signal");
+    assert!(report["rounds"].as_u64().unwrap() <= 1);
+    Registry::open(&db).unwrap().integrity().unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-batch",
+            config.to_str().unwrap(),
+            db.to_str().unwrap(),
+            "100",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()["stop_reason"],
+        "complete"
+    );
+}
