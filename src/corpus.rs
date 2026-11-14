@@ -324,6 +324,36 @@ pub fn signals(
     max_candles: usize,
     feature_cells: usize,
 ) -> Result<crate::indicators::Mask> {
+    signals_internal(base, spec, strategy, max_candles, feature_cells, None)
+}
+/// Compile the prior-only prefix needed for a window. Signals before its start
+/// are warmup only; execution eligibility must still enforce the window.
+pub fn signals_window(
+    base: &Path,
+    spec: &Specification,
+    strategy: &crate::strategies::Strategy,
+    max_candles: usize,
+    feature_cells: usize,
+    window: &crate::validation::Interval,
+) -> Result<crate::indicators::Mask> {
+    window.validate()?;
+    signals_internal(
+        base,
+        spec,
+        strategy,
+        max_candles,
+        feature_cells,
+        Some(window),
+    )
+}
+fn signals_internal(
+    base: &Path,
+    spec: &Specification,
+    strategy: &crate::strategies::Strategy,
+    max_candles: usize,
+    feature_cells: usize,
+    window: Option<&crate::validation::Interval>,
+) -> Result<crate::indicators::Mask> {
     let strategy = strategy.canonical()?;
     if max_candles == 0 || max_candles > 1_000_000 {
         return Err("invalid aggregate corpus candle budget".into());
@@ -341,6 +371,9 @@ pub fn signals(
             }
         }
         for tick in &dataset.ticks {
+            if window.is_some_and(|w| tick.timestamp_ms >= w.end_exclusive_ms) {
+                break;
+            }
             for (tf, stream) in &mut streams {
                 if let Some(c) = stream.push(*tick)? {
                     if total >= max_candles {

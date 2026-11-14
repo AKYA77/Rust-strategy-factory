@@ -383,3 +383,46 @@ fn corpus_primary_signals_equal_batch_compilation_and_enforce_feature_budget() {
         serde_json::to_value(expected).unwrap()
     );
 }
+
+#[test]
+fn corpus_window_keeps_prior_warmup_and_excludes_end_publication() {
+    use rust_strategy_factory::{
+        strategies::{Features, Strategy},
+        validation::Interval,
+    };
+    let f = Fixture::new("window-context", "EURUSD", 2);
+    let strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+    let all = candles::build(&f.data, Timeframe::M1).unwrap();
+    for boundary in [1, 3, 8] {
+        let end = all[boundary].available_ms;
+        let prefix = &all[..all.partition_point(|c| c.available_ms < end)];
+        let window = Interval {
+            start_ms: end - 1,
+            end_exclusive_ms: end,
+        };
+        let actual =
+            corpus::signals_window(&f.root, &f.spec, &strategy, 100, 10000, &window).unwrap();
+        let expected = Features::new(prefix, 10000)
+            .unwrap()
+            .signal(&strategy.rule)
+            .unwrap();
+        assert_eq!(
+            serde_json::to_value(actual).unwrap(),
+            serde_json::to_value(expected).unwrap()
+        );
+    }
+    assert!(
+        corpus::signals_window(
+            &f.root,
+            &f.spec,
+            &strategy,
+            100,
+            10000,
+            &Interval {
+                start_ms: 1,
+                end_exclusive_ms: 1
+            }
+        )
+        .is_err()
+    );
+}
