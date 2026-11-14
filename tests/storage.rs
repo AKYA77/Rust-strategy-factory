@@ -76,7 +76,7 @@ fn compatible_event_lookup_upgrade_preserves_history_and_marker_semantics() {
     let version: i64 = c
         .query_row("PRAGMA user_version", [], |r| r.get(0))
         .unwrap();
-    assert_eq!(version, 9);
+    assert_eq!(version, 10);
     drop(c);
     let registry = Registry::open(&path).unwrap();
     registry.integrity().unwrap();
@@ -759,5 +759,340 @@ fn corpus_status_is_verified_bounded_metadata_without_lease_tokens() {
     assert!(!text.contains("private-state"));
     assert!(r.corpus_status("invalid").is_err());
     drop(r);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn large_receipts_are_file_backed_exact_idempotent_and_backup_portable() {
+    let dir = directory();
+    let db = dir.join("source.sqlite");
+    let mut registry = Registry::open(&db).unwrap();
+    let id = registry.register(&key()).unwrap();
+    let Claim::Acquired(lease) = registry.claim(&id, 0, 1000).unwrap() else {
+        panic!()
+    };
+    let result = json!({"payload":"x".repeat(9*1024*1024),"event_id":u64::MAX,"amount":-123,"tick_replay":{"trades":[{"entry_sequence":u64::MAX}],"realized_micro_usd":20_000_000}});
+    assert!(
+        registry
+            .finish(&lease, 1, Outcome::Completed, &result)
+            .unwrap()
+    );
+    assert!(
+        !registry
+            .finish(&lease, 2, Outcome::Completed, &result)
+            .unwrap()
+    );
+    let stored = registry.result(&id).unwrap().unwrap();
+    assert_eq!(stored.result, result);
+    assert_eq!(
+        stored.result_hash,
+        rust_strategy_factory::data::hash(&result).unwrap()
+    );
+    let c = rusqlite::Connection::open(&db).unwrap();
+    let (len,count):(usize,usize)=c.query_row("SELECT length(result_json),(SELECT count(*) FROM result_artifacts) FROM experiments WHERE id=?1",[&id],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+    assert!(len < 4096);
+    assert_eq!(count, 1);
+    assert!(
+        c.execute("UPDATE result_artifacts SET bytes=bytes+1", [])
+            .is_err()
+    );
+    assert!(c.execute("DELETE FROM result_artifacts", []).is_err());
+    drop(c);
+    let inventory = rust_strategy_factory::result_artifact::inventory(&registry).unwrap();
+    assert_eq!(inventory["physical_files"], "1");
+    assert_eq!(inventory["referenced_receipts"], "1");
+    let snapshot = dir.join("snapshot.sqlite");
+    registry.backup(&snapshot).unwrap();
+    drop(registry);
+    let moved = dir.join("relocated");
+    std::fs::create_dir(&moved).unwrap();
+    std::fs::rename(&snapshot, moved.join("restored.sqlite")).unwrap();
+    std::fs::rename(
+        dir.join("snapshot.sqlite.artifacts"),
+        moved.join("restored.sqlite.artifacts"),
+    )
+    .unwrap();
+    std::fs::remove_dir_all(dir.join("source.sqlite.artifacts")).unwrap();
+    let restored = Registry::open(&moved.join("restored.sqlite")).unwrap();
+    restored.integrity().unwrap();
+    assert_eq!(restored.result(&id).unwrap().unwrap().result, result);
+    drop(restored);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+#[test]
+fn artifact_corruption_missing_file_and_summary_tampering_fail_closed() {
+    let dir = directory();
+    let db = dir.join("db.sqlite");
+    let mut registry = Registry::open(&db).unwrap();
+    let id = registry.register(&key()).unwrap();
+    let Claim::Acquired(lease) = registry.claim(&id, 0, 100).unwrap() else {
+        panic!()
+    };
+    let value = json!({"payload":"a".repeat(300000)});
+    registry
+        .finish(&lease, 1, Outcome::Rejected, &value)
+        .unwrap();
+    let hash = rust_strategy_factory::data::hash(&value).unwrap();
+    let file = dir.join("db.sqlite.artifacts").join(format!("{hash}.json"));
+    let original = std::fs::read(&file).unwrap();
+    let mut corrupt = original.clone();
+    corrupt[15] = b'b';
+    std::fs::write(&file, &corrupt).unwrap();
+    assert!(registry.result(&id).is_err());
+    assert!(registry.integrity().is_err());
+    assert!(
+        registry
+            .finish(&lease, 2, Outcome::Rejected, &value)
+            .is_err()
+    );
+    assert!(registry.backup(&dir.join("bad.sqlite")).is_err());
+    std::fs::write(&file, &original).unwrap();
+    let c = rusqlite::Connection::open(&db).unwrap();
+    let json: String = c
+        .query_row(
+            "SELECT result_json FROM experiments WHERE id=?1",
+            [&id],
+            |r| r.get(0),
+        )
+        .unwrap();
+    c.execute(
+        "UPDATE experiments SET result_json=json_set(result_json,'$.bytes',3) WHERE id=?1",
+        [&id],
+    )
+    .unwrap();
+    assert!(registry.result(&id).is_err());
+    c.execute(
+        "UPDATE experiments SET result_json=?2 WHERE id=?1",
+        rusqlite::params![id, json],
+    )
+    .unwrap();
+    drop(c);
+    std::fs::remove_file(&file).unwrap();
+    assert!(registry.result(&id).is_err());
+    std::fs::write(&file, &original).unwrap();
+    registry.integrity().unwrap();
+    drop(registry);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+#[test]
+fn stale_leases_do_not_publish_files_and_uncommitted_files_recover_without_overwrite() {
+    let dir = directory();
+    let db = dir.join("db.sqlite");
+    let mut registry = Registry::open(&db).unwrap();
+    let id = registry.register(&key()).unwrap();
+    let Claim::Acquired(old) = registry.claim(&id, 0, 10).unwrap() else {
+        panic!()
+    };
+    let Claim::Acquired(lease) = registry.claim(&id, 11, 100).unwrap() else {
+        panic!()
+    };
+    let value = json!({"payload":"a".repeat(300000)});
+    assert!(registry.finish(&old, 12, Outcome::Failed, &value).is_err());
+    let mut forged = lease.clone();
+    forged.attempt += 1;
+    assert!(
+        registry
+            .finish(&forged, 12, Outcome::Failed, &value)
+            .is_err()
+    );
+    assert!(!dir.join("db.sqlite.artifacts").exists());
+    let root = dir.join("db.sqlite.artifacts");
+    std::fs::create_dir(&root).unwrap();
+    let hash = rust_strategy_factory::data::hash(&value).unwrap();
+    let target = root.join(format!("{hash}.json"));
+    std::fs::write(&target, b"preserve unrelated bytes").unwrap();
+    assert!(
+        registry
+            .finish(&lease, 12, Outcome::Failed, &value)
+            .is_err()
+    );
+    assert_eq!(std::fs::read(&target).unwrap(), b"preserve unrelated bytes");
+    assert!(registry.result(&id).unwrap().is_none());
+    std::fs::write(&target, serde_json::to_vec(&value).unwrap()).unwrap();
+    let partial = root.join(format!(".partial-{}", "a".repeat(64)));
+    std::fs::write(&partial, b"uncommitted crash residue").unwrap();
+    assert!(
+        registry
+            .finish(&lease, 13, Outcome::Failed, &value)
+            .unwrap()
+    );
+    assert_eq!(
+        rust_strategy_factory::result_artifact::inventory(&registry).unwrap()["partial_files"],
+        "1"
+    );
+    assert_eq!(registry.result(&id).unwrap().unwrap().outcome, "failed");
+    registry.integrity().unwrap();
+    assert!(partial.exists());
+    drop(registry);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+#[test]
+#[cfg(unix)]
+fn artifact_symlinks_and_quota_pressure_refuse_without_deleting_evidence() {
+    use std::os::unix::fs::symlink;
+    let dir = directory();
+    let db = dir.join("db.sqlite");
+    let mut registry = Registry::open(&db).unwrap();
+    let id = registry.register(&key()).unwrap();
+    let Claim::Acquired(lease) = registry.claim(&id, 0, 100).unwrap() else {
+        panic!()
+    };
+    let value = json!({"payload":"a".repeat(300000)});
+    let hash = rust_strategy_factory::data::hash(&value).unwrap();
+    let root = dir.join("db.sqlite.artifacts");
+    std::fs::create_dir(&root).unwrap();
+    let unrelated = dir.join("unrelated");
+    std::fs::write(&unrelated, serde_json::to_vec(&value).unwrap()).unwrap();
+    let target = root.join(format!("{hash}.json"));
+    symlink(&unrelated, &target).unwrap();
+    assert!(
+        registry
+            .finish(&lease, 1, Outcome::Completed, &value)
+            .is_err()
+    );
+    assert!(target.is_symlink());
+    std::fs::remove_file(&target).unwrap();
+    for i in 0..16 {
+        let file = std::fs::File::create(root.join(format!("{i:064x}.json"))).unwrap();
+        file.set_len(64 * 1024 * 1024).unwrap();
+    }
+    assert!(
+        registry
+            .finish(&lease, 2, Outcome::Completed, &value)
+            .unwrap_err()
+            .contains("quota")
+    );
+    assert_eq!(std::fs::read_dir(&root).unwrap().count(), 16);
+    assert!(registry.result(&id).unwrap().is_none());
+    assert!(unrelated.exists());
+    drop(registry);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn database_rollback_after_artifact_publication_retries_without_extra_file_or_attempt() {
+    let dir = directory();
+    let db = dir.join("db.sqlite");
+    let mut registry = Registry::open(&db).unwrap();
+    let id = registry.register(&key()).unwrap();
+    let Claim::Acquired(lease) = registry.claim(&id, 0, 100).unwrap() else {
+        panic!()
+    };
+    let value = json!({"payload":"rollback".repeat(50000)});
+    let c = rusqlite::Connection::open(&db).unwrap();
+    c.execute_batch("CREATE TRIGGER fail_result BEFORE UPDATE OF result_json ON experiments BEGIN SELECT RAISE(ABORT,'injected commit refusal');END;").unwrap();
+    assert!(
+        registry
+            .finish(&lease, 1, Outcome::Completed, &value)
+            .unwrap_err()
+            .contains("injected")
+    );
+    assert!(registry.result(&id).unwrap().is_none());
+    assert_eq!(
+        rust_strategy_factory::result_artifact::inventory(&registry).unwrap()["physical_files"],
+        "1"
+    );
+    assert_eq!(
+        rust_strategy_factory::result_artifact::inventory(&registry).unwrap()["referenced_receipts"],
+        "0"
+    );
+    c.execute_batch("DROP TRIGGER fail_result;").unwrap();
+    drop(c);
+    assert!(
+        registry
+            .finish(&lease, 2, Outcome::Completed, &value)
+            .unwrap()
+    );
+    assert_eq!(registry.counts().unwrap().attempts, 1);
+    assert_eq!(
+        rust_strategy_factory::result_artifact::inventory(&registry).unwrap()["physical_files"],
+        "1"
+    );
+    registry.integrity().unwrap();
+    drop(registry);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+#[test]
+fn concurrent_large_completion_has_one_receipt_and_preserves_terminal_evidence() {
+    let dir = directory();
+    let db = dir.join("db.sqlite");
+    let mut registry = Registry::open(&db).unwrap();
+    let id = registry.register(&key()).unwrap();
+    let Claim::Acquired(lease) = registry.claim(&id, 0, 100).unwrap() else {
+        panic!()
+    };
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+    drop(registry);
+    let handles: Vec<_> = (0..2)
+        .map(|_| {
+            let db = db.clone();
+            let lease = lease.clone();
+            let barrier = barrier.clone();
+            std::thread::spawn(move || {
+                let mut registry = Registry::open(&db).unwrap();
+                barrier.wait();
+                registry
+                    .finish(
+                        &lease,
+                        1,
+                        Outcome::Rejected,
+                        &json!({"payload":"permanent rejection".repeat(20000)}),
+                    )
+                    .unwrap()
+            })
+        })
+        .collect();
+    let wins = handles
+        .into_iter()
+        .map(|h| usize::from(h.join().unwrap()))
+        .sum::<usize>();
+    assert_eq!(wins, 1);
+    let registry = Registry::open(&db).unwrap();
+    assert_eq!(registry.result(&id).unwrap().unwrap().outcome, "rejected");
+    assert_eq!(
+        rust_strategy_factory::result_artifact::inventory(&registry).unwrap()["physical_files"],
+        "1"
+    );
+    registry.integrity().unwrap();
+    drop(registry);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn legacy_inline_receipts_above_new_threshold_upgrade_without_rewriting_identity() {
+    let dir = directory();
+    let db = dir.join("legacy.sqlite");
+    let mut registry = Registry::open(&db).unwrap();
+    let id = registry.register(&key()).unwrap();
+    let _ = registry.claim(&id, 0, 100).unwrap();
+    drop(registry);
+    let value = json!({"payload":"legacy".repeat(60000),"event":u64::MAX});
+    let hash = rust_strategy_factory::data::hash(&value).unwrap();
+    let json = serde_json::to_string(&value).unwrap();
+    let c = rusqlite::Connection::open(&db).unwrap();
+    c.execute(
+        "UPDATE experiments SET result_json=?1,result_hash=?2,state='completed'",
+        rusqlite::params![json, hash],
+    )
+    .unwrap();
+    c.execute_batch("DROP TABLE result_artifacts;PRAGMA user_version=9;")
+        .unwrap();
+    drop(c);
+    let registry = Registry::open(&db).unwrap();
+    assert_eq!(registry.result(&id).unwrap().unwrap().result, value);
+    registry.integrity().unwrap();
+    assert_eq!(
+        rust_strategy_factory::result_artifact::inventory(&registry).unwrap()["physical_files"],
+        "0"
+    );
+    drop(registry);
+    let c = rusqlite::Connection::open(&db).unwrap();
+    assert_eq!(
+        c.query_row("SELECT result_json FROM experiments", [], |r| r
+            .get::<_, String>(0))
+            .unwrap(),
+        json
+    );
+    drop(c);
     std::fs::remove_dir_all(dir).unwrap();
 }

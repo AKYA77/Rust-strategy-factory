@@ -56,15 +56,36 @@ with tempfile.TemporaryDirectory(prefix='factory-operations-') as directory:
                                    'rule': {'AboveMean': {'window': 100000}}}))
     experiment = json.loads(command(binary, 'experiment', dataset, strategy, database).stdout)
     command(binary, 'diagnose', database, experiment['experiment_id'])
+    # Actual replay, not injected metrics: enough synthetic resolved trades to externalize receipts.
+    profile = next(p for p in json.loads(command(binary, 'profiles').stdout) if p['symbol'] == 'EURUSD')
+    profile_file, quotes, large_dataset = base / 'profile.json', base / 'quotes.csv', base / 'large-input.json'
+    profile_file.write_text(json.dumps(profile))
+    rows = ['timestamp_ms,sequence,bid,ask']
+    for cycle in range(1600):
+        for index, (offset, bid, ask) in enumerate([(0,'1.00000','1.00010'),(60000,'1.00020','1.00030'),(120000,'1.00040','1.00050'),(120001,'1.00050','1.00060'),(121000,'1.00500','1.00510')]):
+            rows.append(f'{1735689600000 + cycle * 180000 + offset},{cycle * 5 + index},{bid},{ask}')
+    quotes.write_text('\n'.join(rows) + '\n')
+    command(binary, 'import', quotes, profile_file, 'SYNTHETIC_TEST_ONLY artifact operations', large_dataset, 'synthetic')
+    strategy.write_text(json.dumps({'timeframe':'M1','side':'Long','stop_ticks':50,'rule':{'AboveMean':{'window':2}}}))
+    large = json.loads(command(binary, 'experiment', large_dataset, strategy, database).stdout)
+    inventory = json.loads(command(binary, 'registry-artifacts', database).stdout)
+    assert int(inventory['referenced_receipts']) >= 1
+    def artifacts(db):
+        folder = Path(str(db) + '.artifacts')
+        return {file.name: digest(file) for file in folder.iterdir()} if folder.exists() else {}
+    source_artifacts = artifacts(database)
+    assert source_artifacts
     counts = json.loads(command(binary, 'registry-check', database).stdout)
     backup = prefix / 'backups/verified.sqlite'
     assert operate('backup', database, backup)['counts'] == counts
     original_backup = digest(backup)
+    assert artifacts(backup) == source_artifacts
     operate('backup', database, backup, success=False)
     assert digest(backup) == original_backup
     restored = prefix / 'state/recovered.sqlite'
     assert operate('restore', backup, restored)['counts'] == counts
     assert json.loads(command(binary, 'registry-check', restored).stdout) == counts
+    assert artifacts(restored) == artifacts(backup) == source_artifacts
     assert digest(backup) == original_backup
     restored_hash = digest(restored)
     operate('restore', backup, restored, success=False)
@@ -82,6 +103,20 @@ with tempfile.TemporaryDirectory(prefix='factory-operations-') as directory:
     operate('restore', backup, prefix / 'state/live-refused.sqlite', success=False)
     assert not (prefix / 'state/live-refused.sqlite').exists()
     live.unlink()
+    artifact_collision = prefix / 'state/artifact-collision.sqlite'
+    reserved = Path(str(artifact_collision) + '.artifacts')
+    reserved.mkdir()
+    (reserved / 'preserve').write_bytes(b'user evidence')
+    operate('restore', backup, artifact_collision, success=False)
+    assert not artifact_collision.exists() and (reserved / 'preserve').read_bytes() == b'user evidence'
+    artifact = next(Path(str(backup) + '.artifacts').iterdir())
+    original_artifact = artifact.read_bytes()
+    artifact.write_bytes(b'x' + original_artifact[1:])
+    corrupt_destination = prefix / 'state/corrupt-artifact.sqlite'
+    operate('restore', backup, corrupt_destination, success=False)
+    assert not corrupt_destination.exists() and not Path(str(corrupt_destination) + '.artifacts').exists()
+    artifact.write_bytes(original_artifact)
+    assert artifacts(backup) == source_artifacts
     second = operate('install', args.alternate)['release']
     assert second != first
     assert operate('status')['previous'] == first
@@ -135,5 +170,5 @@ with tempfile.TemporaryDirectory(prefix='factory-operations-') as directory:
     print(json.dumps({'synthetic': True, 'passed': ['install', 'repeat install', 'update',
         'rollback', 'explicit activation', 'checksum tamper refusal', 'preserved configuration',
         'native verified backup', 'new-path restore', 'no-overwrite', 'invalid registry refusal',
-        'unrelated activation file preservation'], 'populated_user_units_verified': units_verified,
+        'unrelated activation file preservation', 'actual large receipt artifact backup/restore', 'artifact collision/corruption refusal'], 'populated_user_units_verified': units_verified,
         'live_systemd_and_vps_execution': 'NOT_RUN'}))

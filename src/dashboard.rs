@@ -596,7 +596,7 @@ fn experiment_page(
     limit: usize,
 ) -> Result<HistoryPage> {
     let mut sql = String::from(
-        "SELECT rowid,id,state,key_json,json_extract(result_json,'$.data_manifest'),json_extract(result_json,'$.strategy'),json_array_length(result_json,'$.tick_replay.trades'),CASE WHEN typeof(json_extract(result_json,'$.tick_replay.realized_micro_usd'))='integer' AND json_extract(result_json,'$.tick_replay.realized_micro_usd') BETWEEN -9007199254740991 AND 9007199254740991 THEN json_extract(result_json,'$.tick_replay.realized_micro_usd') ELSE NULL END FROM experiments WHERE 1=1",
+        "SELECT rowid,id,state,key_json,json_extract(result_json,'$.data_manifest'),json_extract(result_json,'$.strategy'),coalesce(json_array_length(result_json,'$.tick_replay.trades'),json_extract(result_json,'$._receipt_summary.closed_trades')),CASE WHEN typeof(json_extract(result_json,'$.tick_replay.realized_micro_usd'))='integer' AND json_extract(result_json,'$.tick_replay.realized_micro_usd') BETWEEN -9007199254740991 AND 9007199254740991 THEN json_extract(result_json,'$.tick_replay.realized_micro_usd') ELSE NULL END FROM experiments WHERE 1=1",
     );
     let mut parameters = Vec::<rusqlite::types::Value>::new();
     if let Some(before) = before {
@@ -1099,6 +1099,18 @@ async fn generated_search_control(
         ),
     }
 }
+async fn artifact_status(State(app): State<Arc<App>>) -> Response {
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match crate::result_artifact::inventory(&registry) {
+        Ok(value) => Json(value).into_response(),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "artifact inventory unavailable; preserve evidence and inspect registry",
+        ),
+    }
+}
 async fn resource_status() -> Response {
     match crate::resource::observe() {
         Ok(snapshot) => {
@@ -1434,6 +1446,7 @@ pub async fn serve_with_reviews(
         .route("/api/logout", post(logout))
         .route("/api/overview", get(overview))
         .route("/api/resources", get(resource_status))
+        .route("/api/artifacts", get(artifact_status))
         .route("/api/corpus-fleets", get(corpus_fleets))
         .route("/api/corpus-fleets/{id}", get(corpus_fleet_status))
         .route(

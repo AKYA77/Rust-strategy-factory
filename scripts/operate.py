@@ -32,6 +32,37 @@ def sync_directory(path):
         os.close(descriptor)
 
 
+def copy_artifact_store(source, destination):
+    # Offline restore: bounded copies, no symlink traversal or automatic evidence deletion.
+    if not source.exists() and not source.is_symlink():
+        return
+    if source.is_symlink() or not source.is_dir():
+        raise ValueError('artifact store must be a directory without symlink indirection')
+    destination.mkdir()
+    count, total = 0, 0
+    for entry in source.iterdir():
+        count += 1
+        if count > 4096 or entry.is_symlink() or not entry.is_file():
+            raise ValueError('invalid artifact store entry/count')
+        expected = entry.stat().st_size
+        total += expected
+        if expected > 64 * 1024 * 1024 or total > 1024 * 1024 * 1024:
+            raise ValueError('artifact restore byte budget exceeded')
+        with entry.open('rb') as incoming, (destination / entry.name).open('xb') as outgoing:
+            remaining = expected
+            while remaining:
+                block = incoming.read(min(65536, remaining))
+                if not block:
+                    raise ValueError('artifact shortened during restore')
+                outgoing.write(block)
+                remaining -= len(block)
+            if incoming.read(1):
+                raise ValueError('artifact grew during restore')
+            outgoing.flush()
+            os.fsync(outgoing.fileno())
+    sync_directory(destination)
+
+
 def directory(path):
     if path.is_symlink():
         raise ValueError(f'refusing symlink directory: {path}')
@@ -182,7 +213,7 @@ def main():
                           'previous': target(args.prefix, 'previous', required=False)}
             else:
                 source, destination = args.source.absolute(), args.destination.absolute()
-                output_paths = [Path(str(destination) + suffix) for suffix in ['', '-wal', '-shm']]
+                output_paths = [Path(str(destination) + suffix) for suffix in ['', '-wal', '-shm', '.artifacts']]
                 if not source.is_file() or any(p.exists() or p.is_symlink() for p in output_paths):
                     raise ValueError('source must exist and destination/sidecars must be new')
                 # Verify in private staging and atomically publish without replacing a path.
@@ -195,6 +226,7 @@ def main():
                                 raise ValueError('restore requires an offline backup without live sidecars')
                         expected = digest(source)
                         shutil.copyfile(source, staged)
+                        copy_artifact_store(Path(str(source) + '.artifacts'), Path(str(staged) + '.artifacts'))
                         if digest(staged) != expected or digest(source) != expected or any(Path(str(source) + suffix).exists() for suffix in ['-wal', '-shm']):
                             raise ValueError('backup source changed during restore')
                     else:
@@ -206,6 +238,14 @@ def main():
                             raise ValueError('staged registry still has live sidecars')
                     with staged.open('rb') as stream:
                         os.fsync(stream.fileno())
+                    staged_artifacts = Path(str(staged) + '.artifacts')
+                    if staged_artifacts.exists():
+                        published_artifacts = Path(str(destination) + '.artifacts')
+                        published_artifacts.mkdir()  # Exclusive; preserve a concurrently created path.
+                        for artifact in staged_artifacts.iterdir():
+                            os.link(artifact, published_artifacts / artifact.name)
+                        sync_directory(published_artifacts)
+                        sync_directory(destination.parent)
                     os.link(staged, destination)  # EEXIST preserves a concurrently created path.
                     sync_directory(destination.parent)
                 result = {'operation': args.command, 'destination': str(destination),

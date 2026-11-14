@@ -55,6 +55,7 @@ fn main() {
         "src/operator_config.rs",
         "src/corpus_fleet.rs",
         "src/storage.rs",
+        "src/result_artifact.rs",
     ] {
         println!("cargo:rerun-if-changed={path}");
         hasher.update(path.as_bytes());

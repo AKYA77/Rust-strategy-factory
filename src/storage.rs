@@ -118,7 +118,7 @@ impl Registry {
         let version: i64 = connection
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .map_err(db_err)?;
-        if version > 9 {
+        if version > 10 {
             return Err("database schema newer than supported".into());
         }
         if version == 0 {
@@ -248,6 +248,12 @@ impl Registry {
             .map_err(db_err)?;
         connection.execute_batch("CREATE TABLE IF NOT EXISTS replay_checkpoints(experiment_id TEXT NOT NULL REFERENCES experiments(id),cursor INTEGER NOT NULL CHECK(cursor>0),body BLOB NOT NULL CHECK(typeof(body)='blob' AND length(body)<=4194304),hash TEXT NOT NULL CHECK(length(hash)=64),PRIMARY KEY(experiment_id,cursor));CREATE TRIGGER IF NOT EXISTS replay_checkpoint_no_update BEFORE UPDATE ON replay_checkpoints BEGIN SELECT RAISE(ABORT,'checkpoint immutable');END;CREATE TRIGGER IF NOT EXISTS replay_checkpoint_no_delete BEFORE DELETE ON replay_checkpoints BEGIN SELECT RAISE(ABORT,'checkpoint immutable');END;").map_err(db_err)?;
         connection.execute_batch("CREATE TABLE IF NOT EXISTS corpus_controls(experiment_id TEXT PRIMARY KEY REFERENCES experiments(id),state TEXT NOT NULL CHECK(state IN ('running','paused','stopped')));").map_err(db_err)?;
+        crate::result_artifact::initialize(&connection)?;
+        if version < 10 {
+            connection
+                .execute_batch("PRAGMA user_version=10;")
+                .map_err(db_err)?;
+        }
         crate::corpus_search::initialize(&connection)?;
         crate::corpus_fleet::initialize(&connection)?;
         Ok(Self { connection })
@@ -597,11 +603,8 @@ impl Registry {
         outcome: Outcome,
         result: &serde_json::Value,
     ) -> Result<bool> {
-        let json = serde_json::to_string(result).map_err(|e| e.to_string())?;
-        if json.len() > 8 * 1024 * 1024 {
-            return Err("result exceeds metadata budget; use an immutable artifact".into());
-        }
-        let result_hash = hash(result)?;
+        let bytes = crate::result_artifact::serialize(result, crate::result_artifact::MAX_BYTES)?;
+        let result_hash = blake3::hash(&bytes).to_hex().to_string();
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -627,32 +630,53 @@ impl Registry {
         {
             crate::indexed_policy::guard(&tx)?;
         }
-        let (state, token, expiry, old_hash): (
+        let (state, token, expiry, old_hash, attempt): (
             String,
             Option<String>,
             Option<i64>,
             Option<String>,
+            i64,
         ) = tx
             .query_row(
-                "SELECT state,token,expires_ms,result_hash FROM experiments WHERE id=?1",
+                "SELECT state,token,expires_ms,result_hash,attempt FROM experiments WHERE id=?1",
                 [&lease.experiment_id],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
             )
             .map_err(db_err)?;
-        if token.as_deref() != Some(&lease.token) {
+        if token.as_deref() != Some(&lease.token) || attempt != lease.attempt {
             return Err("stale lease token".into());
         }
         if state == outcome.name() && old_hash.as_ref() == Some(&result_hash) {
+            read_result(&tx, &lease.experiment_id)?.ok_or("terminal receipt missing")?;
             return Ok(false);
         }
         if state != "running" || expiry.is_none_or(|e| e <= now_ms) {
             return Err("lease expired or experiment already terminal".into());
         }
+        let external = bytes.len() > crate::result_artifact::INLINE_BYTES;
+        let json = if external {
+            crate::result_artifact::publish(&tx, &result_hash, &bytes)?;
+            serde_json::to_string(&crate::result_artifact::marker(
+                result,
+                &result_hash,
+                bytes.len(),
+            ))
+            .map_err(|e| e.to_string())?
+        } else {
+            String::from_utf8(bytes.clone()).map_err(|e| e.to_string())?
+        };
         tx.execute(
             "UPDATE experiments SET state=?2,result_json=?3,result_hash=?4 WHERE id=?1",
             params![lease.experiment_id, outcome.name(), json, result_hash],
         )
         .map_err(db_err)?;
+        if external {
+            tx.execute(
+                "INSERT INTO result_artifacts(experiment_id,hash,bytes) VALUES(?1,?2,?3)",
+                params![lease.experiment_id, result_hash, bytes.len()],
+            )
+            .map_err(db_err)?;
+        }
         tx.execute(
             "INSERT INTO events(experiment_id,at_ms,action,attempt) VALUES (?1,?2,?3,?4)",
             params![lease.experiment_id, now_ms, outcome.name(), lease.attempt],
@@ -765,10 +789,19 @@ impl Registry {
         }
         crate::corpus_search::integrity(self)?;
         crate::corpus_fleet::integrity(self)?;
+        crate::result_artifact::integrity(&self.connection)?;
         Ok(())
     }
     /// SQLite online backup includes committed WAL contents. Destination must be new.
     pub fn backup(&self, destination: &Path) -> Result<()> {
+        let mut artifact_name = destination
+            .file_name()
+            .ok_or("backup filename missing")?
+            .to_os_string();
+        artifact_name.push(".artifacts");
+        if std::fs::symlink_metadata(destination.with_file_name(artifact_name)).is_ok() {
+            return Err("backup artifact destination must be new".into());
+        }
         let guard = std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -783,6 +816,8 @@ impl Registry {
                 .run_to_completion(128, Duration::from_millis(5), None)
                 .map_err(db_err)?;
         }
+        crate::result_artifact::initialize(&dest)?;
+        crate::result_artifact::copy_referenced(&self.connection, &mut dest)?;
         drop(dest);
         Registry::open(destination)?.integrity()
     }
@@ -790,7 +825,8 @@ impl Registry {
 fn read_result(connection: &Connection, id: &str) -> Result<Option<StoredResult>> {
     let row:Option<(String,String,String)>=connection.query_row("SELECT state,result_json,result_hash FROM experiments WHERE id=?1 AND result_json IS NOT NULL",[id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional().map_err(db_err)?;
     row.map(|(outcome, json, result_hash)| {
-        let result: serde_json::Value = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+        let stored: serde_json::Value = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+        let result = crate::result_artifact::resolve(connection, id, stored, &result_hash)?;
         if hash(&result)? != result_hash {
             return Err("result content hash corrupted".into());
         }
