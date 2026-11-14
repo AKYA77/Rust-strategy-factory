@@ -279,7 +279,7 @@ pub fn control(registry: &mut Registry, id: &str, state: &str) -> Result<()> {
     if !["running", "paused", "stopped"].contains(&state) {
         return Err("invalid fleet control".into());
     }
-    let n=registry.connection.execute("UPDATE corpus_fleets SET state=?2,idle_visits=CASE WHEN ?2='running' THEN 0 ELSE idle_visits END WHERE id=?1 AND state IN ('running','paused')",params![id,state]).map_err(|e|e.to_string())?;
+    let n=registry.connection.execute("UPDATE corpus_fleets SET token=CASE WHEN state=?2 AND ?2='running' THEN token ELSE NULL END,expires_ms=CASE WHEN state=?2 AND ?2='running' THEN expires_ms ELSE NULL END,state=?2,idle_visits=CASE WHEN ?2='running' THEN 0 ELSE idle_visits END WHERE id=?1 AND state IN ('running','paused')",params![id,state]).map_err(|e|e.to_string())?;
     if n != 1 {
         return Err("unknown or terminal fleet".into());
     }
@@ -611,7 +611,15 @@ mod tests {
         assert_eq!(status(&registry, &id).unwrap()["visits"], "0");
         control(&mut registry, &id, "paused").unwrap();
         assert!(publish(&mut registry, &second, 0, "blocked", false, None).is_err());
+        control(&mut registry, &id, "running").unwrap();
+        assert!(publish(&mut registry, &second, 0, "blocked", false, None).is_err());
+        let resumed = coordinator::claim(&mut registry, Kind::Fleet, &id, now + 102, 100)
+            .unwrap()
+            .unwrap();
         coordinator::release(&registry, &second).unwrap();
+        control(&mut registry, &id, "running").unwrap();
+        coordinator::fence(&registry.connection, &resumed, now + 103).unwrap();
+        coordinator::release(&registry, &resumed).unwrap();
         registry.integrity().unwrap();
         drop(registry);
         std::fs::remove_dir_all(root).unwrap();

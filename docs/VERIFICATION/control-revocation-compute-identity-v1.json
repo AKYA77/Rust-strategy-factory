@@ -1,0 +1,99 @@
+{
+  "class": "SYNTHETIC_DEVELOPMENT_REBUILD_ONLY",
+  "baseline_identity": "compute-blake3:6e1656f98e2803881c205a1d0c45b3302b2fbe728ab6ec110d4244bda324fd0a",
+  "checks": [
+    {
+      "path": "src/catalog.rs",
+      "original_sha256": "442346f5b54f51b19a525a78d098a4c990d26a5a5137a28ed5f70f4f6afcabb4",
+      "probe_sha256": "f4a1427608481142d01d2c2570bfe08fa8150d248e781926c1b9fa9554f3e7de",
+      "identity_changed": true,
+      "identity": "compute-blake3:d3036ddb3867d84d5206fa2f7aa8215638ea4bfc4a801a33c80aa541662bf5f0"
+    },
+    {
+      "path": "src/machine_evidence.rs",
+      "original_sha256": "de9880308735c1e1e76c52b974abed0f2fefb0ae50c43ba72f8c8b62568c2cd8",
+      "probe_sha256": "2e7f7220c36615aac42d7c83c1cecf45ade60617dd57d25b4d2958673be028f3",
+      "identity_changed": true,
+      "identity": "compute-blake3:7dfdfafb312c006ed28f24431f4febc03e1035eedec03827873b1669b8b76249"
+    },
+    {
+      "path": "src/review_authority.rs",
+      "original_sha256": "3bed8b89c4b8c378c48d9aad978d8a3a6ae9935d52f039dd3180b758264326b9",
+      "probe_sha256": "f3815075a3728a836f3ee43f333f627da06815cfe501424f7f14346130f20811",
+      "identity_changed": true,
+      "identity": "compute-blake3:4c8d5f4e9b38e9a591726ed3d8f971522456d23809e4f7ed4b61cd3b31f246ee"
+    },
+    {
+      "path": "src/data_approval.rs",
+      "original_sha256": "fd8b5629d9f1b0c16646e6e80702e533b1b537fcffad067bafbf4ca21ae62a22",
+      "probe_sha256": "ff386c3af8518ea3da54bd22a6d41ae4a81124b886ebac0134548e242be97418",
+      "identity_changed": true,
+      "identity": "compute-blake3:cbc04513138630386d40818aee816f9bd8247a6b0ebf49a9d5778993f42d3777"
+    },
+    {
+      "path": "src/corpus.rs",
+      "original_sha256": "ccc1008b8dde025546f040aa11a51948fc7e2d65625d9d5ea3886f6557f14c75",
+      "probe_sha256": "123ded74044f6d74c020c5bfe02771cfff8fe84a0dcc01948b4fcac0e2917a00",
+      "identity_changed": true,
+      "identity": "compute-blake3:c120cb616c5607274a5bbcab84553cddc8475db610cefee4d441850e6ab207ab"
+    },
+    {
+      "path": "src/resource.rs",
+      "original_sha256": "22c267f32bc733adabcf34f4c16b807950c731bd706dff69619a9963cc0080b6",
+      "probe_sha256": "fbb0a95d4ce42a0416ea6ef0dd08e764229b9b31d80d2db1c297a9358923845c",
+      "identity_changed": true,
+      "identity": "compute-blake3:0c2b3c21da470837db739208c9970e8e088ca21c58d9c3f52a04f01c692a2186"
+    },
+    {
+      "path": "src/corpus_search.rs",
+      "original_sha256": "c81a3580243385b805120a6ceade07bc9c7580b7f2339fdb08fbacd386d2cd52",
+      "probe_sha256": "d18f09d202b3c4f81494f5b14772eb99994ce7722f5349d825c5348959637717",
+      "identity_changed": true,
+      "identity": "compute-blake3:e9daa099781550814785f98cad526e06358b8cad3e7713545c1b4678cbf4147b"
+    },
+    {
+      "path": "src/corpus_fleet.rs",
+      "original_sha256": "9e6d128127502594f2d0af49d5624c6fbe384d3722c7a95c03228a9714d07bc1",
+      "probe_sha256": "84abaaa08b8d61f56a2ebd876236c7485ee5fc137651966eb601da38328f6820",
+      "identity_changed": true,
+      "identity": "compute-blake3:1f939e0910f5f42d571ce3cf6e84dc694723fb4980f78824f4ee928a19c246f2"
+    },
+    {
+      "path": "src/coordinator.rs",
+      "original_sha256": "1ee8a75224aad278487ac171bd6ea611650fc80200510ca355e1ee62befe708e",
+      "probe_sha256": "c3ec0569faef8d0a0acdbce0da76f34da6c54829b0c7d7ad25398f3daf8db0e0",
+      "identity_changed": true,
+      "identity": "compute-blake3:14e247aec187497e4c886c7621492efe19037005ad1aab0d2171a2604501f513"
+    },
+    {
+      "path": "src/operator_config.rs",
+      "original_sha256": "ba1a16d82181d70133f8a3c447309772d83dd7b565e02c367e1f11ac8fe8335c",
+      "probe_sha256": "bf8da3ef0633b2364e25ecea789dc8691ac287658ae7f54593a6627fdf6b90db",
+      "identity_changed": true,
+      "identity": "compute-blake3:798bf2612231a8641c891cf8c604c2679580383edb2158e09166192a5c955051"
+    },
+    {
+      "path": "src/result_artifact.rs",
+      "original_sha256": "a4cf0718155adc3a00c9488c0c4d9097f2cf0100004a483f5818a34de49d65ab",
+      "probe_sha256": "4db07da75172f40589a0f18b0dc3e11af3cf8428310940d291da179446416099",
+      "identity_changed": true,
+      "identity": "compute-blake3:1861d6f96f3d9b35059f9e334bce0e6e55badba0561277dad3dee66c9b3c6261"
+    },
+    {
+      "path": "src/disk.rs",
+      "original_sha256": "b3c480525843cc86e304526442868e75aa344868462dd138c6622bde73938250",
+      "probe_sha256": "7b2d2a2ebba5a85c71c14a015ee4d0273a52d6846f5029a3e5c0b534d8a2e783",
+      "identity_changed": true,
+      "identity": "compute-blake3:0261198983b97648118692a49aa211e4cbab8a11c1738628341dda3bb718da41"
+    },
+    {
+      "path": "web/style.css",
+      "original_sha256": "90225951cb43f460db599377af647d044b0e61bb613cbdde5d9e48f401d223a6",
+      "probe_sha256": "92edf5b2cc9421755aa30e83b0692444da25ba93a574597bdefae0c9559d054d",
+      "identity_changed": false,
+      "identity": "compute-blake3:6e1656f98e2803881c205a1d0c45b3302b2fbe728ab6ec110d4244bda324fd0a"
+    }
+  ],
+  "all_original_bytes_and_identity_restored": true,
+  "limitations": "Actual debug rebuild source fingerprint checks only; no market data, simulations, throughput or scientific eligibility. CSS changes stay outside compute identity. No background processes or external services."
+}

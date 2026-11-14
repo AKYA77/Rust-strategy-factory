@@ -491,7 +491,7 @@ pub fn control(registry: &mut Registry, id: &str, state: &str) -> Result<()> {
     let n = registry
         .connection
         .execute(
-            "UPDATE corpus_searches SET state=?2 WHERE id=?1 AND state IN ('running','paused')",
+            "UPDATE corpus_searches SET token=CASE WHEN state=?2 AND ?2='running' THEN token ELSE NULL END,expires_ms=CASE WHEN state=?2 AND ?2='running' THEN expires_ms ELSE NULL END,state=?2 WHERE id=?1 AND state IN ('running','paused')",
             params![id, state],
         )
         .map_err(|e| e.to_string())?;
@@ -771,7 +771,13 @@ mod tests {
         fence(&registry.connection, &replacement, now + 102).unwrap();
         control(&mut registry, &id, "paused").unwrap();
         assert!(fence(&registry.connection, &replacement, now + 102).is_err());
+        control(&mut registry, &id, "running").unwrap();
+        assert!(fence(&registry.connection, &replacement, now + 102).is_err());
+        let resumed = claim(&mut registry, &id, now + 102, 100).unwrap().unwrap();
         release(&registry, &replacement).unwrap();
+        control(&mut registry, &id, "running").unwrap();
+        fence(&registry.connection, &resumed, now + 103).unwrap();
+        release(&registry, &resumed).unwrap();
         assert_eq!(status(&registry, &id).unwrap()["lease_active"], false);
         registry.integrity().unwrap();
         drop(registry);
