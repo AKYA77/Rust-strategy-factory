@@ -808,6 +808,22 @@ pub struct CorpusBudget {
     pub feature_cells: usize,
     pub max_receipts: usize,
 }
+pub(crate) fn corpus_configuration_hash(
+    source_identity: &str,
+    strategy: &Strategy,
+    costs: &Costs,
+    budget: CorpusBudget,
+    revision: &str,
+) -> Result<String> {
+    crate::data::hash(&(
+        "corpus-run-v1",
+        source_identity,
+        strategy.canonical()?,
+        costs,
+        budget,
+        revision,
+    ))
+}
 /// Freeze all corpus execution inputs before acquiring a registry lease.
 pub fn corpus_key(
     base: &std::path::Path,
@@ -850,14 +866,13 @@ pub fn corpus_key(
         engine_version: crate::ENGINE_VERSION.into(),
         protocol_hash: "synthetic-corpus-training-v1".into(),
         code_revision: crate::research::compute_revision()?,
-        configuration_hash: crate::data::hash(&(
-            "corpus-run-v1",
-            spec.identity()?,
-            strategy,
+        configuration_hash: corpus_configuration_hash(
+            &spec.identity()?,
+            &strategy,
             costs,
             budget,
-            crate::research::compute_revision()?,
-        ))?,
+            &crate::research::compute_revision()?,
+        )?,
         stage: crate::storage::Stage::TickVerification,
     })
 }

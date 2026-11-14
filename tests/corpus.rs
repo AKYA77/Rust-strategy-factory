@@ -1340,3 +1340,425 @@ fn corpus_resource_pressure_exits_before_claim_and_resumes_after_policy_change()
     assert!(status["available_parallelism"].as_u64().unwrap() > 0);
     assert!(status["process_rss_bytes"].as_u64().unwrap() > 0);
 }
+
+#[test]
+fn durable_corpus_search_reopens_drains_then_replenishes_and_matches_scalar_receipts() {
+    use rust_strategy_factory::{
+        corpus_search::{self, SearchRun},
+        storage::Registry,
+        tick_engine::{self, CorpusBatchLimits, CorpusBudget, Costs},
+    };
+    let f = Fixture::new("durable-search", "EURUSD", 7);
+    let db = f.root.join("search.sqlite");
+    let costs = Costs::default();
+    let budget = CorpusBudget {
+        max_candles: 100,
+        feature_cells: 10000,
+        max_receipts: 1000,
+    };
+    let limits = CorpusBatchLimits {
+        workers: 2,
+        max_parallel_candles: 200,
+        max_parallel_feature_cells: 20000,
+        max_parallel_receipts: 2000,
+        max_new_chunks: 1,
+        lease_ms: 60000,
+    };
+    let run = || SearchRun {
+        base: &f.root,
+        specification: &f.spec,
+        costs: &costs,
+        budget,
+        seed: 42,
+        maximum_candidates: 4,
+        queue_width: 2,
+    };
+    let first = corpus_search::step(&db, run(), limits).unwrap();
+    let id = first.status["search_id"].as_str().unwrap().to_owned();
+    assert_eq!(first.status["generated_slots"], "2");
+    assert_eq!(first.status["slot_states"]["pending"], 2);
+    assert_eq!(first.status["lease_active"], false);
+    let mut registry = Registry::open(&db).unwrap();
+    registry.integrity().unwrap();
+    corpus_search::control(&mut registry, &id, "paused").unwrap();
+    drop(registry);
+    let held = corpus_search::step(&db, run(), limits).unwrap();
+    assert_eq!(held.kind, "held");
+    assert_eq!(held.status["generated_slots"], "2");
+    let mut registry = Registry::open(&db).unwrap();
+    corpus_search::control(&mut registry, &id, "running").unwrap();
+    drop(registry);
+    let mut exhausted = false;
+    for _ in 0..30 {
+        let step = corpus_search::step(&db, run(), limits).unwrap();
+        if step.kind == "exhausted" {
+            assert_eq!(step.status["generated_slots"], "4");
+            assert_eq!(step.status["slot_states"]["completed"], 4);
+            assert_eq!(step.status["qualification_granted"], false);
+            exhausted = true;
+            break;
+        }
+    }
+    assert!(exhausted);
+    let registry = Registry::open(&db).unwrap();
+    let attempts = registry.counts().unwrap().attempts;
+    for slot in 0..4 {
+        let (_, strategy) = rust_strategy_factory::research::candidate_at(slot, 42).unwrap();
+        let key = tick_engine::corpus_key(&f.root, &f.spec, &strategy, &costs, budget).unwrap();
+        let result = registry.result(&key.identity().unwrap()).unwrap().unwrap();
+        assert_eq!(
+            result.result["tick_replay"],
+            serde_json::to_value(
+                tick_engine::replay_corpus(&f.root, &f.spec, &strategy, &costs, budget).unwrap()
+            )
+            .unwrap()
+        );
+    }
+    registry.integrity().unwrap();
+    drop(registry);
+    assert_eq!(
+        corpus_search::step(&db, run(), limits).unwrap().kind,
+        "exhausted"
+    );
+    assert_eq!(
+        Registry::open(&db).unwrap().counts().unwrap().attempts,
+        attempts
+    );
+}
+#[test]
+fn durable_search_backup_and_terminal_controls_preserve_original_queue() {
+    use rust_strategy_factory::{
+        corpus_search::{self, SearchRun},
+        storage::Registry,
+        tick_engine::{CorpusBatchLimits, CorpusBudget, Costs},
+    };
+    let f = Fixture::new("search-backup", "EURUSD", 7);
+    let db = f.root.join("original.sqlite");
+    let backup = f.root.join("backup.sqlite");
+    let costs = Costs::default();
+    let budget = CorpusBudget {
+        max_candles: 100,
+        feature_cells: 10000,
+        max_receipts: 1000,
+    };
+    let limits = CorpusBatchLimits {
+        workers: 2,
+        max_parallel_candles: 200,
+        max_parallel_feature_cells: 20000,
+        max_parallel_receipts: 2000,
+        max_new_chunks: 1,
+        lease_ms: 60000,
+    };
+    let run = || SearchRun {
+        base: &f.root,
+        specification: &f.spec,
+        costs: &costs,
+        budget,
+        seed: 42,
+        maximum_candidates: 2,
+        queue_width: 2,
+    };
+    let first = corpus_search::step(&db, run(), limits).unwrap();
+    let id = first.status["search_id"].as_str().unwrap();
+    let mut registry = Registry::open(&db).unwrap();
+    corpus_search::control(&mut registry, id, "paused").unwrap();
+    registry.backup(&backup).unwrap();
+    let mut restored = Registry::open(&backup).unwrap();
+    assert_eq!(
+        corpus_search::status(&restored, id).unwrap()["state"],
+        "paused"
+    );
+    corpus_search::control(&mut restored, id, "running").unwrap();
+    drop(restored);
+    let mut done = false;
+    for _ in 0..10 {
+        if corpus_search::step(&backup, run(), limits).unwrap().kind == "exhausted" {
+            done = true;
+            break;
+        }
+    }
+    assert!(done);
+    assert_eq!(
+        corpus_search::status(&registry, id).unwrap()["slot_states"]["pending"],
+        2
+    );
+    corpus_search::control(&mut registry, id, "stopped").unwrap();
+    assert!(corpus_search::control(&mut registry, id, "running").is_err());
+    assert_eq!(
+        corpus_search::step(&db, run(), limits).unwrap().kind,
+        "held"
+    );
+    registry.integrity().unwrap();
+}
+#[test]
+fn corpus_search_worker_errors_pause_without_becoming_completed_evidence() {
+    use rust_strategy_factory::{
+        corpus_search::{self, SearchRun},
+        storage::Registry,
+        tick_engine::{CorpusBatchLimits, CorpusBudget, Costs},
+    };
+    let f = Fixture::new("search-errors", "EURUSD", 7);
+    let db = f.root.join("errors.sqlite");
+    let costs = Costs::default();
+    let progress = corpus_search::step(
+        &db,
+        SearchRun {
+            base: &f.root,
+            specification: &f.spec,
+            costs: &costs,
+            budget: CorpusBudget {
+                max_candles: 100,
+                feature_cells: 1,
+                max_receipts: 1000,
+            },
+            seed: 42,
+            maximum_candidates: 2,
+            queue_width: 2,
+        },
+        CorpusBatchLimits {
+            workers: 2,
+            max_parallel_candles: 200,
+            max_parallel_feature_cells: 2,
+            max_parallel_receipts: 2000,
+            max_new_chunks: 1,
+            lease_ms: 60000,
+        },
+    )
+    .unwrap();
+    assert_eq!(progress.status["state"], "paused");
+    assert_eq!(progress.status["slot_states"]["error"], 2);
+    assert_eq!(progress.status["qualification_granted"], false);
+    assert_eq!(progress.status["lease_active"], false);
+    Registry::open(&db).unwrap().integrity().unwrap();
+}
+
+fn corpus_search_fixture(f: &Fixture) -> std::path::PathBuf {
+    let config = corpus_batch_fixture(f);
+    let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&config).unwrap()).unwrap();
+    value.as_object_mut().unwrap().remove("strategies");
+    value["seed"] = serde_json::json!(42);
+    value["maximum_candidates"] = serde_json::json!(4);
+    value["queue_width"] = serde_json::json!(2);
+    let path = f.root.join("search.json");
+    fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+    path
+}
+#[test]
+fn corpus_search_cli_reopens_controls_replenishes_and_exhausts_without_extra_attempts() {
+    let f = Fixture::new("search-cli", "EURUSD", 7);
+    let config = corpus_search_fixture(&f);
+    let db = f.root.join("search.sqlite");
+    let call = |rounds: &str| {
+        let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args([
+                "corpus-search",
+                config.to_str().unwrap(),
+                db.to_str().unwrap(),
+                rounds,
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()
+    };
+    let mut pressure: serde_json::Value =
+        serde_json::from_slice(&fs::read(&config).unwrap()).unwrap();
+    pressure["resource_guard"] =
+        serde_json::json!({"maximum_process_rss_bytes":1,"minimum_host_available_memory_bytes":0});
+    fs::write(&config, serde_json::to_vec(&pressure).unwrap()).unwrap();
+    let blocked = call("100");
+    assert_eq!(blocked["stop_reason"], "resource-pressure");
+    assert_eq!(blocked["rounds"], 0);
+    assert!(!db.exists());
+    pressure.as_object_mut().unwrap().remove("resource_guard");
+    fs::write(&config, serde_json::to_vec(&pressure).unwrap()).unwrap();
+    let first = call("1");
+    let id = first["last"]["status"]["search_id"].as_str().unwrap();
+    assert_eq!(first["last"]["status"]["generated_slots"], "2");
+    assert_eq!(first["stop_reason"], "round-limit");
+    let control = |state: &str| {
+        let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args(["corpus-search-control", db.to_str().unwrap(), id, state])
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+    };
+    control("paused");
+    let held = call("100");
+    assert_eq!(held["stop_reason"], "held");
+    assert_eq!(held["rounds"], 1);
+    control("running");
+    let done = call("100");
+    assert_eq!(done["stop_reason"], "exhausted");
+    assert_eq!(done["last"]["status"]["slot_states"]["completed"], 4);
+    let attempts = rust_strategy_factory::storage::Registry::open(&db)
+        .unwrap()
+        .counts()
+        .unwrap()
+        .attempts;
+    assert_eq!(call("100")["rounds"], 1);
+    assert_eq!(
+        rust_strategy_factory::storage::Registry::open(&db)
+            .unwrap()
+            .counts()
+            .unwrap()
+            .attempts,
+        attempts
+    );
+    let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args(["corpus-search-status", db.to_str().unwrap(), id])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()["state"],
+        "exhausted"
+    );
+}
+#[test]
+#[cfg(unix)]
+fn killed_search_process_waiting_for_writer_preserves_generated_queue_and_checkpoints() {
+    use rust_strategy_factory::storage::Registry;
+    use std::io::BufRead;
+    use std::os::unix::process::ExitStatusExt;
+    let f = Fixture::new("search-kill", "EURUSD", 7);
+    let config = corpus_search_fixture(&f);
+    let db = f.root.join("kill.sqlite");
+    let args = [
+        "corpus-search",
+        config.to_str().unwrap(),
+        db.to_str().unwrap(),
+        "1",
+    ];
+    let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let first: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let id = first["last"]["status"]["search_id"].as_str().unwrap();
+    let before =
+        rust_strategy_factory::corpus_search::status(&Registry::open(&db).unwrap(), id).unwrap();
+    let lock = rusqlite::Connection::open(&db).unwrap();
+    lock.execute_batch("BEGIN IMMEDIATE").unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args(args)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut ready = String::new();
+    std::io::BufReader::new(child.stderr.take().unwrap())
+        .read_line(&mut ready)
+        .unwrap();
+    assert!(ready.contains("corpus search ready"));
+    child.kill().unwrap();
+    assert_eq!(child.wait().unwrap().signal(), Some(9));
+    lock.execute_batch("ROLLBACK").unwrap();
+    drop(lock);
+    let registry = Registry::open(&db).unwrap();
+    assert_eq!(
+        rust_strategy_factory::corpus_search::status(&registry, id).unwrap(),
+        before
+    );
+    registry.integrity().unwrap();
+    drop(registry);
+    let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-search",
+            config.to_str().unwrap(),
+            db.to_str().unwrap(),
+            "100",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()["stop_reason"],
+        "exhausted"
+    );
+}
+#[test]
+fn oversized_operator_configs_refuse_before_registry_creation() {
+    let f = Fixture::new("config-budget", "EURUSD", 7);
+    let config = corpus_search_fixture(&f);
+    let mut bytes = fs::read(&config).unwrap();
+    bytes.extend(std::iter::repeat_n(b' ', 1024 * 1024));
+    fs::write(&config, bytes).unwrap();
+    let db = f.root.join("absent.sqlite");
+    let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-search",
+            config.to_str().unwrap(),
+            db.to_str().unwrap(),
+            "1",
+        ])
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("1 MiB"));
+    assert!(!db.exists());
+}
+
+#[test]
+#[cfg(unix)]
+fn generated_search_sigterm_exits_at_a_round_boundary_and_restarts() {
+    use rust_strategy_factory::storage::Registry;
+    use std::io::BufRead;
+    let f = Fixture::new("search-signal", "EURUSD", 7);
+    let config = corpus_search_fixture(&f);
+    let db = f.root.join("signal.sqlite");
+    drop(Registry::open(&db).unwrap());
+    let lock = rusqlite::Connection::open(&db).unwrap();
+    lock.execute_batch("BEGIN IMMEDIATE").unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-search",
+            config.to_str().unwrap(),
+            db.to_str().unwrap(),
+            "10000",
+        ])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut ready = String::new();
+    std::io::BufReader::new(child.stderr.take().unwrap())
+        .read_line(&mut ready)
+        .unwrap();
+    assert!(ready.contains("corpus search ready"));
+    assert!(
+        Command::new("kill")
+            .args(["-TERM", &child.id().to_string()])
+            .status()
+            .unwrap()
+            .success()
+    );
+    std::thread::sleep(std::time::Duration::from_millis(20));
+    lock.execute_batch("ROLLBACK").unwrap();
+    drop(lock);
+    let output = child.wait_with_output().unwrap();
+    assert!(output.status.success());
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["stop_reason"], "signal");
+    assert!(report["rounds"].as_u64().unwrap() <= 1);
+    Registry::open(&db).unwrap().integrity().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-search",
+            config.to_str().unwrap(),
+            db.to_str().unwrap(),
+            "100",
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap()["stop_reason"],
+        "exhausted"
+    );
+}

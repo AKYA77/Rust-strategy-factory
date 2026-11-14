@@ -70,3 +70,5 @@ pub mod review_authority;
 pub mod corpus;
 
 pub mod resource;
+
+pub mod corpus_search;

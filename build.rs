@@ -50,6 +50,7 @@ fn main() {
         "src/regimes.rs",
         "src/research.rs",
         "src/resource.rs",
+        "src/corpus_search.rs",
         "src/storage.rs",
     ] {
         println!("cargo:rerun-if-changed={path}");

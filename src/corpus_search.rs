@@ -1,0 +1,733 @@
+//! Bounded synthetic corpus candidate generation and fenced durable queue progress.
+use crate::{
+    Result, data, research,
+    storage::{ExperimentKey, Registry},
+    strategies::Strategy,
+    tick_engine::{self, CorpusBatchLimits, CorpusBudget, CorpusProgress, CorpusRun, Costs},
+};
+use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use serde::{Deserialize, Serialize};
+use std::path::Path;
+const VERSION: &str = "synthetic-corpus-search-v1";
+const GENERATOR: &str = "candidate-at-regions-v1";
+pub(crate) fn initialize(connection: &Connection) -> Result<()> {
+    connection.execute_batch("CREATE TABLE IF NOT EXISTS corpus_searches(id TEXT PRIMARY KEY,configuration TEXT NOT NULL,cursor INTEGER NOT NULL DEFAULT 0 CHECK(cursor>=0),state TEXT NOT NULL DEFAULT 'running' CHECK(state IN ('running','paused','stopped','exhausted')),token TEXT,expires_ms INTEGER,attempt INTEGER NOT NULL DEFAULT 0 CHECK(attempt>=0));
+    CREATE TABLE IF NOT EXISTS corpus_search_jobs(search_id TEXT NOT NULL REFERENCES corpus_searches(id),slot INTEGER NOT NULL CHECK(slot>=0),body TEXT NOT NULL,hash TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('queued','pending','completed','terminal','error')),error TEXT,PRIMARY KEY(search_id,slot));
+    CREATE TRIGGER IF NOT EXISTS corpus_search_definition_immutable BEFORE UPDATE OF id,configuration ON corpus_searches BEGIN SELECT RAISE(ABORT,'search definition immutable');END;
+    CREATE TRIGGER IF NOT EXISTS corpus_search_job_immutable BEFORE UPDATE OF search_id,slot,body,hash ON corpus_search_jobs BEGIN SELECT RAISE(ABORT,'search job immutable');END;
+    CREATE TRIGGER IF NOT EXISTS corpus_search_no_delete BEFORE DELETE ON corpus_searches BEGIN SELECT RAISE(ABORT,'search immutable');END;
+    CREATE TRIGGER IF NOT EXISTS corpus_search_job_no_delete BEFORE DELETE ON corpus_search_jobs BEGIN SELECT RAISE(ABORT,'search job immutable');END;").map_err(|e|e.to_string())
+}
+pub struct SearchRun<'a> {
+    pub base: &'a Path,
+    pub specification: &'a crate::corpus::Specification,
+    pub costs: &'a Costs,
+    pub budget: CorpusBudget,
+    pub seed: u64,
+    pub maximum_candidates: usize,
+    pub queue_width: usize,
+}
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Configuration {
+    version: String,
+    generator: String,
+    seed: u64,
+    maximum_candidates: usize,
+    queue_width: usize,
+    source_identity: String,
+    source_key: ExperimentKey,
+    costs: Costs,
+    budget: CorpusBudget,
+}
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Definition {
+    slot: usize,
+    family: String,
+    strategy: Strategy,
+    key: ExperimentKey,
+}
+struct Job {
+    definition: Definition,
+    state: String,
+    error: Option<String>,
+}
+#[derive(Clone)]
+struct Lease {
+    id: String,
+    token: String,
+    attempt: i64,
+}
+#[derive(Serialize)]
+pub struct Step {
+    pub kind: String,
+    pub status: serde_json::Value,
+}
+fn configuration(run: &SearchRun<'_>) -> Result<Configuration> {
+    if !(1..=4096).contains(&run.maximum_candidates) || !(1..=32).contains(&run.queue_width) {
+        return Err("invalid corpus search candidate/queue limits".into());
+    }
+    let (_, first) = research::candidate_at(0, run.seed)?;
+    Ok(Configuration {
+        version: VERSION.into(),
+        generator: GENERATOR.into(),
+        seed: run.seed,
+        maximum_candidates: run.maximum_candidates,
+        queue_width: run.queue_width,
+        source_identity: run.specification.identity()?,
+        source_key: tick_engine::corpus_key(
+            run.base,
+            run.specification,
+            &first,
+            run.costs,
+            run.budget,
+        )?,
+        costs: run.costs.clone(),
+        budget: run.budget,
+    })
+}
+fn frozen_key(config: &Configuration, strategy: &Strategy) -> Result<ExperimentKey> {
+    let mut key = config.source_key.clone();
+    key.concept_hash = strategy.identity()?;
+    key.configuration_hash = tick_engine::corpus_configuration_hash(
+        &config.source_identity,
+        strategy,
+        &config.costs,
+        config.budget,
+        &config.source_key.code_revision,
+    )?;
+    Ok(key)
+}
+fn definition(config: &Configuration, slot: usize) -> Result<Definition> {
+    let (family, strategy) = research::candidate_at(slot as u64, config.seed)?;
+    let key = frozen_key(config, &strategy)?;
+    Ok(Definition {
+        slot,
+        family: format!("{family:?}"),
+        strategy,
+        key,
+    })
+}
+fn register(registry: &mut Registry, config: &Configuration) -> Result<String> {
+    let id = data::hash(config)?;
+    let body = serde_json::to_string(config).map_err(|e| e.to_string())?;
+    let exists: bool = registry
+        .connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM corpus_searches WHERE id=?1)",
+            [&id],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if !exists {
+        for slot in 0..config.maximum_candidates {
+            research::candidate_at(slot as u64, config.seed)
+                .map_err(|error| format!("frozen candidate slot {slot} refused: {error}"))?;
+        }
+    }
+    let tx = registry
+        .connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|e| e.to_string())?;
+    let previous: Option<String> = tx
+        .query_row(
+            "SELECT configuration FROM corpus_searches WHERE id=?1",
+            [&id],
+            |r| r.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+    if let Some(previous) = previous {
+        if previous != body {
+            return Err("immutable corpus search configuration mismatch".into());
+        }
+    } else {
+        let count: i64 = tx
+            .query_row("SELECT count(*) FROM corpus_searches", [], |r| r.get(0))
+            .map_err(|e| e.to_string())?;
+        if count >= 64 {
+            return Err("corpus search count quota reached".into());
+        }
+        tx.execute(
+            "INSERT INTO corpus_searches(id,configuration) VALUES(?1,?2)",
+            params![id, body],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(id)
+}
+fn claim(registry: &mut Registry, id: &str, now: i64, duration: i64) -> Result<Option<Lease>> {
+    let expiry = now.checked_add(duration).ok_or("search lease overflow")?;
+    let tx = registry
+        .connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|e| e.to_string())?;
+    let (state, old, until, attempt): (String, Option<String>, Option<i64>, i64) = tx
+        .query_row(
+            "SELECT state,token,expires_ms,attempt FROM corpus_searches WHERE id=?1",
+            [id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+        )
+        .map_err(|e| e.to_string())?;
+    if state != "running" || old.is_some() && until.is_some_and(|t| t > now) {
+        return Ok(None);
+    }
+    let attempt = attempt.checked_add(1).ok_or("search attempt overflow")?;
+    let token: String = tx
+        .query_row("SELECT lower(hex(randomblob(32)))", [], |r| r.get(0))
+        .map_err(|e| e.to_string())?;
+    tx.execute(
+        "UPDATE corpus_searches SET token=?2,expires_ms=?3,attempt=?4 WHERE id=?1",
+        params![id, token, expiry, attempt],
+    )
+    .map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(Some(Lease {
+        id: id.into(),
+        token,
+        attempt,
+    }))
+}
+fn fence(connection: &Connection, lease: &Lease, now: i64) -> Result<()> {
+    let valid:bool=connection.query_row("SELECT EXISTS(SELECT 1 FROM corpus_searches WHERE id=?1 AND token=?2 AND attempt=?3 AND expires_ms>?4 AND state='running')",params![lease.id,lease.token,lease.attempt,now],|r|r.get(0)).map_err(|e|e.to_string())?;
+    if !valid {
+        return Err("corpus search coordinator expired, controlled or fenced".into());
+    }
+    Ok(())
+}
+fn release(registry: &Registry, lease: &Lease) -> Result<()> {
+    registry.connection.execute("UPDATE corpus_searches SET token=NULL,expires_ms=NULL WHERE id=?1 AND token=?2 AND attempt=?3",params![lease.id,lease.token,lease.attempt]).map_err(|e|e.to_string())?;
+    Ok(())
+}
+type SearchRow = (String, usize, String, i64, Option<i64>);
+type SearchSnapshot = (Configuration, usize, String, i64, Option<i64>, Vec<Job>);
+fn read(connection: &Connection, id: &str) -> Result<SearchSnapshot> {
+    let (body, cursor, state, attempt, expiry): SearchRow = connection
+        .query_row(
+            "SELECT configuration,cursor,state,attempt,expires_ms FROM corpus_searches WHERE id=?1",
+            [id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+        )
+        .map_err(|e| e.to_string())?;
+    if body.len() > 1024 * 1024 {
+        return Err("corpus search definition budget exceeded".into());
+    }
+    let config: Configuration = serde_json::from_str(&body).map_err(|e| e.to_string())?;
+    if data::hash(&config)? != id
+        || config.version != VERSION
+        || config.generator != GENERATOR
+        || !(1..=4096).contains(&config.maximum_candidates)
+        || !(1..=32).contains(&config.queue_width)
+        || cursor > config.maximum_candidates
+    {
+        return Err("corpus search identity/cursor integrity failure".into());
+    }
+    config.source_key.identity()?;
+    config.costs.validate()?;
+    if config.source_key.cost_hash != data::hash(&config.costs)? {
+        return Err("search frozen cost identity mismatch".into());
+    }
+    let mut q=connection.prepare("SELECT slot,body,hash,state,error FROM corpus_search_jobs WHERE search_id=?1 ORDER BY slot").map_err(|e|e.to_string())?;
+    let rows = q
+        .query_map([id], |r| {
+            Ok((
+                r.get::<_, usize>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+                r.get::<_, Option<String>>(4)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+    let mut jobs = Vec::new();
+    for row in rows {
+        let (slot, body, hash, state, error) = row.map_err(|e| e.to_string())?;
+        if body.len() > 65536 || error.as_ref().is_some_and(|s| s.chars().count() > 512) {
+            return Err("corpus search job metadata budget exceeded".into());
+        }
+        let definition: Definition = serde_json::from_str(&body).map_err(|e| e.to_string())?;
+        definition.key.identity()?;
+        if slot != jobs.len()
+            || definition.slot != slot
+            || data::hash(&definition)? != hash
+            || definition.strategy.identity()? != definition.key.concept_hash
+            || data::hash(&definition.key)?
+                != data::hash(&frozen_key(&config, &definition.strategy)?)?
+            || definition.key.protocol_hash != "synthetic-corpus-training-v1"
+        {
+            return Err("corpus search job integrity failure".into());
+        }
+        if state == "completed" {
+            let completed: bool = connection
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM experiments WHERE id=?1 AND state='completed')",
+                    [definition.key.identity()?],
+                    |r| r.get(0),
+                )
+                .map_err(|e| e.to_string())?;
+            if !completed {
+                return Err("search completed slot lacks committed experiment".into());
+            }
+        }
+        jobs.push(Job {
+            definition,
+            state,
+            error,
+        });
+    }
+    if jobs.len() != cursor {
+        return Err("corpus search queue/cursor mismatch".into());
+    }
+    Ok((config, cursor, state, attempt, expiry, jobs))
+}
+pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
+    let tx = registry
+        .connection
+        .unchecked_transaction()
+        .map_err(|e| e.to_string())?;
+    let (config, cursor, state, attempt, expiry, jobs) = read(&tx, id)?;
+    let mut counts = std::collections::BTreeMap::<String, usize>::new();
+    for job in &jobs {
+        *counts.entry(job.state.clone()).or_default() += 1;
+    }
+    let recent:Vec<_>=jobs.iter().rev().take(32).map(|j|serde_json::json!({"candidate_index":j.definition.slot.to_string(),"family":j.definition.family,"experiment_id":j.definition.key.identity().ok(),"state":j.state,"error":j.error})).collect();
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(
+        serde_json::json!({"search_id":id,"state":state,"generated_slots":cursor.to_string(),"maximum_candidates":config.maximum_candidates.to_string(),"attempt":attempt.to_string(),"lease_active":expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"slot_states":counts,"recent_slots":recent,"qualification_granted":false,"limitations":"Generated slots are not new tick simulations; canonical duplicates can share immutable experiment receipts. Synthetic USD training search only."}),
+    )
+}
+pub(crate) fn integrity(registry: &Registry) -> Result<()> {
+    let tx = registry
+        .connection
+        .unchecked_transaction()
+        .map_err(|e| e.to_string())?;
+    let ids = {
+        let mut q = tx
+            .prepare("SELECT id FROM corpus_searches")
+            .map_err(|e| e.to_string())?;
+        q.query_map([], |r| r.get::<_, String>(0))
+            .map_err(|e| e.to_string())?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?
+    };
+    let (jobs, bytes): (usize, usize) = tx
+        .query_row(
+            "SELECT count(*),coalesce(sum(length(CAST(body AS BLOB))),0) FROM corpus_search_jobs",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .map_err(|e| e.to_string())?;
+    if ids.len() > 64 || jobs > 4096 || bytes > 16 * 1024 * 1024 {
+        return Err("corpus search persisted quotas exceeded".into());
+    }
+    for id in ids {
+        read(&tx, &id)?;
+    }
+    tx.commit().map_err(|e| e.to_string())
+}
+pub fn control(registry: &mut Registry, id: &str, state: &str) -> Result<()> {
+    if !["running", "paused", "stopped"].contains(&state) {
+        return Err("invalid corpus search control".into());
+    }
+    let n = registry
+        .connection
+        .execute(
+            "UPDATE corpus_searches SET state=?2 WHERE id=?1 AND state IN ('running','paused')",
+            params![id, state],
+        )
+        .map_err(|e| e.to_string())?;
+    if n != 1 {
+        return Err("unknown or terminal corpus search".into());
+    }
+    Ok(())
+}
+fn admit(registry: &mut Registry, lease: &Lease, config: &Configuration) -> Result<()> {
+    let (_, cursor, _, _, _, jobs) = read(&registry.connection, &lease.id)?;
+    if jobs
+        .iter()
+        .any(|j| j.state == "queued" || j.state == "pending")
+        || cursor >= config.maximum_candidates
+    {
+        return Ok(());
+    }
+    let end = (cursor + config.queue_width).min(config.maximum_candidates);
+    let mut incoming = Vec::new();
+    let mut bytes = 0usize;
+    for slot in cursor..end {
+        let definition = definition(config, slot)?;
+        let body = serde_json::to_string(&definition).map_err(|e| e.to_string())?;
+        if body.len() > 65536 {
+            return Err("corpus search job exceeds metadata cap".into());
+        }
+        bytes += body.len();
+        incoming.push((slot, body, data::hash(&definition)?));
+    }
+    let tx = registry
+        .connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|e| e.to_string())?;
+    fence(&tx, lease, chrono::Utc::now().timestamp_millis())?;
+    let (count, size): (usize, usize) = tx
+        .query_row(
+            "SELECT count(*),coalesce(sum(length(CAST(body AS BLOB))),0) FROM corpus_search_jobs",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .map_err(|e| e.to_string())?;
+    if count + incoming.len() > 4096 || size + bytes > 16 * 1024 * 1024 {
+        return Err("durable corpus queue quota reached".into());
+    }
+    for (slot, body, hash) in incoming {
+        tx.execute("INSERT INTO corpus_search_jobs(search_id,slot,body,hash,state) VALUES(?1,?2,?3,?4,'queued')",params![lease.id,slot,body,hash]).map_err(|e|e.to_string())?;
+    }
+    let n = tx
+        .execute(
+            "UPDATE corpus_searches SET cursor=?2 WHERE id=?1 AND cursor=?3",
+            params![lease.id, end, cursor],
+        )
+        .map_err(|e| e.to_string())?;
+    if n != 1 {
+        return Err("search admission cursor changed".into());
+    }
+    tx.commit().map_err(|e| e.to_string())
+}
+/// Recover an admitted batch before generating another bounded candidate region.
+pub fn step(database: &Path, run: SearchRun<'_>, limits: CorpusBatchLimits) -> Result<Step> {
+    if !(1..=16).contains(&limits.workers)
+        || !(1..=64).contains(&limits.max_new_chunks)
+        || !(1..=86_400_000).contains(&limits.lease_ms)
+    {
+        return Err("invalid corpus search worker/step/lease limits".into());
+    }
+    let config = configuration(&run)?;
+    let mut registry = Registry::open(database)?;
+    let id = register(&mut registry, &config)?;
+    let Some(lease) = claim(
+        &mut registry,
+        &id,
+        chrono::Utc::now().timestamp_millis(),
+        limits.lease_ms,
+    )?
+    else {
+        let status = status(&registry, &id)?;
+        let kind = if status["state"] == "running" {
+            "busy"
+        } else if status["state"] == "exhausted" {
+            "exhausted"
+        } else {
+            "held"
+        };
+        return Ok(Step {
+            kind: kind.into(),
+            status,
+        });
+    };
+    let result = (|| -> Result<Step> {
+        admit(&mut registry, &lease, &config)?;
+        fence(
+            &registry.connection,
+            &lease,
+            chrono::Utc::now().timestamp_millis(),
+        )?;
+        let (_, _, _, _, _, jobs) = read(&registry.connection, &id)?;
+        let pending: Vec<_> = jobs
+            .iter()
+            .filter(|j| j.state == "queued" || j.state == "pending")
+            .collect();
+        let mut unique = Vec::<&Job>::new();
+        let mut mapping = std::collections::BTreeMap::new();
+        for job in &pending {
+            if data::hash(&job.definition)?
+                != data::hash(&definition(&config, job.definition.slot)?)?
+            {
+                return Err("search slot no longer matches frozen generator".into());
+            }
+            let key = job.definition.key.identity()?;
+            if let std::collections::btree_map::Entry::Vacant(entry) = mapping.entry(key) {
+                entry.insert(unique.len());
+                unique.push(job);
+            }
+        }
+        let mut blocked = false;
+        let updates = if unique.is_empty() {
+            Vec::new()
+        } else {
+            let runs: Vec<_> = unique
+                .iter()
+                .map(|j| CorpusRun {
+                    base: run.base,
+                    spec: run.specification,
+                    strategy: &j.definition.strategy,
+                    costs: run.costs,
+                    budget: run.budget,
+                })
+                .collect();
+            let report = tick_engine::execute_corpus_batch(database, &runs, limits)?;
+            blocked = report.jobs.iter().all(|r| match r {
+                Ok(CorpusProgress::Busy { .. }) => true,
+                Ok(CorpusProgress::Held { state, .. }) => state != "stopped",
+                _ => false,
+            });
+            pending
+                .iter()
+                .map(|job| {
+                    let index = mapping[&job
+                        .definition
+                        .key
+                        .identity()
+                        .expect("prevalidated search key")];
+                    let (state, error) = match &report.jobs[index] {
+                        Ok(CorpusProgress::Completed { .. }) => ("completed", None),
+                        Ok(CorpusProgress::Terminal { .. }) => ("terminal", None),
+                        Ok(CorpusProgress::Held { state, .. }) if state == "stopped" => {
+                            ("terminal", None)
+                        }
+                        Ok(_) => ("pending", None),
+                        Err(error) => ("error", Some(error.chars().take(512).collect::<String>())),
+                    };
+                    (job.definition.slot, state, error)
+                })
+                .collect::<Vec<_>>()
+        };
+        let tx = registry
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|e| e.to_string())?;
+        fence(&tx, &lease, chrono::Utc::now().timestamp_millis())?;
+        let errored = updates.iter().any(|(_, state, _)| *state == "error");
+        for (slot, state, error) in updates {
+            tx.execute(
+                "UPDATE corpus_search_jobs SET state=?3,error=?4 WHERE search_id=?1 AND slot=?2",
+                params![id, slot, state, error],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+        let (cursor,remaining):(usize,usize)=tx.query_row("SELECT cursor,(SELECT count(*) FROM corpus_search_jobs WHERE search_id=?1 AND state IN ('queued','pending')) FROM corpus_searches WHERE id=?1",[&id],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|e|e.to_string())?;
+        if errored {
+            tx.execute(
+                "UPDATE corpus_searches SET state='paused' WHERE id=?1",
+                [&id],
+            )
+            .map_err(|e| e.to_string())?;
+        } else if cursor == config.maximum_candidates && remaining == 0 {
+            tx.execute(
+                "UPDATE corpus_searches SET state='exhausted' WHERE id=?1",
+                [&id],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+        tx.commit().map_err(|e| e.to_string())?;
+        let status = status(&registry, &id)?;
+        Ok(Step {
+            kind: if status["state"] == "exhausted" {
+                "exhausted"
+            } else if blocked {
+                "held-or-busy"
+            } else {
+                "advanced"
+            }
+            .into(),
+            status,
+        })
+    })();
+    let released = release(&registry, &lease);
+    match result {
+        Err(error) => Err(error),
+        Ok(mut value) => {
+            released?;
+            value.status = status(&registry, &id)?;
+            Ok(value)
+        }
+    }
+}
+
+pub fn list(registry: &Registry) -> Result<Vec<serde_json::Value>> {
+    let ids = {
+        let mut query = registry
+            .connection
+            .prepare("SELECT id FROM corpus_searches ORDER BY rowid DESC LIMIT 65")
+            .map_err(|e| e.to_string())?;
+        query
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| e.to_string())?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?
+    };
+    if ids.len() > 64 {
+        return Err("corpus search inventory quota exceeded".into());
+    }
+    ids.iter().map(|id| status(registry, id)).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn fixture(name: &str) -> (std::path::PathBuf, crate::corpus::Specification) {
+        let root =
+            std::env::temp_dir().join(format!("corpus-search-unit-{name}-{}", std::process::id()));
+        std::fs::create_dir(&root).unwrap();
+        let data = crate::data::synthetic_fixture("EURUSD").unwrap();
+        let path = root.join("source.rsf");
+        crate::native::write(&path, &data).unwrap();
+        let specification = crate::corpus::describe(&[path], 10000).unwrap();
+        (root, specification)
+    }
+    fn run<'a>(
+        root: &'a Path,
+        spec: &'a crate::corpus::Specification,
+        costs: &'a Costs,
+    ) -> SearchRun<'a> {
+        SearchRun {
+            base: root,
+            specification: spec,
+            costs,
+            budget: CorpusBudget {
+                max_candles: 10000,
+                feature_cells: 1000000,
+                max_receipts: 10000,
+            },
+            seed: 42,
+            maximum_candidates: 4,
+            queue_width: 2,
+        }
+    }
+    #[test]
+    fn replaced_coordinators_and_controls_fence_progress_without_clearing_new_tokens() {
+        let (root, spec) = fixture("fencing");
+        let costs = Costs::default();
+        let config = configuration(&run(&root, &spec, &costs)).unwrap();
+        let mut registry = Registry::open(&root.join("state.sqlite")).unwrap();
+        let id = register(&mut registry, &config).unwrap();
+        let now = chrono::Utc::now().timestamp_millis();
+        let first = claim(&mut registry, &id, now, 100).unwrap().unwrap();
+        assert!(claim(&mut registry, &id, now + 50, 100).unwrap().is_none());
+        let replacement = claim(&mut registry, &id, now + 101, 100).unwrap().unwrap();
+        assert_eq!(replacement.attempt, first.attempt + 1);
+        assert!(fence(&registry.connection, &first, now + 102).is_err());
+        fence(&registry.connection, &replacement, now + 102).unwrap();
+        release(&registry, &first).unwrap();
+        fence(&registry.connection, &replacement, now + 102).unwrap();
+        control(&mut registry, &id, "paused").unwrap();
+        assert!(fence(&registry.connection, &replacement, now + 102).is_err());
+        release(&registry, &replacement).unwrap();
+        assert_eq!(status(&registry, &id).unwrap()["lease_active"], false);
+        registry.integrity().unwrap();
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn child_publication_before_queue_update_recovers_without_new_experiment_attempts() {
+        let (root, spec) = fixture("child-recovery");
+        let costs = Costs::default();
+        let search = run(&root, &spec, &costs);
+        let config = configuration(&search).unwrap();
+        let db = root.join("state.sqlite");
+        let mut registry = Registry::open(&db).unwrap();
+        let id = register(&mut registry, &config).unwrap();
+        let lease = claim(
+            &mut registry,
+            &id,
+            chrono::Utc::now().timestamp_millis(),
+            60000,
+        )
+        .unwrap()
+        .unwrap();
+        admit(&mut registry, &lease, &config).unwrap();
+        let (_, _, _, _, _, jobs) = read(&registry.connection, &id).unwrap();
+        let runs: Vec<_> = jobs
+            .iter()
+            .map(|j| CorpusRun {
+                base: &root,
+                spec: &spec,
+                strategy: &j.definition.strategy,
+                costs: &costs,
+                budget: config.budget,
+            })
+            .collect();
+        let limits = CorpusBatchLimits {
+            workers: 2,
+            max_parallel_candles: 20000,
+            max_parallel_feature_cells: 2000000,
+            max_parallel_receipts: 20000,
+            max_new_chunks: 64,
+            lease_ms: 60000,
+        };
+        tick_engine::execute_corpus_batch(&db, &runs, limits).unwrap();
+        let attempts = registry.counts().unwrap().attempts;
+        registry
+            .connection
+            .execute(
+                "UPDATE corpus_searches SET expires_ms=?2 WHERE id=?1",
+                params![id, chrono::Utc::now().timestamp_millis() - 1],
+            )
+            .unwrap();
+        drop(registry);
+        let recovered = step(&db, search, limits).unwrap();
+        assert_eq!(recovered.status["slot_states"]["completed"], 2);
+        let registry = Registry::open(&db).unwrap();
+        assert_eq!(registry.counts().unwrap().attempts, attempts);
+        registry.integrity().unwrap();
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn job_identity_corruption_and_cursor_changes_refuse_status_and_backup_integrity() {
+        let (root, spec) = fixture("corruption");
+        let costs = Costs::default();
+        let config = configuration(&run(&root, &spec, &costs)).unwrap();
+        let mut registry = Registry::open(&root.join("state.sqlite")).unwrap();
+        let id = register(&mut registry, &config).unwrap();
+        let lease = claim(
+            &mut registry,
+            &id,
+            chrono::Utc::now().timestamp_millis(),
+            60000,
+        )
+        .unwrap()
+        .unwrap();
+        admit(&mut registry, &lease, &config).unwrap();
+        assert!(
+            registry
+                .connection
+                .execute(
+                    "UPDATE corpus_search_jobs SET hash=?2 WHERE search_id=?1",
+                    params![id, "0".repeat(64)]
+                )
+                .is_err()
+        );
+        registry.integrity().unwrap();
+        registry
+            .connection
+            .execute(
+                "UPDATE corpus_searches SET cursor=cursor+1 WHERE id=?1",
+                [&id],
+            )
+            .unwrap();
+        assert!(status(&registry, &id).is_err());
+        registry
+            .connection
+            .execute(
+                "UPDATE corpus_searches SET cursor=cursor-1 WHERE id=?1",
+                [&id],
+            )
+            .unwrap();
+        registry.integrity().unwrap();
+        registry
+            .connection
+            .execute_batch("DROP TRIGGER corpus_search_job_immutable")
+            .unwrap();
+        registry
+            .connection
+            .execute(
+                "UPDATE corpus_search_jobs SET hash=?2 WHERE search_id=?1",
+                params![id, "0".repeat(64)],
+            )
+            .unwrap();
+        assert!(status(&registry, &id).is_err());
+        assert!(registry.integrity().is_err());
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}

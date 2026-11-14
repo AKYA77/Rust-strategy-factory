@@ -961,6 +961,63 @@ async fn trades(
         ),
     }
 }
+async fn generated_searches(State(app): State<Arc<App>>) -> Response {
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match crate::corpus_search::list(&registry) {
+        Ok(list) => Json(list).into_response(),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "unable to verify generated search inventory",
+        ),
+    }
+}
+async fn generated_search_status(
+    State(app): State<Arc<App>>,
+    Param(id): Param<String>,
+) -> Response {
+    if !catalog_id(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid generated search identity");
+    }
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    let exists: std::result::Result<bool, _> = registry.connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM corpus_searches WHERE id=?1)",
+        [&id],
+        |r| r.get(0),
+    );
+    if matches!(exists, Ok(false)) {
+        return api_error(StatusCode::NOT_FOUND, "generated search not found");
+    }
+    match crate::corpus_search::status(&registry, &id) {
+        Ok(value) => Json(value).into_response(),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "generated search integrity unavailable",
+        ),
+    }
+}
+async fn generated_search_control(
+    State(app): State<Arc<App>>,
+    Param(id): Param<String>,
+    Json(body): Json<Control>,
+) -> Response {
+    if !catalog_id(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid generated search identity");
+    }
+    let Ok(mut registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match crate::corpus_search::control(&mut registry, &id, &body.state) {
+        Ok(()) => Json(serde_json::json!({"ok":true})).into_response(),
+        Err(_) => api_error(
+            StatusCode::BAD_REQUEST,
+            "invalid generated search control transition",
+        ),
+    }
+}
 async fn resource_status() -> Response {
     match crate::resource::observe() {
         Ok(snapshot) => {
@@ -1296,6 +1353,12 @@ pub async fn serve_with_reviews(
         .route("/api/logout", post(logout))
         .route("/api/overview", get(overview))
         .route("/api/resources", get(resource_status))
+        .route("/api/corpus-searches", get(generated_searches))
+        .route("/api/corpus-searches/{id}", get(generated_search_status))
+        .route(
+            "/api/corpus-searches/{id}/control",
+            post(generated_search_control),
+        )
         .route("/api/catalog", get(catalog_page))
         .route("/api/catalog/{id}", get(catalog_detail))
         .route("/api/data-review/{id}", get(data_review_state))
