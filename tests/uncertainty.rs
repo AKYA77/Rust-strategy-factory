@@ -65,3 +65,63 @@ fn uncertainty_changes_monotonically_and_never_certifies_independence() {
         .is_err()
     );
 }
+
+#[test]
+fn time_block_bound_matches_independent_weighted_hoeffding_calculation() {
+    let day = 86_400_000;
+    let mut trades = Vec::new();
+    // Fixed independent oracle: block sizes2,3,5; sum of squares38; N10.
+    for (block, size) in [2, 3, 5].into_iter().enumerate() {
+        for _ in 0..size {
+            trades.push(Observation {
+                exit_ms: block as i64 * day,
+                net_micro_usd: 1,
+            });
+        }
+    }
+    let diagnostic = uncertainty::diagnose_blocks(&trades, 7, day).unwrap();
+    assert_eq!(diagnostic.occupied_blocks, 3);
+    assert_eq!(diagnostic.effective_blocks, Some(100.0 / 38.0));
+    let expected = (1.0 - ((140f64).ln() * 38.0 / 200.0).sqrt()).max(0.0);
+    assert!((diagnostic.conditional_lower_net_win_rate.unwrap() - expected).abs() < 1e-14);
+    assert!(!diagnostic.assumptions_verified);
+    assert!(
+        diagnostic.conditional_lower_net_win_rate
+            <= uncertainty::diagnose(&trades, 7)
+                .unwrap()
+                .conditional_lower_net_win_rate
+    );
+}
+#[test]
+fn clustered_successes_do_not_gain_certainty_by_repeating_same_block() {
+    let day = 86_400_000;
+    for n in [1, 100, 10000] {
+        let trades = observations(n, n);
+        let d = uncertainty::diagnose_blocks(&trades, 1, day).unwrap();
+        assert_eq!(d.effective_blocks, Some(1.0));
+        assert_eq!(d.conditional_lower_net_win_rate, Some(0.0));
+    }
+    let mut trades = observations(100, 100);
+    for (i, t) in trades.iter_mut().enumerate() {
+        t.exit_ms = i as i64 * day;
+    }
+    let independent = uncertainty::diagnose_blocks(&trades, 1, day).unwrap();
+    assert!(
+        (independent.conditional_lower_net_win_rate.unwrap()
+            - uncertainty::diagnose(&trades, 1)
+                .unwrap()
+                .conditional_lower_net_win_rate
+                .unwrap())
+        .abs()
+            < 1e-14
+    );
+    let grouped = uncertainty::diagnose_blocks(&trades, 1, 10 * day).unwrap();
+    assert_eq!(grouped.effective_blocks, Some(10.0));
+    assert!(grouped.conditional_lower_net_win_rate < independent.conditional_lower_net_win_rate);
+    let empty = uncertainty::diagnose_blocks(&[], 1, day).unwrap();
+    assert_eq!(empty.effective_blocks, None);
+    assert_eq!(empty.conditional_lower_net_win_rate, None);
+    assert_eq!(empty.occupied_blocks, 0);
+    assert!(uncertainty::diagnose_blocks(&trades, 1, day - 1).is_err());
+    assert!(uncertainty::diagnose_blocks(&trades, 1, 91 * day).is_err());
+}

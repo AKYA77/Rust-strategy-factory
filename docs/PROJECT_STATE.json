@@ -121,7 +121,8 @@
     "A bounded corpus batch API now preflights at most256 unique frozen jobs, starts1\u201316 connection-owning workers, enforces worst-case concurrent candle/feature/receipt caps, preserves input-order per-job outcomes and reports worker startup/panic failures for resumable retry. Parallel complete receipts match scalar replay; aggregate overcommit and duplicate jobs refuse before registry creation, and a failed job does not lose another job's checkpoint. Declared object caps are not measured RSS or OS enforcement.",
     "corpus-batch now executes bounded1\u201310000-round sessions from a strict1 MiB config, resumes multiple frozen jobs across processes, exits instead of spinning on held/busy/terminal work and handles SIGINT/SIGTERM at bounded round boundaries. Actual process tests verify pause/resume, completion/cache reuse and SIGTERM under writer contention followed by successful restart.",
     "Corpus experiment history now opens verified recovery metadata, exact exports and durable pause/resume/permanent-stop controls behind existing session/CSRF/origin enforcement. Chromium verifies desktop/mobile layout, restart persistence, token/account redaction and stopped CLI non-advancement. All three browser suites pass after correcting long-ID mobile overflow; integrated release/operations results are recorded separately.",
-    "A reproducible optimized full-session comparison now records nine synthetic4000-event/eight-strategy/four-round trials at1/2/4 workers with per-child Linux CPU/RSS/I/O, exact source/binary/script hashes and identical complete result hashes. Median wall times1.3861/0.8716/0.7961 seconds are limited warm-cache fixture evidence; no production worker default or real-data speed claim. Integrated release, all three browser suites and local operations acceptance pass."
+    "A reproducible optimized full-session comparison now records nine synthetic4000-event/eight-strategy/four-round trials at1/2/4 workers with per-child Linux CPU/RSS/I/O, exact source/binary/script hashes and identical complete result hashes. Median wall times1.3861/0.8716/0.7961 seconds are limited warm-cache fixture evidence; no production worker default or real-data speed claim. Integrated release, all three browser suites and local operations acceptance pass.",
+    "Scientific plans optionally freeze1\u201390-day exit-time blocks and a versioned weighted Hoeffding/Bonferroni sensitivity diagnostic allowing arbitrary within-block dependence. Reports retain exact squared block-size sums/effective counts and explicitly unverified cross-block/conditional-size assumptions. Independent formula, clustered-success, empty-data, immutable reuse, retrospective retuning refusal and legacy hash tests pass. This does not implement or grant final qualification."
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -129,9 +130,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Implement optional frozen time-block dependence sensitivity in scientific plans with conditional weighted uncertainty diagnostics, legacy receipt compatibility and explicit unverified cross-block assumptions; continue qualification and autonomous/resource backlog.",
+  "next_action": "Add bounded prespecified descriptive robustness acceptance policy with explicit per-probe failures and unknown evidence, frozen before OOS exposure; preserve scientific qualification refusal and continue autonomous/resource/dashboard backlog.",
   "qualified_strategies": 0,
-  "tests_passed": 259,
+  "tests_passed": 262,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks; persisted proof/indexed failure monitoring, restart and read-only API; optional authenticated catalog pagination/exact exports/full-u64 desktop/mobile and corrupt-state refusal; independent review actual Rust/SQLite workflow covers credentials/CSRF/origin, paginated history/exact export, synthetic refusal, revocation/stale head, changed files, current authority failure, desktop/mobile and restart",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",

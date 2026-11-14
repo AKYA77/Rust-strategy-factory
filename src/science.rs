@@ -23,9 +23,14 @@ pub struct Plan {
     pub costs: Costs,
     /// Preregistered total selection/testing budget; not an assertion of independent trials.
     pub trial_budget: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uncertainty_block_ms: Option<i64>,
 }
 impl Plan {
     pub fn canonical(&self) -> Result<Self> {
+        if let Some(ms) = self.uncertainty_block_ms {
+            crate::uncertainty::validate_block_ms(ms)?;
+        }
         self.training.validate()?;
         self.holdout.validate()?;
         if self.folds.is_empty()
@@ -141,6 +146,8 @@ pub struct CandidateEvidence {
     pub failed_windows: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uncertainty: Option<crate::uncertainty::Diagnostic>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub block_uncertainty: Option<crate::uncertainty::BlockDiagnostic>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub robustness: Vec<crate::robustness::EvidenceSet>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -164,9 +171,11 @@ pub struct ProtocolResult {
     pub report: Report,
 }
 fn definition(plan: &Plan, input: &Input, revision: &str) -> Result<serde_json::Value> {
-    Ok(
-        serde_json::json!({"version":"frozen-chronological-protocol-v7","neighborhood_method":crate::neighborhood::VERSION,"regime_method":crate::regimes::VERSION,"breakdown_method":crate::diagnostics::VERSION,"robustness_method":crate::robustness::VERSION,"robustness_cases":plan.candidates.iter().map(|s|crate::robustness::cases(s,&plan.costs)).collect::<Result<Vec<_>>>()?,"uncertainty_method":crate::uncertainty::VERSION,"plan":plan,"dataset_hash":input.dataset.manifest.content_hash,"dataset_identity":data::dataset_identity(&input.dataset.manifest)?,"profile_hash":input.dataset.manifest.profile_hash,"conversions_hash":data::hash(&input.conversions)?,"revision":revision,"engine":crate::ENGINE_VERSION,"indicators":crate::INDICATOR_VERSION,"signals":crate::SIGNAL_VERSION}),
-    )
+    let mut value = serde_json::json!({"version":"frozen-chronological-protocol-v7","neighborhood_method":crate::neighborhood::VERSION,"regime_method":crate::regimes::VERSION,"breakdown_method":crate::diagnostics::VERSION,"robustness_method":crate::robustness::VERSION,"robustness_cases":plan.candidates.iter().map(|s|crate::robustness::cases(s,&plan.costs)).collect::<Result<Vec<_>>>()?,"uncertainty_method":crate::uncertainty::VERSION,"plan":plan,"dataset_hash":input.dataset.manifest.content_hash,"dataset_identity":data::dataset_identity(&input.dataset.manifest)?,"profile_hash":input.dataset.manifest.profile_hash,"conversions_hash":data::hash(&input.conversions)?,"revision":revision,"engine":crate::ENGINE_VERSION,"indicators":crate::INDICATOR_VERSION,"signals":crate::SIGNAL_VERSION});
+    if plan.uncertainty_block_ms.is_some() {
+        value["block_uncertainty_method"] = serde_json::json!(crate::uncertainty::BLOCK_VERSION);
+    }
+    Ok(value)
 }
 /// Immutable report lookup verifies stored scientific evidence integrity.
 pub fn read_report(registry: &Registry, id: &str) -> Result<Option<Report>> {
@@ -420,6 +429,10 @@ pub fn execute(
             robustness: crate::robustness::execute(
                 registry, input, strategy, &plan, &id, revision, budget,
             )?,
+            block_uncertainty: plan
+                .uncertainty_block_ms
+                .map(|ms| crate::uncertainty::diagnose_blocks(&observations, plan.trial_budget, ms))
+                .transpose()?,
             uncertainty: Some(crate::uncertainty::diagnose(
                 &observations,
                 plan.trial_budget,

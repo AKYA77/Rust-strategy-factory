@@ -35,6 +35,7 @@ fn span(start: &str, end: &str) -> Interval {
 }
 fn plan() -> Plan {
     Plan {
+        uncertainty_block_ms: None,
         training: span("2025-01-01T00:00:00Z", "2025-03-01T00:00:00Z"),
         folds: vec![
             Fold {
@@ -512,4 +513,48 @@ fn frozen_protocol_executes_atr_stops_and_includes_all_policy_probes_in_trial_bu
     registry.integrity().unwrap();
     drop(registry);
     std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn frozen_time_blocks_bind_protocol_identity_and_preserve_conditional_status() {
+    let directory = dir();
+    let path = directory.join("blocks.sqlite");
+    let mut registry = Registry::open(&path).unwrap();
+    let input = input();
+    let mut p = plan();
+    assert!(
+        !serde_json::to_string(&p)
+            .unwrap()
+            .contains("uncertainty_block_ms")
+    );
+    p.uncertainty_block_ms = Some(86_400_000);
+    let budget = science::Budget {
+        feature_cells: 100000,
+        ..Default::default()
+    };
+    let result = science::execute(&mut registry, &input, &p, "block-build", &budget).unwrap();
+    let candidate = &result.report.candidates[0];
+    let block = candidate.block_uncertainty.as_ref().unwrap();
+    let scalar = candidate.uncertainty.as_ref().unwrap();
+    assert_eq!(block.observations, scalar.observations);
+    assert_eq!(block.net_wins, scalar.net_wins);
+    assert!(block.observations > 0);
+    assert!(!block.assumptions_verified);
+    assert!(block.conditional_lower_net_win_rate <= scalar.conditional_lower_net_win_rate);
+    assert_eq!(result.report.status, "INSUFFICIENT_EVIDENCE");
+    drop(registry);
+    let mut registry = Registry::open(&path).unwrap();
+    let again = science::execute(&mut registry, &input, &p, "block-build", &budget).unwrap();
+    assert!(again.reused);
+    assert_eq!(
+        again.report.candidates[0].block_uncertainty,
+        Some(block.clone())
+    );
+    p.uncertainty_block_ms = Some(7 * 86_400_000);
+    assert!(science::execute(&mut registry, &input, &p, "block-build", &budget).is_err());
+    p.uncertainty_block_ms = None;
+    assert!(science::execute(&mut registry, &input, &p, "block-build", &budget).is_err());
+    p.uncertainty_block_ms = Some(0);
+    assert!(p.canonical().is_err());
+    std::fs::remove_dir_all(directory).unwrap();
 }
