@@ -108,7 +108,8 @@
     "Windowed causal corpus signal prefixes preserving prior warmup and exclusive publication end, with exact batch-prefix mask tests",
     "Single authoritative serializable account event transition shared by ordinary and bounded synthetic USD corpus replay, with full receipt parity and state round-trip checks",
     "Registry-fenced immutable experiment/configuration-bound checkpoint history with cursor CAS, integrity validation, restart/backup preservation and stale/expired/terminal refusal",
-    "Registered corpus identities now bind exact ordered artifacts, canonical strategy, costs, budgets, profile, engine and compiled source revision; duplicate registration reuses one frozen identity and changed budgets separate runs."
+    "Registered corpus identities now bind exact ordered artifacts, canonical strategy, costs, budgets, profile, engine and compiled source revision; duplicate registration reuses one frozen identity and changed budgets separate runs.",
+    "Replay workers can now validate lease token, attempt, expiry and running state before expensive resume preparation; write transactions retain their independent fencing. Tests cover forged attempts, exact expiry and completed tasks."
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -116,9 +117,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Integrate authoritative account checkpoints with exact cursor/source state and fenced registered corpus resume; then complete atomic publication and the remaining streaming/research queue.",
+  "next_action": "Connect registered corpus replay to bounded source-bound account checkpoint steps, prefix validation and restart recovery; retain transactional fencing for every write.",
   "qualified_strategies": 0,
-  "tests_passed": 244,
+  "tests_passed": 245,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks; persisted proof/indexed failure monitoring, restart and read-only API; optional authenticated catalog pagination/exact exports/full-u64 desktop/mobile and corrupt-state refusal; independent review actual Rust/SQLite workflow covers credentials/CSRF/origin, paginated history/exact export, synthetic refusal, revocation/stale head, changed files, current authority failure, desktop/mobile and restart",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",

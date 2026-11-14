@@ -654,3 +654,23 @@ fn immutable_replay_checkpoints_fence_stale_workers_and_survive_restart() {
     drop(sql);
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn lease_snapshot_validation_checks_attempt_expiry_and_terminal_state() {
+    let dir = directory();
+    let mut r = Registry::open(&dir.join("lease.sqlite")).unwrap();
+    let id = r.register(&key()).unwrap();
+    let Claim::Acquired(lease) = r.claim(&id, 0, 10).unwrap() else {
+        panic!()
+    };
+    r.validate_lease(&lease, 9).unwrap();
+    assert!(r.validate_lease(&lease, 10).is_err());
+    let mut forged = lease.clone();
+    forged.attempt += 1;
+    assert!(r.validate_lease(&forged, 1).is_err());
+    r.finish(&lease, 2, Outcome::Completed, &json!({"fixture":true}))
+        .unwrap();
+    assert!(r.validate_lease(&lease, 3).is_err());
+    drop(r);
+    std::fs::remove_dir_all(dir).unwrap();
+}

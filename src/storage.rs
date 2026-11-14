@@ -836,6 +836,14 @@ fn checkpoint_read(c: &Connection, id: &str) -> Result<Option<(ReplayCheckpoint,
     Ok(last)
 }
 impl Registry {
+    /// Snapshot validation only. Every subsequent write still fences within its transaction.
+    pub fn validate_lease(&self, lease: &Lease, now_ms: i64) -> Result<()> {
+        let valid:bool=self.connection.query_row("SELECT EXISTS(SELECT 1 FROM experiments WHERE id=?1 AND state='running' AND token=?2 AND attempt=?3 AND expires_ms>?4)",params![lease.experiment_id,lease.token,lease.attempt,now_ms],|r|r.get(0)).map_err(db_err)?;
+        if !valid {
+            return Err("lease stale, expired or terminal".into());
+        }
+        Ok(())
+    }
     /// Mechanically verified, frozen-experiment-bound checkpoint history. State
     /// semantics must additionally be validated by the account replay driver.
     pub fn replay_checkpoint(&self, id: &str) -> Result<Option<(ReplayCheckpoint, String)>> {
