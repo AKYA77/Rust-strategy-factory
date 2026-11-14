@@ -998,3 +998,22 @@ impl Registry {
         tx.commit().map_err(db_err)
     }
 }
+
+impl Registry {
+    /// Verified recovery metadata only; no lease tokens or claimed financial metrics.
+    pub fn corpus_status(&self, id: &str) -> Result<serde_json::Value> {
+        let tx = self.connection.unchecked_transaction().map_err(db_err)?;
+        let control = self.corpus_control(id)?;
+        let (state, attempt, expiry): (String, i64, Option<i64>) = tx
+            .query_row(
+                "SELECT state,attempt,expires_ms FROM experiments WHERE id=?1",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .map_err(db_err)?;
+        let checkpoint = checkpoint_read(&tx, id)?;
+        let value = serde_json::json!({"experiment_id":id,"state":state,"control":control,"attempt":attempt.to_string(),"expires_ms":expiry,"checkpoint_cursor":checkpoint.as_ref().map(|(r,_)|r.cursor),"checkpoint_hash":checkpoint.map(|(_,h)|h),"limitations":"Recovery metadata only; checkpoints do not establish qualification or completed replay."});
+        tx.commit().map_err(db_err)?;
+        Ok(value)
+    }
+}

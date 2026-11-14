@@ -861,6 +861,21 @@ async fn detail(State(app): State<Arc<App>>, Param(id): Param<String>) -> Respon
         ),
     }
 }
+async fn corpus_status(State(app): State<Arc<App>>, Param(id): Param<String>) -> Response {
+    if !catalog_id(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid corpus identity");
+    }
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "registry unavailable");
+    };
+    match registry.corpus_status(&id) {
+        Ok(v) => Json(v).into_response(),
+        Err(_) => api_error(
+            StatusCode::NOT_FOUND,
+            "verified corpus recovery status unavailable",
+        ),
+    }
+}
 async fn protocols(State(app): State<Arc<App>>) -> Response {
     let Ok(registry) = app.registry.lock() else {
         return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
@@ -1030,6 +1045,7 @@ pub async fn serve_with_reviews(
         .route("/api/training-reviews", get(reviews))
         .route("/api/training-reviews/{id}", get(review_detail))
         .route("/api/protocols", get(protocols))
+        .route("/api/corpus/{id}/status", get(corpus_status))
         .route("/api/protocols/{id}", get(protocol_detail))
         .route("/api/experiments/{id}", get(detail))
         .route("/api/runs/{id}/control", post(control))

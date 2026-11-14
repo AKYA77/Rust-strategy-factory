@@ -738,3 +738,26 @@ fn durable_corpus_controls_survive_restart_and_block_publication() {
     drop(r);
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn corpus_status_is_verified_bounded_metadata_without_lease_tokens() {
+    let dir = directory();
+    let mut r = Registry::open(&dir.join("status.sqlite")).unwrap();
+    let mut k = key();
+    k.protocol_hash = "synthetic-corpus-training-v1".into();
+    let id = r.register(&k).unwrap();
+    let Claim::Acquired(lease) = r.claim(&id, 0, 1000).unwrap() else {
+        panic!()
+    };
+    r.save_replay_checkpoint(&lease, 1, 0, 2, json!({"private-state":"not in status"}))
+        .unwrap();
+    let v = r.corpus_status(&id).unwrap();
+    assert_eq!(v["checkpoint_cursor"], 2);
+    assert_eq!(v["attempt"], "1");
+    let text = v.to_string();
+    assert!(!text.contains(&lease.token));
+    assert!(!text.contains("private-state"));
+    assert!(r.corpus_status("invalid").is_err());
+    drop(r);
+    std::fs::remove_dir_all(dir).unwrap();
+}

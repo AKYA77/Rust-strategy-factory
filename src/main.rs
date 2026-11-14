@@ -616,6 +616,9 @@ fn run(args: &[String]) -> Result<()> {
             )?;
             print(&serde_json::json!({"ok":true}))
         }
+        ["corpus-status", database, id] => {
+            print(&Registry::open(Path::new(database))?.corpus_status(id)?)
+        }
         ["corpus-inspect", specification] => {
             let path = Path::new(specification);
             print(&rust_strategy_factory::corpus::inspect(
