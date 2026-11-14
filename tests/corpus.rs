@@ -1528,6 +1528,13 @@ fn corpus_search_worker_errors_pause_without_becoming_completed_evidence() {
     assert_eq!(progress.status["state"], "paused");
     assert_eq!(progress.status["control"]["pause_origin"], "worker_error");
     assert_eq!(progress.status["control"]["epoch"], "1");
+    assert!(
+        progress.status["recent_slots"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|j| j["error_kind"] == "unclassified" && j["retry_candidate"] == false)
+    );
     assert_eq!(progress.status["slot_states"]["error"], 2);
     assert_eq!(progress.status["qualification_granted"], false);
     assert_eq!(progress.status["lease_active"], false);
@@ -2178,4 +2185,62 @@ fn actual_disk_observation_resolves_parent_and_refuses_unknown_targets() {
     let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert!(report["available_bytes"].is_string());
     assert!(!report.to_string().contains(first.root.to_str().unwrap()));
+}
+
+#[test]
+fn actual_sqlite_writer_contention_has_typed_admission_failures_and_no_child_claims() {
+    use rust_strategy_factory::{
+        contracts::Side,
+        corpus_failure::Kind,
+        storage::Registry,
+        strategies::{Rule, Strategy},
+        tick_engine::{self, CorpusBatchLimits, CorpusBudget, CorpusRun, Costs},
+    };
+    let f = Fixture::new("typed-busy", "EURUSD", 7);
+    let db = f.root.join("busy.sqlite");
+    drop(Registry::open(&db).unwrap());
+    let lock = rusqlite::Connection::open(&db).unwrap();
+    lock.execute_batch("BEGIN IMMEDIATE").unwrap();
+    let strategy = Strategy {
+        timeframe: Timeframe::M1,
+        side: Side::Long,
+        stop_ticks: 100,
+        rule: Rule::AboveMean { window: 2 },
+        entry: None,
+        stop_policy: None,
+    };
+    let costs = Costs::default();
+    let runs = [CorpusRun {
+        base: &f.root,
+        spec: &f.spec,
+        strategy: &strategy,
+        costs: &costs,
+        budget: CorpusBudget {
+            max_candles: 100,
+            feature_cells: 10000,
+            max_receipts: 1000,
+        },
+    }];
+    let limits = CorpusBatchLimits {
+        workers: 1,
+        max_parallel_candles: 100,
+        max_parallel_feature_cells: 10000,
+        max_parallel_receipts: 1000,
+        max_new_chunks: 64,
+        lease_ms: 60000,
+    };
+    let blocked = tick_engine::execute_corpus_batch(&db, &runs, limits).unwrap();
+    assert_eq!(blocked.workers_started, 0);
+    assert_eq!(
+        blocked.failure_kinds,
+        vec![Some(Kind::RegistryAdmissionBusy)]
+    );
+    assert!(blocked.jobs[0].is_err());
+    lock.execute_batch("ROLLBACK").unwrap();
+    drop(lock);
+    assert_eq!(Registry::open(&db).unwrap().counts().unwrap().registered, 0);
+    let completed = tick_engine::execute_corpus_batch(&db, &runs, limits).unwrap();
+    assert!(completed.jobs[0].is_ok());
+    assert_eq!(completed.failure_kinds, vec![None]);
+    Registry::open(&db).unwrap().integrity().unwrap();
 }

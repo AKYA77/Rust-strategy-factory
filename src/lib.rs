@@ -82,3 +82,5 @@ pub mod result_artifact;
 pub mod disk;
 
 mod search_control;
+
+pub mod corpus_failure;

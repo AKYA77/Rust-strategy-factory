@@ -1290,6 +1290,8 @@ pub struct CorpusBatchReport {
     pub worker_failures: usize,
     /// Input order is preserved, including errors and held/busy/terminal jobs.
     pub jobs: Vec<Result<CorpusProgress>>,
+    /// Aligned with jobs; None for success, typed conservative provenance for errors.
+    pub failure_kinds: Vec<Option<crate::corpus_failure::Kind>>,
 }
 /// One bounded checkpoint round. Preflight all jobs before opening the registry;
 /// each worker owns a connection and shares only a bounded atomic work cursor.
@@ -1344,7 +1346,17 @@ pub fn execute_corpus_batch(
     // Initialize sequentially; do not race schema migrations across workers.
     let mut connections = Vec::with_capacity(workers);
     for _ in 0..workers {
-        connections.push(crate::storage::Registry::open(database)?);
+        match crate::storage::Registry::open_classified(database) {
+            Ok(connection) => connections.push(connection),
+            Err(error) => {
+                return Ok(CorpusBatchReport {
+                    workers_started: 0,
+                    worker_failures: 1,
+                    jobs: runs.iter().map(|_| Err(error.message.clone())).collect(),
+                    failure_kinds: vec![Some(error.kind); runs.len()],
+                });
+            }
+        }
     }
     let next = AtomicUsize::new(0);
     let mut results: Vec<Option<Result<CorpusProgress>>> = (0..runs.len()).map(|_| None).collect();
@@ -1398,9 +1410,18 @@ pub fn execute_corpus_batch(
             }
         }
     });
+    let failure_kinds = results
+        .iter()
+        .map(|r| match r {
+            Some(Ok(_)) => None,
+            Some(Err(_)) => Some(crate::corpus_failure::Kind::Unclassified),
+            None => Some(crate::corpus_failure::Kind::WorkerInterrupted),
+        })
+        .collect();
     Ok(CorpusBatchReport {
         workers_started,
         worker_failures,
+        failure_kinds,
         jobs: results
             .into_iter()
             .map(|r| {

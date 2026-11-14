@@ -83,25 +83,28 @@ pub(crate) fn register(c: &Connection, id: &str, state: &str) -> Result<()> {
         },
     )
 }
-pub(crate) fn initialize(c: &mut Connection, migrate: bool) -> Result<()> {
+pub(crate) fn initialize(
+    c: &mut Connection,
+    migrate: bool,
+) -> std::result::Result<(), crate::corpus_failure::AdmissionFailure> {
     let tx = c
         .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(db)?;
+        .map_err(crate::corpus_failure::AdmissionFailure::from)?;
     tx.execute_batch("CREATE TABLE IF NOT EXISTS corpus_search_runtime(search_id TEXT PRIMARY KEY REFERENCES corpus_searches(id),body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=4096),hash TEXT NOT NULL CHECK(length(hash)=64));
     CREATE TABLE IF NOT EXISTS corpus_search_transitions(event_id INTEGER PRIMARY KEY,search_id TEXT NOT NULL REFERENCES corpus_searches(id),epoch INTEGER NOT NULL CHECK(epoch>0),body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=4096),hash TEXT NOT NULL CHECK(length(hash)=64),UNIQUE(search_id,epoch));
     CREATE TRIGGER IF NOT EXISTS search_runtime_key_immutable BEFORE UPDATE OF search_id ON corpus_search_runtime BEGIN SELECT RAISE(ABORT,'search runtime key immutable');END;
     CREATE TRIGGER IF NOT EXISTS search_runtime_no_delete BEFORE DELETE ON corpus_search_runtime BEGIN SELECT RAISE(ABORT,'search runtime retained');END;
     CREATE TRIGGER IF NOT EXISTS search_transition_no_update BEFORE UPDATE ON corpus_search_transitions BEGIN SELECT RAISE(ABORT,'search transition immutable');END;
-    CREATE TRIGGER IF NOT EXISTS search_transition_no_delete BEFORE DELETE ON corpus_search_transitions BEGIN SELECT RAISE(ABORT,'search transition immutable');END;").map_err(db)?;
+    CREATE TRIGGER IF NOT EXISTS search_transition_no_delete BEFORE DELETE ON corpus_search_transitions BEGIN SELECT RAISE(ABORT,'search transition immutable');END;").map_err(crate::corpus_failure::AdmissionFailure::from)?;
     if migrate {
         let rows = {
             let mut q = tx
                 .prepare("SELECT id,state FROM corpus_searches LIMIT 65")
-                .map_err(db)?;
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
             q.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
-                .map_err(db)?
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?
                 .collect::<std::result::Result<Vec<_>, _>>()
-                .map_err(db)?
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?
         };
         if rows.len() > 64 {
             return Err("search migration count budget exceeded".into());
@@ -111,21 +114,23 @@ pub(crate) fn initialize(c: &mut Connection, migrate: bool) -> Result<()> {
                 "UPDATE corpus_searches SET token=NULL,expires_ms=NULL WHERE id=?1",
                 [&id],
             )
-            .map_err(db)?;
+            .map_err(crate::corpus_failure::AdmissionFailure::from)?;
             let exists: bool = tx
                 .query_row(
                     "SELECT EXISTS(SELECT 1 FROM corpus_search_runtime WHERE search_id=?1)",
                     [&id],
                     |r| r.get(0),
                 )
-                .map_err(db)?;
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
             if !exists {
                 register(&tx, &id, &state)?;
             }
         }
-        tx.execute_batch("PRAGMA user_version=11;").map_err(db)?;
+        tx.execute_batch("PRAGMA user_version=11;")
+            .map_err(crate::corpus_failure::AdmissionFailure::from)?;
     }
-    tx.commit().map_err(db)
+    tx.commit()
+        .map_err(crate::corpus_failure::AdmissionFailure::from)
 }
 fn history(c: &Connection, id: &str) -> Result<Vec<(Event, String)>> {
     let mut q=c.prepare("SELECT epoch,CASE WHEN length(CAST(body AS BLOB))<=4096 THEN body END,hash FROM corpus_search_transitions WHERE search_id=?1 ORDER BY epoch LIMIT 129").map_err(db)?;

@@ -106,25 +106,31 @@ fn db_err(e: rusqlite::Error) -> String {
 }
 impl Registry {
     pub fn open(path: &Path) -> Result<Self> {
-        let mut connection = Connection::open(path).map_err(db_err)?;
+        Self::open_classified(path).map_err(|e| e.to_string())
+    }
+    pub fn open_classified(
+        path: &Path,
+    ) -> std::result::Result<Self, crate::corpus_failure::AdmissionFailure> {
+        let mut connection =
+            Connection::open(path).map_err(crate::corpus_failure::AdmissionFailure::from)?;
         connection
             .busy_timeout(Duration::from_secs(5))
-            .map_err(db_err)?;
+            .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         connection
             .execute_batch(
                 "PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;",
             )
-            .map_err(db_err)?;
+            .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         let version: i64 = connection
             .query_row("PRAGMA user_version", [], |r| r.get(0))
-            .map_err(db_err)?;
-        if version > 11 {
+            .map_err(crate::corpus_failure::AdmissionFailure::from)?;
+        if version > 12 {
             return Err("database schema newer than supported".into());
         }
         if version == 0 {
             let tx = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(db_err)?;
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
             tx.execute_batch("CREATE TABLE IF NOT EXISTS experiments (
                 id TEXT PRIMARY KEY, key_json TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('queued','running','completed','rejected','invalid','inconclusive','failed')),
                 token TEXT, expires_ms INTEGER, attempt INTEGER NOT NULL DEFAULT 0,
@@ -136,13 +142,14 @@ impl Registry {
                 event_id INTEGER PRIMARY KEY, experiment_id TEXT NOT NULL REFERENCES experiments(id),
                 at_ms INTEGER NOT NULL, action TEXT NOT NULL, attempt INTEGER NOT NULL
             );
-            PRAGMA user_version=1;").map_err(db_err)?;
-            tx.commit().map_err(db_err)?;
+            PRAGMA user_version=1;").map_err(crate::corpus_failure::AdmissionFailure::from)?;
+            tx.commit()
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         }
         if version < 2 {
             let tx = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(db_err)?;
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
             tx.execute_batch("CREATE TABLE IF NOT EXISTS holdouts (
                 dataset_hash TEXT PRIMARY KEY, start_ms INTEGER NOT NULL, end_ms INTEGER NOT NULL,
                 protocol_hash TEXT NOT NULL, selected_json TEXT NOT NULL
@@ -151,13 +158,14 @@ impl Registry {
                 dataset_hash TEXT NOT NULL REFERENCES holdouts(dataset_hash), concept_hash TEXT NOT NULL,
                 experiment_id TEXT NOT NULL REFERENCES experiments(id),
                 PRIMARY KEY(dataset_hash,concept_hash), UNIQUE(experiment_id)
-            ); PRAGMA user_version=2;").map_err(db_err)?;
-            tx.commit().map_err(db_err)?;
+            ); PRAGMA user_version=2;").map_err(crate::corpus_failure::AdmissionFailure::from)?;
+            tx.commit()
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         }
         if version < 3 {
             let tx = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(db_err)?;
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
             tx.execute_batch("CREATE TABLE IF NOT EXISTS research_runs (
                 id TEXT PRIMARY KEY, configuration TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'running' CHECK(state IN ('running','paused','stopped')),
                 cursor INTEGER NOT NULL DEFAULT 0 CHECK(cursor>=0), token TEXT, expires_ms INTEGER,
@@ -169,15 +177,16 @@ impl Registry {
                 run_id TEXT NOT NULL REFERENCES research_runs(id), cursor INTEGER NOT NULL,
                 experiment_id TEXT, outcome TEXT NOT NULL, reused INTEGER NOT NULL, error TEXT,
                 PRIMARY KEY(run_id,cursor)
-            ); PRAGMA user_version=3;").map_err(db_err)?;
-            tx.commit().map_err(db_err)?;
+            ); PRAGMA user_version=3;").map_err(crate::corpus_failure::AdmissionFailure::from)?;
+            tx.commit()
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         }
         if version < 4 {
             connection.execute_batch("CREATE TABLE IF NOT EXISTS scientific_protocols (
                 id TEXT PRIMARY KEY, definition_json TEXT NOT NULL, definition_hash TEXT NOT NULL,
                 report_json TEXT, report_hash TEXT,
                 CHECK ((report_json IS NULL AND report_hash IS NULL) OR (report_json IS NOT NULL AND report_hash IS NOT NULL))
-            ); PRAGMA user_version=4;").map_err(db_err)?;
+            ); PRAGMA user_version=4;").map_err(crate::corpus_failure::AdmissionFailure::from)?;
         }
         if version < 5 {
             connection.execute_batch("CREATE TABLE IF NOT EXISTS instrument_holdouts (
@@ -187,50 +196,53 @@ impl Registry {
                 dataset_hash TEXT NOT NULL,instrument TEXT NOT NULL,concept_hash TEXT NOT NULL,experiment_id TEXT NOT NULL REFERENCES experiments(id),
                 PRIMARY KEY(dataset_hash,instrument,concept_hash),UNIQUE(experiment_id),
                 FOREIGN KEY(dataset_hash,instrument) REFERENCES instrument_holdouts(dataset_hash,instrument)
-            );PRAGMA user_version=5;").map_err(db_err)?;
+            );PRAGMA user_version=5;").map_err(crate::corpus_failure::AdmissionFailure::from)?;
         }
         if version < 6 {
             let tx = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(db_err)?;
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
             tx.execute_batch("CREATE TABLE IF NOT EXISTS protocol_ranges (
                 instrument TEXT NOT NULL, start_ms INTEGER NOT NULL, end_ms INTEGER NOT NULL,
                 dataset_hash TEXT NOT NULL, protocol_hash TEXT NOT NULL,
                 CHECK(start_ms<end_ms), PRIMARY KEY(instrument,start_ms,end_ms)
             );CREATE INDEX IF NOT EXISTS experiment_instrument ON experiments(json_extract(key_json,'$.instrument'));
-            PRAGMA user_version=6;").map_err(db_err)?;
-            tx.commit().map_err(db_err)?;
+            PRAGMA user_version=6;").map_err(crate::corpus_failure::AdmissionFailure::from)?;
+            tx.commit()
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         }
         if version < 7 {
             let tx = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(db_err)?;
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
             tx.execute_batch(
                 "CREATE TABLE IF NOT EXISTS training_diagnoses (
                 id TEXT PRIMARY KEY, parent_id TEXT NOT NULL REFERENCES experiments(id),
                 report_json TEXT NOT NULL, report_hash TEXT NOT NULL
             ); PRAGMA user_version=7;",
             )
-            .map_err(db_err)?;
-            tx.commit().map_err(db_err)?;
+            .map_err(crate::corpus_failure::AdmissionFailure::from)?;
+            tx.commit()
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         }
         if version < 8 {
             let tx = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(db_err)?;
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
             tx.execute_batch(
                 "CREATE TABLE IF NOT EXISTS training_reviews (
                 id TEXT PRIMARY KEY, diagnosis_id TEXT NOT NULL REFERENCES training_diagnoses(id),
                 report_json TEXT NOT NULL, report_hash TEXT NOT NULL
             ); PRAGMA user_version=8;",
             )
-            .map_err(db_err)?;
-            tx.commit().map_err(db_err)?;
+            .map_err(crate::corpus_failure::AdmissionFailure::from)?;
+            tx.commit()
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         }
         if version < 9 {
             let tx = connection
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(db_err)?;
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
             tx.execute_batch("CREATE TABLE IF NOT EXISTS improvement_jobs (
                 run_id TEXT NOT NULL REFERENCES research_runs(id), parent_cursor INTEGER NOT NULL,
                 input_index INTEGER NOT NULL CHECK(input_index>=0), parent_id TEXT NOT NULL REFERENCES experiments(id),
@@ -238,25 +250,27 @@ impl Registry {
                 diagnosis_id TEXT REFERENCES training_diagnoses(id), review_id TEXT REFERENCES training_reviews(id), error TEXT,
                 PRIMARY KEY(run_id,parent_cursor), FOREIGN KEY(run_id,parent_cursor) REFERENCES research_steps(run_id,cursor)
             ); CREATE UNIQUE INDEX IF NOT EXISTS one_pending_improvement ON improvement_jobs(run_id) WHERE state='queued';
-            PRAGMA user_version=9;").map_err(db_err)?;
-            tx.commit().map_err(db_err)?;
+            PRAGMA user_version=9;").map_err(crate::corpus_failure::AdmissionFailure::from)?;
+            tx.commit()
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         }
         // Additive lookup optimization: no table/row-format or version change.
         // Older v9 readers/writers remain compatible and SQLite maintains it.
         connection
             .execute_batch("CREATE INDEX IF NOT EXISTS event_action_lookup ON events(action) WHERE action='proof-audit-contradiction-v1' OR action='indexed-audit-contradiction-v1';")
-            .map_err(db_err)?;
-        connection.execute_batch("CREATE TABLE IF NOT EXISTS replay_checkpoints(experiment_id TEXT NOT NULL REFERENCES experiments(id),cursor INTEGER NOT NULL CHECK(cursor>0),body BLOB NOT NULL CHECK(typeof(body)='blob' AND length(body)<=4194304),hash TEXT NOT NULL CHECK(length(hash)=64),PRIMARY KEY(experiment_id,cursor));CREATE TRIGGER IF NOT EXISTS replay_checkpoint_no_update BEFORE UPDATE ON replay_checkpoints BEGIN SELECT RAISE(ABORT,'checkpoint immutable');END;CREATE TRIGGER IF NOT EXISTS replay_checkpoint_no_delete BEFORE DELETE ON replay_checkpoints BEGIN SELECT RAISE(ABORT,'checkpoint immutable');END;").map_err(db_err)?;
-        connection.execute_batch("CREATE TABLE IF NOT EXISTS corpus_controls(experiment_id TEXT PRIMARY KEY REFERENCES experiments(id),state TEXT NOT NULL CHECK(state IN ('running','paused','stopped')));").map_err(db_err)?;
+            .map_err(crate::corpus_failure::AdmissionFailure::from)?;
+        connection.execute_batch("CREATE TABLE IF NOT EXISTS replay_checkpoints(experiment_id TEXT NOT NULL REFERENCES experiments(id),cursor INTEGER NOT NULL CHECK(cursor>0),body BLOB NOT NULL CHECK(typeof(body)='blob' AND length(body)<=4194304),hash TEXT NOT NULL CHECK(length(hash)=64),PRIMARY KEY(experiment_id,cursor));CREATE TRIGGER IF NOT EXISTS replay_checkpoint_no_update BEFORE UPDATE ON replay_checkpoints BEGIN SELECT RAISE(ABORT,'checkpoint immutable');END;CREATE TRIGGER IF NOT EXISTS replay_checkpoint_no_delete BEFORE DELETE ON replay_checkpoints BEGIN SELECT RAISE(ABORT,'checkpoint immutable');END;").map_err(crate::corpus_failure::AdmissionFailure::from)?;
+        connection.execute_batch("CREATE TABLE IF NOT EXISTS corpus_controls(experiment_id TEXT PRIMARY KEY REFERENCES experiments(id),state TEXT NOT NULL CHECK(state IN ('running','paused','stopped')));").map_err(crate::corpus_failure::AdmissionFailure::from)?;
         crate::result_artifact::initialize(&connection)?;
         if version < 10 {
             connection
                 .execute_batch("PRAGMA user_version=10;")
-                .map_err(db_err)?;
+                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         }
         crate::corpus_search::initialize(&connection)?;
         crate::search_control::initialize(&mut connection, version < 11)?;
         crate::corpus_fleet::initialize(&connection)?;
+        crate::corpus_failure::initialize(&mut connection, version < 12)?;
         Ok(Self { connection })
     }
     /// Atomically reserve OOS time across dataset aliases before any competing registration.
