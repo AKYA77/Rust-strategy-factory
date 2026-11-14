@@ -874,6 +874,93 @@ async fn detail(State(app): State<Arc<App>>, Param(id): Param<String>) -> Respon
         ),
     }
 }
+
+#[derive(Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TradeQuery {
+    after: Option<String>,
+    limit: Option<usize>,
+}
+fn trade_cursor(cursor: Option<&str>) -> Result<Option<(String, usize)>> {
+    let Some(cursor) = cursor else {
+        return Ok(None);
+    };
+    let (hash, offset) = cursor.split_once(':').ok_or("invalid trade cursor")?;
+    if !crate::machine_evidence::hex(hash)
+        || offset.is_empty()
+        || !offset.bytes().all(|b| b.is_ascii_digit())
+    {
+        return Err("invalid trade cursor".into());
+    }
+    let offset = offset
+        .parse::<usize>()
+        .map_err(|_| "invalid trade cursor")?;
+    if !(1..=1_000_000).contains(&offset) {
+        return Err("invalid trade cursor offset".into());
+    }
+    Ok(Some((hash.into(), offset)))
+}
+fn trade_page(
+    result: &crate::storage::StoredResult,
+    after: Option<&(String, usize)>,
+    limit: usize,
+) -> Result<serde_json::Value> {
+    if !(1..=100).contains(&limit) {
+        return Err("invalid trade page size".into());
+    }
+    let offset = if let Some((hash, offset)) = after {
+        if hash != &result.result_hash {
+            return Err("trade cursor belongs to another immutable receipt".into());
+        }
+        *offset
+    } else {
+        0
+    };
+    let trades = result.result["tick_replay"]["trades"].as_array();
+    let total = trades.map_or(0, Vec::len);
+    if total > 1_000_000 || offset > total {
+        return Err("invalid trade page extent".into());
+    }
+    let end = offset.saturating_add(limit).min(total);
+    let rows=trades.into_iter().flatten().skip(offset).take(limit).enumerate().map(|(i,trade)|serde_json::json!({"ordinal":(offset+i+1).to_string(),"trade":trade,"event_ids":{"entry":trade["entry_event"].as_u64().map(|n|n.to_string()),"exit":trade["exit_event"].as_u64().map(|n|n.to_string())}})).collect::<Vec<_>>();
+    Ok(
+        serde_json::json!({"result_hash":result.result_hash,"replay_present":!result.result["tick_replay"].is_null(),"total_trades":total,"first_ordinal":if rows.is_empty(){None}else{Some((offset+1).to_string())},"last_ordinal":if rows.is_empty(){None}else{Some(end.to_string())},"rows":rows,"next_cursor":if end<total{Some(format!("{}:{end}",result.result_hash))}else{None},"limitations":"Immutable receipt page; the complete stored receipt is still loaded and hash-verified before slicing. Full exact export remains separate."}),
+    )
+}
+async fn trades(
+    State(app): State<Arc<App>>,
+    Param(id): Param<String>,
+    Query(query): Query<TradeQuery>,
+) -> Response {
+    if !catalog_id(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid experiment identity");
+    }
+    let limit = query.limit.unwrap_or(100);
+    if !(1..=100).contains(&limit) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid trade page size");
+    }
+    let after = match trade_cursor(query.after.as_deref()) {
+        Ok(v) => v,
+        Err(_) => return api_error(StatusCode::BAD_REQUEST, "invalid trade cursor"),
+    };
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match registry.result(&id) {
+        Ok(Some(result)) => match trade_page(&result, after.as_ref(), limit) {
+            Ok(page) => Json(page).into_response(),
+            Err(_) => api_error(
+                StatusCode::CONFLICT,
+                "trade cursor or receipt extent mismatch",
+            ),
+        },
+        Ok(None) => api_error(StatusCode::NOT_FOUND, "result not completed"),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "result integrity check failed",
+        ),
+    }
+}
 async fn corpus_status(State(app): State<Arc<App>>, Param(id): Param<String>) -> Response {
     if !catalog_id(&id) {
         return api_error(StatusCode::BAD_REQUEST, "invalid corpus identity");
@@ -1207,6 +1294,7 @@ pub async fn serve_with_reviews(
         .route("/api/corpus/{id}/control", post(corpus_control))
         .route("/api/protocols/{id}", get(protocol_detail))
         .route("/api/experiments/{id}", get(detail))
+        .route("/api/experiments/{id}/trades", get(trades))
         .route("/api/runs/{id}/control", post(control))
         .layer(DefaultBodyLimit::max(8192))
         .layer(middleware::from_fn_with_state(app.clone(), guard))
@@ -1443,5 +1531,76 @@ mod ledger_page_tests {
         assert!(ledger_page(&registry, None, 25, false).is_err());
         drop(registry);
         std::fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod trade_page_tests {
+    use super::*;
+    #[test]
+    fn receipt_bound_pages_cover_all_trades_and_exact_unsigned_ids() {
+        let trades: Vec<_> = (0..602u64)
+            .map(|i| serde_json::json!({"entry_event":u64::MAX-602+i,"exit_event":u64::MAX-601+i}))
+            .collect();
+        let result = serde_json::json!({"tick_replay":{"trades":trades}});
+        let result = crate::storage::StoredResult {
+            outcome: "completed".into(),
+            result_hash: crate::data::hash(&result).unwrap(),
+            result,
+        };
+        let mut after = None;
+        let mut seen = Vec::new();
+        loop {
+            let page = trade_page(&result, after.as_ref(), 100).unwrap();
+            assert!(page["rows"].as_array().unwrap().len() <= 100);
+            for row in page["rows"].as_array().unwrap() {
+                seen.push(row["event_ids"]["exit"].as_str().unwrap().to_owned());
+            }
+            if let Some(cursor) = page["next_cursor"].as_str() {
+                after = trade_cursor(Some(cursor)).unwrap();
+            } else {
+                break;
+            }
+        }
+        assert_eq!(seen.len(), 602);
+        assert_eq!(seen[601], u64::MAX.to_string());
+        assert_eq!(
+            seen.into_iter()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len(),
+            602
+        );
+        let first = trade_page(&result, None, 100).unwrap();
+        let cursor = trade_cursor(first["next_cursor"].as_str()).unwrap();
+        let mut other = result.clone();
+        other.result["other_receipt"] = serde_json::json!(true);
+        other.result_hash = crate::data::hash(&other.result).unwrap();
+        assert!(trade_page(&other, cursor.as_ref(), 100).is_err());
+        assert!(trade_page(&result, Some(&(result.result_hash.clone(), 603)), 100).is_err());
+        assert!(trade_page(&result, None, 101).is_err());
+    }
+    #[test]
+    fn malformed_trade_cursors_and_missing_replays_remain_explicit() {
+        for cursor in [
+            "",
+            "bad:1",
+            &format!("{}:0", "0".repeat(64)),
+            &format!("{}:-1", "0".repeat(64)),
+            &format!("{}:1000001", "0".repeat(64)),
+            &format!("{}:1:2", "0".repeat(64)),
+        ] {
+            assert!(trade_cursor(Some(cursor)).is_err());
+        }
+        let value = serde_json::json!({"proof_rejection":true,"tick_replay":null});
+        let result = crate::storage::StoredResult {
+            outcome: "rejected".into(),
+            result_hash: crate::data::hash(&value).unwrap(),
+            result: value,
+        };
+        let page = trade_page(&result, None, 100).unwrap();
+        assert_eq!(page["replay_present"], false);
+        assert_eq!(page["total_trades"], 0);
+        assert!(page["next_cursor"].is_null());
+        assert!(page["first_ordinal"].is_null());
     }
 }
