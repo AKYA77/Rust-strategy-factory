@@ -1257,3 +1257,142 @@ mod account_checkpoint_tests {
         assert!(resolved > 0);
     }
 }
+
+/// Declared concurrent object budgets; these are not measured RSS or OS limits.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CorpusBatchLimits {
+    pub workers: usize,
+    pub max_parallel_candles: usize,
+    pub max_parallel_feature_cells: usize,
+    pub max_parallel_receipts: usize,
+    pub max_new_chunks: usize,
+    pub lease_ms: i64,
+}
+#[derive(Debug, Serialize)]
+pub struct CorpusBatchReport {
+    pub workers_started: usize,
+    pub worker_failures: usize,
+    /// Input order is preserved, including errors and held/busy/terminal jobs.
+    pub jobs: Vec<Result<CorpusProgress>>,
+}
+/// One bounded checkpoint round. Preflight all jobs before opening the registry;
+/// each worker owns a connection and shares only a bounded atomic work cursor.
+pub fn execute_corpus_batch(
+    database: &std::path::Path,
+    runs: &[CorpusRun<'_>],
+    limits: CorpusBatchLimits,
+) -> Result<CorpusBatchReport> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    if runs.is_empty()
+        || runs.len() > 256
+        || !(1..=16).contains(&limits.workers)
+        || !(1..=64).contains(&limits.max_new_chunks)
+        || !(1..=86_400_000).contains(&limits.lease_ms)
+    {
+        return Err("invalid corpus batch job/worker/step/lease limits".into());
+    }
+    let workers = limits.workers.min(runs.len());
+    for (mut values, cap) in [
+        (
+            runs.iter()
+                .map(|r| r.budget.max_candles)
+                .collect::<Vec<_>>(),
+            limits.max_parallel_candles,
+        ),
+        (
+            runs.iter().map(|r| r.budget.feature_cells).collect(),
+            limits.max_parallel_feature_cells,
+        ),
+        (
+            runs.iter().map(|r| r.budget.max_receipts).collect(),
+            limits.max_parallel_receipts,
+        ),
+    ] {
+        values.sort_unstable_by(|a, b| b.cmp(a));
+        let total = values
+            .iter()
+            .take(workers)
+            .try_fold(0usize, |a, b| a.checked_add(*b))
+            .ok_or("corpus aggregate budget overflow")?;
+        if total > cap {
+            return Err("corpus concurrent budget exceeds declared cap".into());
+        }
+    }
+    let mut identities = std::collections::BTreeSet::new();
+    for run in runs {
+        let key = corpus_key(run.base, run.spec, run.strategy, run.costs, run.budget)?;
+        if !identities.insert(crate::data::hash(&key)?) {
+            return Err("duplicate frozen corpus job in batch".into());
+        }
+    }
+    // Initialize sequentially; do not race schema migrations across workers.
+    let mut connections = Vec::with_capacity(workers);
+    for _ in 0..workers {
+        connections.push(crate::storage::Registry::open(database)?);
+    }
+    let next = AtomicUsize::new(0);
+    let mut results: Vec<Option<Result<CorpusProgress>>> = (0..runs.len()).map(|_| None).collect();
+    let mut worker_failures = 0;
+    let mut workers_started = 0;
+    std::thread::scope(|scope| {
+        let mut handles = Vec::new();
+        for (i, mut registry) in connections.into_iter().enumerate() {
+            let next = &next;
+            match std::thread::Builder::new()
+                .name(format!("corpus-{i}"))
+                .spawn_scoped(scope, move || {
+                    let mut completed = Vec::new();
+                    loop {
+                        let index = next.fetch_add(1, Ordering::Relaxed);
+                        let Some(run) = runs.get(index) else {
+                            break;
+                        };
+                        let result = execute_corpus_step(
+                            &mut registry,
+                            CorpusRun {
+                                base: run.base,
+                                spec: run.spec,
+                                strategy: run.strategy,
+                                costs: run.costs,
+                                budget: run.budget,
+                            },
+                            limits.max_new_chunks,
+                            limits.lease_ms,
+                            || chrono::Utc::now().timestamp_millis(),
+                        );
+                        completed.push((index, result));
+                    }
+                    completed
+                }) {
+                Ok(handle) => {
+                    workers_started += 1;
+                    handles.push(handle);
+                }
+                Err(_) => worker_failures += 1,
+            }
+        }
+        for handle in handles {
+            match handle.join() {
+                Ok(completed) => {
+                    for (index, result) in completed {
+                        results[index] = Some(result);
+                    }
+                }
+                Err(_) => worker_failures += 1,
+            }
+        }
+    });
+    Ok(CorpusBatchReport {
+        workers_started,
+        worker_failures,
+        jobs: results
+            .into_iter()
+            .map(|r| {
+                r.unwrap_or_else(|| {
+                    Err("worker interrupted; inspect registry and retry after lease expiry".into())
+                })
+            })
+            .collect(),
+    })
+}

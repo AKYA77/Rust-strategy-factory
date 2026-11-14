@@ -976,3 +976,171 @@ fn killed_corpus_process_waiting_for_writer_preserves_committed_checkpoint() {
     let next: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(next["Pending"]["cursor"], 2);
 }
+
+#[test]
+fn parallel_corpus_rounds_match_serial_receipts_and_reject_aggregate_overcommit() {
+    use rust_strategy_factory::{
+        storage::Registry,
+        strategies::{Rule, Strategy},
+        tick_engine::{self, CorpusBatchLimits, CorpusBudget, CorpusProgress, CorpusRun, Costs},
+    };
+    let f = Fixture::new("parallel-rounds", "EURUSD", 7);
+    let costs = Costs::default();
+    let budget = CorpusBudget {
+        max_candles: 100,
+        feature_cells: 10000,
+        max_receipts: 1000,
+    };
+    let strategies: Vec<_> = [90, 100, 110]
+        .into_iter()
+        .map(|stop_ticks| Strategy {
+            timeframe: Timeframe::M1,
+            side: rust_strategy_factory::contracts::Side::Long,
+            stop_ticks,
+            rule: Rule::AboveMean { window: 2 },
+            entry: None,
+            stop_policy: None,
+        })
+        .collect();
+    let runs: Vec<_> = strategies
+        .iter()
+        .map(|strategy| CorpusRun {
+            base: &f.root,
+            spec: &f.spec,
+            strategy,
+            costs: &costs,
+            budget,
+        })
+        .collect();
+    let db = f.root.join("batch.sqlite");
+    let limits = CorpusBatchLimits {
+        workers: 2,
+        max_parallel_candles: 200,
+        max_parallel_feature_cells: 20000,
+        max_parallel_receipts: 2000,
+        max_new_chunks: 1,
+        lease_ms: 60000,
+    };
+    let mut bad = limits;
+    bad.max_parallel_feature_cells = 19999;
+    assert!(tick_engine::execute_corpus_batch(&db, &runs, bad).is_err());
+    assert!(!db.exists());
+    let duplicates = [
+        CorpusRun {
+            base: &f.root,
+            spec: &f.spec,
+            strategy: &strategies[0],
+            costs: &costs,
+            budget,
+        },
+        CorpusRun {
+            base: &f.root,
+            spec: &f.spec,
+            strategy: &strategies[0],
+            costs: &costs,
+            budget,
+        },
+    ];
+    assert!(tick_engine::execute_corpus_batch(&db, &duplicates, limits).is_err());
+    assert!(!db.exists());
+    for round in 0..f.spec.chunks.len() {
+        let report = tick_engine::execute_corpus_batch(&db, &runs, limits).unwrap();
+        assert_eq!(report.workers_started, 2);
+        assert_eq!(report.worker_failures, 0);
+        assert_eq!(report.jobs.len(), 3);
+        for (i, outcome) in report.jobs.into_iter().enumerate() {
+            match outcome.unwrap() {
+                CorpusProgress::Pending { cursor, .. } => assert_eq!(cursor, round as i64 + 1),
+                CorpusProgress::Completed { result, cached, .. } => {
+                    assert!(!cached);
+                    assert_eq!(
+                        result.result["tick_replay"],
+                        serde_json::to_value(
+                            tick_engine::replay_corpus(
+                                &f.root,
+                                &f.spec,
+                                &strategies[i],
+                                &costs,
+                                budget
+                            )
+                            .unwrap()
+                        )
+                        .unwrap()
+                    );
+                }
+                other => panic!("unexpected {other:?}"),
+            }
+        }
+    }
+    let cached = tick_engine::execute_corpus_batch(&db, &runs, limits).unwrap();
+    assert!(
+        cached
+            .jobs
+            .iter()
+            .all(|r| matches!(r, Ok(CorpusProgress::Completed { cached: true, .. })))
+    );
+    Registry::open(&db).unwrap().integrity().unwrap();
+}
+
+#[test]
+fn corpus_workers_report_job_failures_without_losing_other_checkpoints() {
+    use rust_strategy_factory::{
+        storage::Registry,
+        strategies::{Rule, Strategy},
+        tick_engine::{self, CorpusBatchLimits, CorpusBudget, CorpusProgress, CorpusRun, Costs},
+    };
+    let f = Fixture::new("parallel-errors", "EURUSD", 7);
+    let costs = Costs::default();
+    let strategy = Strategy {
+        timeframe: Timeframe::M1,
+        side: rust_strategy_factory::contracts::Side::Long,
+        stop_ticks: 100,
+        rule: Rule::AboveMean { window: 2 },
+        entry: None,
+        stop_policy: None,
+    };
+    let good = CorpusBudget {
+        max_candles: 100,
+        feature_cells: 10000,
+        max_receipts: 1000,
+    };
+    let mut bad = good;
+    bad.feature_cells = 1;
+    let runs = [
+        CorpusRun {
+            base: &f.root,
+            spec: &f.spec,
+            strategy: &strategy,
+            costs: &costs,
+            budget: bad,
+        },
+        CorpusRun {
+            base: &f.root,
+            spec: &f.spec,
+            strategy: &strategy,
+            costs: &costs,
+            budget: good,
+        },
+    ];
+    let db = f.root.join("errors.sqlite");
+    let report = tick_engine::execute_corpus_batch(
+        &db,
+        &runs,
+        CorpusBatchLimits {
+            workers: 2,
+            max_parallel_candles: 200,
+            max_parallel_feature_cells: 10001,
+            max_parallel_receipts: 2000,
+            max_new_chunks: 1,
+            lease_ms: 60000,
+        },
+    )
+    .unwrap();
+    assert_eq!(report.worker_failures, 0);
+    assert!(report.jobs[0].is_err());
+    assert!(matches!(
+        &report.jobs[1],
+        Ok(CorpusProgress::Pending { cursor: 1, .. })
+    ));
+    Registry::open(&db).unwrap().integrity().unwrap();
+}
