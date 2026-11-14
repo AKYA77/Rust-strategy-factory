@@ -354,5 +354,32 @@ fn corpus_primary_signals_equal_batch_compilation_and_enforce_feature_budget() {
         timeframe: Timeframe::H1,
         rule: Box::new(Rule::AboveMean { window: 2 }),
     };
-    assert!(corpus::signals(&f.root, &f.spec, &higher, 100, 10000).is_err());
+    let expected = Features::with_context(&candles, 10000, &f.data, Timeframe::M1)
+        .unwrap()
+        .signal(&higher.rule)
+        .unwrap();
+    let actual = corpus::signals(&f.root, &f.spec, &higher, 100, 10000).unwrap();
+    assert_eq!(
+        serde_json::to_value(actual).unwrap(),
+        serde_json::to_value(expected).unwrap()
+    );
+    assert!(corpus::signals(&f.root, &f.spec, &higher, 1, 10000).is_err());
+    higher.rule = Rule::HigherTimeframe {
+        timeframe: Timeframe::H1,
+        rule: Box::new(Rule::UtcSession {
+            start_hour: 0,
+            end_hour: 23,
+            weekdays: 127,
+        }),
+    };
+    let expected = Features::with_context(&candles, 10000, &f.data, Timeframe::M1)
+        .unwrap()
+        .signal(&higher.rule)
+        .unwrap();
+    let actual = corpus::signals(&f.root, &f.spec, &higher, 100, 10000).unwrap();
+    assert!(actual.count() > 0);
+    assert_eq!(
+        serde_json::to_value(actual).unwrap(),
+        serde_json::to_value(expected).unwrap()
+    );
 }

@@ -316,9 +316,7 @@ pub fn candle_context(
     Ok(output)
 }
 
-/// Compile bounded causal primary-frame signals using the existing feature
-/// engine. Higher-timeframe rules still require verified multi-frame context
-/// and are refused by Features::new rather than silently approximated.
+/// Compile causal signals from verified multi-frame contexts with an aggregate candle cap.
 pub fn signals(
     base: &Path,
     spec: &Specification,
@@ -327,6 +325,37 @@ pub fn signals(
     feature_cells: usize,
 ) -> Result<crate::indicators::Mask> {
     let strategy = strategy.canonical()?;
-    let candles = candle_context(base, spec, strategy.timeframe, max_candles)?;
-    crate::strategies::Features::new(&candles, feature_cells)?.signal(&strategy.rule)
+    if max_candles == 0 || max_candles > 1_000_000 {
+        return Err("invalid aggregate corpus candle budget".into());
+    }
+    let mut frames = std::collections::BTreeMap::new();
+    let mut streams = Vec::new();
+    let mut total = 0;
+    visit_chunks(base, spec, |_, dataset| {
+        if streams.is_empty() {
+            for tf in Timeframe::ALL {
+                if tf.millis() >= strategy.timeframe.millis() {
+                    streams.push((tf, candles::Stream::new(dataset.profile.clone(), tf)?));
+                    frames.insert(tf, Vec::new());
+                }
+            }
+        }
+        for tick in &dataset.ticks {
+            for (tf, stream) in &mut streams {
+                if let Some(c) = stream.push(*tick)? {
+                    if total >= max_candles {
+                        return Err("aggregate corpus candle budget exceeded".into());
+                    }
+                    frames.get_mut(tf).ok_or("frame unavailable")?.push(c);
+                    total += 1;
+                }
+            }
+        }
+        Ok(())
+    })?;
+    let candles = frames
+        .get(&strategy.timeframe)
+        .ok_or("primary frame missing")?;
+    crate::strategies::Features::with_frames(candles, feature_cells, &frames, strategy.timeframe)?
+        .signal(&strategy.rule)
 }

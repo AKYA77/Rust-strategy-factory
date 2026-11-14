@@ -332,6 +332,7 @@ enum Feature {
 pub struct Features<'a> {
     candles: &'a [Candle],
     context: Option<(&'a crate::data::Dataset, Timeframe)>,
+    frame_context: Option<(&'a BTreeMap<Timeframe, Vec<Candle>>, Timeframe)>,
     close: Vec<i64>,
     cache: BTreeMap<Feature, Vec<Option<i64>>>,
     signals: BTreeMap<Rule, Mask>,
@@ -356,6 +357,7 @@ impl<'a> Features<'a> {
         Ok(Self {
             candles,
             context: None,
+            frame_context: None,
             close: candles.iter().map(|c| c.bid.close).collect(),
             cache: BTreeMap::new(),
             signals: BTreeMap::new(),
@@ -372,6 +374,16 @@ impl<'a> Features<'a> {
     ) -> Result<Self> {
         let mut features = Self::new(candles, max_cells)?;
         features.context = Some((data, timeframe));
+        Ok(features)
+    }
+    pub(crate) fn with_frames(
+        candles: &'a [Candle],
+        max_cells: usize,
+        frames: &'a BTreeMap<Timeframe, Vec<Candle>>,
+        timeframe: Timeframe,
+    ) -> Result<Self> {
+        let mut features = Self::new(candles, max_cells)?;
+        features.frame_context = Some((frames, timeframe));
         Ok(features)
     }
     fn can_retain(&self, additional: usize) -> bool {
@@ -569,8 +581,10 @@ impl<'a> Features<'a> {
                 Mask::from_bools((0..bands.len()).map(|i|i>0 && matches!((bands[i],bands[i-1]),(Some(a),Some(b)) if if *upper {self.close[i]>a && self.close[i-1]<=b}else{self.close[i]<a && self.close[i-1]>=b})))
             }
             Rule::HigherTimeframe { timeframe, rule } => {
-                let (data, base) = self
+                let base = self
                     .context
+                    .map(|(_, tf)| tf)
+                    .or_else(|| self.frame_context.map(|(_, tf)| tf))
                     .ok_or("higher-timeframe signals require dataset context")?;
                 if timeframe.millis() <= base.millis() {
                     return Err("confirmation timeframe must strictly increase".into());
@@ -578,7 +592,16 @@ impl<'a> Features<'a> {
                 let used =
                     (1 + self.cache.len() + self.signals.len()).saturating_mul(self.close.len());
                 let remaining = self.max_cells.saturating_sub(used);
-                let mut higher = crate::candles::build(data, *timeframe)?;
+                let mut higher = if let Some((data, _)) = self.context {
+                    crate::candles::build(data, *timeframe)?
+                } else {
+                    self.frame_context
+                        .ok_or("frame context missing")?
+                        .0
+                        .get(timeframe)
+                        .ok_or("required higher frame missing")?
+                        .clone()
+                };
                 let visible = self.candles.last().map_or(0, |last| {
                     higher.partition_point(|h| {
                         (h.available_ms, h.publication_sequence)
@@ -586,7 +609,16 @@ impl<'a> Features<'a> {
                     })
                 });
                 higher.truncate(visible);
-                let mut features = Features::with_context(&higher, remaining, data, *timeframe)?;
+                let mut features = if let Some((data, _)) = self.context {
+                    Features::with_context(&higher, remaining, data, *timeframe)?
+                } else {
+                    Features::with_frames(
+                        &higher,
+                        remaining,
+                        self.frame_context.ok_or("frame context missing")?.0,
+                        *timeframe,
+                    )?
+                };
                 let mask = features.signal(rule)?;
                 Mask::from_bools(self.candles.iter().map(|c| {
                     let n = higher.partition_point(|h| {

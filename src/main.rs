@@ -542,7 +542,7 @@ fn run(args: &[String]) -> Result<()> {
             )?;
             save(
                 output,
-                &serde_json::json!({"corpus_identity":spec.identity()?,"strategy_identity":strategy.identity()?,"signals":mask,"limitations":"Causal primary-frame signals only; no account replay or qualification."}),
+                &serde_json::json!({"corpus_identity":spec.identity()?,"strategy_identity":strategy.identity()?,"signals":mask,"limitations":"Causal multi-frame signals with bounded contexts; no account replay or qualification."}),
             )
         }
         ["corpus-inspect", specification] => {
