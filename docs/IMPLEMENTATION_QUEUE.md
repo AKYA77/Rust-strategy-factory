@@ -68,3 +68,5 @@ Review journal: immutable five-area text evidence/receipt binding and explicit i
 Review history: indexed bounded receipt-scoped listing, validated reports, hash cursors and actual CLI/plan/append-stability tests now pass. SQL-only fixture timing is limited and not a research speed claim. Next critical step: typed calendar/coverage/quality validators and source/profile review authority, then review UI.
 
 Calendar evidence: receipt/data/declaration-bound mechanical open-session observations and unobserved-interval summaries now reuse existing coverage with actual oracle/CLI evidence. Schedules remain unapproved; nonempty intervals do not prove continuity. Next: raw normalized archive consistency, then independent authority/policy and review UI.
+
+Raw consistency: archive-evidence now binds exact receipt to actual consumed normalized CSV bytes/full quotes, with CLI/assembled/u64/change/partial refusals verified. Bounded normalized format only; no approval. Next: machine evidence admission/recomputation and independent authority, then review UI and coordinated/scalable lifecycle.

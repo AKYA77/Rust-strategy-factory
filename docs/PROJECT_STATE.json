@@ -93,7 +93,8 @@
     "Immutable scoped correction ancestry in versioned catalog receipts with parent/reason identity, bounded full-chain validation, repeat/conflict refusal and snapshot/CLI preservation; no approval grant",
     "Immutable receipt-bound five-area text evidence journal with pending/rejected/recorded-assertion states, evidence hashes, source receipt conflict refusal and validated snapshot/legacy upgrade/CLI recovery; no approval authority",
     "Bounded receipt-scoped review history CLI/API with stable hash cursors, verified returned reports and expression-index lookup; functional insert/cursor/plan tests and scoped SQL-only comparison",
-    "Typed exact-receipt declared-calendar observations reusing verified coverage, bounded in/out-session and empty-interval diagnostics with unapproved assumptions and point-oracle/CLI evidence"
+    "Typed exact-receipt declared-calendar observations reusing verified coverage, bounded in/out-session and empty-interval diagnostics with unapproved assumptions and point-oracle/CLI evidence",
+    "Typed normalized archive consistency evidence reuses exact consumed-byte importer and full quote comparison against catalog receipt; rejects changed bytes/quotes/partial chunks and retains declared class without authenticity/approval grant"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -101,9 +102,9 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Verify normalized raw archive bytes and parsed quote stream against exact observed receipt using existing strict importer; then complete independent source/profile/calendar review authority and machine-evidence policy.",
+  "next_action": "Implement machine-evidence admission/revalidation against exact receipts and raw source inputs, then trusted independent source/profile/calendar review authority; human assertions and consistency reports alone never authorize research.",
   "qualified_strategies": 0,
-  "tests_passed": 219,
+  "tests_passed": 220,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks; persisted proof/indexed failure monitoring, restart and read-only API; optional authenticated catalog pagination/exact exports/full-u64 desktop/mobile and corrupt-state refusal",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
