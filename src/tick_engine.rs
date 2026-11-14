@@ -1050,6 +1050,10 @@ fn replay_corpus_internal(
 
 #[derive(Debug, Serialize)]
 pub enum CorpusProgress {
+    Held {
+        experiment_id: String,
+        state: String,
+    },
     Pending {
         experiment_id: String,
         cursor: i64,
@@ -1074,6 +1078,13 @@ pub fn execute_corpus_step(
 ) -> Result<CorpusProgress> {
     let key = corpus_key(run.base, run.spec, run.strategy, run.costs, run.budget)?;
     let id = registry.register(&key)?;
+    let control = registry.corpus_control(&id)?;
+    if control != "running" {
+        return Ok(CorpusProgress::Held {
+            experiment_id: id,
+            state: control,
+        });
+    }
     let lease = match registry.claim(&id, clock(), lease_ms)? {
         crate::storage::Claim::Busy => return Ok(CorpusProgress::Busy { experiment_id: id }),
         crate::storage::Claim::Reused(result) => {
@@ -1100,6 +1111,14 @@ pub fn execute_corpus_step(
             })
         }
         Some(replay) => {
+            let control = registry.corpus_control(&id)?;
+            if control != "running" {
+                registry.yield_lease(&lease, clock())?;
+                return Ok(CorpusProgress::Held {
+                    experiment_id: id,
+                    state: control,
+                });
+            }
             let result = serde_json::json!({"kind":"synthetic-corpus-replay-v1","corpus_identity":corpus_id,"tick_replay":replay});
             registry.finish(&lease, clock(), crate::storage::Outcome::Completed, &result)?;
             let result = registry

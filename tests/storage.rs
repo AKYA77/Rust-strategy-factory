@@ -697,3 +697,44 @@ fn checkpoint_worker_yield_allows_immediate_reclaim_and_fences_prior_token() {
     drop(r);
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn durable_corpus_controls_survive_restart_and_block_publication() {
+    let dir = directory();
+    let path = dir.join("controls.sqlite");
+    let mut r = Registry::open(&path).unwrap();
+    let mut k = key();
+    k.protocol_hash = "synthetic-corpus-training-v1".into();
+    let id = r.register(&k).unwrap();
+    r.set_corpus_control(&id, "paused", 0).unwrap();
+    drop(r);
+    let mut r = Registry::open(&path).unwrap();
+    assert_eq!(r.corpus_control(&id).unwrap(), "paused");
+    let Claim::Acquired(lease) = r.claim(&id, 1, 1000).unwrap() else {
+        panic!()
+    };
+    assert!(
+        r.finish(
+            &lease,
+            2,
+            Outcome::Completed,
+            &json!({"kind":"synthetic-corpus-replay-v1"})
+        )
+        .is_err()
+    );
+    r.set_corpus_control(&id, "running", 2).unwrap();
+    assert_eq!(r.corpus_control(&id).unwrap(), "running");
+    r.set_corpus_control(&id, "stopped", 3).unwrap();
+    assert!(r.set_corpus_control(&id, "running", 4).is_err());
+    assert!(
+        r.finish(
+            &lease,
+            4,
+            Outcome::Completed,
+            &json!({"kind":"synthetic-corpus-replay-v1"})
+        )
+        .is_err()
+    );
+    drop(r);
+    std::fs::remove_dir_all(dir).unwrap();
+}

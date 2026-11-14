@@ -608,6 +608,14 @@ fn run(args: &[String]) -> Result<()> {
                 || chrono::Utc::now().timestamp_millis(),
             )?)
         }
+        ["corpus-control", database, id, state] => {
+            Registry::open(Path::new(database))?.set_corpus_control(
+                id,
+                state,
+                chrono::Utc::now().timestamp_millis(),
+            )?;
+            print(&serde_json::json!({"ok":true}))
+        }
         ["corpus-inspect", specification] => {
             let path = Path::new(specification);
             print(&rust_strategy_factory::corpus::inspect(

@@ -247,6 +247,7 @@ impl Registry {
             .execute_batch("CREATE INDEX IF NOT EXISTS event_action_lookup ON events(action) WHERE action='proof-audit-contradiction-v1' OR action='indexed-audit-contradiction-v1';")
             .map_err(db_err)?;
         connection.execute_batch("CREATE TABLE IF NOT EXISTS replay_checkpoints(experiment_id TEXT NOT NULL REFERENCES experiments(id),cursor INTEGER NOT NULL CHECK(cursor>0),body BLOB NOT NULL CHECK(typeof(body)='blob' AND length(body)<=4194304),hash TEXT NOT NULL CHECK(length(hash)=64),PRIMARY KEY(experiment_id,cursor));CREATE TRIGGER IF NOT EXISTS replay_checkpoint_no_update BEFORE UPDATE ON replay_checkpoints BEGIN SELECT RAISE(ABORT,'checkpoint immutable');END;CREATE TRIGGER IF NOT EXISTS replay_checkpoint_no_delete BEFORE DELETE ON replay_checkpoints BEGIN SELECT RAISE(ABORT,'checkpoint immutable');END;").map_err(db_err)?;
+        connection.execute_batch("CREATE TABLE IF NOT EXISTS corpus_controls(experiment_id TEXT PRIMARY KEY REFERENCES experiments(id),state TEXT NOT NULL CHECK(state IN ('running','paused','stopped')));").map_err(db_err)?;
         Ok(Self { connection })
     }
     /// Atomically reserve OOS time across dataset aliases before any competing registration.
@@ -603,6 +604,19 @@ impl Registry {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(db_err)?;
+        if result["kind"] == "synthetic-corpus-replay-v1" {
+            let control: Option<String> = tx
+                .query_row(
+                    "SELECT state FROM corpus_controls WHERE experiment_id=?1",
+                    [&lease.experiment_id],
+                    |r| r.get(0),
+                )
+                .optional()
+                .map_err(db_err)?;
+            if control.is_some_and(|s| s != "running") {
+                return Err("corpus publication blocked by durable control".into());
+            }
+        }
         if result["proof_rejection"] == true && matches!(outcome, Outcome::Rejected) {
             crate::proof_screen::guard(&tx)?;
         }
@@ -935,6 +949,50 @@ impl Registry {
         tx.execute(
             "INSERT INTO events(experiment_id,at_ms,action,attempt) VALUES(?1,?2,'yielded',?3)",
             params![lease.experiment_id, now_ms, lease.attempt],
+        )
+        .map_err(db_err)?;
+        tx.commit().map_err(db_err)
+    }
+}
+
+impl Registry {
+    pub fn corpus_control(&self, id: &str) -> Result<String> {
+        let key = self
+            .experiment_key(id)?
+            .ok_or("corpus experiment missing")?;
+        if key.protocol_hash != "synthetic-corpus-training-v1" {
+            return Err("not a registered corpus job".into());
+        }
+        Ok(self
+            .connection
+            .query_row(
+                "SELECT state FROM corpus_controls WHERE experiment_id=?1",
+                [id],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(db_err)?
+            .unwrap_or_else(|| "running".into()))
+    }
+    pub fn set_corpus_control(&mut self, id: &str, state: &str, now_ms: i64) -> Result<()> {
+        if !["running", "paused", "stopped"].contains(&state) {
+            return Err("invalid corpus control".into());
+        }
+        self.corpus_control(id)?;
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(db_err)?;
+        let (status,control):(String,Option<String>)=tx.query_row("SELECT e.state,c.state FROM experiments e LEFT JOIN corpus_controls c ON c.experiment_id=e.id WHERE e.id=?1",[id],|r|Ok((r.get(0)?,r.get(1)?))).map_err(db_err)?;
+        if !["queued", "running"].contains(&status.as_str())
+            || control.as_deref() == Some("stopped")
+        {
+            return Err("terminal corpus job/control cannot be changed".into());
+        }
+        tx.execute("INSERT INTO corpus_controls VALUES(?1,?2) ON CONFLICT(experiment_id) DO UPDATE SET state=excluded.state",params![id,state]).map_err(db_err)?;
+        tx.execute(
+            "INSERT INTO events(experiment_id,at_ms,action,attempt) VALUES(?1,?2,?3,0)",
+            params![id, now_ms, format!("corpus-control-{state}")],
         )
         .map_err(db_err)?;
         tx.commit().map_err(db_err)
