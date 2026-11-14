@@ -30,6 +30,8 @@ struct FleetFile {
     coordinator_lease_ms: i64,
     #[serde(default)]
     resource_guard: Option<resource::Guard>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    disk_guard: Option<crate::disk::Guard>,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -45,12 +47,15 @@ struct Definition {
     sources: Vec<Reference>,
     coordinator_lease_ms: i64,
     resource_guard: Option<resource::Guard>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    disk_guard: Option<crate::disk::Guard>,
 }
 #[derive(Serialize)]
 pub struct Step {
     pub kind: String,
     pub visit: Option<serde_json::Value>,
     pub admission_observation: Option<resource::Decision>,
+    pub disk_admission: Option<crate::disk::Decision>,
     pub status: serde_json::Value,
 }
 struct Source {
@@ -80,6 +85,9 @@ fn validate(definition: &Definition) -> Result<()> {
         return Err("invalid fleet definition bounds".into());
     }
     if let Some(guard) = &definition.resource_guard {
+        guard.validate()?;
+    }
+    if let Some(guard) = &definition.disk_guard {
         guard.validate()?;
     }
     let mut names = std::collections::BTreeSet::new();
@@ -128,6 +136,7 @@ pub fn register_file(config_path: &Path, database: &Path) -> Result<String> {
         sources,
         coordinator_lease_ms: file.coordinator_lease_ms,
         resource_guard: file.resource_guard,
+        disk_guard: file.disk_guard,
     };
     validate(&definition)?;
     let id = data::hash(&definition)?;
@@ -227,6 +236,7 @@ fn read(connection: &Connection, id: &str) -> Result<Snapshot> {
                 "held-or-busy",
                 "blocked",
                 "resource-pressure",
+                "disk-pressure",
                 "paused",
                 "stopped",
             ]
@@ -262,7 +272,7 @@ pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
     let sources:Vec<_>=snapshot.sources.iter().map(|source|{let reference=&snapshot.definition.sources[source.index];serde_json::json!({"index":source.index.to_string(),"name":reference.name,"search_id":reference.search_id,"visits":source.visits.to_string(),"progress_visits":source.progress.to_string(),"last_kind":source.kind,"last_obstacle":source.obstacle,"obstacle_at_visit":source.obstacle_at.map(|n|n.to_string())})}).collect();
     tx.commit().map_err(|e| e.to_string())?;
     Ok(
-        serde_json::json!({"fleet_id":id,"state":snapshot.state,"next_source_index":snapshot.cursor.to_string(),"visits":snapshot.visits.to_string(),"idle_visits":snapshot.idle.to_string(),"attempt":snapshot.attempt.to_string(),"lease_active":snapshot.expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"sources":sources,"qualification_granted":false,"limitations":"Round-robin bounded source visits, not equal CPU allocation, new simulation counts, complete error history or qualification. Returned source errors are isolated; filesystem-stall deadlines and hard OS enforcement remain separate."}),
+        serde_json::json!({"fleet_id":id,"state":snapshot.state,"next_source_index":snapshot.cursor.to_string(),"visits":snapshot.visits.to_string(),"idle_visits":snapshot.idle.to_string(),"attempt":snapshot.attempt.to_string(),"lease_active":snapshot.expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"sources":sources,"disk_reserve_bytes":snapshot.definition.disk_guard.as_ref().map(|g|g.minimum_available_bytes.to_string()),"qualification_granted":false,"limitations":"Round-robin bounded source visits, not equal CPU allocation, new simulation counts, complete error history or qualification. Returned source errors are isolated; filesystem-stall deadlines and hard OS enforcement remain separate."}),
     )
 }
 pub fn control(registry: &mut Registry, id: &str, state: &str) -> Result<()> {
@@ -308,6 +318,17 @@ fn visit(
                 false,
                 Some(decision.reasons.join("; ")),
                 None,
+            ));
+        }
+    }
+    if let Some(guard) = &loaded.file.disk_guard {
+        let decision = guard.check(database)?;
+        if !decision.allowed {
+            return Ok((
+                "disk-pressure".into(),
+                false,
+                Some(decision.reasons.join("; ")),
+                Some(serde_json::json!({"disk_admission":decision})),
             ));
         }
     }
@@ -382,6 +403,21 @@ fn publish(
 pub fn step(database: &Path, id: &str) -> Result<Step> {
     let mut registry = Registry::open(database)?;
     let snapshot = read(&registry.connection, id)?;
+    let disk_admission = snapshot
+        .definition
+        .disk_guard
+        .as_ref()
+        .map(|guard| guard.check(database))
+        .transpose()?;
+    if disk_admission.as_ref().is_some_and(|d| !d.allowed) {
+        return Ok(Step {
+            kind: "disk-pressure".into(),
+            visit: None,
+            admission_observation: None,
+            disk_admission,
+            status: status(&registry, id)?,
+        });
+    }
     let observation = snapshot
         .definition
         .resource_guard
@@ -393,6 +429,7 @@ pub fn step(database: &Path, id: &str) -> Result<Step> {
             kind: "resource-pressure".into(),
             visit: None,
             admission_observation: observation,
+            disk_admission,
             status: status(&registry, id)?,
         });
     }
@@ -416,6 +453,7 @@ pub fn step(database: &Path, id: &str) -> Result<Step> {
             .into(),
             visit: None,
             admission_observation: observation,
+            disk_admission,
             status,
         });
     };
@@ -458,6 +496,7 @@ pub fn step(database: &Path, id: &str) -> Result<Step> {
             .into(),
             visit: Some(visit),
             admission_observation: observation.clone(),
+            disk_admission: disk_admission.clone(),
             status,
         })
     })();
@@ -530,6 +569,20 @@ mod tests {
         let db = root.join("state.sqlite");
         let id = register_file(&file, &db).unwrap();
         (root, db, id)
+    }
+    #[test]
+    fn omitted_disk_guard_preserves_legacy_fleet_definition_bytes() {
+        let legacy = format!(
+            r#"{{"version":"synthetic-corpus-fleet-v1","sources":[{{"name":"fixture","config_path":"/operator.json","search_id":"{}"}}],"coordinator_lease_ms":60000,"resource_guard":null}}"#,
+            "a".repeat(64)
+        );
+        let definition: Definition = serde_json::from_str(&legacy).unwrap();
+        validate(&definition).unwrap();
+        assert_eq!(serde_json::to_string(&definition).unwrap(), legacy);
+        assert_eq!(
+            data::hash(&definition).unwrap(),
+            blake3::hash(legacy.as_bytes()).to_hex().to_string()
+        );
     }
     #[test]
     fn replaced_fleet_coordinators_cannot_publish_or_clear_new_leases() {

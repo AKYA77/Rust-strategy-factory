@@ -78,3 +78,5 @@ pub mod corpus_fleet;
 pub mod operator_config;
 
 pub mod result_artifact;
+
+pub mod disk;

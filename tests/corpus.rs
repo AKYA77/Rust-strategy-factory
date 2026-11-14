@@ -2040,3 +2040,139 @@ fn fleet_cli_restarts_at_next_input_and_stops_with_terminal_budget() {
         "exhausted"
     );
 }
+
+#[test]
+fn disk_pressure_sessions_refuse_before_registration_and_resume_with_unchanged_keys() {
+    use rust_strategy_factory::{corpus_search, operator_config};
+    let first = Fixture::new("disk-process", "EURUSD", 7);
+    for (command, config) in [
+        ("corpus-batch", corpus_batch_fixture(&first)),
+        ("corpus-search", corpus_search_fixture(&first)),
+    ] {
+        let db = first.root.join(format!("{command}.sqlite"));
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&fs::read(&config).unwrap()).unwrap();
+        let original_id = if command == "corpus-search" {
+            Some(
+                corpus_search::identity(&operator_config::load_search(&config).unwrap().run())
+                    .unwrap(),
+            )
+        } else {
+            None
+        };
+        value["disk_guard"] = serde_json::json!({"minimum_available_bytes":u64::MAX});
+        fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+        let run = || {
+            let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+                .args([
+                    command,
+                    config.to_str().unwrap(),
+                    db.to_str().unwrap(),
+                    "100",
+                ])
+                .output()
+                .unwrap();
+            assert!(
+                out.status.success(),
+                "{}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()
+        };
+        let blocked = run();
+        assert_eq!(blocked["stop_reason"], "disk-pressure");
+        assert_eq!(blocked["rounds"], 0);
+        assert_eq!(blocked["disk_admission"]["allowed"], false);
+        assert!(blocked["disk_admission"]["observed"]["available_bytes"].is_string());
+        assert!(!db.exists());
+        value["disk_guard"] = serde_json::json!({"minimum_available_bytes":1});
+        fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+        if let Some(original_id) = original_id {
+            assert_eq!(
+                corpus_search::identity(&operator_config::load_search(&config).unwrap().run())
+                    .unwrap(),
+                original_id
+            );
+        }
+        let completed = run();
+        assert_eq!(
+            completed["stop_reason"],
+            if command == "corpus-search" {
+                "exhausted"
+            } else {
+                "complete"
+            }
+        );
+    }
+}
+#[test]
+fn fleet_disk_guard_preserves_cursor_and_isolates_one_source_until_policy_restored() {
+    use rust_strategy_factory::{corpus_fleet, storage::Registry};
+    let first = Fixture::new("disk-fleet", "EURUSD", 7);
+    let second = Fixture::new("disk-fleet", "XAUUSD", 7);
+    let file = corpus_fleet_fixture(&first, &second);
+    let db = first.root.join("fleet.sqlite");
+    let mut config: serde_json::Value = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
+    config["disk_guard"] = serde_json::json!({"minimum_available_bytes":u64::MAX});
+    fs::write(&file, serde_json::to_vec(&config).unwrap()).unwrap();
+    let guarded = corpus_fleet::register_file(&file, &db).unwrap();
+    let blocked = corpus_fleet::step(&db, &guarded).unwrap();
+    assert_eq!(blocked.kind, "disk-pressure");
+    assert_eq!(blocked.status["visits"], "0");
+    assert_eq!(blocked.status["attempt"], "0");
+    assert!(!blocked.disk_admission.unwrap().allowed);
+    assert_eq!(Registry::open(&db).unwrap().counts().unwrap().registered, 0);
+    config.as_object_mut().unwrap().remove("disk_guard");
+    fs::write(&file, serde_json::to_vec(&config).unwrap()).unwrap();
+    let id = corpus_fleet::register_file(&file, &db).unwrap();
+    let source = config["sources"][0]["config"].as_str().unwrap();
+    let mut source_config: serde_json::Value =
+        serde_json::from_slice(&fs::read(source).unwrap()).unwrap();
+    source_config["disk_guard"] = serde_json::json!({"minimum_available_bytes":u64::MAX});
+    fs::write(source, serde_json::to_vec(&source_config).unwrap()).unwrap();
+    let held = corpus_fleet::step(&db, &id).unwrap();
+    assert_eq!(held.visit.unwrap()["kind"], "disk-pressure");
+    let mut paused = false;
+    for _ in 0..60 {
+        let result = corpus_fleet::step(&db, &id).unwrap();
+        if result.kind == "no-ready-sources" {
+            assert_eq!(result.status["sources"][1]["last_kind"], "exhausted");
+            paused = true;
+            break;
+        }
+    }
+    assert!(paused);
+    source_config.as_object_mut().unwrap().remove("disk_guard");
+    fs::write(source, serde_json::to_vec(&source_config).unwrap()).unwrap();
+    let mut registry = Registry::open(&db).unwrap();
+    corpus_fleet::control(&mut registry, &id, "running").unwrap();
+    drop(registry);
+    let mut exhausted = false;
+    for _ in 0..60 {
+        if corpus_fleet::step(&db, &id).unwrap().kind == "exhausted" {
+            exhausted = true;
+            break;
+        }
+    }
+    assert!(exhausted);
+    Registry::open(&db).unwrap().integrity().unwrap();
+}
+#[test]
+fn actual_disk_observation_resolves_parent_and_refuses_unknown_targets() {
+    use rust_strategy_factory::disk;
+    let first = Fixture::new("disk-observe", "EURUSD", 7);
+    let db = first.root.join("new.sqlite");
+    let snapshot = disk::observe(&db).unwrap();
+    assert!(snapshot.total_bytes > 0 && snapshot.available_bytes <= snapshot.total_bytes);
+    assert!(!db.exists());
+    assert!(disk::observe(&first.root.join("missing").join("new.sqlite")).is_err());
+    assert!(disk::observe(&first.root).is_err());
+    let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args(["disk-status", db.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert!(report["available_bytes"].is_string());
+    assert!(!report.to_string().contains(first.root.to_str().unwrap()));
+}

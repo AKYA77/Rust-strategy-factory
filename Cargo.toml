@@ -21,6 +21,7 @@ csv = "1.4"
 rusqlite = { version = "0.37", features = ["bundled", "backup"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision"] }
+fs2 = "=0.4.3"
 
 [profile.release]
 lto = "thin"

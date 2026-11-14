@@ -1096,3 +1096,34 @@ fn legacy_inline_receipts_above_new_threshold_upgrade_without_rewriting_identity
     drop(c);
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn artifact_file_quota_reserves_staging_and_final_entries_before_publication() {
+    let dir = directory();
+    let db = dir.join("db.sqlite");
+    let mut registry = Registry::open(&db).unwrap();
+    let id = registry.register(&key()).unwrap();
+    let Claim::Acquired(lease) = registry.claim(&id, 0, 100).unwrap() else {
+        panic!()
+    };
+    let root = dir.join("db.sqlite.artifacts");
+    std::fs::create_dir(&root).unwrap();
+    for i in 0..4095 {
+        std::fs::File::create(root.join(format!("{i:064x}.json"))).unwrap();
+    }
+    let value = json!({"payload":"a".repeat(300000)});
+    assert!(
+        registry
+            .finish(&lease, 1, Outcome::Completed, &value)
+            .unwrap_err()
+            .contains("quota")
+    );
+    assert_eq!(std::fs::read_dir(&root).unwrap().count(), 4095);
+    assert!(registry.result(&id).unwrap().is_none());
+    assert_eq!(
+        rust_strategy_factory::result_artifact::inventory(&registry).unwrap()["partial_files"],
+        "0"
+    );
+    drop(registry);
+    std::fs::remove_dir_all(dir).unwrap();
+}

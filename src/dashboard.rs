@@ -1111,6 +1111,24 @@ async fn artifact_status(State(app): State<Arc<App>>) -> Response {
         ),
     }
 }
+async fn disk_status(State(app): State<Arc<App>>) -> Response {
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    let Some(path) = registry.connection.path().filter(|s| !s.is_empty()) else {
+        return api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "filesystem observations unavailable",
+        );
+    };
+    match crate::disk::observe(Path::new(path)) {
+        Ok(snapshot) => Json(snapshot).into_response(),
+        Err(_) => api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "filesystem observations unavailable",
+        ),
+    }
+}
 async fn resource_status() -> Response {
     match crate::resource::observe() {
         Ok(snapshot) => {
@@ -1446,6 +1464,7 @@ pub async fn serve_with_reviews(
         .route("/api/logout", post(logout))
         .route("/api/overview", get(overview))
         .route("/api/resources", get(resource_status))
+        .route("/api/disk", get(disk_status))
         .route("/api/artifacts", get(artifact_status))
         .route("/api/corpus-fleets", get(corpus_fleets))
         .route("/api/corpus-fleets/{id}", get(corpus_fleet_status))

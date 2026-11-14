@@ -50,6 +50,7 @@ fn main() {
         "src/regimes.rs",
         "src/research.rs",
         "src/resource.rs",
+        "src/disk.rs",
         "src/corpus_search.rs",
         "src/coordinator.rs",
         "src/operator_config.rs",

@@ -157,7 +157,7 @@ pub(crate) fn publish(c: &Connection, hash: &str, bytes: &[u8]) -> Result<()> {
         return Ok(());
     }
     let (files, total, _) = scan(&root)?;
-    if files >= MAX_FILES || total + bytes.len() as u64 > MAX_STORE_BYTES {
+    if files.saturating_add(2) > MAX_FILES || total + 2 * bytes.len() as u64 > MAX_STORE_BYTES {
         return Err("artifact store quota prevents publication; retain evidence".into());
     }
     let mut nonce = [0u8; 32];
@@ -236,7 +236,7 @@ pub(crate) fn copy_referenced(source: &Connection, destination: &mut Connection)
         .map_err(|e| e.to_string())?;
     {
         let mut query = tx
-            .prepare("SELECT experiment_id,hash,bytes FROM result_artifacts ORDER BY experiment_id")
+            .prepare("SELECT experiment_id,hash,bytes FROM result_artifacts ORDER BY bytes DESC,experiment_id")
             .map_err(|e| e.to_string())?;
         let rows = query
             .query_map([], |r| {
@@ -285,7 +285,7 @@ pub fn inventory(registry: &crate::storage::Registry) -> Result<Value> {
         )
         .map_err(|e| e.to_string())?;
     Ok(
-        json!({"referenced_receipts":refs.to_string(),"referenced_bytes":referenced.to_string(),"physical_files":files.to_string(),"physical_bytes":bytes.to_string(),"partial_files":partial.to_string(),"maximum_files":MAX_FILES.to_string(),"maximum_store_bytes":MAX_STORE_BYTES.to_string(),"maximum_receipt_bytes":MAX_BYTES.to_string(),"automatic_deletion":false,"limitations":"Metadata inventory only, not full content verification. Unreferenced or partial evidence consumes physical quotas and is never removed automatically; registry-check verifies referenced receipt contents. Not an OS disk quota."}),
+        json!({"referenced_receipts":refs.to_string(),"referenced_bytes":referenced.to_string(),"physical_files":files.to_string(),"physical_bytes":bytes.to_string(),"partial_files":partial.to_string(),"maximum_files":MAX_FILES.to_string(),"maximum_store_bytes":MAX_STORE_BYTES.to_string(),"maximum_receipt_bytes":MAX_BYTES.to_string(),"automatic_deletion":false,"limitations":"Metadata inventory only, not full content verification. Byte counts sum file lengths, not allocated filesystem blocks; publication reserves both staging and final link entries. Unreferenced or partial evidence consumes physical quotas and is never removed automatically; registry-check verifies referenced receipt contents. Not an OS disk quota."}),
     )
 }
 
