@@ -7,7 +7,7 @@ use crate::{
     validation::Interval,
 };
 use serde::{Deserialize, Serialize};
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Declaration {
     pub reference: String,
@@ -34,24 +34,7 @@ pub struct Report {
     pub hash: String,
 }
 pub fn assess(dataset: &Dataset, entry: &Entry, declaration: Declaration) -> Result<Report> {
-    declaration.scope.validate()?;
-    if declaration.reference.trim().is_empty()
-        || declaration.reference.len() > 4096
-        || declaration.open.len() > 100000
-    {
-        return Err("calendar declaration budget/reference invalid".into());
-    }
-    let mut last = declaration.scope.start_ms;
-    for w in &declaration.open {
-        w.validate()?;
-        if w.start_ms < last
-            || w.start_ms < declaration.scope.start_ms
-            || w.end_exclusive_ms > declaration.scope.end_exclusive_ms
-        {
-            return Err("calendar intervals must be ordered disjoint and within scope".into());
-        }
-        last = w.end_exclusive_ms;
-    }
+    declaration.validate()?;
     if data::hash(&entry.receipt)? != entry.hash || entry.receipt.facts != Facts::observe(dataset)?
     {
         return Err("calendar evidence catalog/dataset context mismatch".into());
@@ -109,4 +92,28 @@ pub fn assess(dataset: &Dataset, entry: &Entry, declaration: Declaration) -> Res
     };
     let hash = data::hash(&evidence)?;
     Ok(Report { evidence, hash })
+}
+
+impl Declaration {
+    pub fn validate(&self) -> Result<()> {
+        self.scope.validate()?;
+        if self.reference.trim().is_empty()
+            || self.reference.len() > 4096
+            || self.open.len() > 100000
+        {
+            return Err("calendar declaration budget/reference invalid".into());
+        }
+        let mut last = self.scope.start_ms;
+        for w in &self.open {
+            w.validate()?;
+            if w.start_ms < last
+                || w.start_ms < self.scope.start_ms
+                || w.end_exclusive_ms > self.scope.end_exclusive_ms
+            {
+                return Err("calendar intervals must be ordered disjoint and within scope".into());
+            }
+            last = w.end_exclusive_ms;
+        }
+        Ok(())
+    }
 }

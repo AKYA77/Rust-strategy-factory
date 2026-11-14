@@ -72,3 +72,5 @@ Calendar evidence: receipt/data/declaration-bound mechanical open-session observ
 Raw consistency: archive-evidence now binds exact receipt to actual consumed normalized CSV bytes/full quotes, with CLI/assembled/u64/change/partial refusals verified. Bounded normalized format only; no approval. Next: machine evidence admission/recomputation and independent authority, then review UI and coordinated/scalable lifecycle.
 
 New sampling authorization integrated: REAL_DATA_MATRIX.json records all-eight pending scopes/budgets and exact current access blockers. Machine revalidation now recomputes archive/calendar evidence; persist admitted artifacts and trusted authority next. Full software remains incomplete.
+
+Machine admission: persisted recomputation now binds exact archive byte count/hash, normalized/profile/parser/calendar identities and immutable verification time, with explicit revalidation, source-revision separation, bounded quotas and verified snapshot preservation. Four added API/CLI/corruption/revision tests pass. Independent credentialed review authority and dashboard workflow remain next; no authenticity or scientific eligibility is inferred.

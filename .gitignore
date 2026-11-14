@@ -5,3 +5,6 @@
 .env
 *.secret
 /node_modules/
+
+/work/
+/dev-data/

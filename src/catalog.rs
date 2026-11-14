@@ -176,7 +176,7 @@ pub struct Page {
     pub limitations: &'static str,
 }
 pub struct Catalog {
-    connection: Connection,
+    pub(crate) connection: Connection,
 }
 fn db(e: rusqlite::Error) -> String {
     e.to_string()
@@ -258,7 +258,7 @@ fn correction_context(c: &Connection, entry: &Entry) -> Result<()> {
     Err("catalog correction depth exceeds64".into())
 }
 
-fn get(c: &Connection, id: &str) -> Result<Option<Entry>> {
+pub(crate) fn get(c: &Connection, id: &str) -> Result<Option<Entry>> {
     let entry = get_raw(c, id)?;
     if let Some(entry) = &entry {
         correction_context(c, entry)?;
@@ -356,7 +356,8 @@ impl Catalog {
                 )
                 .map_err(db)?;
             let has_reviews:bool=source.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='catalog_reviews')",[],|r|r.get(0)).map_err(db)?;
-            if tables != if has_reviews { 2 } else { 1 }
+            let has_machine = crate::machine_evidence::exists(&source)?;
+            if tables != 1 + i64::from(has_reviews) + i64::from(has_machine)
                 || columns != 3
                 || all_columns != 3
                 || count > 10000
@@ -438,6 +439,7 @@ impl Catalog {
                             .map_err(db)?;
                     }
                 }
+                crate::machine_evidence::copy(&source, &write)?;
                 write.commit().map_err(db)?;
             }
             source.commit().map_err(db)?;
@@ -523,6 +525,9 @@ impl Catalog {
         }
         if create {
             c.execute_batch("CREATE INDEX IF NOT EXISTS reviews_scope ON catalog_reviews(json_extract(CAST(body AS TEXT),'$.request.catalog_identity'),id)").map_err(db)?;
+        }
+        if create {
+            crate::machine_evidence::initialize(&c)?;
         }
         Ok(Self { connection: c })
     }

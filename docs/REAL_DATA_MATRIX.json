@@ -2,7 +2,7 @@
   "status": "REAL_DATA_ACQUISITION_BLOCKED",
   "compressed_budget_bytes": 1000000000,
   "acquired_bytes": 0,
-  "observed_at_utc": "2026-11-14T02:16Z",
+  "observed_at_utc": "2026-11-14T10:04:54.334805+00:00",
   "source_checks": {
     "Dukascopy": "Proxy CONNECT403; terms/data not obtained",
     "HistData": "Proxy CONNECT403; terms/data not obtained",
@@ -162,5 +162,34 @@
       "recovery": "NOT_RUN",
       "assumptions": "Provider terms, actual bid/ask format, broker/profile/calendar facts remain unverified"
     }
-  ]
+  ],
+  "alternative_source_checks": [
+    {
+      "url": "https://tickdata.fxopen.com/",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "url": "https://support.fxopen.com/portal/en/kb/articles/tick-data",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "url": "https://www.truefx.com/truefx-historical-downloads/",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    },
+    {
+      "url": "https://www.dukascopy-node.app/",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    }
+  ],
+  "alternative_source_findings": {
+    "TrueFX": {
+      "official_download_url": "https://www.truefx.com/truefx-historical-downloads-2/",
+      "official_terms_url": "https://www.truefx.com/truefx-terms-and-conditions/",
+      "findings": "Official pages retrieved through web tool: historical millisecond bid/offer data requires login/free registration; terms restrict use to internal analysis and forbid redistribution. No account created, no terms accepted, no quote files acquired. Eight-symbol/2025/2026 coverage and size remain unverified."
+    },
+    "FXOpen": {
+      "official_documentation": "https://support.fxopen.com/portal/en/kb/articles/quotes-downloader",
+      "findings": "Official documentation describes a Quotes Downloader requiring connection parameters and selectable tick CSV history. Direct shell hosts blocked; license, coverage, Linux access, precision and sample sizes unverified. No connection or acquisition attempted."
+    }
+  }
 }

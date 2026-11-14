@@ -384,6 +384,32 @@ fn run(args: &[String]) -> Result<()> {
                 limit.parse().map_err(|_| "invalid review limit")?,
             )?,
         ),
+        [
+            "machine-admit",
+            archive,
+            dataset,
+            catalog,
+            identity,
+            declaration,
+            claim,
+        ] => print(
+            &rust_strategy_factory::catalog::Catalog::open(Path::new(catalog))?.admit_machine(
+                Path::new(archive),
+                &read_dataset(dataset)?,
+                identity,
+                read_json(declaration)?,
+                &read_json(claim)?,
+            )?,
+        ),
+        ["machine-report", catalog, id] => print(
+            &rust_strategy_factory::catalog::Catalog::existing(Path::new(catalog))?
+                .machine(id)?
+                .ok_or("machine admission missing")?,
+        ),
+        ["machine-revalidate", catalog, id, archive, dataset] => print(
+            &rust_strategy_factory::catalog::Catalog::existing(Path::new(catalog))?
+                .revalidate_machine(id, Path::new(archive), &read_dataset(dataset)?)?,
+        ),
         ["calendar-evidence", dataset, catalog, identity, declaration] => {
             print(&rust_strategy_factory::calendar_evidence::assess(
                 &read_dataset(dataset)?,
