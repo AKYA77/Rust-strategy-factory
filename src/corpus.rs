@@ -283,3 +283,35 @@ pub fn visit_chunks(
     }
     Ok(())
 }
+
+/// Build a bounded candle context from verified chunks without retaining the
+/// quote corpus. The cap includes only published candles; no final bucket is
+/// fabricated. Consumers must retain normal causal publication checks.
+pub fn candle_context(
+    base: &Path,
+    spec: &Specification,
+    timeframe: Timeframe,
+    max_candles: usize,
+) -> Result<Vec<candles::Candle>> {
+    if max_candles == 0 || max_candles > 1_000_000 {
+        return Err("corpus candle context budget must be1..1000000".into());
+    }
+    let mut stream = None;
+    let mut output = Vec::new();
+    visit_chunks(base, spec, |_, dataset| {
+        if stream.is_none() {
+            stream = Some(candles::Stream::new(dataset.profile.clone(), timeframe)?);
+        }
+        let stream = stream.as_mut().ok_or("candle stream unavailable")?;
+        for tick in &dataset.ticks {
+            if let Some(candle) = stream.push(*tick)? {
+                if output.len() >= max_candles {
+                    return Err("corpus candle context budget exceeded".into());
+                }
+                output.push(candle);
+            }
+        }
+        Ok(())
+    })?;
+    Ok(output)
+}

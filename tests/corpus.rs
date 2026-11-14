@@ -280,3 +280,55 @@ fn chunk_visitor_preserves_state_and_stops_before_invalid_or_failed_callbacks() 
     );
     assert_eq!(visited, vec![0]);
 }
+
+#[test]
+fn bounded_candle_context_matches_all_batch_frames_and_refuses_partial_outputs() {
+    let f = Fixture::new("context", "EURUSD", 2);
+    for tf in Timeframe::ALL {
+        let expected = candles::build(&f.data, tf).unwrap();
+        assert_eq!(
+            corpus::candle_context(&f.root, &f.spec, tf, 100).unwrap(),
+            expected
+        );
+        if !expected.is_empty() {
+            assert_eq!(
+                corpus::candle_context(&f.root, &f.spec, tf, expected.len()).unwrap(),
+                expected
+            );
+            if expected.len() > 1 {
+                assert!(corpus::candle_context(&f.root, &f.spec, tf, expected.len() - 1).is_err());
+            }
+        }
+    }
+    for cap in [0, 1_000_001, usize::MAX] {
+        assert!(corpus::candle_context(&f.root, &f.spec, Timeframe::M1, cap).is_err());
+    }
+    let spec = f.root.join("spec.json");
+    fs::write(&spec, serde_json::to_vec(&f.spec).unwrap()).unwrap();
+    let output = f.root.join("candles.json");
+    let result = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-candles",
+            spec.to_str().unwrap(),
+            "M1",
+            "1",
+            output.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(!result.status.success());
+    assert!(!output.exists());
+    let result = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-candles",
+            spec.to_str().unwrap(),
+            "M1",
+            "100",
+            output.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(result.status.success());
+    let actual: Vec<candles::Candle> = serde_json::from_slice(&fs::read(&output).unwrap()).unwrap();
+    assert_eq!(actual, candles::build(&f.data, Timeframe::M1).unwrap());
+}

@@ -508,6 +508,20 @@ fn run(args: &[String]) -> Result<()> {
             rust_strategy_factory::corpus::inspect(Path::new("."), &specification)?;
             save(output, &specification)
         }
+        ["corpus-candles", specification, timeframe, budget, output] => {
+            let path = Path::new(specification);
+            let tf: Timeframe =
+                serde_json::from_value(serde_json::Value::String(timeframe.to_string()))
+                    .map_err(|e| e.to_string())?;
+            let spec = rust_strategy_factory::corpus::load(path)?;
+            let candles = rust_strategy_factory::corpus::candle_context(
+                path.parent().unwrap_or(Path::new(".")),
+                &spec,
+                tf,
+                budget.parse().map_err(|_| "invalid candle budget")?,
+            )?;
+            save(output, &candles)
+        }
         ["corpus-inspect", specification] => {
             let path = Path::new(specification);
             print(&rust_strategy_factory::corpus::inspect(
