@@ -2,3 +2,5 @@
 #detail-label{overflow-wrap:anywhere}#training-json{max-height:36rem;overflow:auto}
 
 #catalog-detail-label{overflow-wrap:anywhere}#catalog-json{max-height:36rem;overflow:auto}
+
+#review-form{display:grid;gap:.65rem;max-width:100%}#review-form[hidden]{display:none}#review-form input,#review-form select,#review-form textarea{width:100%;min-width:0;font:inherit}#review-form textarea{min-height:7rem}#review-history,#review-live{max-height:32rem;overflow:auto}

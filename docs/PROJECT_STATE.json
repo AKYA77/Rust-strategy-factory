@@ -97,7 +97,8 @@
     "Typed normalized archive consistency evidence reuses exact consumed-byte importer and full quote comparison against catalog receipt; rejects changed bytes/quotes/partial chunks and retains declared class without authenticity/approval grant",
     "Machine evidence revalidation recomputes raw archive and declared calendar reports against exact catalog receipt rather than trusting supplied hashes",
     "Immutable persisted recomputed machine archive/calendar evidence with exact artifact bindings, explicit source revalidation, revision isolation, bounded admission and verified catalog snapshot preservation",
-    "Operator-provisioned independent scoped Argon2id review authority, keyed authenticated immutable approval/rejection/revocation chains, stale-head fencing, exact live artifact/scope data gates, revision/synthetic/expiry refusal and preserved snapshot authentication"
+    "Operator-provisioned independent scoped Argon2id review authority, keyed authenticated immutable approval/rejection/revocation chains, stale-head fencing, exact live artifact/scope data gates, revision/synthetic/expiry refusal and preserved snapshot authentication",
+    "Optional authenticated independent-review dashboard with server-selected artifact paths, paginated durable decisions/exact exports, separate reviewer credentials and stale-head/synthetic refusal, explicit current-artifact gates and authority reload with bounded blocking work"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -105,19 +106,19 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Integrate authenticated independent data review and explicit live-gate revalidation in the dashboard using operator-selected artifact paths; then full-history chunk streaming and coordinated recovery.",
+  "next_action": "Implement bounded-memory multi-chunk corpus traversal and incremental candles using the authoritative candle model; preserve exact event order/provenance, fail on corruption and avoid claiming full research streaming before engine integration.",
   "qualified_strategies": 0,
   "tests_passed": 231,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
-  "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks; persisted proof/indexed failure monitoring, restart and read-only API; optional authenticated catalog pagination/exact exports/full-u64 desktop/mobile and corrupt-state refusal",
+  "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks; persisted proof/indexed failure monitoring, restart and read-only API; optional authenticated catalog pagination/exact exports/full-u64 desktop/mobile and corrupt-state refusal; independent review actual Rust/SQLite workflow covers credentials/CSRF/origin, paginated history/exact export, synthetic refusal, revocation/stale head, changed files, current authority failure, desktop/mobile and restart",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
   "component_benchmark": "docs/BENCHMARKS/v6-prefix-component.json",
   "generation_component_benchmark": "docs/BENCHMARKS/structural-generation-v1.json",
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43584010114,
-    "sha": "a4908404d9c1f0501e63a7df745b64193030c957",
+    "run_id": 43584467552,
+    "sha": "b3553ee0eaa0efe9200515287c9ec6107e153cd1",
     "conclusion": "success"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",

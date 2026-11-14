@@ -75,6 +75,9 @@ struct Session {
 struct App {
     registry: Mutex<Registry>,
     catalog_path: Option<PathBuf>,
+    review_config: Option<ReviewConfig>,
+    review_slots: Arc<tokio::sync::Semaphore>,
+    review_bucket: Mutex<(Instant, u32)>,
     password_hash: String,
     sessions: Mutex<HashMap<String, Session>>,
     login_bucket: Mutex<(Instant, u32)>,
@@ -327,6 +330,240 @@ async fn catalog_detail(State(app): State<Arc<App>>, Param(id): Param<String>) -
         ),
     }
 }
+// Operator-owned artifact selection; requests never choose local paths.
+#[derive(Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewConfig {
+    authority: PathBuf,
+    artifacts: Vec<ReviewArtifact>,
+}
+#[derive(Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReviewArtifact {
+    machine_id: String,
+    archive: PathBuf,
+    dataset: PathBuf,
+}
+impl ReviewConfig {
+    fn load(path: &Path) -> Result<Self> {
+        if fs::metadata(path).map_err(|e| e.to_string())?.len() > 128 * 1024 {
+            return Err("review configuration exceeds128KiB".into());
+        }
+        let body = fs::read(path).map_err(|e| e.to_string())?;
+        if body.len() > 128 * 1024 {
+            return Err("review configuration exceeds128KiB".into());
+        }
+        let mut cfg: Self =
+            serde_json::from_slice(&body).map_err(|_| "invalid review configuration")?;
+        if cfg.artifacts.is_empty() || cfg.artifacts.len() > 64 {
+            return Err("review configuration requires1..64 artifacts".into());
+        }
+        let base = path.parent().unwrap_or(Path::new("."));
+        cfg.authority = base.join(cfg.authority);
+        let mut seen = std::collections::HashSet::new();
+        for a in &mut cfg.artifacts {
+            if !catalog_id(&a.machine_id)
+                || !seen.insert(a.machine_id.clone())
+                || a.archive.as_os_str().is_empty()
+                || a.dataset.as_os_str().is_empty()
+            {
+                return Err("invalid or duplicate configured review artifact".into());
+            }
+            a.archive = base.join(&a.archive);
+            a.dataset = base.join(&a.dataset);
+        }
+        crate::review_authority::Authority::load(&cfg.authority)?;
+        Ok(cfg)
+    }
+}
+fn review_dataset(path: &Path) -> Result<crate::data::Dataset> {
+    match path.extension().and_then(|e| e.to_str()) {
+        Some("rsf") => crate::native::read(path),
+        Some("rsfz") => crate::compressed::read(path),
+        Some("parquet") => crate::parquet_store::read(path),
+        _ => {
+            let f = fs::File::open(path).map_err(|e| e.to_string())?;
+            if f.metadata().map_err(|e| e.to_string())?.len() > 128 * 1024 * 1024 {
+                return Err("review dataset exceeds128MiB".into());
+            }
+            serde_json::from_reader(std::io::BufReader::new(f)).map_err(|e| e.to_string())
+        }
+    }
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReviewQuery {
+    before: Option<String>,
+    limit: Option<usize>,
+}
+async fn data_review_state(
+    State(app): State<Arc<App>>,
+    Param(id): Param<String>,
+    Query(query): Query<ReviewQuery>,
+) -> Response {
+    let limit = query.limit.unwrap_or(25);
+    let before = match query.before {
+        Some(s) => match s.parse::<i64>() {
+            Ok(n) if n > 0 && n.to_string() == s => Some(n),
+            _ => return api_error(StatusCode::BAD_REQUEST, "invalid review cursor"),
+        },
+        None => None,
+    };
+    if !catalog_id(&id) || limit == 0 || limit > 25 {
+        return api_error(StatusCode::BAD_REQUEST, "invalid review identity/limit");
+    }
+    let (Some(config), Some(catalog)) = (&app.review_config, &app.catalog_path) else {
+        return Json(serde_json::json!({"configured":false,"message":"Independent review workflow is not configured."})).into_response();
+    };
+    let config = config.clone();
+    let catalog = catalog.clone();
+    let Ok(permit) = app.review_slots.clone().try_acquire_owned() else {
+        return api_error(StatusCode::TOO_MANY_REQUESTS, "review work busy");
+    };
+    let result=tokio::task::spawn_blocking(move||->Result<serde_json::Value>{
+        let _permit=permit;
+        let a=crate::review_authority::Authority::load(&config.authority)?;
+        let c=crate::catalog::Catalog::existing(&catalog)?;
+        let state=c.review_state(&id,&a)?;
+        let mut events=state.events.iter().rev().filter(|e|before.is_none_or(|b|e.record.sequence<b)).take(limit+1).collect::<Vec<_>>();
+        let more=events.len()>limit;events.truncate(limit);
+        let next=if more{events.last().map(|e|e.record.sequence.to_string())}else{None};
+        let mut admissions=Vec::new();
+        for artifact in &config.artifacts {
+            let r=c.machine(&artifact.machine_id)?.ok_or("configured machine admission missing")?;
+            if r.record.binding.catalog_identity==id {admissions.push(serde_json::json!({"id":r.id,"hash":r.hash,"verified_at":r.record.verified_at,"archive_hash":r.record.binding.archive_hash,"scope":r.record.binding.calendar.scope}));}
+        }
+        Ok(serde_json::json!({"configured":true,"catalog_identity":id,"head":state.head,"events":events,"next_cursor":next,"current_authority_authenticated":state.current_authority_authenticated,"admissions":admissions,"limitations":state.limitations}))
+    }).await;
+    match result {
+        Ok(Ok(v)) => Json(v).into_response(),
+        _ => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "review history/configuration integrity failed",
+        ),
+    }
+}
+async fn live_eligibility(State(app): State<Arc<App>>, Param(id): Param<String>) -> Response {
+    if !catalog_id(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid machine identity");
+    }
+    let (Some(config), Some(catalog)) = (&app.review_config, &app.catalog_path) else {
+        return api_error(
+            StatusCode::NOT_FOUND,
+            "independent review workflow not configured",
+        );
+    };
+    let Some(artifact) = config
+        .artifacts
+        .iter()
+        .find(|a| a.machine_id == id)
+        .cloned()
+    else {
+        return api_error(
+            StatusCode::NOT_FOUND,
+            "artifact is not configured for review",
+        );
+    };
+    let authority = config.authority.clone();
+    let catalog = catalog.clone();
+    let Ok(permit) = app.review_slots.clone().try_acquire_owned() else {
+        return api_error(StatusCode::TOO_MANY_REQUESTS, "review work busy");
+    };
+    let result =
+        tokio::task::spawn_blocking(move || -> Result<crate::data_approval::Eligibility> {
+            let _permit = permit;
+            let a = crate::review_authority::Authority::load(&authority)?;
+            let c = crate::catalog::Catalog::existing(&catalog)?;
+            c.data_eligibility(
+                &a,
+                &id,
+                &artifact.archive,
+                &review_dataset(&artifact.dataset)?,
+            )
+        })
+        .await;
+    match result {
+        Ok(Ok(v)) => Json(v).into_response(),
+        _ => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "live artifact verification unavailable; no eligibility grant",
+        ),
+    }
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReviewDecision {
+    reviewer: String,
+    password: String,
+    request: crate::data_approval::Request,
+}
+async fn data_review_decide(
+    State(app): State<Arc<App>>,
+    Json(body): Json<ReviewDecision>,
+) -> Response {
+    let (Some(config), Some(catalog)) = (&app.review_config, &app.catalog_path) else {
+        return api_error(
+            StatusCode::NOT_FOUND,
+            "independent review workflow not configured",
+        );
+    };
+    if body.reviewer.len() > 128
+        || body.password.len() > 1024
+        || !config
+            .artifacts
+            .iter()
+            .any(|a| a.machine_id == body.request.machine_id)
+    {
+        return api_error(
+            StatusCode::BAD_REQUEST,
+            "invalid or unconfigured review request",
+        );
+    }
+    if !bucket(&app.review_bucket, 8) {
+        return api_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            "review authentication rate limit",
+        );
+    }
+    let Ok(permit) = app.review_slots.clone().try_acquire_owned() else {
+        return api_error(StatusCode::TOO_MANY_REQUESTS, "review work busy");
+    };
+    let authority = config.authority.clone();
+    let catalog = catalog.clone();
+    let owner_hash = app.password_hash.clone();
+    let result = tokio::task::spawn_blocking(
+        move || -> std::result::Result<crate::data_approval::Event, bool> {
+            let _permit = permit;
+            let a = crate::review_authority::Authority::load(&authority).map_err(|_| false)?;
+            // Reusing the dashboard owner's credential is not independent review.
+            if PasswordHash::new(&owner_hash).ok().is_some_and(|h| {
+                Argon2::default()
+                    .verify_password(body.password.as_bytes(), &h)
+                    .is_ok()
+            }) {
+                return Err(true);
+            }
+            let p = a
+                .authenticate(&body.reviewer, &body.password)
+                .map_err(|_| true)?;
+            let mut c = crate::catalog::Catalog::open(&catalog).map_err(|_| false)?;
+            c.decide(&a, &p, body.request).map_err(|_| false)
+        },
+    )
+    .await;
+    match result {
+        Ok(Ok(v)) => Json(v).into_response(),
+        Ok(Err(true)) => api_error(
+            StatusCode::FORBIDDEN,
+            "independent reviewer credentials refused",
+        ),
+        _ => api_error(
+            StatusCode::CONFLICT,
+            "review refused; inspect scope, synthetic/profile limits and latest history",
+        ),
+    }
+}
+
 #[derive(Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct HistoryQuery {
@@ -683,6 +920,19 @@ pub async fn serve_with_catalog(
     port: u16,
     catalog: Option<&Path>,
 ) -> Result<()> {
+    serve_with_reviews(database, auth_path, port, catalog, None).await
+}
+pub async fn serve_with_reviews(
+    database: &Path,
+    auth_path: &Path,
+    port: u16,
+    catalog: Option<&Path>,
+    review_path: Option<&Path>,
+) -> Result<()> {
+    let review_config = review_path.map(ReviewConfig::load).transpose()?;
+    if review_config.is_some() && catalog.is_none() {
+        return Err("review workflow requires a configured catalog".into());
+    }
     if port != 0 && port < 1024 {
         return Err("use an unprivileged loopback port or zero for allocation".into());
     }
@@ -708,6 +958,19 @@ pub async fn serve_with_catalog(
     if auth.version != 1 || PasswordHash::new(&auth.password_hash).is_err() {
         return Err("unsupported password hash configuration".into());
     }
+    if let Some(cfg) = &review_config {
+        let authority = crate::review_authority::Authority::load(&cfg.authority)?;
+        if authority.shares_password_hash(&auth.password_hash) {
+            return Err(
+                "independent reviewer credential cannot equal dashboard owner credential".into(),
+            );
+        }
+        let c = crate::catalog::Catalog::existing(catalog.ok_or("review catalog missing")?)?;
+        for artifact in &cfg.artifacts {
+            c.machine(&artifact.machine_id)?
+                .ok_or("configured machine admission missing")?;
+        }
+    }
     let listener = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port))
         .await
         .map_err(|e| e.to_string())?;
@@ -715,6 +978,9 @@ pub async fn serve_with_catalog(
     let app = Arc::new(App {
         registry: Mutex::new(Registry::open(database)?),
         catalog_path: catalog.map(Path::to_path_buf),
+        review_config,
+        review_slots: Arc::new(tokio::sync::Semaphore::new(1)),
+        review_bucket: Mutex::new((Instant::now(), 0)),
         password_hash: auth.password_hash,
         sessions: Mutex::new(HashMap::new()),
         login_bucket: Mutex::new((Instant::now(), 0)),
@@ -754,6 +1020,9 @@ pub async fn serve_with_catalog(
         .route("/api/overview", get(overview))
         .route("/api/catalog", get(catalog_page))
         .route("/api/catalog/{id}", get(catalog_detail))
+        .route("/api/data-review/{id}", get(data_review_state))
+        .route("/api/data-review", post(data_review_decide))
+        .route("/api/data-eligibility/{id}", get(live_eligibility))
         .route("/api/experiments", get(experiments))
         .route("/api/experiment-history", get(history))
         .route("/api/training-diagnoses", get(diagnoses))

@@ -2,6 +2,10 @@
   "name": "rust-strategy-factory-browser-tests",
   "version": "0.1.0",
   "private": true,
-  "scripts": {"test:browser": "node scripts/browser-check.cjs"},
-  "devDependencies": {"playwright": "1.62.1"}
+  "scripts": {
+    "test:browser": "node scripts/browser-check.cjs && node scripts/browser-review-check.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
 }

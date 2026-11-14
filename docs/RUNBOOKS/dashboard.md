@@ -42,3 +42,17 @@ Authenticated `GET /api/training-diagnoses?parent=EXPERIMENT_ID` and `GET /api/t
 The authenticated detail response adds `trade_event_ids` decimal strings for the first500 visible trades, derived from the verified immutable result's original u64 values. The table renders these strings rather than rounded JavaScript numbers. Older responses without valid exact strings use a safe-integer guard and direct users to the raw receipt for unsafe values. The original result remains unchanged; `result_hash` covers that stored result, and exports retain its exact numeric values alongside the derived display fields.
 
 Actual browser acceptance imports/replays a synthetic trade with entry18446744073709551614 and exit18446744073709551615, verifies both distinct decimal strings at desktop/mobile widths, safe-boundary fallback behavior and byte-for-byte raw export. The regression failed before the fix. These display/API changes preserve the complete compiled compute/version identity; no simulation is rerun or financial result altered.
+
+## Independent data review
+
+After provisioning the independent authority and machine admissions described in `dataset-catalog.md`, an operator may enable review workflows:
+
+```sh
+rust-strategy-factory serve registry.sqlite owner-auth.secret 8080 catalog.sqlite review-config.json
+```
+
+The bounded configuration selects an `authority` file and1..64 `artifacts`, each with `machine_id`, `archive` and `dataset` paths. Paths resolve relative to the configuration file. These server-owned paths are never selected by browser input or exported. The authority is reloaded for each operation; removal, unsafe permissions, corruption or policy rotation cannot retain cached approvals. Existing `serve` invocations remain supported; without review configuration, approval mutations are unavailable.
+
+Inspect a catalog receipt to browse25-decision history pages, download the exact response and select its configured artifact admission. Revalidation is explicit and recomputes the current archive/dataset/calendar plus five scoped approval gates. A failure clears the displayed live result; historical consistency is not current eligibility. Decisions require the existing owner session/CSRF guards plus independently provisioned reviewer credentials on each submission. Owner credentials cannot substitute for independent review, and passwords are cleared after submission. Scope/expiry, synthetic/profile restrictions and latest-head fencing are enforced by the same durable backend as the CLI. Older-page submission is disabled until the latest history is loaded. Rejections/revocations retain evidence and prior decisions; no history-reset endpoint exists.
+
+Review history: authenticated GET `/api/data-review/{catalog-identity}` with optional `before` decimal sequence and `limit`1..25. Live gate: GET `/api/data-eligibility/{configured-machine-id}`. Decision: POST `/api/data-review`, JSON `reviewer`, `password`, and the existing typed decision `request`. Existing8KiB body, host/origin/session/CSRF and request limits remain; reviewer authentication adds8 attempts/minute and a single bounded blocking-work slot shared with artifact verification. Secrets and provisioning grants are never returned. Backend scientific protocols remain blocked for real qualification prerequisites; no dashboard action can approve synthetic data or manufacture a qualified strategy.
