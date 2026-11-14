@@ -855,3 +855,124 @@ fn corpus_terminal_failures_are_not_success_and_invalid_budgets_do_not_register(
     assert_eq!(outcome, "failed");
     assert_eq!(r.counts().unwrap().attempts, 1);
 }
+
+#[test]
+fn paused_corpus_backup_restores_without_mutating_original_job() {
+    use rust_strategy_factory::storage::Registry;
+    let f = Fixture::new("paused-backup", "EURUSD", 7);
+    let spec = f.root.join("spec.json");
+    let strategy = f.root.join("strategy.json");
+    let db = f.root.join("original.sqlite");
+    let backup = f.root.join("backup.sqlite");
+    fs::write(&spec, serde_json::to_vec(&f.spec).unwrap()).unwrap();
+    fs::write(
+        &strategy,
+        r#"{"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}}"#,
+    )
+    .unwrap();
+    let call = |db: &std::path::Path| {
+        let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args([
+                "corpus-step",
+                spec.to_str().unwrap(),
+                strategy.to_str().unwrap(),
+                db.to_str().unwrap(),
+                "100",
+                "10000",
+                "1000",
+                "1",
+                "60000",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()
+    };
+    let first = call(&db);
+    let id = first["Pending"]["experiment_id"].as_str().unwrap();
+    let mut r = Registry::open(&db).unwrap();
+    r.set_corpus_control(id, "paused", 1).unwrap();
+    let hash = r.replay_checkpoint(id).unwrap().unwrap().1;
+    r.backup(&backup).unwrap();
+    let held = call(&backup);
+    assert_eq!(held["Held"]["state"], "paused");
+    let mut restored = Registry::open(&backup).unwrap();
+    assert_eq!(restored.replay_checkpoint(id).unwrap().unwrap().1, hash);
+    restored.set_corpus_control(id, "running", 2).unwrap();
+    drop(restored);
+    let mut done = false;
+    for _ in 0..f.spec.chunks.len() {
+        if !call(&backup)["Completed"].is_null() {
+            done = true;
+            break;
+        }
+    }
+    assert!(done);
+    assert_eq!(r.corpus_control(id).unwrap(), "paused");
+    assert_eq!(r.replay_checkpoint(id).unwrap().unwrap().0.cursor, 1);
+}
+#[test]
+#[cfg(unix)]
+fn killed_corpus_process_waiting_for_writer_preserves_committed_checkpoint() {
+    use rust_strategy_factory::storage::Registry;
+    use std::os::unix::process::ExitStatusExt;
+    let f = Fixture::new("killed-resume", "EURUSD", 7);
+    let spec = f.root.join("spec.json");
+    let strategy = f.root.join("strategy.json");
+    let db = f.root.join("kill.sqlite");
+    fs::write(&spec, serde_json::to_vec(&f.spec).unwrap()).unwrap();
+    fs::write(
+        &strategy,
+        r#"{"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}}"#,
+    )
+    .unwrap();
+    let args = [
+        "corpus-step",
+        spec.to_str().unwrap(),
+        strategy.to_str().unwrap(),
+        db.to_str().unwrap(),
+        "100",
+        "10000",
+        "1000",
+        "1",
+        "60000",
+    ];
+    let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let first: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let id = first["Pending"]["experiment_id"].as_str().unwrap();
+    let r = Registry::open(&db).unwrap();
+    let hash = r.replay_checkpoint(id).unwrap().unwrap().1;
+    drop(r);
+    let lock = rusqlite::Connection::open(&db).unwrap();
+    lock.execute_batch("BEGIN IMMEDIATE").unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args(args)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    child.kill().unwrap();
+    assert_eq!(child.wait().unwrap().signal(), Some(9));
+    lock.execute_batch("ROLLBACK").unwrap();
+    drop(lock);
+    let r = Registry::open(&db).unwrap();
+    assert_eq!(r.replay_checkpoint(id).unwrap().unwrap().1, hash);
+    r.integrity().unwrap();
+    drop(r);
+    let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let next: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(next["Pending"]["cursor"], 2);
+}
