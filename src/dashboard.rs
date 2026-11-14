@@ -876,6 +876,25 @@ async fn corpus_status(State(app): State<Arc<App>>, Param(id): Param<String>) ->
         ),
     }
 }
+async fn corpus_control(
+    State(app): State<Arc<App>>,
+    Param(id): Param<String>,
+    Json(body): Json<Control>,
+) -> Response {
+    if !catalog_id(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid corpus identity");
+    }
+    let Ok(mut registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "registry unavailable");
+    };
+    match registry.set_corpus_control(&id, &body.state, chrono::Utc::now().timestamp_millis()) {
+        Ok(()) => Json(serde_json::json!({"ok":true})).into_response(),
+        Err(_) => api_error(
+            StatusCode::BAD_REQUEST,
+            "invalid corpus job or control transition",
+        ),
+    }
+}
 async fn protocols(State(app): State<Arc<App>>) -> Response {
     let Ok(registry) = app.registry.lock() else {
         return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
@@ -1046,6 +1065,7 @@ pub async fn serve_with_reviews(
         .route("/api/training-reviews/{id}", get(review_detail))
         .route("/api/protocols", get(protocols))
         .route("/api/corpus/{id}/status", get(corpus_status))
+        .route("/api/corpus/{id}/control", post(corpus_control))
         .route("/api/protocols/{id}", get(protocol_detail))
         .route("/api/experiments/{id}", get(detail))
         .route("/api/runs/{id}/control", post(control))

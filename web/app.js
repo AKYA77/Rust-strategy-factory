@@ -31,7 +31,21 @@ byId('history-previous').addEventListener('click',()=>{if(!historyStack.length)r
 
 byId('logout').addEventListener('click',()=>api('/api/logout',{}).then(()=>location.assign('/')).catch(failure));
 byId('export').addEventListener('click',()=>{const link=el('a');const url=URL.createObjectURL(new Blob([exportText],{type:'application/json'}));link.href=url;link.download=exportId+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
-function renderResults(){const table=byId('results');table.replaceChildren();for(const row of rows){const tr=el('tr');const button=el('button',row.id.slice(0,12));button.addEventListener('click',()=>detail(row).catch(failure));const id=el('td');id.append(button);tr.append(id,...[row.key.instrument,row.strategy?.timeframe||'—',row.state+(row.key.engine_version!==currentEngine?' · legacy engine':''),row.closed_trades??'—',money(row.ending_micro_usd)].map(v=>el('td',v)));table.append(tr);}}
+function renderResults(){const table=byId('results');table.replaceChildren();for(const row of rows){const tr=el('tr');const button=el('button',row.id.slice(0,12));button.addEventListener('click',()=>detail(row).catch(failure));const id=el('td');id.append(button);if(row.key.protocol_hash==='synthetic-corpus-training-v1'){const recovery=el('button','Recovery');recovery.addEventListener('click',()=>loadCorpus(row.id));id.append(recovery);}tr.append(id,...[row.key.instrument,row.strategy?.timeframe||'—',row.state+(row.key.engine_version!==currentEngine?' · legacy engine':''),row.closed_trades??'—',money(row.ending_micro_usd)].map(v=>el('td',v)));table.append(tr);}}
+let corpusSelected='',corpusRequest=0,corpusRaw='';
+function corpusDisable(){for(const action of ['pause','resume','stop'])byId('corpus-'+action).disabled=true;}
+async function loadCorpus(id){
+ const request=++corpusRequest;corpusSelected=id;corpusRaw='';corpusDisable();byId('corpus-export').disabled=true;byId('corpus-recovery').hidden=false;byId('corpus-label').textContent=id;byId('corpus-status').textContent='Verifying recovery checkpoint…';byId('corpus-json').textContent='';
+ try{const raw=await api('/api/corpus/'+id+'/status').then(r=>r.text());if(request!==corpusRequest)return;const data=JSON.parse(raw);corpusRaw=raw;byId('corpus-json').textContent=diagnosticJson(data);byId('corpus-status').textContent=data.state+' · '+data.control+' · checkpoint '+(data.checkpoint_cursor??'none')+' · attempt '+data.attempt;byId('corpus-export').disabled=false;
+ const active=['queued','running'].includes(data.state)&&data.control!=='stopped';byId('corpus-pause').disabled=!active||data.control!=='running';byId('corpus-resume').disabled=!active||data.control!=='paused';byId('corpus-stop').disabled=!active;
+ }catch(error){if(request===corpusRequest){byId('corpus-status').textContent='Verified recovery status unavailable.';failure(error);}}
+}
+for(const [action,state]of [['pause','paused'],['resume','running'],['stop','stopped']])byId('corpus-'+action).addEventListener('click',async()=>{
+ const id=corpusSelected;corpusDisable();try{await api('/api/corpus/'+id+'/control',{state});if(id===corpusSelected)await loadCorpus(id);}catch(error){if(id===corpusSelected){await loadCorpus(id);failure(error);}}
+});
+byId('corpus-refresh').addEventListener('click',()=>{if(corpusSelected)loadCorpus(corpusSelected);});
+byId('corpus-export').addEventListener('click',()=>{if(!corpusRaw)return;const link=el('a'),url=URL.createObjectURL(new Blob([corpusRaw],{type:'application/json'}));link.href=url;link.download='corpus-recovery-'+corpusSelected+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+
 let trainingSelection='',trainingDiagnosis='',trainingText='',trainingId='';
 async function trainingList(kind,parent,host,before=null,append=false,owner=exportId,selection=null){
  const query=new URLSearchParams({parent,limit:'10'});if(before!==null)query.set('before',before);
