@@ -1,0 +1,50 @@
+{
+  "class": "SYNTHETIC_DEVELOPMENT_REBUILD_ONLY",
+  "baseline_identity": "compute-blake3:859ed118fc44a0a342dd0b853067aa1c09b0805e747596be273a90f713ec175b",
+  "checks": [
+    {
+      "path": "src/catalog.rs",
+      "original_sha256": "442346f5b54f51b19a525a78d098a4c990d26a5a5137a28ed5f70f4f6afcabb4",
+      "probe_sha256": "f4a1427608481142d01d2c2570bfe08fa8150d248e781926c1b9fa9554f3e7de",
+      "identity_changed": true,
+      "identity": "compute-blake3:86d8707865140f654562c66b8f6a720b6ff34051a7eda246814af5969449df83"
+    },
+    {
+      "path": "src/machine_evidence.rs",
+      "original_sha256": "de9880308735c1e1e76c52b974abed0f2fefb0ae50c43ba72f8c8b62568c2cd8",
+      "probe_sha256": "2e7f7220c36615aac42d7c83c1cecf45ade60617dd57d25b4d2958673be028f3",
+      "identity_changed": true,
+      "identity": "compute-blake3:09d41017a24fe49f9cd649e128089bb0e8fe43d11149adc5a7b18655580ff09f"
+    },
+    {
+      "path": "src/review_authority.rs",
+      "original_sha256": "3bed8b89c4b8c378c48d9aad978d8a3a6ae9935d52f039dd3180b758264326b9",
+      "probe_sha256": "f3815075a3728a836f3ee43f333f627da06815cfe501424f7f14346130f20811",
+      "identity_changed": true,
+      "identity": "compute-blake3:579d4d1996c597e8fbe7b15b1498c66409020e39d64ffaf86826e6c9089fe8a1"
+    },
+    {
+      "path": "src/data_approval.rs",
+      "original_sha256": "fd8b5629d9f1b0c16646e6e80702e533b1b537fcffad067bafbf4ca21ae62a22",
+      "probe_sha256": "ff386c3af8518ea3da54bd22a6d41ae4a81124b886ebac0134548e242be97418",
+      "identity_changed": true,
+      "identity": "compute-blake3:aa8cfee0fbaf10e46e0b4436925c5d78f99d73e78b13779be9e65e246bc176d1"
+    },
+    {
+      "path": "src/corpus.rs",
+      "original_sha256": "29ca99a524c3cdac7ad19928b99705df625eeb1d0d42dbec9798890e92192ee2",
+      "probe_sha256": "613427508baddce98380223abc3af61a67bea6b8a87b8b2c1dffc5ab1c878360",
+      "identity_changed": true,
+      "identity": "compute-blake3:407a2ff9ed079ed8178469fcf2dc963c7787c5a316e55123bc30d624fa7df080"
+    },
+    {
+      "path": "web/style.css",
+      "original_sha256": "9440c59c4e3365d39b7c35cba22f78d567f234d4dfdd06ea9dfac9feba3fb97b",
+      "probe_sha256": "11334f13115b563aba82b1e021b4da161bb1938fa2bf1fe09bab5f28002571a6",
+      "identity_changed": false,
+      "identity": "compute-blake3:859ed118fc44a0a342dd0b853067aa1c09b0805e747596be273a90f713ec175b"
+    }
+  ],
+  "all_original_bytes_and_identity_restored": true,
+  "limitations": "Actual debug rebuild source fingerprint checks only; no market data, simulations, throughput or scientific eligibility. CSS changes stay outside compute identity. No background processes or external services."
+}

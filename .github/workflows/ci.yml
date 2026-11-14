@@ -17,6 +17,10 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium
       - run: cargo build --locked
+      - name: Verify data compute identity boundaries
+        run: |
+          mkdir -p work
+          python3 scripts/check-data-compute-identity.py work/data-compute-identity.json
       - run: npm run test:browser
       - run: cargo build --locked --release
       - run: python3 scripts/check-operations.py
