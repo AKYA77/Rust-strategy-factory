@@ -84,3 +84,5 @@ pub mod disk;
 mod search_control;
 
 pub mod corpus_failure;
+
+pub mod retry_policy;

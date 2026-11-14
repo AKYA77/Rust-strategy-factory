@@ -53,6 +53,7 @@ fn main() {
         "src/disk.rs",
         "src/corpus_search.rs",
         "src/corpus_failure.rs",
+        "src/retry_policy.rs",
         "src/search_control.rs",
         "src/coordinator.rs",
         "src/operator_config.rs",

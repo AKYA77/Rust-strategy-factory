@@ -19,6 +19,7 @@ pub(crate) enum Cause {
     WorkerError,
     Exhausted,
     OperatorRequeue,
+    PolicyRequeue,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -29,7 +30,7 @@ pub(crate) struct Head {
     pub state: String,
     pub epoch: i64,
     pub origin: Option<Origin>,
-    paused_at: Option<i64>,
+    pub paused_at: Option<i64>,
     journaled: usize,
     omitted: i64,
     last_hash: String,
@@ -173,7 +174,7 @@ fn allowed(from: &str, to: &str, cause: Cause) -> bool {
         }
         Cause::WorkerError => from == "running" && to == "paused",
         Cause::Exhausted => from == "running" && to == "exhausted",
-        Cause::OperatorRequeue => from == "paused" && to == "running",
+        Cause::OperatorRequeue | Cause::PolicyRequeue => from == "paused" && to == "running",
     }
 }
 pub(crate) fn read(c: &Connection, id: &str) -> Result<Head> {

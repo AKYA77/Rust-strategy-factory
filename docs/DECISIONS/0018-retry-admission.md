@@ -1,0 +1,9 @@
+# Immutable opt-in retry admission
+
+Schema13 stores one immutable operational policy per search: positive1..86400000 ms backoff and1..32 maximum slots. Configure is idempotent for the same policy; retuning and terminal-search installation refuse. Financial keys and budgets are not changed. Older binaries must not write this schema; preserve a verified pre-upgrade snapshot/matching binary and stop old processes before upgrade.
+
+The admission API starts no workers. One immediate transaction checks the expected exact state epoch, worker_error pause origin, observed pause time, clock rollback, frozen policy/deadline, inactive coordinator, verified typed registry_admission_busy slots, available queue width and existing three-requeue lifetime budget. Active or terminal child experiments are excluded without modifying their leases/results. Operator and legacy-unknown pauses, unclassified errors, backoff and exhausted capacity/history hold without spinning or partial requeue.
+
+The existing requeue transaction is shared with manual requeue, preserving its explicit operator semantics. Policy requeues append the policy hash and prior kind/error to immutable per-slot chains and use an explicit policy_requeue control transition. Optional absent policy fields keep old record hashes unchanged. Registry integrity and backups verify/preserve policies and action provenance. Hold/backoff responses are observations, not a durable decision journal or evidence of executed simulations.
+
+Tests cover exact deadline/clock/epoch boundaries, immutable policy and backup independence, competing one-winner admissions, operator/nonretryable holds, three-requeue exhaustion and active/terminal child preservation. This is the admission library prerequisite; foreground automatic execution, decision/session history, CLI/dashboard actions and owned-process supervision remain separate unfinished requirements. No classification or policy grants scientific eligibility.

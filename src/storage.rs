@@ -124,7 +124,7 @@ impl Registry {
         let version: i64 = connection
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .map_err(crate::corpus_failure::AdmissionFailure::from)?;
-        if version > 12 {
+        if version > 13 {
             return Err("database schema newer than supported".into());
         }
         if version == 0 {
@@ -271,6 +271,7 @@ impl Registry {
         crate::search_control::initialize(&mut connection, version < 11)?;
         crate::corpus_fleet::initialize(&connection)?;
         crate::corpus_failure::initialize(&mut connection, version < 12)?;
+        crate::retry_policy::initialize(&mut connection, version < 13)?;
         Ok(Self { connection })
     }
     /// Atomically reserve OOS time across dataset aliases before any competing registration.

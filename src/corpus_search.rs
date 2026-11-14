@@ -312,6 +312,8 @@ struct RequeueRecord {
     previous_hash: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     prior_error_kind: Option<crate::corpus_failure::Kind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    supervision_policy_hash: Option<String>,
 }
 fn requeue_history(
     connection: &Connection,
@@ -354,6 +356,16 @@ fn requeue_history(
         {
             return Err("requeue history integrity mismatch".into());
         }
+        if let Some(policy_hash) = &record.supervision_policy_hash {
+            let (_, actual) = crate::retry_policy::read(connection, id)?
+                .ok_or("requeue references missing retry policy")?;
+            if policy_hash != &actual
+                || record.prior_error_kind
+                    != Some(crate::corpus_failure::Kind::RegistryAdmissionBusy)
+            {
+                return Err("requeue policy provenance mismatch".into());
+            }
+        }
         heads.insert(slot, (sequence, hash.clone()));
         result.push((record, hash));
     }
@@ -366,18 +378,42 @@ pub fn requeue_errors(
     id: &str,
     maximum_slots: usize,
 ) -> Result<serde_json::Value> {
-    if !(1..=32).contains(&maximum_slots) {
-        return Err("requeue request must contain1..32 slots".into());
-    }
     let tx = registry
         .connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(|e| e.to_string())?;
-    let (config, cursor, state, _, expiry, jobs) = read(&tx, id)?;
-    if state != "paused" || expiry.is_some_and(|t| t > chrono::Utc::now().timestamp_millis()) {
+    let value = requeue_in(
+        &tx,
+        id,
+        maximum_slots,
+        None,
+        chrono::Utc::now().timestamp_millis(),
+    )?;
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(value)
+}
+fn requeue_in(
+    tx: &Connection,
+    id: &str,
+    maximum_slots: usize,
+    policy_hash: Option<&str>,
+    now: i64,
+) -> Result<serde_json::Value> {
+    if !(1..=32).contains(&maximum_slots) {
+        return Err("requeue request must contain1..32 slots".into());
+    }
+    let held = |reason: &str| -> Result<serde_json::Value> {
+        if policy_hash.is_some() {
+            Ok(serde_json::json!({"kind":"held","reason":reason}))
+        } else {
+            Err(reason.into())
+        }
+    };
+    let (config, cursor, state, _, expiry, jobs) = read(tx, id)?;
+    if state != "paused" || expiry.is_some_and(|t| t > now) {
         return Err("requeue requires a paused search without an active coordinator".into());
     }
-    let history = requeue_history(&tx, id, cursor)?;
+    let history = requeue_history(tx, id, cursor)?;
     let mut heads = std::collections::BTreeMap::<usize, (usize, String)>::new();
     for (record, hash) in history {
         heads.insert(record.slot, (record.sequence, hash));
@@ -388,15 +424,39 @@ pub fn requeue_errors(
         .count();
     let capacity = config.queue_width.saturating_sub(active).min(maximum_slots);
     if capacity == 0 {
-        return Err("no retry queue capacity; reconcile pending slots first".into());
+        return held("no retry queue capacity; reconcile pending slots first");
     }
-    let eligible: Vec<_> = jobs
-        .iter()
-        .filter(|j| j.state == "error" && heads.get(&j.definition.slot).map_or(0, |(n, _)| *n) < 3)
-        .take(capacity)
-        .collect();
+    let mut eligible = Vec::new();
+    for job in &jobs {
+        if job.state != "error" || heads.get(&job.definition.slot).map_or(0, |(n, _)| *n) >= 3 {
+            continue;
+        }
+        if policy_hash.is_some() {
+            if job.error_kind != Some(crate::corpus_failure::Kind::RegistryAdmissionBusy) {
+                continue;
+            }
+            let child: Option<(String, Option<i64>)> = tx
+                .query_row(
+                    "SELECT state,expires_ms FROM experiments WHERE id=?1",
+                    [job.definition.key.identity()?],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .optional()
+                .map_err(|e| e.to_string())?;
+            if child.is_some_and(|(state, expiry)| {
+                !matches!(state.as_str(), "queued" | "running")
+                    || state == "running" && expiry.is_some_and(|t| t > now)
+            }) {
+                continue;
+            }
+        }
+        eligible.push(job);
+        if eligible.len() == capacity {
+            break;
+        }
+    }
     if eligible.is_empty() {
-        return Err("no eligible error slots; bounded requeue budget may be exhausted".into());
+        return held("no admissible error slots or requeue budget exhausted");
     }
     let (count,size):(usize,usize)=tx.query_row("SELECT count(*),coalesce(sum(length(CAST(body AS BLOB))),0) FROM corpus_search_requeues",[],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|e|e.to_string())?;
     let mut incoming = Vec::new();
@@ -412,9 +472,10 @@ pub fn requeue_errors(
             search_id: id.into(),
             slot: job.definition.slot,
             sequence: previous.map_or(1, |(n, _)| n + 1),
-            at_ms: chrono::Utc::now().timestamp_millis(),
+            at_ms: now,
             prior_error,
             prior_error_kind: job.error_kind,
+            supervision_policy_hash: policy_hash.map(str::to_owned),
             previous_hash: previous.map_or_else(String::new, |(_, h)| h.clone()),
         };
         let body = serde_json::to_string(&record).map_err(|e| e.to_string())?;
@@ -425,7 +486,7 @@ pub fn requeue_errors(
         incoming.push((record, body));
     }
     if count + incoming.len() > 10000 || size + bytes > 40 * 1024 * 1024 {
-        return Err("global requeue history quota reached".into());
+        return held("global requeue history quota reached");
     }
     let mut slots = Vec::new();
     for (record, body) in incoming {
@@ -437,17 +498,66 @@ pub fn requeue_errors(
         slots.push(record.slot.to_string());
     }
     crate::search_control::transition(
-        &tx,
+        tx,
         id,
         "running",
-        crate::search_control::Cause::OperatorRequeue,
-        chrono::Utc::now().timestamp_millis(),
+        if policy_hash.is_some() {
+            crate::search_control::Cause::PolicyRequeue
+        } else {
+            crate::search_control::Cause::OperatorRequeue
+        },
+        now,
     )?;
-    tx.commit().map_err(|e| e.to_string())?;
     Ok(
-        serde_json::json!({"search_id":id,"requeued_slots":slots,"state":"running","qualification_granted":false,"limitations":"Explicit bounded requeue under unchanged keys; original errors remain immutable. Child leases and committed results are never reset. Start an operator process to execute queued work."}),
+        serde_json::json!({"kind":"requeued","search_id":id,"requeued_slots":slots,"state":"running","qualification_granted":false,"limitations":"Explicit bounded requeue under unchanged keys; original errors remain immutable. Child leases and committed results are never reset. Start an operator process to execute queued work."}),
     )
 }
+pub(crate) fn retry_admit(
+    registry: &mut Registry,
+    id: &str,
+    expected_epoch: i64,
+    now: i64,
+) -> Result<serde_json::Value> {
+    if chrono::DateTime::from_timestamp_millis(now).is_none() {
+        return Err("invalid retry admission time".into());
+    }
+    let tx = registry
+        .connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|e| e.to_string())?;
+    let head = crate::search_control::read(&tx, id)?;
+    let hold = |reason: &str| serde_json::json!({"kind":"held","reason":reason,"epoch":head.epoch.to_string(),"workers_started":0});
+    if head.epoch != expected_epoch {
+        return Ok(hold("stale-epoch"));
+    }
+    if head.state != "paused" || head.origin != Some(crate::search_control::Origin::WorkerError) {
+        return Ok(hold("not-worker-error-pause"));
+    }
+    let Some((policy, hash)) = crate::retry_policy::read(&tx, id)? else {
+        return Ok(hold("policy-not-configured"));
+    };
+    let paused = head.paused_at.ok_or("worker pause lacks timestamp")?;
+    if now < paused {
+        return Ok(hold("clock-rollback"));
+    }
+    let deadline = paused
+        .checked_add(policy.backoff_ms)
+        .ok_or("retry backoff overflow")?;
+    if chrono::DateTime::from_timestamp_millis(deadline).is_none() {
+        return Err("retry deadline unsupported".into());
+    }
+    if now < deadline {
+        return Ok(
+            serde_json::json!({"kind":"backoff","retry_at_ms":deadline.to_string(),"epoch":head.epoch.to_string(),"workers_started":0}),
+        );
+    }
+    let mut value = requeue_in(&tx, id, policy.maximum_slots, Some(&hash), now)?;
+    value["policy_hash"] = hash.into();
+    value["workers_started"] = 0.into();
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(value)
+}
+
 pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
     let tx = registry
         .connection
@@ -475,9 +585,10 @@ pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
     }
     let recent:Vec<_>=jobs.iter().rev().take(32).map(|j|serde_json::json!({"candidate_index":j.definition.slot.to_string(),"family":j.definition.family,"experiment_id":j.definition.key.identity().ok(),"state":j.state,"error":j.error,"error_kind":j.error_kind,"retry_candidate":j.error_kind.is_some_and(|k|k.retry_candidate())})).collect();
     let control = crate::search_control::status(&tx, id)?;
+    let retry_policy=crate::retry_policy::read(&tx,id)?.map(|(p,hash)|serde_json::json!({"hash":hash,"backoff_ms":p.backoff_ms.to_string(),"maximum_slots":p.maximum_slots.to_string()}));
     tx.commit().map_err(|e| e.to_string())?;
     Ok(
-        serde_json::json!({"control":control,"search_id":id,"state":state,"generated_slots":cursor.to_string(),"maximum_candidates":config.maximum_candidates.to_string(),"attempt":attempt.to_string(),"lease_active":expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"slot_states":counts,"recent_slots":recent,"requeue_records":history.len().to_string(),"retry_eligible_slots":retry_eligible.to_string(),"retry_capacity":retry_capacity.to_string(),"maximum_requeues_per_slot":3,"recent_requeues":recent_requeues,"automatic_retry_enabled":false,"qualification_granted":false,"limitations":"Generated slots are not new tick simulations; canonical duplicates can share immutable experiment receipts. Synthetic USD training search only."}),
+        serde_json::json!({"control":control,"search_id":id,"state":state,"generated_slots":cursor.to_string(),"maximum_candidates":config.maximum_candidates.to_string(),"attempt":attempt.to_string(),"lease_active":expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"slot_states":counts,"recent_slots":recent,"requeue_records":history.len().to_string(),"retry_eligible_slots":retry_eligible.to_string(),"retry_capacity":retry_capacity.to_string(),"maximum_requeues_per_slot":3,"recent_requeues":recent_requeues,"retry_policy":retry_policy,"automatic_retry_enabled":false,"qualification_granted":false,"limitations":"Generated slots are not new tick simulations; canonical duplicates can share immutable experiment receipts. Synthetic USD training search only."}),
     )
 }
 pub(crate) fn integrity(registry: &Registry) -> Result<()> {
@@ -509,6 +620,7 @@ pub(crate) fn integrity(registry: &Registry) -> Result<()> {
         return Err("persisted requeue quota exceeded".into());
     }
     crate::search_control::integrity(&tx)?;
+    crate::retry_policy::integrity(&tx)?;
     for id in ids {
         let (_, cursor, _, _, _, _) = read(&tx, &id)?;
         requeue_history(&tx, &id, cursor)?;
@@ -1225,6 +1337,264 @@ mod tests {
         registry.integrity().unwrap();
         drop(registry);
         (root, spec, costs, id)
+    }
+    fn policy_fixture(name: &str) -> (std::path::PathBuf, String) {
+        let (root, _spec, _costs, id) = failed_slots(name, 1);
+        let mut registry = Registry::open(&root.join("state.sqlite")).unwrap();
+        let (hash, error): (String, String) = registry
+            .connection
+            .query_row(
+                "SELECT hash,error FROM corpus_search_jobs WHERE search_id=?1",
+                [&id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        registry.connection.execute("UPDATE corpus_search_jobs SET error_kind='registry_admission_busy',failure_hash=?2 WHERE search_id=?1",params![id,crate::corpus_failure::fingerprint(&id,0,&hash,crate::corpus_failure::Kind::RegistryAdmissionBusy,&error).unwrap()]).unwrap();
+        control(&mut registry, &id, "running").unwrap();
+        let tx = registry
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .unwrap();
+        crate::search_control::transition(
+            &tx,
+            &id,
+            "paused",
+            crate::search_control::Cause::WorkerError,
+            1000,
+        )
+        .unwrap();
+        tx.commit().unwrap();
+        drop(registry);
+        (root, id)
+    }
+    #[test]
+    fn policy_freeze_backoff_epoch_clock_and_backup_are_exact() {
+        use crate::retry_policy::{self, Policy};
+        let (root, id) = policy_fixture("policy-clock");
+        let db = root.join("state.sqlite");
+        let mut registry = Registry::open(&db).unwrap();
+        let epoch = crate::search_control::read(&registry.connection, &id)
+            .unwrap()
+            .epoch;
+        assert_eq!(
+            retry_policy::admit(&mut registry, &id, epoch, 1060).unwrap()["reason"],
+            "policy-not-configured"
+        );
+        let policy = Policy {
+            backoff_ms: 50,
+            maximum_slots: 1,
+        };
+        let hash = retry_policy::configure(&mut registry, &id, &policy).unwrap();
+        assert_eq!(
+            retry_policy::configure(&mut registry, &id, &policy).unwrap(),
+            hash
+        );
+        assert!(
+            retry_policy::configure(
+                &mut registry,
+                &id,
+                &Policy {
+                    backoff_ms: 49,
+                    maximum_slots: 1
+                }
+            )
+            .is_err()
+        );
+        assert_eq!(
+            retry_policy::admit(&mut registry, &id, epoch - 1, 1060).unwrap()["reason"],
+            "stale-epoch"
+        );
+        assert_eq!(
+            retry_policy::admit(&mut registry, &id, epoch, 999).unwrap()["reason"],
+            "clock-rollback"
+        );
+        let wait = retry_policy::admit(&mut registry, &id, epoch, 1049).unwrap();
+        assert_eq!(wait["kind"], "backoff");
+        assert_eq!(wait["retry_at_ms"], "1050");
+        registry.backup(&root.join("backup.sqlite")).unwrap();
+        let mut backup = Registry::open(&root.join("backup.sqlite")).unwrap();
+        let applied = retry_policy::admit(&mut backup, &id, epoch, 1050).unwrap();
+        assert_eq!(applied["kind"], "requeued");
+        assert_eq!(applied["workers_started"], 0);
+        assert_eq!(applied["policy_hash"], hash);
+        backup.integrity().unwrap();
+        assert_eq!(status(&registry, &id).unwrap()["state"], "paused");
+        assert_eq!(
+            status(&backup, &id).unwrap()["recent_requeues"][0]["prior_error_kind"],
+            "registry_admission_busy"
+        );
+        drop(backup);
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn policy_never_overrides_operator_or_retries_unknown_failures() {
+        use crate::retry_policy::{self, Policy};
+        let (root, id) = policy_fixture("policy-intent");
+        let mut registry = Registry::open(&root.join("state.sqlite")).unwrap();
+        retry_policy::configure(
+            &mut registry,
+            &id,
+            &Policy {
+                backoff_ms: 1,
+                maximum_slots: 1,
+            },
+        )
+        .unwrap();
+        control(&mut registry, &id, "paused").unwrap();
+        let epoch = crate::search_control::read(&registry.connection, &id)
+            .unwrap()
+            .epoch;
+        assert_eq!(
+            retry_policy::admit(&mut registry, &id, epoch, 2000).unwrap()["reason"],
+            "not-worker-error-pause"
+        );
+        control(&mut registry, &id, "running").unwrap();
+        fixture_error(&registry, &id, "permanent configuration refusal");
+        let tx = registry
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .unwrap();
+        crate::search_control::transition(
+            &tx,
+            &id,
+            "paused",
+            crate::search_control::Cause::WorkerError,
+            1000,
+        )
+        .unwrap();
+        tx.commit().unwrap();
+        let epoch = crate::search_control::read(&registry.connection, &id)
+            .unwrap()
+            .epoch;
+        assert_eq!(
+            retry_policy::admit(&mut registry, &id, epoch, 2000).unwrap()["kind"],
+            "held"
+        );
+        assert_eq!(status(&registry, &id).unwrap()["requeue_records"], "0");
+        registry.integrity().unwrap();
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn concurrent_policy_admission_has_one_winner_and_preserves_lifetime_budget() {
+        use crate::retry_policy::{self, Policy};
+        let (root, id) = policy_fixture("policy-race");
+        let db = root.join("state.sqlite");
+        let mut registry = Registry::open(&db).unwrap();
+        retry_policy::configure(
+            &mut registry,
+            &id,
+            &Policy {
+                backoff_ms: 1,
+                maximum_slots: 1,
+            },
+        )
+        .unwrap();
+        let epoch = crate::search_control::read(&registry.connection, &id)
+            .unwrap()
+            .epoch;
+        drop(registry);
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+        let threads: Vec<_> = (0..2)
+            .map(|_| {
+                let db = db.clone();
+                let id = id.clone();
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    let mut registry = Registry::open(&db).unwrap();
+                    barrier.wait();
+                    retry_policy::admit(&mut registry, &id, epoch, 2000).unwrap()
+                })
+            })
+            .collect();
+        let values: Vec<_> = threads.into_iter().map(|t| t.join().unwrap()).collect();
+        assert_eq!(values.iter().filter(|v| v["kind"] == "requeued").count(), 1);
+        let mut registry = Registry::open(&db).unwrap();
+        for number in 1..=3 {
+            let (hash, error) = (
+                registry
+                    .connection
+                    .query_row(
+                        "SELECT hash FROM corpus_search_jobs WHERE search_id=?1",
+                        [&id],
+                        |r| r.get::<_, String>(0),
+                    )
+                    .unwrap(),
+                "admission busy",
+            );
+            registry.connection.execute("UPDATE corpus_search_jobs SET state='error',error=?2,error_kind='registry_admission_busy',failure_hash=?3 WHERE search_id=?1",params![id,error,crate::corpus_failure::fingerprint(&id,0,&hash,crate::corpus_failure::Kind::RegistryAdmissionBusy,error).unwrap()]).unwrap();
+            let tx = registry
+                .connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .unwrap();
+            crate::search_control::transition(
+                &tx,
+                &id,
+                "paused",
+                crate::search_control::Cause::WorkerError,
+                2000 + number * 100,
+            )
+            .unwrap();
+            tx.commit().unwrap();
+            let epoch = crate::search_control::read(&registry.connection, &id)
+                .unwrap()
+                .epoch;
+            let result =
+                retry_policy::admit(&mut registry, &id, epoch, 3000 + number * 100).unwrap();
+            assert_eq!(result["kind"], if number < 3 { "requeued" } else { "held" });
+        }
+        assert_eq!(status(&registry, &id).unwrap()["requeue_records"], "3");
+        registry.integrity().unwrap();
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn policy_holds_active_and_terminal_children_without_resetting_them() {
+        use crate::{
+            retry_policy::{self, Policy},
+            storage::{Claim, Outcome},
+        };
+        let (root, id) = policy_fixture("policy-child");
+        let mut registry = Registry::open(&root.join("state.sqlite")).unwrap();
+        retry_policy::configure(
+            &mut registry,
+            &id,
+            &Policy {
+                backoff_ms: 1,
+                maximum_slots: 1,
+            },
+        )
+        .unwrap();
+        let (_, _, _, _, _, jobs) = read(&registry.connection, &id).unwrap();
+        let child = registry.register(&jobs[0].definition.key).unwrap();
+        let Claim::Acquired(lease) = registry.claim(&child, 1000, 10000).unwrap() else {
+            panic!()
+        };
+        let epoch = crate::search_control::read(&registry.connection, &id)
+            .unwrap()
+            .epoch;
+        assert_eq!(
+            retry_policy::admit(&mut registry, &id, epoch, 2000).unwrap()["kind"],
+            "held"
+        );
+        registry
+            .finish(
+                &lease,
+                2001,
+                Outcome::Failed,
+                &serde_json::json!({"test":"terminal refusal"}),
+            )
+            .unwrap();
+        assert_eq!(
+            retry_policy::admit(&mut registry, &id, epoch, 2002).unwrap()["kind"],
+            "held"
+        );
+        assert_eq!(registry.counts().unwrap().attempts, 1);
+        assert_eq!(status(&registry, &id).unwrap()["requeue_records"], "0");
+        registry.integrity().unwrap();
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
     }
     #[test]
     fn legacy_requeue_bodies_keep_their_original_hash_without_a_kind_field() {
