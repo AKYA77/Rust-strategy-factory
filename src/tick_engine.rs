@@ -1050,6 +1050,11 @@ fn replay_corpus_internal(
 
 #[derive(Debug, Serialize)]
 pub enum CorpusProgress {
+    Terminal {
+        experiment_id: String,
+        outcome: String,
+        result: crate::storage::StoredResult,
+    },
     Held {
         experiment_id: String,
         state: String,
@@ -1076,6 +1081,9 @@ pub fn execute_corpus_step(
     lease_ms: i64,
     mut clock: impl FnMut() -> i64,
 ) -> Result<CorpusProgress> {
+    if !(1..=64).contains(&max_new_chunks) || !(1..=86_400_000).contains(&lease_ms) {
+        return Err("invalid corpus step/lease budget".into());
+    }
     let key = corpus_key(run.base, run.spec, run.strategy, run.costs, run.budget)?;
     let id = registry.register(&key)?;
     let control = registry.corpus_control(&id)?;
@@ -1088,6 +1096,24 @@ pub fn execute_corpus_step(
     let lease = match registry.claim(&id, clock(), lease_ms)? {
         crate::storage::Claim::Busy => return Ok(CorpusProgress::Busy { experiment_id: id }),
         crate::storage::Claim::Reused(result) => {
+            if result.outcome != "completed" {
+                return Ok(CorpusProgress::Terminal {
+                    experiment_id: id,
+                    outcome: result.outcome.clone(),
+                    result,
+                });
+            }
+            let receipt = &result.result["tick_replay"];
+            if result.result["kind"] != "synthetic-corpus-replay-v1"
+                || result.result["corpus_identity"] != run.spec.identity()?
+                || receipt["version"] != key.engine_version
+                || receipt["dataset_id"] != key.dataset_hash
+                || receipt["strategy_id"] != key.concept_hash
+                || receipt["profile_id"] != key.profile_hash
+                || receipt["cost_id"] != key.cost_hash
+            {
+                return Err("cached corpus receipt does not match frozen run".into());
+            }
             return Ok(CorpusProgress::Completed {
                 experiment_id: id,
                 cached: true,

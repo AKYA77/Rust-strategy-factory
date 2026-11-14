@@ -808,3 +808,50 @@ fn separate_cli_processes_resume_registered_corpus_and_reuse_completion() {
     assert_eq!(cached["Completed"]["cached"], true);
     assert_eq!(cached["Completed"]["result"], done["Completed"]["result"]);
 }
+
+#[test]
+fn corpus_terminal_failures_are_not_success_and_invalid_budgets_do_not_register() {
+    use rust_strategy_factory::{
+        storage::{Claim, Outcome, Registry},
+        strategies::Strategy,
+        tick_engine::{self, CorpusBudget, CorpusProgress, CorpusRun, Costs},
+    };
+    let f = Fixture::new("terminal-driver", "EURUSD", 7);
+    let costs = Costs::default();
+    let budget = CorpusBudget {
+        max_candles: 100,
+        feature_cells: 10000,
+        max_receipts: 1000,
+    };
+    let strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+    let run = || CorpusRun {
+        base: &f.root,
+        spec: &f.spec,
+        strategy: &strategy,
+        costs: &costs,
+        budget,
+    };
+    let mut r = Registry::open(&f.root.join("terminal.sqlite")).unwrap();
+    assert!(tick_engine::execute_corpus_step(&mut r, run(), 0, 1000, || 1).is_err());
+    assert_eq!(r.counts().unwrap().registered, 0);
+    let id = r
+        .register(&tick_engine::corpus_key(&f.root, &f.spec, &strategy, &costs, budget).unwrap())
+        .unwrap();
+    let Claim::Acquired(lease) = r.claim(&id, 0, 1000).unwrap() else {
+        panic!()
+    };
+    r.finish(
+        &lease,
+        1,
+        Outcome::Failed,
+        &serde_json::json!({"error":"fixture failure"}),
+    )
+    .unwrap();
+    let CorpusProgress::Terminal { outcome, .. } =
+        tick_engine::execute_corpus_step(&mut r, run(), 1, 1000, || 2).unwrap()
+    else {
+        panic!()
+    };
+    assert_eq!(outcome, "failed");
+    assert_eq!(r.counts().unwrap().attempts, 1);
+}
