@@ -575,3 +575,82 @@ fn concurrent_oos_reservation_and_outside_registration_cannot_both_succeed() {
     drop(registry);
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn immutable_replay_checkpoints_fence_stale_workers_and_survive_restart() {
+    let dir = directory();
+    let path = dir.join("state.sqlite");
+    let mut r = Registry::open(&path).unwrap();
+    let id = r.register(&key()).unwrap();
+    let Claim::Acquired(first) = r.claim(&id, 0, 10).unwrap() else {
+        panic!()
+    };
+    let h = r
+        .save_replay_checkpoint(
+            &first,
+            1,
+            0,
+            5,
+            json!({"balance":"20000000","last_sequence":"18446744073709551615"}),
+        )
+        .unwrap();
+    assert!(
+        r.save_replay_checkpoint(&first, 2, 0, 6, json!({}))
+            .is_err()
+    );
+    assert!(
+        r.save_replay_checkpoint(&first, 10, 5, 6, json!({}))
+            .is_err()
+    );
+    drop(r);
+    let mut r = Registry::open(&path).unwrap();
+    assert_eq!(r.replay_checkpoint(&id).unwrap().unwrap().1, h);
+    let Claim::Acquired(second) = r.claim(&id, 10, 20).unwrap() else {
+        panic!()
+    };
+    assert!(
+        r.save_replay_checkpoint(&first, 11, 5, 6, json!({}))
+            .is_err()
+    );
+    r.save_replay_checkpoint(&second, 11, 5, 7, json!({"balance":19000000}))
+        .unwrap();
+    r.integrity().unwrap();
+    let snapshot = dir.join("checkpoint-snapshot.sqlite");
+    r.backup(&snapshot).unwrap();
+    let restored = Registry::open(&snapshot).unwrap();
+    assert_eq!(
+        restored.replay_checkpoint(&id).unwrap().unwrap().0.cursor,
+        7
+    );
+    drop(restored);
+    let damaged = rusqlite::Connection::open(&snapshot).unwrap();
+    damaged
+        .execute_batch("DROP TRIGGER replay_checkpoint_no_update")
+        .unwrap();
+    damaged
+        .execute(
+            "UPDATE replay_checkpoints SET hash=?1 WHERE cursor=5",
+            ["0".repeat(64)],
+        )
+        .unwrap();
+    drop(damaged);
+    let damaged = Registry::open(&snapshot).unwrap();
+    assert!(damaged.replay_checkpoint(&id).is_err());
+    assert!(damaged.integrity().is_err());
+    drop(damaged);
+    let sql = rusqlite::Connection::open(&path).unwrap();
+    assert!(sql.execute("DELETE FROM replay_checkpoints", []).is_err());
+    assert!(
+        sql.execute("UPDATE replay_checkpoints SET hash='x'", [])
+            .is_err()
+    );
+    r.finish(&second, 12, Outcome::Completed, &json!({"fixture":true}))
+        .unwrap();
+    assert!(
+        r.save_replay_checkpoint(&second, 13, 7, 8, json!({}))
+            .is_err()
+    );
+    drop(r);
+    drop(sql);
+    std::fs::remove_dir_all(dir).unwrap();
+}

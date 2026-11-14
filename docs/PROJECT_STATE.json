@@ -106,7 +106,8 @@
     "Bounded verified corpus primary-frame signal compilation through the existing Features engine, with batch equivalence and unsupported-context/budget refusal",
     "Verified single-pass bounded multi-frame corpus contexts integrated into existing recursive causal feature compilation, with nonzero higher-confirmation parity and aggregate-cap refusal",
     "Windowed causal corpus signal prefixes preserving prior warmup and exclusive publication end, with exact batch-prefix mask tests",
-    "Single authoritative serializable account event transition shared by ordinary and bounded synthetic USD corpus replay, with full receipt parity and state round-trip checks"
+    "Single authoritative serializable account event transition shared by ordinary and bounded synthetic USD corpus replay, with full receipt parity and state round-trip checks",
+    "Registry-fenced immutable experiment/configuration-bound checkpoint history with cursor CAS, integrity validation, restart/backup preservation and stale/expired/terminal refusal"
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -116,7 +117,7 @@
   ],
   "next_action": "Persist source-bound account checkpoints and integrate verified stream preparation/recovery with registry fencing; real/protected and non-USD corpus execution remain refused.",
   "qualified_strategies": 0,
-  "tests_passed": 242,
+  "tests_passed": 243,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
   "browser_acceptance": "Chromium desktop/mobile with real Rust/SQLite/Parquet workflows: auth/control/history/lineage/proofs, exact extreme-loss money and full-u64 event display/raw exports, restart and refusal checks; persisted proof/indexed failure monitoring, restart and read-only API; optional authenticated catalog pagination/exact exports/full-u64 desktop/mobile and corrupt-state refusal; independent review actual Rust/SQLite workflow covers credentials/CSRF/origin, paginated history/exact export, synthetic refusal, revocation/stale head, changed files, current authority failure, desktop/mobile and restart",
   "benchmark_resources": "docs/BENCHMARKS/v6-sequential-synthetic-resources.json",
