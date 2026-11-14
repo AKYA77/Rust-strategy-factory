@@ -688,3 +688,72 @@ fn hash_consistent_but_fabricated_account_checkpoint_is_not_trusted() {
     );
     assert_eq!(r.replay_checkpoint(&id).unwrap().unwrap().0.cursor, 1);
 }
+
+#[test]
+fn registered_corpus_driver_yields_publishes_once_and_reuses_exact_receipt() {
+    use rust_strategy_factory::{
+        storage::Registry,
+        strategies::Strategy,
+        tick_engine::{self, CorpusBudget, CorpusProgress, CorpusRun, Costs},
+    };
+    let f = Fixture::new("published-driver", "EURUSD", 7);
+    let costs = Costs::default();
+    let budget = CorpusBudget {
+        max_candles: 100,
+        feature_cells: 10000,
+        max_receipts: 1000,
+    };
+    let strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+    let path = f.root.join("driver.sqlite");
+    let mut result_hash = None;
+    for _ in 0..f.spec.chunks.len() {
+        let mut r = Registry::open(&path).unwrap();
+        match tick_engine::execute_corpus_step(
+            &mut r,
+            CorpusRun {
+                base: &f.root,
+                spec: &f.spec,
+                strategy: &strategy,
+                costs: &costs,
+                budget,
+            },
+            1,
+            10000,
+            || 1,
+        )
+        .unwrap()
+        {
+            CorpusProgress::Pending { experiment_id, .. } => {
+                assert_eq!(r.counts().unwrap().running, 0, "yielded {experiment_id}")
+            }
+            CorpusProgress::Completed { cached, result, .. } => {
+                assert!(!cached);
+                result_hash = Some(result.result_hash);
+                break;
+            }
+            _ => panic!("unexpected busy"),
+        }
+    }
+    let mut r = Registry::open(&path).unwrap();
+    let before = r.counts().unwrap().attempts;
+    let CorpusProgress::Completed { cached, result, .. } = tick_engine::execute_corpus_step(
+        &mut r,
+        CorpusRun {
+            base: &f.root,
+            spec: &f.spec,
+            strategy: &strategy,
+            costs: &costs,
+            budget,
+        },
+        1,
+        10000,
+        || 1,
+    )
+    .unwrap() else {
+        panic!()
+    };
+    assert!(cached);
+    assert_eq!(Some(result.result_hash), result_hash);
+    assert_eq!(r.counts().unwrap().attempts, before);
+    r.integrity().unwrap();
+}

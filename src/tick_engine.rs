@@ -1048,6 +1048,72 @@ fn replay_corpus_internal(
     }))
 }
 
+#[derive(Debug, Serialize)]
+pub enum CorpusProgress {
+    Pending {
+        experiment_id: String,
+        cursor: i64,
+    },
+    Busy {
+        experiment_id: String,
+    },
+    Completed {
+        experiment_id: String,
+        cached: bool,
+        result: crate::storage::StoredResult,
+    },
+}
+/// A standalone safe checkpoint: reclaim, validate, advance, then yield or
+/// publish through the registry's token-fenced completion transaction.
+pub fn execute_corpus_step(
+    registry: &mut crate::storage::Registry,
+    run: CorpusRun<'_>,
+    max_new_chunks: usize,
+    lease_ms: i64,
+    mut clock: impl FnMut() -> i64,
+) -> Result<CorpusProgress> {
+    let key = corpus_key(run.base, run.spec, run.strategy, run.costs, run.budget)?;
+    let id = registry.register(&key)?;
+    let lease = match registry.claim(&id, clock(), lease_ms)? {
+        crate::storage::Claim::Busy => return Ok(CorpusProgress::Busy { experiment_id: id }),
+        crate::storage::Claim::Reused(result) => {
+            return Ok(CorpusProgress::Completed {
+                experiment_id: id,
+                cached: true,
+                result,
+            });
+        }
+        crate::storage::Claim::Acquired(lease) => lease,
+    };
+    let corpus_id = run.spec.identity()?;
+    match advance_corpus(registry, &lease, run, max_new_chunks, &mut clock)? {
+        None => {
+            let cursor = registry
+                .replay_checkpoint(&id)?
+                .ok_or("missing committed corpus checkpoint")?
+                .0
+                .cursor;
+            registry.yield_lease(&lease, clock())?;
+            Ok(CorpusProgress::Pending {
+                experiment_id: id,
+                cursor,
+            })
+        }
+        Some(replay) => {
+            let result = serde_json::json!({"kind":"synthetic-corpus-replay-v1","corpus_identity":corpus_id,"tick_replay":replay});
+            registry.finish(&lease, clock(), crate::storage::Outcome::Completed, &result)?;
+            let result = registry
+                .result(&id)?
+                .ok_or("completed corpus receipt missing")?;
+            Ok(CorpusProgress::Completed {
+                experiment_id: id,
+                cached: false,
+                result,
+            })
+        }
+    }
+}
+
 #[cfg(test)]
 mod account_checkpoint_tests {
     use super::*;
