@@ -120,7 +120,8 @@
     "Actual binary-process tests preserve committed corpus checkpoints after SIGKILL while waiting for a SQLite writer, and restore paused corpus backups into independently resumable jobs without changing the original registry. This covers one crash point, not exhaustive power-loss or disk-full faults.",
     "A bounded corpus batch API now preflights at most256 unique frozen jobs, starts1\u201316 connection-owning workers, enforces worst-case concurrent candle/feature/receipt caps, preserves input-order per-job outcomes and reports worker startup/panic failures for resumable retry. Parallel complete receipts match scalar replay; aggregate overcommit and duplicate jobs refuse before registry creation, and a failed job does not lose another job's checkpoint. Declared object caps are not measured RSS or OS enforcement.",
     "corpus-batch now executes bounded1\u201310000-round sessions from a strict1 MiB config, resumes multiple frozen jobs across processes, exits instead of spinning on held/busy/terminal work and handles SIGINT/SIGTERM at bounded round boundaries. Actual process tests verify pause/resume, completion/cache reuse and SIGTERM under writer contention followed by successful restart.",
-    "Corpus experiment history now opens verified recovery metadata, exact exports and durable pause/resume/permanent-stop controls behind existing session/CSRF/origin enforcement. Chromium verifies desktop/mobile layout, restart persistence, token/account redaction and stopped CLI non-advancement. All three browser suites pass after correcting long-ID mobile overflow; integrated release/operations results are recorded separately."
+    "Corpus experiment history now opens verified recovery metadata, exact exports and durable pause/resume/permanent-stop controls behind existing session/CSRF/origin enforcement. Chromium verifies desktop/mobile layout, restart persistence, token/account redaction and stopped CLI non-advancement. All three browser suites pass after correcting long-ID mobile overflow; integrated release/operations results are recorded separately.",
+    "A reproducible optimized full-session comparison now records nine synthetic4000-event/eight-strategy/four-round trials at1/2/4 workers with per-child Linux CPU/RSS/I/O, exact source/binary/script hashes and identical complete result hashes. Median wall times1.3861/0.8716/0.7961 seconds are limited warm-cache fixture evidence; no production worker default or real-data speed claim. Integrated release, all three browser suites and local operations acceptance pass."
   ],
   "external_pending": [
     "reviewed broker profiles/calendar",
@@ -128,7 +129,7 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Measure complete registered corpus sessions at1/2/4 workers with identical receipt hashes and per-process resources; preserve negative results, then continue integrated autonomous scheduling and scientific qualification requirements.",
+  "next_action": "Implement optional frozen time-block dependence sensitivity in scientific plans with conditional weighted uncertainty diagnostics, legacy receipt compatibility and explicit unverified cross-block assumptions; continue qualification and autonomous/resource backlog.",
   "qualified_strategies": 0,
   "tests_passed": 259,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
