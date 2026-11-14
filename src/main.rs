@@ -545,6 +545,34 @@ fn run(args: &[String]) -> Result<()> {
                 &serde_json::json!({"corpus_identity":spec.identity()?,"strategy_identity":strategy.identity()?,"signals":mask,"limitations":"Causal multi-frame signals with bounded contexts; no account replay or qualification."}),
             )
         }
+        [
+            "corpus-replay",
+            specification,
+            strategy,
+            candles,
+            cells,
+            receipts,
+            output,
+        ] => {
+            let path = Path::new(specification);
+            let spec = rust_strategy_factory::corpus::load(path)?;
+            let strategy: Strategy = read_json(strategy)?;
+            let budget = rust_strategy_factory::tick_engine::CorpusBudget {
+                max_candles: candles.parse().map_err(|_| "invalid candle budget")?,
+                feature_cells: cells.parse().map_err(|_| "invalid feature budget")?,
+                max_receipts: receipts.parse().map_err(|_| "invalid receipt budget")?,
+            };
+            save(
+                output,
+                &rust_strategy_factory::tick_engine::replay_corpus(
+                    path.parent().unwrap_or(Path::new(".")),
+                    &spec,
+                    &strategy,
+                    &Costs::default(),
+                    budget,
+                )?,
+            )
+        }
         ["corpus-inspect", specification] => {
             let path = Path::new(specification);
             print(&rust_strategy_factory::corpus::inspect(

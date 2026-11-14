@@ -426,3 +426,113 @@ fn corpus_window_keeps_prior_warmup_and_excludes_end_publication() {
         .is_err()
     );
 }
+
+#[test]
+fn corpus_account_replay_matches_all_materialized_receipt_fields() {
+    use rust_strategy_factory::{
+        contracts::Conversion,
+        strategies::{EntryPlan, Features, Strategy},
+        tick_engine::{self, CorpusBudget, Costs},
+    };
+    let mut trades = 0;
+    for symbol in ["EURUSD", "XAUUSD"] {
+        let f = Fixture::new("account-parity", symbol, 2);
+        for entry in [
+            None,
+            Some(EntryPlan::StopMarket {
+                offset_ticks: 2,
+                ttl_ms: 120000,
+                cancel_on_signal_false: true,
+            }),
+            Some(EntryPlan::Limit {
+                offset_ticks: 2,
+                ttl_ms: 120000,
+                cancel_on_signal_false: true,
+            }),
+        ] {
+            let mut strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+            strategy.entry = entry;
+            let candles = candles::build(&f.data, Timeframe::M1).unwrap();
+            let mask = Features::new(&candles, 10000)
+                .unwrap()
+                .signal(&strategy.rule)
+                .unwrap();
+            let reference = tick_engine::replay(
+                &f.data,
+                &candles,
+                &mask,
+                &strategy,
+                &Costs::default(),
+                &vec![Conversion::usd(); f.data.ticks.len()],
+            )
+            .unwrap();
+            let actual = tick_engine::replay_corpus(
+                &f.root,
+                &f.spec,
+                &strategy,
+                &Costs::default(),
+                CorpusBudget {
+                    max_candles: 100,
+                    feature_cells: 10000,
+                    max_receipts: 10000,
+                },
+            )
+            .unwrap();
+            trades += actual.trades.len();
+            assert_eq!(
+                serde_json::to_value(actual).unwrap(),
+                serde_json::to_value(reference).unwrap()
+            );
+            assert!(
+                tick_engine::replay_corpus(
+                    &f.root,
+                    &f.spec,
+                    &strategy,
+                    &Costs::default(),
+                    CorpusBudget {
+                        max_candles: 100,
+                        feature_cells: 1,
+                        max_receipts: 10000
+                    }
+                )
+                .is_err()
+            );
+        }
+    }
+    assert!(trades > 0);
+    let f = Fixture::new("account-cli", "USDJPY", 2);
+    let strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+    assert!(
+        tick_engine::replay_corpus(
+            &f.root,
+            &f.spec,
+            &strategy,
+            &Costs::default(),
+            CorpusBudget {
+                max_candles: 100,
+                feature_cells: 10000,
+                max_receipts: 1000
+            }
+        )
+        .is_err()
+    );
+    let spec = f.root.join("spec.json");
+    let rule = f.root.join("rule.json");
+    let result = f.root.join("result.json");
+    fs::write(&spec, serde_json::to_vec(&f.spec).unwrap()).unwrap();
+    fs::write(&rule, serde_json::to_vec(&strategy).unwrap()).unwrap();
+    let status = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-replay",
+            spec.to_str().unwrap(),
+            rule.to_str().unwrap(),
+            "100",
+            "10000",
+            "1000",
+            result.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(!status.status.success());
+    assert!(!result.exists());
+}

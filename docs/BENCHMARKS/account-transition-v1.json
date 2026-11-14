@@ -1,0 +1,112 @@
+{
+  "available_parallelism": 2,
+  "build": "release thin LTO, codegen-units=1",
+  "cache": "resident fixtures; warm process; derived candles/features rebuilt each repetition",
+  "cgroup_cpu_max": "200000 100000\n",
+  "cgroup_memory_max": "8589934592\n",
+  "class": "SYNTHETIC_TEST_ONLY",
+  "compute_revision": "compute-blake3:1e896989146956c1a0b6a465eef2a4be82a4aa25d9170610eef28766190d3a9e",
+  "coverage": "20000 events per instrument, eight instruments; NOT genuine quote data, not full historical coverage",
+  "cpu": "model name\t: AMD EPYC 9V74 80-Core Processor\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext cpuid_fault vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx512_bf16 clzero xsaveerptr arat npt nrip_save tsc_scale vmcb_clean flushbyasid pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm arch_capabilities",
+  "dataset_hashes": [
+    [
+      "EURUSD",
+      "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+    ],
+    [
+      "GBPUSD",
+      "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+    ],
+    [
+      "USDJPY",
+      "44e42dddb51ec4cb363f635c55d508292913cd449c9c754590da77fb140eff8d"
+    ],
+    [
+      "USDCHF",
+      "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+    ],
+    [
+      "USDCAD",
+      "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+    ],
+    [
+      "AUDUSD",
+      "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+    ],
+    [
+      "NZDUSD",
+      "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+    ],
+    [
+      "XAUUSD",
+      "f3100585b3b718b3e8e242d509011cf9a7979957affec4aa1b38694130bf6101"
+    ]
+  ],
+  "engine": "ordered-l1-v6-frozen-atr-stops",
+  "measurements": [
+    {
+      "completed_synthetic_replays_per_repetition": 8,
+      "dispersion_max_minus_min": 0.003410401999999993,
+      "median_seconds": 0.068932458,
+      "repetitions": 5,
+      "replays_per_second_median": 116.05563231184938,
+      "trades_per_repetition": 6997,
+      "wall_seconds": [
+        0.068765247,
+        0.068835162,
+        0.068932458,
+        0.070424164,
+        0.072175649
+      ],
+      "workers": 1
+    },
+    {
+      "completed_synthetic_replays_per_repetition": 8,
+      "dispersion_max_minus_min": 0.0005362740000000032,
+      "median_seconds": 0.035010766,
+      "repetitions": 5,
+      "replays_per_second_median": 228.5011416202662,
+      "trades_per_repetition": 6997,
+      "wall_seconds": [
+        0.034502212,
+        0.034754391,
+        0.035010766,
+        0.035011727,
+        0.035038486
+      ],
+      "workers": 2
+    },
+    {
+      "completed_synthetic_replays_per_repetition": 8,
+      "dispersion_max_minus_min": 0.020995293999999998,
+      "median_seconds": 0.026320717,
+      "repetitions": 5,
+      "replays_per_second_median": 303.9430878725682,
+      "trades_per_repetition": 6997,
+      "wall_seconds": [
+        0.025936252,
+        0.026283772,
+        0.026320717,
+        0.027073827,
+        0.046931546
+      ],
+      "workers": 3
+    },
+    {
+      "completed_synthetic_replays_per_repetition": 8,
+      "dispersion_max_minus_min": 0.032722585,
+      "median_seconds": 0.027153596,
+      "repetitions": 5,
+      "replays_per_second_median": 294.6202779182544,
+      "trades_per_repetition": 6997,
+      "wall_seconds": [
+        0.025883903,
+        0.026582981,
+        0.027153596,
+        0.049671443,
+        0.058606488
+      ],
+      "workers": 4
+    }
+  ]
+}

@@ -281,46 +281,65 @@ pub(crate) fn prepare_replay(
         visible,
     })
 }
-fn replay_internal(
-    data: &Dataset,
-    candles: &[Candle],
-    mask: &Mask,
-    strategy: &Strategy,
-    costs: &Costs,
-    conversions: &[Conversion],
-    window: Option<&crate::validation::Interval>,
-) -> Result<Replay> {
-    let PreparedReplay {
-        strategy,
-        distances,
-        slip,
-        ..
-    } = prepare_replay(data, candles, mask, strategy, costs, conversions, window)?;
-    let p = &data.profile;
-    let mut balance = contracts::INITIAL_EQUITY;
-    let mut marked = balance;
-    let mut peak = balance;
-    let mut drawdown = 0;
-    let mut trades = Vec::new();
-    let mut rejections = Vec::new();
-    let mut position: Option<OpenPosition> = None;
-    let mut candle_i = 0;
-    let mut pending: Option<PendingEntry> = None;
-    let mut entry_receipts = Vec::new();
-    for (event_i, t) in data.ticks.iter().enumerate() {
-        if let Some(window) = window {
-            if t.timestamp_ms >= window.end_exclusive_ms {
-                break;
-            }
-            if t.timestamp_ms < window.start_ms {
-                continue;
-            }
+struct EventContext<'a> {
+    p: &'a Profile,
+    strategy: &'a Strategy,
+    distances: &'a crate::stops::Prepared,
+    costs: &'a Costs,
+    candles: &'a [Candle],
+    mask: &'a Mask,
+    window: Option<&'a crate::validation::Interval>,
+    slip: i64,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct AccountState {
+    balance: i128,
+    marked: i128,
+    peak: i128,
+    drawdown: i128,
+    trades: Vec<Trade>,
+    rejections: Vec<Rejection>,
+    position: Option<OpenPosition>,
+    candle_i: usize,
+    pending: Option<PendingEntry>,
+    entry_receipts: Vec<EntryReceipt>,
+}
+impl AccountState {
+    fn initial() -> Self {
+        Self {
+            balance: contracts::INITIAL_EQUITY,
+            marked: contracts::INITIAL_EQUITY,
+            peak: contracts::INITIAL_EQUITY,
+            drawdown: 0,
+            trades: Vec::new(),
+            rejections: Vec::new(),
+            position: None,
+            candle_i: 0,
+            pending: None,
+            entry_receipts: Vec::new(),
         }
-        let fx = conversions[event_i];
+    }
+    fn advance(
+        &mut self,
+        t: &Tick,
+        fx: Conversion,
+        previous_ms: Option<i64>,
+        context: &EventContext<'_>,
+    ) -> Result<()> {
+        let EventContext {
+            p,
+            strategy,
+            distances,
+            costs,
+            candles,
+            mask,
+            window,
+            slip,
+        } = *context;
         fx.validate(p, t.timestamp_ms, costs.max_conversion_age_ms)?;
         let (bid, ask) = costs.effective(p, *t)?;
         let mut closed_now = false;
-        if let Some(mut pos) = position.take() {
+        if let Some(mut pos) = self.position.take() {
             let mark = if pos.side == Side::Long { bid } else { ask };
             let movement = signed_delta(pos.side, mark, pos.entry)?;
             pos.mfe = pos.mfe.max(movement);
@@ -371,11 +390,12 @@ fn replay_internal(
                     pos.volume_micro_lots,
                     fx,
                 )?;
-                balance = balance
+                self.balance = self
+                    .balance
                     .checked_add(gross)
                     .and_then(|v| v.checked_sub(commission))
-                    .ok_or("balance overflow")?;
-                trades.push(Trade {
+                    .ok_or("self.balance overflow")?;
+                self.trades.push(Trade {
                     entry_event: pos.entry_event,
                     exit_event: t.sequence,
                     entry_ms: pos.entry_ms,
@@ -391,30 +411,26 @@ fn replay_internal(
                     reason,
                     mfe_price_units: pos.mfe,
                     mae_price_units: pos.mae,
-                    crossed_gap_ms: if event_i == 0 {
-                        0
-                    } else {
-                        t.timestamp_ms - data.ticks[event_i - 1].timestamp_ms
-                    },
+                    crossed_gap_ms: previous_ms.map_or(0, |previous| t.timestamp_ms - previous),
                 });
                 closed_now = true;
             } else {
-                position = Some(pos);
+                self.position = Some(pos);
             }
         }
         if let Some(plan) = &strategy.entry {
             let (_, _, cancel_on_false) = plan.parameters();
             let mut filled_now = false;
-            if let Some(mut intent) = pending.take() {
+            if let Some(mut intent) = self.pending.take() {
                 let mut preview = intent.order.clone();
                 let candidate = preview.on_quote(p, costs, *t)?;
                 if let Some(fill) = candidate {
                     let distance = intent
                         .reservation
                         .stop_distance_price_units
-                        .ok_or("legacy pending reservation lacks frozen stop distance")?;
+                        .ok_or("legacy self.pending reservation lacks frozen stop distance")?;
                     let request = crate::risk::Request {
-                        equity: balance,
+                        equity: self.balance,
                         entry: fill.price,
                         mark: if strategy.side == Side::Long {
                             bid
@@ -430,8 +446,8 @@ fn replay_internal(
                     match accepted {
                         Ok((reservation, (stop, target))) => {
                             intent.reservation = reservation;
-                            balance -= reservation.entry_fee_micro_usd;
-                            position = Some(OpenPosition {
+                            self.balance -= reservation.entry_fee_micro_usd;
+                            self.position = Some(OpenPosition {
                                 entry_event: t.sequence,
                                 entry_ms: t.timestamp_ms,
                                 deadline_ms: t
@@ -447,49 +463,49 @@ fn replay_internal(
                                 mfe: 0,
                                 mae: 0,
                             });
-                            entry_receipts.push(receipt(
+                            self.entry_receipts.push(receipt(
                                 *t,
                                 &intent,
                                 EntryStatus::Filled,
                                 Some(fill),
-                                "fixed quantity accepted by pre-fill marked-equity/risk gate",
+                                "fixed quantity accepted by pre-fill self.marked-equity/risk gate",
                             ));
                             filled_now = true;
                         }
                         Err(reason) => {
                             intent.order.cancel(t.timestamp_ms)?;
-                            entry_receipts.push(receipt(
+                            self.entry_receipts.push(receipt(
                                 *t,
                                 &intent,
                                 EntryStatus::RiskRejected,
                                 None,
                                 &reason,
                             ));
-                            rejections.push(Rejection {
+                            self.rejections.push(Rejection {
                                 event: t.sequence,
                                 reason,
                             });
                         }
                     }
                 } else if matches!(preview.state(), crate::orders::State::Expired { .. }) {
-                    entry_receipts.push(receipt(
+                    self.entry_receipts.push(receipt(
                         *t,
                         &intent,
                         EntryStatus::Expired,
                         None,
-                        "pending entry expired before quote eligibility",
+                        "self.pending entry expired before quote eligibility",
                     ));
                 } else {
                     intent.order = preview;
-                    pending = Some(intent);
+                    self.pending = Some(intent);
                 }
             }
             // Existing orders consume the quote first. Newly observed signals cancel only surviving intents.
             if cancel_on_false
-                && candle_i < candles.len()
-                && candles[candle_i].publication_sequence == t.sequence
-                && !mask.get(candle_i)
-                && let Some(mut intent) = pending.take()
+                && self.candle_i < candles.len()
+                && candles[self.candle_i].publication_sequence == t.sequence
+                && !mask.get(self.candle_i)
+                && let Some(mut intent) = self.pending.take()
             {
                 intent.order.cancel(t.timestamp_ms)?;
                 let status = if matches!(intent.order.state(), crate::orders::State::Expired { .. })
@@ -498,25 +514,32 @@ fn replay_internal(
                 } else {
                     EntryStatus::Cancelled
                 };
-                entry_receipts.push(receipt(
+                self.entry_receipts.push(receipt(
                     *t,
                     &intent,
                     status,
                     None,
-                    "closed signal invalidated pending entry",
+                    "closed signal invalidated self.pending entry",
                 ));
             }
             // New orders are placed after existing order processing; they cannot fill on publication.
-            while candle_i < candles.len() && candles[candle_i].publication_sequence <= t.sequence {
-                let distance = distances.at(candle_i);
-                let wants = mask.get(candle_i)
-                    && window.is_none_or(|w| w.contains(candles[candle_i].available_ms));
-                candle_i += 1;
-                if !wants || pending.is_some() || position.is_some() || closed_now || filled_now {
+            while self.candle_i < candles.len()
+                && candles[self.candle_i].publication_sequence <= t.sequence
+            {
+                let distance = distances.at(self.candle_i);
+                let wants = mask.get(self.candle_i)
+                    && window.is_none_or(|w| w.contains(candles[self.candle_i].available_ms));
+                self.candle_i += 1;
+                if !wants
+                    || self.pending.is_some()
+                    || self.position.is_some()
+                    || closed_now
+                    || filled_now
+                {
                     continue;
                 }
                 let crate::stops::Distance::Ready(distance) = distance else {
-                    rejections.push(Rejection {
+                    self.rejections.push(Rejection {
                         event: t.sequence,
                         reason: distance.rejection().into(),
                     });
@@ -575,7 +598,7 @@ fn replay_internal(
                         p,
                         costs,
                         crate::risk::Request {
-                            equity: balance,
+                            equity: self.balance,
                             entry,
                             mark,
                             side: strategy.side,
@@ -606,27 +629,29 @@ fn replay_internal(
                 };
                 match placement() {
                     Ok(intent) => {
-                        entry_receipts.push(receipt(*t,&intent,EntryStatus::Placed,None,"quantity fixed at publication; one pending reservation blocks other entries"));
-                        pending = Some(intent);
+                        self.entry_receipts.push(receipt(*t,&intent,EntryStatus::Placed,None,"quantity fixed at publication; one self.pending reservation blocks other entries"));
+                        self.pending = Some(intent);
                     }
-                    Err(reason) => rejections.push(Rejection {
+                    Err(reason) => self.rejections.push(Rejection {
                         event: t.sequence,
                         reason,
                     }),
                 }
             }
         } else {
-            // Market-only v1 concepts retain signal timing; sizing now includes marked entry costs.
-            while candle_i < candles.len() && candles[candle_i].publication_sequence < t.sequence {
-                let distance = distances.at(candle_i);
-                let wants = mask.get(candle_i)
-                    && window.is_none_or(|w| w.contains(candles[candle_i].available_ms));
-                candle_i += 1;
-                if !wants || position.is_some() || closed_now {
+            // Market-only v1 concepts retain signal timing; sizing now includes self.marked entry costs.
+            while self.candle_i < candles.len()
+                && candles[self.candle_i].publication_sequence < t.sequence
+            {
+                let distance = distances.at(self.candle_i);
+                let wants = mask.get(self.candle_i)
+                    && window.is_none_or(|w| w.contains(candles[self.candle_i].available_ms));
+                self.candle_i += 1;
+                if !wants || self.position.is_some() || closed_now {
                     continue;
                 }
                 let crate::stops::Distance::Ready(distance) = distance else {
-                    rejections.push(Rejection {
+                    self.rejections.push(Rejection {
                         event: t.sequence,
                         reason: distance.rejection().into(),
                     });
@@ -638,7 +663,7 @@ fn replay_internal(
                     p,
                     costs,
                     crate::risk::Request {
-                        equity: balance,
+                        equity: self.balance,
                         entry,
                         mark: if strategy.side == Side::Long {
                             bid
@@ -652,8 +677,8 @@ fn replay_internal(
                 );
                 match sizing.and_then(|r| Ok((r, protective(entry, strategy.side, distance)?))) {
                     Ok((r, (stop, target))) => {
-                        balance -= r.entry_fee_micro_usd;
-                        position = Some(OpenPosition {
+                        self.balance -= r.entry_fee_micro_usd;
+                        self.position = Some(OpenPosition {
                             entry_event: t.sequence,
                             entry_ms: t.timestamp_ms,
                             deadline_ms: t
@@ -670,15 +695,15 @@ fn replay_internal(
                             mae: 0,
                         });
                     }
-                    Err(reason) => rejections.push(Rejection {
+                    Err(reason) => self.rejections.push(Rejection {
                         event: t.sequence,
                         reason,
                     }),
                 }
             }
         }
-        marked = if let Some(pos) = &position {
-            balance
+        self.marked = if let Some(pos) = &self.position {
+            self.balance
                 .checked_add(contracts::pnl(
                     p,
                     signed_delta(
@@ -689,13 +714,69 @@ fn replay_internal(
                     pos.volume_micro_lots,
                     fx,
                 )?)
-                .ok_or("marked equity overflow")?
+                .ok_or("self.marked equity overflow")?
         } else {
-            balance
+            self.balance
         };
-        peak = peak.max(marked);
-        drawdown = drawdown.max(peak - marked);
+        self.peak = self.peak.max(self.marked);
+        self.drawdown = self.drawdown.max(self.peak - self.marked);
+        Ok(())
     }
+}
+
+fn replay_internal(
+    data: &Dataset,
+    candles: &[Candle],
+    mask: &Mask,
+    strategy: &Strategy,
+    costs: &Costs,
+    conversions: &[Conversion],
+    window: Option<&crate::validation::Interval>,
+) -> Result<Replay> {
+    let PreparedReplay {
+        strategy,
+        distances,
+        slip,
+        ..
+    } = prepare_replay(data, candles, mask, strategy, costs, conversions, window)?;
+    let mut state = AccountState::initial();
+    let context = EventContext {
+        p: &data.profile,
+        strategy: &strategy,
+        distances: &distances,
+        costs,
+        candles,
+        mask,
+        window,
+        slip,
+    };
+    for (event_i, t) in data.ticks.iter().enumerate() {
+        if let Some(window) = window {
+            if t.timestamp_ms >= window.end_exclusive_ms {
+                break;
+            }
+            if t.timestamp_ms < window.start_ms {
+                continue;
+            }
+        }
+        state.advance(
+            t,
+            conversions[event_i],
+            event_i.checked_sub(1).map(|i| data.ticks[i].timestamp_ms),
+            &context,
+        )?;
+    }
+    let AccountState {
+        balance,
+        marked,
+        drawdown,
+        trades,
+        rejections,
+        position,
+        pending,
+        entry_receipts,
+        ..
+    } = state;
     Ok(Replay {
         version: crate::ENGINE_VERSION.into(),
         strategy_id: strategy.identity()?,
@@ -715,4 +796,193 @@ fn replay_internal(
         entry_receipts,
         evaluation_window: window.cloned(),
     })
+}
+
+/// Exact synthetic USD corpus replay using the authoritative event transition.
+/// Feature contexts and result receipts have separate explicit caps. Real/protected
+/// research requires registry/exposure integration and is deliberately refused.
+pub struct CorpusBudget {
+    pub max_candles: usize,
+    pub feature_cells: usize,
+    pub max_receipts: usize,
+}
+pub fn replay_corpus(
+    base: &std::path::Path,
+    spec: &crate::corpus::Specification,
+    strategy: &Strategy,
+    costs: &Costs,
+    budget: CorpusBudget,
+) -> Result<Replay> {
+    let CorpusBudget {
+        max_candles,
+        feature_cells,
+        max_receipts,
+    } = budget;
+    costs.validate()?;
+    if max_receipts == 0 || max_receipts > 1_000_000 {
+        return Err("invalid corpus replay receipt budget".into());
+    }
+    let observed = crate::corpus::inspect(base, spec)?;
+    if observed.declared_class != crate::data::DataClass::SyntheticTestOnly
+        || observed.profile.quote != "USD"
+    {
+        return Err("corpus replay currently requires synthetic literal-USD inputs; real/protected exposure and FX conversion streams are not integrated".into());
+    }
+    let strategy = strategy.canonical()?;
+    let candles = crate::corpus::candle_context(base, spec, strategy.timeframe, max_candles)?;
+    let mask = crate::corpus::signals(base, spec, &strategy, max_candles, feature_cells)?;
+    let distances = crate::stops::prepare(&strategy, &observed.profile, &candles)?;
+    let slip = costs
+        .slippage_pips
+        .checked_mul(observed.profile.pip)
+        .ok_or("slippage overflow")?;
+    let context = EventContext {
+        p: &observed.profile,
+        strategy: &strategy,
+        distances: &distances,
+        costs,
+        candles: &candles,
+        mask: &mask,
+        window: None,
+        slip,
+    };
+    let mut state = AccountState::initial();
+    let mut previous = None;
+    let mut conversions = crate::corpus::SequenceHash::new();
+    crate::corpus::visit_chunks(base, spec, |_, dataset| {
+        for tick in &dataset.ticks {
+            let fx = Conversion::usd();
+            state.advance(tick, fx, previous, &context)?;
+            if state
+                .trades
+                .len()
+                .saturating_add(state.rejections.len())
+                .saturating_add(state.entry_receipts.len())
+                > max_receipts
+            {
+                return Err("corpus replay receipt budget exceeded".into());
+            }
+            conversions.push(&fx)?;
+            previous = Some(tick.timestamp_ms);
+        }
+        Ok(())
+    })?;
+    Ok(Replay {
+        version: crate::ENGINE_VERSION.into(),
+        strategy_id: strategy.identity()?,
+        dataset_id: observed.ordered_events_hash,
+        profile_id: crate::data::hash(&observed.profile)?,
+        cost_id: crate::data::hash(costs)?,
+        conversion_id: conversions.finish(),
+        fill_assumption: FILL_ASSUMPTION.into(),
+        initial_micro_usd: contracts::INITIAL_EQUITY,
+        realized_micro_usd: state.balance,
+        final_marked_micro_usd: state.marked,
+        maximum_drawdown_micro_usd: state.drawdown,
+        trades: state.trades,
+        rejections: state.rejections,
+        unresolved: state.position,
+        pending_entry: state.pending,
+        entry_receipts: state.entry_receipts,
+        evaluation_window: None,
+    })
+}
+
+#[cfg(test)]
+mod account_checkpoint_tests {
+    use super::*;
+    #[test]
+    fn serialized_account_boundaries_preserve_complete_state() {
+        use crate::strategies::{EntryPlan, Features, Rule};
+        let mut resolved = 0;
+        for symbol in ["EURUSD", "XAUUSD"] {
+            let data = crate::data::synthetic_fixture(symbol).unwrap();
+            for side in [Side::Long, Side::Short] {
+                for entry in [
+                    None,
+                    Some(EntryPlan::StopMarket {
+                        offset_ticks: 2,
+                        ttl_ms: 120000,
+                        cancel_on_signal_false: true,
+                    }),
+                    Some(EntryPlan::Limit {
+                        offset_ticks: 2,
+                        ttl_ms: 120000,
+                        cancel_on_signal_false: true,
+                    }),
+                ] {
+                    let strategy = Strategy {
+                        timeframe: crate::candles::Timeframe::M1,
+                        side,
+                        stop_ticks: 100,
+                        rule: Rule::AboveMean { window: 2 },
+                        entry,
+                        stop_policy: None,
+                    };
+                    let costs = Costs::default();
+                    let candles = crate::candles::build(&data, strategy.timeframe).unwrap();
+                    let mask = Features::new(&candles, 100000)
+                        .unwrap()
+                        .signal(&strategy.rule)
+                        .unwrap();
+                    let conversions = vec![Conversion::usd(); data.ticks.len()];
+                    let prepared = prepare_replay(
+                        &data,
+                        &candles,
+                        &mask,
+                        &strategy,
+                        &costs,
+                        &conversions,
+                        None,
+                    )
+                    .unwrap();
+                    let context = EventContext {
+                        p: &data.profile,
+                        strategy: &prepared.strategy,
+                        distances: &prepared.distances,
+                        costs: &costs,
+                        candles: &candles,
+                        mask: &mask,
+                        window: None,
+                        slip: prepared.slip,
+                    };
+                    let mut reference = AccountState::initial();
+                    for (i, t) in data.ticks.iter().enumerate() {
+                        reference
+                            .advance(
+                                t,
+                                conversions[i],
+                                i.checked_sub(1).map(|i| data.ticks[i].timestamp_ms),
+                                &context,
+                            )
+                            .unwrap();
+                    }
+                    resolved += reference.trades.len();
+                    for chunk in [17, 127] {
+                        let mut restored = AccountState::initial();
+                        for (i, t) in data.ticks.iter().enumerate() {
+                            restored
+                                .advance(
+                                    t,
+                                    conversions[i],
+                                    i.checked_sub(1).map(|i| data.ticks[i].timestamp_ms),
+                                    &context,
+                                )
+                                .unwrap();
+                            if (i + 1) % chunk == 0 {
+                                restored =
+                                    serde_json::from_slice(&serde_json::to_vec(&restored).unwrap())
+                                        .unwrap();
+                            }
+                        }
+                        assert_eq!(
+                            crate::data::hash(&restored).unwrap(),
+                            crate::data::hash(&reference).unwrap()
+                        );
+                    }
+                }
+            }
+        }
+        assert!(resolved > 0);
+    }
 }

@@ -74,7 +74,7 @@ pub fn load(path: &Path) -> Result<Specification> {
     Ok(s)
 }
 /// Stream canonical JSON-array fingerprints without retaining an event/candle array.
-struct SequenceHash {
+pub(crate) struct SequenceHash {
     hash: blake3::Hasher,
     count: u64,
 }
@@ -89,12 +89,12 @@ impl Write for HashWriter<'_> {
     }
 }
 impl SequenceHash {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let mut hash = blake3::Hasher::new();
         hash.update(b"[");
         Self { hash, count: 0 }
     }
-    fn push<T: Serialize>(&mut self, value: &T) -> Result<()> {
+    pub(crate) fn push<T: Serialize>(&mut self, value: &T) -> Result<()> {
         if self.count > 0 {
             self.hash.update(b",");
         }
@@ -102,7 +102,7 @@ impl SequenceHash {
         self.count = self.count.checked_add(1).ok_or("corpus count overflow")?;
         Ok(())
     }
-    fn finish(mut self) -> String {
+    pub(crate) fn finish(mut self) -> String {
         self.hash.update(b"]");
         self.hash.finalize().to_hex().to_string()
     }
