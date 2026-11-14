@@ -536,3 +536,48 @@ fn corpus_account_replay_matches_all_materialized_receipt_fields() {
     assert!(!status.status.success());
     assert!(!result.exists());
 }
+
+#[test]
+fn registered_corpus_identity_binds_exact_artifacts_policy_and_budgets() {
+    use rust_strategy_factory::{
+        storage::Registry,
+        strategies::Strategy,
+        tick_engine::{self, CorpusBudget, Costs},
+    };
+    let f = Fixture::new("frozen-run", "EURUSD", 2);
+    let strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+    let budget = CorpusBudget {
+        max_candles: 100,
+        feature_cells: 10000,
+        max_receipts: 1000,
+    };
+    let k =
+        tick_engine::corpus_key(&f.root, &f.spec, &strategy, &Costs::default(), budget).unwrap();
+    let mut r = Registry::open(&f.root.join("run.sqlite")).unwrap();
+    assert_eq!(r.register(&k).unwrap(), r.register(&k).unwrap());
+    let changed = tick_engine::corpus_key(
+        &f.root,
+        &f.spec,
+        &strategy,
+        &Costs::default(),
+        CorpusBudget {
+            feature_cells: 10001,
+            ..budget
+        },
+    )
+    .unwrap();
+    assert_ne!(k.identity().unwrap(), changed.identity().unwrap());
+    assert!(
+        tick_engine::corpus_key(
+            &f.root,
+            &f.spec,
+            &strategy,
+            &Costs::default(),
+            CorpusBudget {
+                max_receipts: 0,
+                ..budget
+            }
+        )
+        .is_err()
+    );
+}

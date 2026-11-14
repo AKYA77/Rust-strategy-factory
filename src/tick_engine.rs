@@ -801,10 +801,65 @@ fn replay_internal(
 /// Exact synthetic USD corpus replay using the authoritative event transition.
 /// Feature contexts and result receipts have separate explicit caps. Real/protected
 /// research requires registry/exposure integration and is deliberately refused.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CorpusBudget {
     pub max_candles: usize,
     pub feature_cells: usize,
     pub max_receipts: usize,
+}
+/// Freeze all corpus execution inputs before acquiring a registry lease.
+pub fn corpus_key(
+    base: &std::path::Path,
+    spec: &crate::corpus::Specification,
+    strategy: &Strategy,
+    costs: &Costs,
+    budget: CorpusBudget,
+) -> Result<crate::storage::ExperimentKey> {
+    costs.validate()?;
+    if budget.max_candles == 0
+        || budget.max_candles > 1_000_000
+        || budget.feature_cells == 0
+        || budget.max_receipts == 0
+        || budget.max_receipts > 1_000_000
+    {
+        return Err("invalid corpus execution budget".into());
+    }
+    let observed = crate::corpus::inspect(base, spec)?;
+    if observed.declared_class != crate::data::DataClass::SyntheticTestOnly
+        || observed.profile.quote != "USD"
+    {
+        return Err("registered corpus execution requires synthetic literal USD".into());
+    }
+    let strategy = strategy.canonical()?;
+    Ok(crate::storage::ExperimentKey {
+        concept_hash: strategy.identity()?,
+        instrument: observed.profile.symbol.clone(),
+        dataset_hash: observed.ordered_events_hash,
+        start_ms: observed.first.timestamp_ms,
+        end_exclusive_ms: observed
+            .latest
+            .timestamp_ms
+            .checked_add(1)
+            .ok_or("corpus end overflow")?,
+        signal_version: crate::SIGNAL_VERSION.into(),
+        indicator_version: crate::INDICATOR_VERSION.into(),
+        cost_hash: crate::data::hash(costs)?,
+        fill_policy: FILL_ASSUMPTION.into(),
+        profile_hash: crate::data::hash(&observed.profile)?,
+        engine_version: crate::ENGINE_VERSION.into(),
+        protocol_hash: "synthetic-corpus-training-v1".into(),
+        code_revision: crate::research::compute_revision()?,
+        configuration_hash: crate::data::hash(&(
+            "corpus-run-v1",
+            spec.identity()?,
+            strategy,
+            costs,
+            budget,
+            crate::research::compute_revision()?,
+        ))?,
+        stage: crate::storage::Stage::TickVerification,
+    })
 }
 pub fn replay_corpus(
     base: &std::path::Path,
