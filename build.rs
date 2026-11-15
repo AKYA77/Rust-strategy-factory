@@ -12,6 +12,7 @@ fn main() {
         "src/contracts.rs",
         "src/data.rs",
         "src/native.rs",
+        "src/blocked_native.rs",
         "src/compressed.rs",
         "src/parquet_store.rs",
         "src/parquet_guard.rs",
