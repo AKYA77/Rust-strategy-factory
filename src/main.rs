@@ -1039,6 +1039,39 @@ fn run(args: &[String]) -> Result<()> {
             )
         }
         [
+            "corpus-supervise-region-owned",
+            config,
+            policy,
+            database,
+            maximum,
+            wait,
+            parent_limits,
+            start_index,
+            expected_source_id,
+        ] => {
+            let maximum: usize = maximum.parse().map_err(|_| "invalid round limit")?;
+            let wait: u64 = wait.parse().map_err(|_| "invalid wait limit")?;
+            let start_index: u64 = start_index
+                .parse()
+                .map_err(|_| "invalid region start index")?;
+            let limits: rust_strategy_factory::owned_process::Limits =
+                read_operator_config(parent_limits)?;
+            let (_signals, shutdown) = checkpoint_shutdown()?;
+            print(&rust_strategy_factory::owned_process::run_region(
+                rust_strategy_factory::owned_process::RegionInput {
+                    config: Path::new(config),
+                    start_index,
+                    expected_source_id,
+                },
+                Path::new(policy),
+                Path::new(database),
+                maximum,
+                wait,
+                &limits,
+                shutdown,
+            )?)
+        }
+        [
             "corpus-supervise-owned",
             config,
             policy,
@@ -1063,13 +1096,16 @@ fn run(args: &[String]) -> Result<()> {
             )?)
         }
         [
-            "corpus-supervise",
+            command,
             config,
             policy,
             database,
             maximum,
             wait_ms,
-        ] => {
+            pin_args @ ..,
+        ] if (*command == "corpus-supervise" && pin_args.is_empty())
+            || (*command == "corpus-supervise-pinned" && pin_args.len() == 1) =>
+        {
             let maximum: usize = maximum
                 .parse()
                 .map_err(|_| "invalid supervision round limit")?;
@@ -1081,9 +1117,18 @@ fn run(args: &[String]) -> Result<()> {
                     "supervision requires1..10000 rounds and0..3600000 total wait ms".into(),
                 );
             }
-            let loaded = rust_strategy_factory::operator_config::load_search(Path::new(config))?;
+            let mut loaded =
+                rust_strategy_factory::operator_config::load_search(Path::new(config))?;
             let policy: rust_strategy_factory::retry_policy::Policy = read_operator_config(policy)?;
             policy.validate()?;
+            if *command == "corpus-supervise-pinned" {
+                if pin_args[0].len() > 4096 {
+                    return Err("owned input pin exceeds 4096 bytes".into());
+                }
+                let pin: rust_strategy_factory::owned_process::InputPin =
+                    serde_json::from_str(pin_args[0]).map_err(|e| e.to_string())?;
+                pin.validate_and_apply(&mut loaded, &policy)?;
+            }
             let (_signals, shutdown) = checkpoint_shutdown()?;
             eprintln!("corpus supervision ready; signals stop at a safe round/wait boundary");
             let mut rounds = 0usize;
@@ -1603,7 +1648,7 @@ fn run(args: &[String]) -> Result<()> {
         }
         [] | ["--help"] | ["help"] => {
             println!(
-                "Rust Strategy Factory — historical research only; SOFTWARE_INCOMPLETE\n\nvalidate-protocol <input-config.json> <plan.json> <registry.sqlite>\nreview-training <input-config.json> <registry.sqlite> <diagnosis-id>\ntraining-review-report <registry.sqlite> <review-id>\ndiagnose <registry.sqlite> <training-experiment-id>\ndiagnosis-report <registry.sqlite> <diagnosis-id>\nprotocol-report <registry.sqlite> <protocol-id>\nauth-init <new-auth.json> (password from stdin)\nserve <registry.sqlite> <auth.json> <port> [catalog.sqlite [review-config.json]]\nprofiles\nfixture <symbol> <new-dataset.json>\ngenerate\nimport <normalized.csv> <profile.json> <source-url-or-description> <new-dataset.json> <real|synthetic>\nimport-step <normalized.csv> <profile.json> <source> <import-directory> <real|synthetic> <chunk-events>\nimport-status <import-directory>\nimport-export <complete-import-directory> <new-dataset.rsf>\npack-blocks <dataset.json|dataset.rsf> <new-dataset.rsfb> <block-rows>\nblock-inspect <dataset.rsfb>\nblock-range <dataset.rsfb> <pinned-root> <start-row> <count>\nunpack-blocks <dataset.rsfb> <new-dataset.json>\npack-native <dataset.json|dataset.rsf|dataset.rsfz> <new-dataset.rsf>\npack-parquet <dataset.json|dataset.rsf|dataset.rsfz> <new-dataset.parquet>\nunpack-parquet <dataset.parquet> <new-dataset.json>\ncompress-native <dataset.rsf> <new-dataset.rsfz>\ndecompress-native <dataset.rsfz> <new-dataset.rsf>\nunpack-native <dataset.rsf> <new-dataset.json>\ninspect <dataset.json|dataset.rsf>\ncatalog-record <dataset> <catalog.sqlite>\ncatalog-entry <catalog.sqlite> <dataset-identity>\narchive-evidence <normalized.csv> <dataset> <catalog.sqlite> <identity>\ncalendar-evidence <dataset> <catalog.sqlite> <identity> <declaration.json>\nmachine-admit <archive.csv> <dataset> <catalog.sqlite> <identity> <calendar.json> <claim.json>\nmachine-report <catalog.sqlite> <admission-id>\nmachine-revalidate <catalog.sqlite> <admission-id> <archive.csv> <dataset>\nreview-authority-init <reviewers.json> <new-authority.secret>\ndata-review-decide <catalog.sqlite> <authority.secret> <reviewer> <request.json> (password from stdin)\ndata-review-state <catalog.sqlite> <authority.secret> <identity>\ndata-eligibility <catalog.sqlite> <authority.secret> <machine-id> <archive.csv> <dataset>\ncatalog-review <catalog.sqlite> <request.json>\ncatalog-review-report <catalog.sqlite> <review-hash>\ncatalog-reviews <catalog.sqlite> <dataset-identity> <after-hash-or--> <limit>\ncatalog-correction <dataset> <catalog.sqlite> <parent-identity> <evidence-reason>\ncatalog-list <catalog.sqlite> [after-identity-or-- limit]\ncatalog-backup <catalog.sqlite> <new-snapshot.sqlite>\ncatalog-restore <snapshot.sqlite> <new-catalog.sqlite>\ncorpus-create-bounded <new-corpus.json> <maximum-artifact-events> <chunk.rsf|chunk.rsfb>...\ncorpus-create <new-corpus.json> <chunk.rsf>...\nresource-status\ndisk-status <registry.sqlite-or-new-path>\ncorpus-fleet-init <fleet.json> <registry.sqlite>\ncorpus-fleet <registry.sqlite> <fleet-id> <maximum-visits>\ncorpus-fleet-supervise <registry.sqlite> <fleet-id> <policy.json> <parent-limits.json> <maximum-visits>\ncorpus-fleet-loop <registry.sqlite> <fleet-id> <policy.json> <parent-limits.json> <maximum-visits> <total-wait-ms>\ncorpus-fleet-status <registry.sqlite> <fleet-id>\ncorpus-fleet-control <registry.sqlite> <fleet-id> <running|paused|stopped>\ncorpus-campaign-run <registry.sqlite> <campaign-id> <max-rounds>\ncorpus-campaign-control <registry.sqlite> <campaign-id> <running|paused|stopped>\ncorpus-campaign-freeze <search-config.json> <registry.sqlite> <regions>\ncorpus-campaign-status <registry.sqlite> <campaign-id>\ncorpus-campaign-verify <registry.sqlite> <campaign-id>\ncorpus-search <config.json> <registry.sqlite> <max-rounds>\nrecovery-list <registry.sqlite>\nrecovery-backup <registry.sqlite> <new-label>\nrecovery-verify <registry.sqlite> <label>\nrecovery-restore <registry.sqlite> <source-label> <new-label>\nrecovery-path <registry.sqlite> <label>\ncorpus-owned-invocations <registry.sqlite>\ncorpus-owned-status <registry.sqlite> <invocation-id>\ncorpus-supervision-sessions <registry.sqlite>\ncorpus-supervision-status <registry.sqlite> <session-id>\ncorpus-supervision-stop <registry.sqlite> <session-id>\ncorpus-supervise-owned <config.json> <policy.json> <registry.sqlite> <max-rounds> <total-wait-ms> <parent-limits.json>\ncorpus-supervise <config.json> <policy.json> <registry.sqlite> <max-rounds> <total-wait-ms>\ncorpus-retry-decisions <registry.sqlite> <search-id> <after-or--> <limit>\ncorpus-retry-configure <registry.sqlite> <search-id> <policy.json>\ncorpus-retry-admit <registry.sqlite> <search-id> <expected-epoch>\ncorpus-search-requeue <registry.sqlite> <search-id> <maximum-slots>\ncorpus-search-status <registry.sqlite> <search-id>\ncorpus-search-control <registry.sqlite> <search-id> <running|paused|stopped>\ncorpus-batch <config.json> <registry.sqlite> <max-rounds>\ncorpus-control <registry.sqlite> <experiment-id> <running|paused|stopped>\ncorpus-status <registry.sqlite> <experiment-id>\ncorpus-step <spec.json> <strategy.json> <registry.sqlite> <max-candles> <feature-cells> <max-receipts> <new-chunks> <lease-ms>\ncorpus-inspect <ordered-corpus.json>\ncoverage <dataset> <start-ms> <end-exclusive-ms> <gap-threshold-ms>\ncandles <dataset.json|dataset.rsf> <M1|M5|M15|M30|H1|H4|D1>\nevaluate <dataset.json|dataset.rsf> <strategy.json> <new-result.json>\nexperiment <dataset.json|dataset.rsf> <strategy.json> <registry.sqlite>\nregistry-check <registry.sqlite>\nregistry-artifacts <registry.sqlite>\nbackup <registry.sqlite> <new-backup.sqlite>\nresearch <config.json> <registry.sqlite> [max-steps]\nbatch-experiments <one-input-config.json> <same-timeframe-strategies.json> <registry.sqlite>\nimprovement-jobs <registry.sqlite> <run-id>\nresearch-status <registry.sqlite> <run-id>\nresearch-control <registry.sqlite> <run-id> <running|paused|stopped>\n\nSynthetic profiles do not establish broker feasibility. No strategy qualification is implemented."
+                "Rust Strategy Factory — historical research only; SOFTWARE_INCOMPLETE\n\nvalidate-protocol <input-config.json> <plan.json> <registry.sqlite>\nreview-training <input-config.json> <registry.sqlite> <diagnosis-id>\ntraining-review-report <registry.sqlite> <review-id>\ndiagnose <registry.sqlite> <training-experiment-id>\ndiagnosis-report <registry.sqlite> <diagnosis-id>\nprotocol-report <registry.sqlite> <protocol-id>\nauth-init <new-auth.json> (password from stdin)\nserve <registry.sqlite> <auth.json> <port> [catalog.sqlite [review-config.json]]\nprofiles\nfixture <symbol> <new-dataset.json>\ngenerate\nimport <normalized.csv> <profile.json> <source-url-or-description> <new-dataset.json> <real|synthetic>\nimport-step <normalized.csv> <profile.json> <source> <import-directory> <real|synthetic> <chunk-events>\nimport-status <import-directory>\nimport-export <complete-import-directory> <new-dataset.rsf>\npack-blocks <dataset.json|dataset.rsf> <new-dataset.rsfb> <block-rows>\nblock-inspect <dataset.rsfb>\nblock-range <dataset.rsfb> <pinned-root> <start-row> <count>\nunpack-blocks <dataset.rsfb> <new-dataset.json>\npack-native <dataset.json|dataset.rsf|dataset.rsfz> <new-dataset.rsf>\npack-parquet <dataset.json|dataset.rsf|dataset.rsfz> <new-dataset.parquet>\nunpack-parquet <dataset.parquet> <new-dataset.json>\ncompress-native <dataset.rsf> <new-dataset.rsfz>\ndecompress-native <dataset.rsfz> <new-dataset.rsf>\nunpack-native <dataset.rsf> <new-dataset.json>\ninspect <dataset.json|dataset.rsf>\ncatalog-record <dataset> <catalog.sqlite>\ncatalog-entry <catalog.sqlite> <dataset-identity>\narchive-evidence <normalized.csv> <dataset> <catalog.sqlite> <identity>\ncalendar-evidence <dataset> <catalog.sqlite> <identity> <declaration.json>\nmachine-admit <archive.csv> <dataset> <catalog.sqlite> <identity> <calendar.json> <claim.json>\nmachine-report <catalog.sqlite> <admission-id>\nmachine-revalidate <catalog.sqlite> <admission-id> <archive.csv> <dataset>\nreview-authority-init <reviewers.json> <new-authority.secret>\ndata-review-decide <catalog.sqlite> <authority.secret> <reviewer> <request.json> (password from stdin)\ndata-review-state <catalog.sqlite> <authority.secret> <identity>\ndata-eligibility <catalog.sqlite> <authority.secret> <machine-id> <archive.csv> <dataset>\ncatalog-review <catalog.sqlite> <request.json>\ncatalog-review-report <catalog.sqlite> <review-hash>\ncatalog-reviews <catalog.sqlite> <dataset-identity> <after-hash-or--> <limit>\ncatalog-correction <dataset> <catalog.sqlite> <parent-identity> <evidence-reason>\ncatalog-list <catalog.sqlite> [after-identity-or-- limit]\ncatalog-backup <catalog.sqlite> <new-snapshot.sqlite>\ncatalog-restore <snapshot.sqlite> <new-catalog.sqlite>\ncorpus-create-bounded <new-corpus.json> <maximum-artifact-events> <chunk.rsf|chunk.rsfb>...\ncorpus-create <new-corpus.json> <chunk.rsf>...\nresource-status\ndisk-status <registry.sqlite-or-new-path>\ncorpus-fleet-init <fleet.json> <registry.sqlite>\ncorpus-fleet <registry.sqlite> <fleet-id> <maximum-visits>\ncorpus-fleet-supervise <registry.sqlite> <fleet-id> <policy.json> <parent-limits.json> <maximum-visits>\ncorpus-fleet-loop <registry.sqlite> <fleet-id> <policy.json> <parent-limits.json> <maximum-visits> <total-wait-ms>\ncorpus-fleet-status <registry.sqlite> <fleet-id>\ncorpus-fleet-control <registry.sqlite> <fleet-id> <running|paused|stopped>\ncorpus-campaign-run <registry.sqlite> <campaign-id> <max-rounds>\ncorpus-campaign-control <registry.sqlite> <campaign-id> <running|paused|stopped>\ncorpus-campaign-freeze <search-config.json> <registry.sqlite> <regions>\ncorpus-campaign-status <registry.sqlite> <campaign-id>\ncorpus-campaign-verify <registry.sqlite> <campaign-id>\ncorpus-search <config.json> <registry.sqlite> <max-rounds>\nrecovery-list <registry.sqlite>\nrecovery-backup <registry.sqlite> <new-label>\nrecovery-verify <registry.sqlite> <label>\nrecovery-restore <registry.sqlite> <source-label> <new-label>\nrecovery-path <registry.sqlite> <label>\ncorpus-owned-invocations <registry.sqlite>\ncorpus-owned-status <registry.sqlite> <invocation-id>\ncorpus-supervision-sessions <registry.sqlite>\ncorpus-supervision-status <registry.sqlite> <session-id>\ncorpus-supervision-stop <registry.sqlite> <session-id>\ncorpus-supervise-region-owned <config.json> <policy.json> <registry.sqlite> <max-rounds> <total-wait-ms> <parent-limits.json> <start-index> <expected-search-id>\ncorpus-supervise-owned <config.json> <policy.json> <registry.sqlite> <max-rounds> <total-wait-ms> <parent-limits.json>\ncorpus-supervise <config.json> <policy.json> <registry.sqlite> <max-rounds> <total-wait-ms>\ncorpus-retry-decisions <registry.sqlite> <search-id> <after-or--> <limit>\ncorpus-retry-configure <registry.sqlite> <search-id> <policy.json>\ncorpus-retry-admit <registry.sqlite> <search-id> <expected-epoch>\ncorpus-search-requeue <registry.sqlite> <search-id> <maximum-slots>\ncorpus-search-status <registry.sqlite> <search-id>\ncorpus-search-control <registry.sqlite> <search-id> <running|paused|stopped>\ncorpus-batch <config.json> <registry.sqlite> <max-rounds>\ncorpus-control <registry.sqlite> <experiment-id> <running|paused|stopped>\ncorpus-status <registry.sqlite> <experiment-id>\ncorpus-step <spec.json> <strategy.json> <registry.sqlite> <max-candles> <feature-cells> <max-receipts> <new-chunks> <lease-ms>\ncorpus-inspect <ordered-corpus.json>\ncoverage <dataset> <start-ms> <end-exclusive-ms> <gap-threshold-ms>\ncandles <dataset.json|dataset.rsf> <M1|M5|M15|M30|H1|H4|D1>\nevaluate <dataset.json|dataset.rsf> <strategy.json> <new-result.json>\nexperiment <dataset.json|dataset.rsf> <strategy.json> <registry.sqlite>\nregistry-check <registry.sqlite>\nregistry-artifacts <registry.sqlite>\nbackup <registry.sqlite> <new-backup.sqlite>\nresearch <config.json> <registry.sqlite> [max-steps]\nbatch-experiments <one-input-config.json> <same-timeframe-strategies.json> <registry.sqlite>\nimprovement-jobs <registry.sqlite> <run-id>\nresearch-status <registry.sqlite> <run-id>\nresearch-control <registry.sqlite> <run-id> <running|paused|stopped>\n\nSynthetic profiles do not establish broker feasibility. No strategy qualification is implemented."
             );
             Ok(())
         }

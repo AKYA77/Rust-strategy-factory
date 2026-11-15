@@ -4110,3 +4110,166 @@ fn campaign_foreground_cli_replenishes_frozen_regions_preserves_holds_and_restar
     let copied = Registry::open(&f.root.join("completed-copy.sqlite")).unwrap();
     assert_eq!(corpus_campaign::status(&copied, &id).unwrap(), final_status);
 }
+
+#[test]
+fn pinned_child_rejects_retuned_inputs_before_registry_creation_and_keeps_operator_files() {
+    use rust_strategy_factory::{
+        corpus_search, operator_config, owned_process::InputPin, retry_policy::Policy,
+        storage::Registry,
+    };
+    let f = Fixture::new("owned-input-pin", "EURUSD", 7);
+    let config = corpus_search_fixture(&f);
+    let original = fs::read(&config).unwrap();
+    let policy = Policy {
+        backoff_ms: 500,
+        maximum_slots: 1,
+    };
+    let policy_path = f.root.join("policy.json");
+    fs::write(&policy_path, serde_json::to_vec(&policy).unwrap()).unwrap();
+    let loaded = operator_config::load_search(&config).unwrap();
+    let pin = InputPin::freeze(&loaded, &policy, Some(12)).unwrap();
+    let text = serde_json::to_string(&pin).unwrap();
+    let db = f.root.join("must-not-exist.sqlite");
+    let invoke = |pin_text: &str, database: &std::path::Path| {
+        Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args([
+                "corpus-supervise-pinned",
+                config.to_str().unwrap(),
+                policy_path.to_str().unwrap(),
+                database.to_str().unwrap(),
+                "1",
+                "0",
+                pin_text,
+            ])
+            .output()
+            .unwrap()
+    };
+    let mut value: serde_json::Value = serde_json::from_slice(&original).unwrap();
+    value["seed"] = 43.into();
+    fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+    assert!(!invoke(&text, &db).status.success());
+    assert!(!db.exists());
+    value = serde_json::from_slice(&original).unwrap();
+    value["start_index"] = 100.into();
+    fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+    let mut current = operator_config::load_search(&config).unwrap();
+    assert!(pin.validate_and_apply(&mut current, &policy).is_err());
+    assert_eq!(current.file.start_index, 100);
+    assert!(!invoke(&text, &db).status.success());
+    assert!(!db.exists());
+    value = serde_json::from_slice(&original).unwrap();
+    value["limits"]["max_new_chunks"] = 2.into();
+    fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+    assert!(!invoke(&text, &db).status.success());
+    assert!(!db.exists());
+    fs::write(&config, &original).unwrap();
+    fs::write(
+        &policy_path,
+        serde_json::to_vec(&Policy {
+            backoff_ms: 501,
+            maximum_slots: 1,
+        })
+        .unwrap(),
+    )
+    .unwrap();
+    assert!(!invoke(&text, &db).status.success());
+    assert!(!db.exists());
+    fs::write(&policy_path, serde_json::to_vec(&policy).unwrap()).unwrap();
+    let mut wrong = serde_json::to_value(&pin).unwrap();
+    wrong["source_id"] = "f".repeat(64).into();
+    assert!(
+        !invoke(&serde_json::to_string(&wrong).unwrap(), &db)
+            .status
+            .success()
+    );
+    assert!(!db.exists());
+    let mut unknown = serde_json::to_value(&pin).unwrap();
+    unknown["metrics"] = serde_json::json!({"qualified":true});
+    assert!(
+        !invoke(&serde_json::to_string(&unknown).unwrap(), &db)
+            .status
+            .success()
+    );
+    assert!(!db.exists());
+    let database = f.root.join("valid.sqlite");
+    let out = invoke(&text, &database);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let registry = Registry::open(&database).unwrap();
+    let mut expected = loaded.run();
+    expected.start_index = 12;
+    let expected = corpus_search::identity(&expected).unwrap();
+    let rows = corpus_search::list(&registry).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["search_id"], expected);
+    assert_eq!(fs::read(&config).unwrap(), original);
+    registry.integrity().unwrap();
+}
+#[test]
+fn owned_region_process_pins_effective_identity_and_preserves_base_operator_file() {
+    use rust_strategy_factory::{corpus_search, operator_config, owned_history, storage::Registry};
+    let f = Fixture::new("owned-region-process", "EURUSD", 7);
+    let config = corpus_search_fixture(&f);
+    let original = fs::read(&config).unwrap();
+    let loaded = operator_config::load_search(&config).unwrap();
+    let mut run = loaded.run();
+    run.start_index = 12;
+    let source_id = corpus_search::identity(&run).unwrap();
+    let db = f.root.join("owned.sqlite");
+    let policy = f.root.join("policy.json");
+    let limits = f.root.join("parent.json");
+    fs::write(&policy, br#"{"backoff_ms":1,"maximum_slots":1}"#).unwrap();
+    fs::write(
+        &limits,
+        br#"{"maximum_wall_ms":30000,"shutdown_grace_ms":1000,"maximum_output_bytes":1048576}"#,
+    )
+    .unwrap();
+    let invalid = f.root.join("invalid.sqlite");
+    let invoke = |database: &std::path::Path, expected: &str| {
+        Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args([
+                "corpus-supervise-region-owned",
+                config.to_str().unwrap(),
+                policy.to_str().unwrap(),
+                database.to_str().unwrap(),
+                "1",
+                "0",
+                limits.to_str().unwrap(),
+                "12",
+                expected,
+            ])
+            .output()
+            .unwrap()
+    };
+    assert!(!invoke(&invalid, &"f".repeat(64)).status.success());
+    assert!(!invalid.exists());
+    let output = invoke(&db, &source_id);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["exit_success"], true, "{report}");
+    assert_eq!(report["reaped"], true);
+    assert_eq!(report["search_id"], source_id);
+    assert_eq!(report["input_pin"]["source_id"], source_id);
+    assert_eq!(report["input_pin"]["start_index"], 12);
+    assert_ne!(
+        report["input_pin"]["operator_hash"],
+        report["input_pin"]["effective_operator_hash"]
+    );
+    assert_eq!(report["session_status"]["search_id"], source_id);
+    let registry = Registry::open(&db).unwrap();
+    let rows = corpus_search::list(&registry).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["search_id"], source_id);
+    let stored =
+        owned_history::status(&registry, report["invocation_id"].as_str().unwrap()).unwrap();
+    assert_eq!(stored["summary"]["input_pin"], report["input_pin"]);
+    assert_eq!(fs::read(&config).unwrap(), original);
+    registry.integrity().unwrap();
+}

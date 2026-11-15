@@ -101,6 +101,110 @@ fn capture(
     }
     output
 }
+/// Exact parent-reviewed inputs, checked by the same-executable child before any registry writes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InputPin {
+    version: String,
+    operator_hash: String,
+    effective_operator_hash: String,
+    policy_hash: String,
+    source_id: String,
+    start_index: Option<u64>,
+}
+impl InputPin {
+    pub fn freeze(
+        loaded: &operator_config::LoadedSearch,
+        policy: &retry_policy::Policy,
+        start_index: Option<u64>,
+    ) -> Result<Self> {
+        policy.validate()?;
+        let mut run = loaded.run();
+        if let Some(start_index) = start_index {
+            run.start_index = start_index;
+        }
+        let source_id = crate::corpus_search::identity(&run)?;
+        let mut effective = loaded.file.clone();
+        if let Some(start_index) = start_index {
+            effective.start_index = start_index;
+        }
+        Ok(Self {
+            version: "owned-input-pin-v1".into(),
+            operator_hash: crate::data::hash(&loaded.file)?,
+            effective_operator_hash: crate::data::hash(&effective)?,
+            policy_hash: crate::data::hash(policy)?,
+            source_id,
+            start_index,
+        })
+    }
+    pub(crate) fn validate_binding(
+        &self,
+        source: &str,
+        effective_operator_hash: &str,
+        policy_hash: &str,
+    ) -> Result<()> {
+        if self.version != "owned-input-pin-v1"
+            || !crate::machine_evidence::hex(&self.operator_hash)
+            || !crate::machine_evidence::hex(&self.effective_operator_hash)
+            || !crate::machine_evidence::hex(&self.policy_hash)
+            || !crate::machine_evidence::hex(&self.source_id)
+            || self.source_id != source
+            || self.effective_operator_hash != effective_operator_hash
+            || self.policy_hash != policy_hash
+            || self.start_index.is_none() && self.operator_hash != self.effective_operator_hash
+        {
+            return Err("owned input pin binding mismatch".into());
+        }
+        Ok(())
+    }
+    pub fn validate_and_apply(
+        &self,
+        loaded: &mut operator_config::LoadedSearch,
+        policy: &retry_policy::Policy,
+    ) -> Result<()> {
+        let current = Self::freeze(loaded, policy, self.start_index)?;
+        if self != &current {
+            return Err("owned child inputs differ from reviewed parent snapshot".into());
+        }
+        if let Some(start_index) = self.start_index {
+            loaded.file.start_index = start_index;
+        }
+        Ok(())
+    }
+}
+pub struct RegionInput<'a> {
+    pub config: &'a Path,
+    pub start_index: u64,
+    pub expected_source_id: &'a str,
+}
+struct RunInput<'a> {
+    config: &'a Path,
+    start_index: Option<u64>,
+    expected_source_id: Option<&'a str>,
+}
+pub fn run_region(
+    input: RegionInput<'_>,
+    policy_path: &Path,
+    database: &Path,
+    rounds: usize,
+    wait_ms: u64,
+    limits: &Limits,
+    shutdown: Arc<AtomicBool>,
+) -> Result<serde_json::Value> {
+    run_input(
+        RunInput {
+            config: input.config,
+            start_index: Some(input.start_index),
+            expected_source_id: Some(input.expected_source_id),
+        },
+        policy_path,
+        database,
+        rounds,
+        wait_ms,
+        limits,
+        shutdown,
+    )
+}
 pub fn run(
     config: &Path,
     policy_path: &Path,
@@ -110,11 +214,41 @@ pub fn run(
     limits: &Limits,
     shutdown: Arc<AtomicBool>,
 ) -> Result<serde_json::Value> {
+    run_input(
+        RunInput {
+            config,
+            start_index: None,
+            expected_source_id: None,
+        },
+        policy_path,
+        database,
+        rounds,
+        wait_ms,
+        limits,
+        shutdown,
+    )
+}
+fn run_input(
+    input: RunInput<'_>,
+    policy_path: &Path,
+    database: &Path,
+    rounds: usize,
+    wait_ms: u64,
+    limits: &Limits,
+    shutdown: Arc<AtomicBool>,
+) -> Result<serde_json::Value> {
+    let config = input.config;
     limits.validate()?;
+    if input
+        .expected_source_id
+        .is_some_and(|id| !crate::machine_evidence::hex(id))
+    {
+        return Err("invalid expected region source identity".into());
+    }
     if !(1..=10000).contains(&rounds) || wait_ms > 3_600_000 {
         return Err("invalid child round/wait limits".into());
     }
-    let loaded = operator_config::load_search(config)?;
+    let mut loaded = operator_config::load_search(config)?;
     let policy: retry_policy::Policy = operator_config::read(policy_path)?;
     policy.validate()?;
     if let Some(guard) = &loaded.file.disk_guard
@@ -127,6 +261,15 @@ pub fn run(
     {
         return Ok(serde_json::json!({"workers_started":0,"stop_reason":"resource-pressure"}));
     }
+    let pin = InputPin::freeze(&loaded, &policy, input.start_index)?;
+    if input
+        .expected_source_id
+        .is_some_and(|id| id != pin.source_id)
+    {
+        return Err("owned region does not match frozen source identity".into());
+    }
+    let pin_json = serde_json::to_string(&pin).map_err(|e| e.to_string())?;
+    pin.validate_and_apply(&mut loaded, &policy)?;
     let source = crate::corpus_search::prepare_supervision(database, &loaded.run(), &policy)?;
     let mut registry = Registry::open(database)?;
     registry
@@ -147,12 +290,13 @@ pub fn run(
     let start = Instant::now();
     let mut owned = Owned(
         Command::new(executable)
-            .arg("corpus-supervise")
+            .arg("corpus-supervise-pinned")
             .arg(config)
             .arg(policy_path)
             .arg(database)
             .arg(rounds.to_string())
             .arg(wait_ms.to_string())
+            .arg(pin_json)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -324,7 +468,7 @@ pub fn run(
     {
         resource_journal_error = Some(e);
     }
-    let mut report = serde_json::json!({"invocation_id":invocation.id,"version":"owned-corpus-process-v1","resource_journal_error":resource_journal_error,"child_resources":{"samples":sample_count.to_string(),"peak_observed_rss_bytes":peak_rss.to_string(),"last_observed_cpu_ticks":last_cpu_ticks.map(|n|n.to_string()),"start_ticks":child_start_ticks.map(|n|n.to_string()),"observation_error":observation_error,"scope":"Owned child only; sampled RSS and native kernel user+system CPU ticks. No tick-to-time conversion, unsampled peak, cgroup aggregate or hard OS limit is implied."},"search_id":source,"pid":pid.to_string(),"started_at_ms":started_at.to_string(),"finished_at_ms":chrono::Utc::now().timestamp_millis().to_string(),"elapsed_ms":start.elapsed().as_millis().to_string(),"stop_reason":cancellation.map(|v|v.0).unwrap_or(if status.success(){"child-exited"}else{"child-failed"}),"reaped":true,"forced_kill":forced,"stop_request_delivered":stop_delivered,"stop_error":stop_error,"exit_success":status.success(),"exit_code":status.code().map(|n|n.to_string()),"stdout_bytes":output.total.to_string(),"stderr_bytes":errors.total.to_string(),"stdout_truncated":output.total>cap as u64,"stderr_truncated":errors.total>cap as u64,"stdout_read_error":output.error,"stderr_read_error":errors.error,"child_report":child_report,"session_id":session,"session_status":session_status,"session_status_error":session_status_error,"limits":limits,"limitations":"Explicit foreground parent, same executable only; sampled wall budget plus cooperative grace. Forced termination can leave an unclosed session and fenced work. No hard kernel/filesystem deadline or survival after parent death is claimed."});
+    let mut report = serde_json::json!({"invocation_id":invocation.id,"version":"owned-corpus-process-v1","input_pin":pin,"resource_journal_error":resource_journal_error,"child_resources":{"samples":sample_count.to_string(),"peak_observed_rss_bytes":peak_rss.to_string(),"last_observed_cpu_ticks":last_cpu_ticks.map(|n|n.to_string()),"start_ticks":child_start_ticks.map(|n|n.to_string()),"observation_error":observation_error,"scope":"Owned child only; sampled RSS and native kernel user+system CPU ticks. No tick-to-time conversion, unsampled peak, cgroup aggregate or hard OS limit is implied."},"search_id":source,"pid":pid.to_string(),"started_at_ms":started_at.to_string(),"finished_at_ms":chrono::Utc::now().timestamp_millis().to_string(),"elapsed_ms":start.elapsed().as_millis().to_string(),"stop_reason":cancellation.map(|v|v.0).unwrap_or(if status.success(){"child-exited"}else{"child-failed"}),"reaped":true,"forced_kill":forced,"stop_request_delivered":stop_delivered,"stop_error":stop_error,"exit_success":status.success(),"exit_code":status.code().map(|n|n.to_string()),"stdout_bytes":output.total.to_string(),"stderr_bytes":errors.total.to_string(),"stdout_truncated":output.total>cap as u64,"stderr_truncated":errors.total>cap as u64,"stdout_read_error":output.error,"stderr_read_error":errors.error,"child_report":child_report,"session_id":session,"session_status":session_status,"session_status_error":session_status_error,"limits":limits,"limitations":"Explicit foreground parent, same executable only; sampled wall budget plus cooperative grace. Forced termination can leave an unclosed session and fenced work. No hard kernel/filesystem deadline or survival after parent death is claimed."});
 
     report["invocation_status"] =
         crate::owned_history::finish(&mut registry, &invocation, &report)?;

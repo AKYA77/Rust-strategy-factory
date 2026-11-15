@@ -231,6 +231,11 @@ fn validate_summary(b: &Body, s: &serde_json::Value) -> Result<()> {
     {
         return Err("owned terminal summary mismatch".into());
     }
+    if let Some(pin) = s.get("input_pin").filter(|v| !v.is_null()) {
+        let pin: crate::owned_process::InputPin =
+            serde_json::from_value(pin.clone()).map_err(|e| e.to_string())?;
+        pin.validate_binding(&b.search_id, &b.config_hash, &b.policy_input_hash)?;
+    }
     Ok(())
 }
 pub fn finish(
@@ -364,6 +369,58 @@ mod tests {
     }
     fn report(id: &str, source: &str) -> serde_json::Value {
         serde_json::json!({"invocation_id":id,"version":"owned-corpus-process-v1","search_id":source,"pid":"123","reaped":true,"stop_reason":"child-exited","child_report":{"synthetic_test_only":true},"session_status":null})
+    }
+    #[test]
+    fn input_pin_summary_bindings_refuse_forgery_and_preserve_legacy_reports() {
+        let (root, mut registry, source) =
+            crate::supervision_session::tests::fixture("owned-input-summary");
+        let owner = start_one(&mut registry, &source);
+        attach(&mut registry, &owner, 123).unwrap();
+        let mut report = report(&owner.id, &source);
+        let pin = serde_json::json!({"version":"owned-input-pin-v1","operator_hash":"a".repeat(64),"effective_operator_hash":"a".repeat(64),"policy_hash":"b".repeat(64),"source_id":source,"start_index":null});
+        for (field, value) in [
+            ("version", "future-version".into()),
+            ("operator_hash", "bad".into()),
+            ("effective_operator_hash", "c".repeat(64)),
+            ("policy_hash", "c".repeat(64)),
+            ("source_id", "c".repeat(64)),
+        ] {
+            let mut wrong = pin.clone();
+            wrong[field] = value.into();
+            report["input_pin"] = wrong;
+            assert!(finish(&mut registry, &owner, &report).is_err());
+            assert!(status(&registry, &owner.id).unwrap()["summary"].is_null());
+        }
+        report["input_pin"] = pin.clone();
+        let done = finish(&mut registry, &owner, &report).unwrap();
+        assert_eq!(done["summary"]["input_pin"], pin);
+        registry.backup(&root.join("pin-copy.sqlite")).unwrap();
+        let copied = Registry::open(&root.join("pin-copy.sqlite")).unwrap();
+        assert_eq!(
+            status(&copied, &owner.id).unwrap()["summary"]["input_pin"],
+            pin
+        );
+        drop(copied);
+        let (mut body, _, _) = read(&registry.connection, &owner.id).unwrap();
+        body.summary.as_mut().unwrap()["input_pin"]["policy_hash"] = "c".repeat(64).into();
+        registry
+            .connection
+            .execute_batch("DROP TRIGGER owned_invocation_terminal;")
+            .unwrap();
+        registry
+            .connection
+            .execute(
+                "UPDATE corpus_owned_invocations SET body=?2,hash=?3 WHERE id=?1",
+                params![
+                    owner.id,
+                    serde_json::to_string(&body).unwrap(),
+                    data::hash(&body).unwrap()
+                ],
+            )
+            .unwrap();
+        assert!(status(&registry, &owner.id).is_err());
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
     }
     #[test]
     fn owner_attachment_terminal_and_backup_fences_preserve_bounded_observations() {
