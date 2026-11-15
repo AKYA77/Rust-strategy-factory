@@ -98,7 +98,7 @@ pub struct Counts {
     pub running: i64,
     pub attempts: i64,
 }
-pub const SCHEMA_VERSION: u32 = 20;
+pub const SCHEMA_VERSION: u32 = 21;
 pub struct Registry {
     pub(crate) connection: Connection,
 }

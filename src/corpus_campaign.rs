@@ -8,12 +8,18 @@ const VERSION: &str = "synthetic-corpus-campaign-v1";
 const MAX_BODY: usize = 65536;
 
 pub(crate) fn initialize(connection: &mut Connection, previous: i64) -> Result<()> {
-    if previous >= 20 {
+    if previous >= 21 {
         return Ok(());
     }
     let tx = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(db)?;
+    let current: i64 = tx
+        .query_row("PRAGMA user_version", [], |r| r.get(0))
+        .map_err(db)?;
+    if current >= 21 {
+        return tx.commit().map_err(db);
+    }
     if previous < 19 {
         tx.execute_batch("CREATE TABLE IF NOT EXISTS corpus_campaigns(id TEXT PRIMARY KEY,body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=65536));
             CREATE TRIGGER IF NOT EXISTS corpus_campaign_no_update BEFORE UPDATE ON corpus_campaigns BEGIN SELECT RAISE(ABORT,'campaign immutable');END;
@@ -27,6 +33,14 @@ pub(crate) fn initialize(connection: &mut Connection, previous: i64) -> Result<(
         CREATE TRIGGER IF NOT EXISTS campaign_advance_no_delete BEFORE DELETE ON corpus_campaign_advances BEGIN SELECT RAISE(ABORT,'campaign progress immutable');END;
         INSERT OR IGNORE INTO corpus_campaign_runs(id,state,last_hash) SELECT id,'paused',id FROM corpus_campaigns;
         PRAGMA user_version=20;").map_err(db)?;
+    tx.execute_batch("CREATE TABLE IF NOT EXISTS corpus_campaign_owned_heads(campaign_id TEXT PRIMARY KEY REFERENCES corpus_campaign_runs(id),count INTEGER NOT NULL CHECK(count BETWEEN 1 AND 128),hash TEXT NOT NULL CHECK(length(hash)=64));
+        CREATE TABLE IF NOT EXISTS corpus_campaign_owned_visits(invocation_id TEXT PRIMARY KEY REFERENCES corpus_owned_invocations(id),campaign_id TEXT NOT NULL REFERENCES corpus_campaign_runs(id),sequence INTEGER NOT NULL CHECK(sequence>0),region INTEGER NOT NULL CHECK(region BETWEEN 0 AND 15),advance_region INTEGER,body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=4096),hash TEXT NOT NULL CHECK(length(hash)=64),UNIQUE(campaign_id,sequence),UNIQUE(campaign_id,advance_region),FOREIGN KEY(campaign_id,advance_region) REFERENCES corpus_campaign_advances(campaign_id,region));
+        CREATE TRIGGER IF NOT EXISTS campaign_owned_head_no_delete BEFORE DELETE ON corpus_campaign_owned_heads BEGIN SELECT RAISE(ABORT,'campaign owned head retained');END;
+        CREATE TRIGGER IF NOT EXISTS campaign_owned_head_key BEFORE UPDATE OF campaign_id ON corpus_campaign_owned_heads BEGIN SELECT RAISE(ABORT,'campaign owned head key immutable');END;
+        CREATE TRIGGER IF NOT EXISTS campaign_owned_visit_no_delete BEFORE DELETE ON corpus_campaign_owned_visits BEGIN SELECT RAISE(ABORT,'campaign owned visit retained');END;
+        CREATE TRIGGER IF NOT EXISTS campaign_owned_visit_no_update BEFORE UPDATE ON corpus_campaign_owned_visits BEGIN SELECT RAISE(ABORT,'campaign owned visit immutable');END;
+        UPDATE corpus_campaign_runs SET token=NULL,expires_ms=NULL;
+        PRAGMA user_version=21;").map_err(db)?;
     tx.commit().map_err(db)
 }
 fn db(e: rusqlite::Error) -> String {
@@ -212,7 +226,7 @@ fn full_snapshot(
 ) -> Result<serde_json::Value> {
     let mut value = snapshot(plan, id, fresh);
     let head = execution(connection, id, plan)?;
-    value["execution"] = serde_json::json!({"state":head.state,"next_region":head.cursor.to_string(),"epoch":head.epoch.to_string(),"attempt":head.attempt.to_string(),"lease_active":head.expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"advance_hash":head.last_hash,"completed_regions":head.advances});
+    value["execution"] = serde_json::json!({"state":head.state,"next_region":head.cursor.to_string(),"epoch":head.epoch.to_string(),"attempt":head.attempt.to_string(),"lease_active":head.expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"advance_hash":head.last_hash,"completed_regions":head.advances,"owned_visits":head.owned_visits,"owned_visit_hash":head.owned_hash});
     Ok(value)
 }
 pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
@@ -255,6 +269,183 @@ pub(crate) fn integrity(connection: &Connection) -> Result<()> {
     Ok(())
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OwnedVisit {
+    version: String,
+    campaign_id: String,
+    invocation_id: String,
+    sequence: i64,
+    region: usize,
+    created_at_ms: i64,
+    parent_observation_hash: String,
+    report_hash: String,
+    advance_hash: Option<String>,
+    previous_hash: String,
+}
+fn owned_root(id: &str) -> Result<String> {
+    data::hash(&("campaign-owned-visits-v1", id))
+}
+fn owned_visits(
+    connection: &Connection,
+    id: &str,
+    plan: &Plan,
+    cursor: usize,
+    attempt: i64,
+) -> Result<(Vec<serde_json::Value>, String)> {
+    let total: usize = connection
+        .query_row(
+            "SELECT count(*) FROM corpus_campaign_owned_visits",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(db)?;
+    if total > 128 {
+        return Err("campaign owned visit global quota exceeded".into());
+    }
+    let head: Option<(usize, String)> = connection
+        .query_row(
+            "SELECT count,hash FROM corpus_campaign_owned_heads WHERE campaign_id=?1",
+            [id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .optional()
+        .map_err(db)?;
+    let (count,bytes):(usize,usize)=connection.query_row("SELECT count(*),coalesce(sum(length(CAST(body AS BLOB))),0) FROM corpus_campaign_owned_visits WHERE campaign_id=?1",[id],|r|Ok((r.get(0)?,r.get(1)?))).map_err(db)?;
+    if count > 128
+        || bytes > 128 * 4096
+        || head
+            .as_ref()
+            .map_or(count != 0, |(n, _)| *n != count || *n == 0)
+    {
+        return Err("campaign owned visit head/count mismatch".into());
+    }
+    let mut previous = owned_root(id)?;
+    let mut last_sequence = 0;
+    let mut last_region = 0;
+    let mut values = Vec::new();
+    let mut q=connection.prepare("SELECT invocation_id,sequence,region,advance_region,body,hash FROM corpus_campaign_owned_visits WHERE campaign_id=?1 ORDER BY sequence").map_err(db)?;
+    let rows = q
+        .query_map([id], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, i64>(1)?,
+                r.get::<_, usize>(2)?,
+                r.get::<_, Option<usize>>(3)?,
+                r.get::<_, String>(4)?,
+                r.get::<_, String>(5)?,
+            ))
+        })
+        .map_err(db)?;
+    for row in rows {
+        let (invocation, sequence, region, advanced, body, hash) = row.map_err(db)?;
+        let item: OwnedVisit = serde_json::from_str(&body).map_err(|e| e.to_string())?;
+        if item.version != "campaign-owned-visit-v1"
+            || item.campaign_id != id
+            || item.invocation_id != invocation
+            || !crate::machine_evidence::hex(&invocation)
+            || item.sequence != sequence
+            || sequence <= last_sequence
+            || sequence > attempt
+            || item.region != region
+            || region < last_region
+            || region >= plan.regions.len()
+            || region > cursor
+            || chrono::DateTime::from_timestamp_millis(item.created_at_ms).is_none()
+            || item.previous_hash != previous
+            || data::hash(&item)? != hash
+            || !crate::machine_evidence::hex(&item.parent_observation_hash)
+            || !crate::machine_evidence::hex(&item.report_hash)
+            || advanced.is_some() != item.advance_hash.is_some()
+            || advanced.is_some_and(|r| r != region)
+        {
+            return Err("campaign owned visit chain integrity failure".into());
+        }
+        let parent = crate::owned_history::status_on(connection, &invocation)?;
+        if parent["finished_at_ms"].is_null()
+            || parent["search_id"] != plan.regions[region].search_id
+            || parent["observation_hash"] != item.parent_observation_hash
+            || parent["summary"]["report_hash"] != item.report_hash
+        {
+            return Err("campaign owned parent binding mismatch".into());
+        }
+        if let Some(advance_hash) = &item.advance_hash {
+            let actual: String = connection
+                .query_row(
+                    "SELECT hash FROM corpus_campaign_advances WHERE campaign_id=?1 AND region=?2",
+                    params![id, region],
+                    |r| r.get(0),
+                )
+                .map_err(db)?;
+            if &actual != advance_hash {
+                return Err("campaign owned advance binding mismatch".into());
+            }
+        }
+        values.push(serde_json::json!({"invocation_id":invocation,"sequence":sequence.to_string(),"region":region.to_string(),"created_at_ms":item.created_at_ms.to_string(),"parent_observation_hash":item.parent_observation_hash,"report_hash":item.report_hash,"advance_hash":item.advance_hash,"previous_hash":item.previous_hash,"hash":hash}));
+        previous = hash;
+        last_sequence = sequence;
+        last_region = region;
+    }
+    if head.as_ref().is_some_and(|(_, hash)| hash != &previous) {
+        return Err("campaign owned append head mismatch".into());
+    }
+    Ok((values, previous))
+}
+fn append_owned(
+    connection: &Connection,
+    lease: &crate::coordinator::Lease,
+    plan: &Plan,
+    head: &Execution,
+    report: &serde_json::Value,
+    advance_hash: Option<String>,
+) -> Result<()> {
+    let invocation = report["invocation_id"]
+        .as_str()
+        .ok_or("owned campaign invocation missing")?;
+    let parent = crate::owned_history::status_on(connection, invocation)?;
+    let mut hashed = report.clone();
+    hashed
+        .as_object_mut()
+        .ok_or("owned campaign report missing")?
+        .remove("invocation_status");
+    let report_hash = data::hash(&hashed)?;
+    if parent["finished_at_ms"].is_null()
+        || parent["search_id"] != plan.regions[head.cursor].search_id
+        || parent["summary"]["report_hash"] != report_hash
+    {
+        return Err("owned campaign report binding mismatch".into());
+    }
+    let total: usize = connection
+        .query_row(
+            "SELECT count(*) FROM corpus_campaign_owned_visits",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(db)?;
+    if total >= 128 {
+        return Err("campaign owned visit quota reached".into());
+    }
+    let item = OwnedVisit {
+        version: "campaign-owned-visit-v1".into(),
+        campaign_id: lease.id.clone(),
+        invocation_id: invocation.into(),
+        sequence: lease.attempt,
+        region: head.cursor,
+        created_at_ms: chrono::Utc::now().timestamp_millis(),
+        parent_observation_hash: parent["observation_hash"]
+            .as_str()
+            .ok_or("parent observation hash missing")?
+            .into(),
+        report_hash,
+        advance_hash,
+        previous_hash: head.owned_hash.clone(),
+    };
+    let hash = data::hash(&item)?;
+    connection.execute("INSERT INTO corpus_campaign_owned_visits(invocation_id,campaign_id,sequence,region,advance_region,body,hash) VALUES(?1,?2,?3,?4,?5,?6,?7)",params![invocation,lease.id,lease.attempt,head.cursor,item.advance_hash.as_ref().map(|_|head.cursor),serde_json::to_string(&item).map_err(|e|e.to_string())?,hash]).map_err(db)?;
+    connection.execute("INSERT INTO corpus_campaign_owned_heads(campaign_id,count,hash) VALUES(?1,?2,?3) ON CONFLICT(campaign_id) DO UPDATE SET count=excluded.count,hash=excluded.hash",params![lease.id,head.owned_visits.len()+1,hash]).map_err(db)?;
+    Ok(())
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Advance {
@@ -271,6 +462,8 @@ struct Execution {
     expiry: Option<i64>,
     last_hash: String,
     advances: Vec<serde_json::Value>,
+    owned_visits: Vec<serde_json::Value>,
+    owned_hash: String,
 }
 type ExecutionRow = (usize, String, i64, i64, Option<String>, Option<i64>, String);
 fn execution(connection: &Connection, id: &str, plan: &Plan) -> Result<Execution> {
@@ -322,6 +515,7 @@ fn execution(connection: &Connection, id: &str, plan: &Plan) -> Result<Execution
     if previous != last_hash {
         return Err("campaign progress head hash mismatch".into());
     }
+    let (owned_visits, owned_hash) = owned_visits(connection, id, plan, cursor, attempt)?;
     Ok(Execution {
         cursor,
         state,
@@ -330,6 +524,8 @@ fn execution(connection: &Connection, id: &str, plan: &Plan) -> Result<Execution
         expiry,
         last_hash,
         advances,
+        owned_visits,
+        owned_hash,
     })
 }
 pub fn list(registry: &Registry) -> Result<Vec<serde_json::Value>> {
@@ -402,6 +598,15 @@ fn publish(
     lease: &crate::coordinator::Lease,
     plan: &Plan,
 ) -> Result<bool> {
+    Ok(publish_result(registry, lease, plan, None, true)?.1)
+}
+fn publish_result(
+    registry: &mut Registry,
+    lease: &crate::coordinator::Lease,
+    plan: &Plan,
+    parent: Option<&serde_json::Value>,
+    require_exhausted: bool,
+) -> Result<(bool, bool)> {
     let tx = registry
         .connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -410,17 +615,21 @@ fn publish(
     let head = execution(&tx, &lease.id, plan)?;
     let source =
         crate::corpus_search::status_connection(&tx, &plan.regions[head.cursor].search_id)?;
-    if source["state"] != "exhausted" {
+    let exhausted = source["state"] == "exhausted";
+    if require_exhausted && !exhausted {
         return Err("campaign region advancement requires verified exhaustion".into());
     }
-    let item = Advance {
-        region: head.cursor,
-        search_id: plan.regions[head.cursor].search_id.clone(),
-        source_status_hash: data::hash(&source)?,
-        previous_hash: head.last_hash,
-    };
-    let hash = data::hash(&item)?;
-    tx.execute(
+    let mut advance_hash = None;
+    let mut terminal = false;
+    if exhausted {
+        let item = Advance {
+            region: head.cursor,
+            search_id: plan.regions[head.cursor].search_id.clone(),
+            source_status_hash: data::hash(&source)?,
+            previous_hash: head.last_hash.clone(),
+        };
+        let hash = data::hash(&item)?;
+        tx.execute(
         "INSERT INTO corpus_campaign_advances(campaign_id,region,body,hash) VALUES(?1,?2,?3,?4)",
         params![
             lease.id,
@@ -430,23 +639,47 @@ fn publish(
         ],
     )
     .map_err(db)?;
-    let cursor = head.cursor + 1;
-    let terminal = cursor == plan.regions.len();
-    tx.execute(
-        "UPDATE corpus_campaign_runs SET cursor=?2,state=?3,last_hash=?4 WHERE id=?1",
-        params![
-            lease.id,
-            cursor,
-            if terminal { "exhausted" } else { "running" },
-            hash
-        ],
-    )
-    .map_err(db)?;
+        let cursor = head.cursor + 1;
+        terminal = cursor == plan.regions.len();
+        tx.execute(
+            "UPDATE corpus_campaign_runs SET cursor=?2,state=?3,last_hash=?4 WHERE id=?1",
+            params![
+                lease.id,
+                cursor,
+                if terminal { "exhausted" } else { "running" },
+                hash
+            ],
+        )
+        .map_err(db)?;
+        advance_hash = Some(hash);
+    }
+    if let Some(report) = parent {
+        append_owned(&tx, lease, plan, &head, report, advance_hash)?;
+    }
     tx.commit().map_err(db)?;
-    Ok(terminal)
+    Ok((exhausted, terminal))
 }
 /// At most one ordinary search round. Parent and child coordinator leases are independent.
+pub struct Supervision<'a> {
+    pub policy: &'a Path,
+    pub limits: &'a crate::owned_process::Limits,
+    pub shutdown: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
 pub fn step(database: &Path, id: &str) -> Result<serde_json::Value> {
+    step_with(database, id, None)
+}
+pub fn supervised_step(
+    database: &Path,
+    id: &str,
+    supervision: &Supervision<'_>,
+) -> Result<serde_json::Value> {
+    step_with(database, id, Some(supervision))
+}
+fn step_with(
+    database: &Path,
+    id: &str,
+    supervision: Option<&Supervision<'_>>,
+) -> Result<serde_json::Value> {
     let mut registry = Registry::open(database)?;
     let plan = read(&registry.connection, id)?;
     let head = execution(&registry.connection, id, &plan)?;
@@ -455,12 +688,39 @@ pub fn step(database: &Path, id: &str) -> Result<serde_json::Value> {
             serde_json::json!({"kind":if head.state=="exhausted" {"exhausted"} else {"held"},"status":status(&registry,id)?}),
         );
     }
+    let policy = supervision
+        .map(|s| -> Result<crate::retry_policy::Policy> {
+            s.limits.validate()?;
+            let policy: crate::retry_policy::Policy = operator_config::read(s.policy)?;
+            policy.validate()?;
+            Ok(policy)
+        })
+        .transpose()?;
+    if supervision.is_some_and(|s| s.shutdown.load(std::sync::atomic::Ordering::Acquire)) {
+        return Ok(serde_json::json!({"kind":"signal","status":status(&registry,id)?}));
+    }
     verify_inputs(&registry, id)?;
     let loaded = operator_config::load_search(Path::new(&plan.config_path))?;
     let mut run = loaded.run();
     run.start_index = plan.regions[head.cursor].start_index;
     if corpus_search::identity(&run)? != plan.regions[head.cursor].search_id {
         return Err("campaign source changed before claim".into());
+    }
+    if let Some(supervision) = supervision {
+        let required = supervision
+            .limits
+            .maximum_wall_ms
+            .checked_add(supervision.limits.shutdown_grace_ms)
+            .and_then(|n| n.checked_add(10000))
+            .ok_or("campaign owned lease margin overflow")?;
+        if loaded.file.limits.lease_ms
+            <= i64::try_from(required).map_err(|_| "campaign owned lease margin overflow")?
+        {
+            return Err(
+                "campaign coordinator lease must exceed parent wall plus grace plus 10000 ms"
+                    .into(),
+            );
+        }
     }
     let disk = loaded
         .file
@@ -499,6 +759,83 @@ pub fn step(database: &Path, id: &str) -> Result<serde_json::Value> {
         )?;
         if current.cursor != head.cursor {
             return Ok(serde_json::json!({"kind":"cursor_changed","status":status(&registry,id)?}));
+        }
+        if let (Some(supervision), Some(policy)) = (supervision, policy.as_ref()) {
+            let source = corpus_search::prepare_supervision(database, &run, policy)?;
+            crate::coordinator::fence(
+                &registry.connection,
+                &lease,
+                chrono::Utc::now().timestamp_millis(),
+            )?;
+            let source_status = corpus_search::status(&registry, &source)?;
+            if source_status["state"] == "exhausted" {
+                let terminal = publish(&mut registry, &lease, &plan)?;
+                return Ok(
+                    serde_json::json!({"kind":if terminal {"exhausted"} else {"advanced_region"},"owned":null,"status":status(&registry,id)?}),
+                );
+            }
+            let mut ready =
+                source_status["state"] == "running" && source_status["lease_active"] == false;
+            let mut retry_at = None;
+            if source_status["state"] == "paused" {
+                retry_at = corpus_search::retry_wakeup_in(
+                    &registry.connection,
+                    &source,
+                    chrono::Utc::now().timestamp_millis(),
+                )?;
+                ready = retry_at.is_some_and(|t| t <= chrono::Utc::now().timestamp_millis());
+            }
+            if !ready {
+                return Ok(
+                    serde_json::json!({"kind":if retry_at.is_some(){"backoff"} else {"held"},"retry_at_ms":retry_at.map(|t|t.to_string()),"source":source_status,"owned":null,"status":status(&registry,id)?}),
+                );
+            }
+            crate::coordinator::fence(
+                &registry.connection,
+                &lease,
+                chrono::Utc::now().timestamp_millis(),
+            )?;
+            let parent = crate::owned_process::run_region(
+                crate::owned_process::RegionInput {
+                    config: Path::new(&plan.config_path),
+                    start_index: plan.regions[head.cursor].start_index,
+                    expected_source_id: &source,
+                },
+                supervision.policy,
+                database,
+                1,
+                0,
+                supervision.limits,
+                supervision.shutdown.clone(),
+            )?;
+            crate::coordinator::fence(
+                &registry.connection,
+                &lease,
+                chrono::Utc::now().timestamp_millis(),
+            )?;
+            if parent.get("invocation_id").is_none() {
+                return Ok(
+                    serde_json::json!({"kind":"pressure","owned":parent,"status":status(&registry,id)?}),
+                );
+            }
+            let (advanced, terminal) =
+                publish_result(&mut registry, &lease, &plan, Some(&parent), false)?;
+            let source_status = corpus_search::status(&registry, &source)?;
+            let kind = if terminal {
+                "exhausted"
+            } else if advanced {
+                "advanced_region"
+            } else if source_status["state"] == "running"
+                && parent["exit_success"] == true
+                && parent["stop_reason"] == "child-exited"
+            {
+                "advanced"
+            } else {
+                "held"
+            };
+            return Ok(
+                serde_json::json!({"kind":kind,"region":head.cursor.to_string(),"owned":parent,"source":source_status,"status":status(&registry,id)?}),
+            );
         }
         let child = corpus_search::step(database, run, loaded.file.limits)?;
         crate::coordinator::fence(
@@ -569,6 +906,53 @@ pub fn run(
     )
 }
 
+pub fn supervise(
+    database: &Path,
+    id: &str,
+    supervision: &Supervision<'_>,
+    maximum: usize,
+) -> Result<serde_json::Value> {
+    if !(1..=10000).contains(&maximum) {
+        return Err("campaign owned visit bound must be 1..10000".into());
+    }
+    let mut checks = 0usize;
+    let mut children = 0usize;
+    let mut last = None;
+    let mut reason = "visit_limit";
+    for _ in 0..maximum {
+        if supervision
+            .shutdown
+            .load(std::sync::atomic::Ordering::Acquire)
+        {
+            reason = "signal";
+            break;
+        }
+        let value = supervised_step(database, id, supervision)?;
+        checks += 1;
+        children += usize::from(value["owned"]["invocation_id"].is_string());
+        let advance = matches!(
+            value["kind"].as_str(),
+            Some("advanced" | "advanced_region" | "cursor_changed")
+        );
+        if !advance {
+            reason = match value["kind"].as_str() {
+                Some("exhausted") => "exhausted",
+                Some("pressure") => "pressure",
+                Some("backoff") => "backoff",
+                Some("signal") => "signal",
+                Some("busy_or_held") => "busy_or_held",
+                _ => "held",
+            };
+        }
+        last = Some(value);
+        if !advance {
+            break;
+        }
+    }
+    Ok(
+        serde_json::json!({"campaign_id":id,"checks":checks.to_string(),"children_started":children.to_string(),"stop_reason":reason,"last":last,"qualification_granted":false}),
+    )
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -626,6 +1010,32 @@ mod tests {
         let db = root.join("state.sqlite");
         let id = register_file(&config_path, &db, 2).unwrap();
         (root, db, id)
+    }
+    #[test]
+    fn schema20_upgrade_revokes_old_parent_without_revoking_a_later_current_actor() {
+        use crate::coordinator::{self, Kind};
+        let mut registry = Registry::open(Path::new(":memory:")).unwrap();
+        let (_, id) = insert_plan(&registry);
+        let now = chrono::Utc::now().timestamp_millis();
+        let old = coordinator::claim(&mut registry, Kind::Campaign, &id, now, 60000)
+            .unwrap()
+            .unwrap();
+        registry
+            .connection
+            .execute_batch("PRAGMA user_version=20;")
+            .unwrap();
+        initialize(&mut registry.connection, 20).unwrap();
+        assert!(coordinator::fence(&registry.connection, &old, now).is_err());
+        let current = coordinator::claim(&mut registry, Kind::Campaign, &id, now, 60000)
+            .unwrap()
+            .unwrap();
+        initialize(&mut registry.connection, 20).unwrap();
+        coordinator::fence(&registry.connection, &current, now).unwrap();
+        assert_eq!(
+            status(&registry, &id).unwrap()["execution"]["owned_visits"],
+            serde_json::json!([])
+        );
+        registry.integrity().unwrap();
     }
     #[test]
     fn expected_epoch_controls_and_bounded_inventory_preserve_holds_and_active_nonce() {

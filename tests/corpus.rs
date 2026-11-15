@@ -4280,3 +4280,326 @@ fn owned_region_process_pins_effective_identity_and_preserves_base_operator_file
     assert_eq!(fs::read(&config).unwrap(), original);
     registry.integrity().unwrap();
 }
+
+fn campaign_owned_fixture(
+    f: &Fixture,
+    regions: usize,
+) -> (PathBuf, PathBuf, String, PathBuf, PathBuf) {
+    let config = corpus_search_fixture(f);
+    let mut file: serde_json::Value = serde_json::from_slice(&fs::read(&config).unwrap()).unwrap();
+    file["start_index"] = 12.into();
+    file["maximum_candidates"] = 1.into();
+    file["queue_width"] = 1.into();
+    fs::write(&config, serde_json::to_vec(&file).unwrap()).unwrap();
+    let db = f.root.join("campaign-owned.sqlite");
+    let id = rust_strategy_factory::corpus_campaign::register_file(&config, &db, regions).unwrap();
+    let policy = f.root.join("policy.json");
+    let limits = f.root.join("limits.json");
+    fs::write(&policy, br#"{"backoff_ms":1,"maximum_slots":1}"#).unwrap();
+    fs::write(
+        &limits,
+        br#"{"maximum_wall_ms":30000,"shutdown_grace_ms":1000,"maximum_output_bytes":1048576}"#,
+    )
+    .unwrap();
+    (config, db, id, policy, limits)
+}
+fn campaign_owned_command(
+    db: &std::path::Path,
+    id: &str,
+    policy: &std::path::Path,
+    limits: &std::path::Path,
+    maximum: &str,
+) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-campaign-supervise",
+            db.to_str().unwrap(),
+            id,
+            policy.to_str().unwrap(),
+            limits.to_str().unwrap(),
+            maximum,
+        ])
+        .output()
+        .unwrap()
+}
+#[test]
+fn campaign_owned_regions_link_actual_parents_and_scalar_receipts_with_restart_and_backup() {
+    use rust_strategy_factory::{
+        corpus_campaign, operator_config, owned_history, research, storage::Registry, tick_engine,
+    };
+    let f = Fixture::new("campaign-owned-complete", "EURUSD", 7);
+    let (config, db, id, policy, limits) = campaign_owned_fixture(&f, 2);
+    let original = fs::read(&config).unwrap();
+    let first = campaign_owned_command(&db, &id, &policy, &limits, "1");
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+    let first: serde_json::Value = serde_json::from_slice(&first.stdout).unwrap();
+    assert_eq!(first["children_started"], "1");
+    let rest = campaign_owned_command(&db, &id, &policy, &limits, "100");
+    assert!(
+        rest.status.success(),
+        "{}",
+        String::from_utf8_lossy(&rest.stderr)
+    );
+    let rest: serde_json::Value = serde_json::from_slice(&rest.stdout).unwrap();
+    assert_eq!(rest["stop_reason"], "exhausted");
+    let registry = Registry::open(&db).unwrap();
+    let status = corpus_campaign::status(&registry, &id).unwrap();
+    let visits = status["execution"]["owned_visits"].as_array().unwrap();
+    assert!(!visits.is_empty());
+    assert_eq!(
+        status["execution"]["completed_regions"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        visits
+            .iter()
+            .filter(|v| !v["advance_hash"].is_null())
+            .count(),
+        2
+    );
+    assert_eq!(owned_history::list(&registry).unwrap().len(), visits.len());
+    for visit in visits {
+        let parent =
+            owned_history::status(&registry, visit["invocation_id"].as_str().unwrap()).unwrap();
+        let region = visit["region"].as_str().unwrap().parse::<usize>().unwrap();
+        assert_eq!(parent["search_id"], status["regions"][region]["search_id"]);
+        assert_eq!(
+            parent["summary"]["input_pin"]["source_id"],
+            parent["search_id"]
+        );
+        assert_eq!(parent["summary"]["reaped"], true);
+        assert_eq!(parent["observation_hash"], visit["parent_observation_hash"]);
+        assert_eq!(parent["summary"]["report_hash"], visit["report_hash"]);
+    }
+    let loaded = operator_config::load_search(&config).unwrap();
+    for index in 12..14 {
+        let strategy = research::candidate_at(index, 42).unwrap().1;
+        let key = tick_engine::corpus_key(
+            &loaded.base,
+            &loaded.specification,
+            &strategy,
+            &loaded.costs,
+            loaded.file.budget,
+        )
+        .unwrap();
+        let stored = registry.result(&key.identity().unwrap()).unwrap().unwrap();
+        assert_eq!(
+            stored.result["tick_replay"],
+            serde_json::to_value(
+                tick_engine::replay_corpus(
+                    &loaded.base,
+                    &loaded.specification,
+                    &strategy,
+                    &loaded.costs,
+                    loaded.file.budget
+                )
+                .unwrap()
+            )
+            .unwrap()
+        );
+    }
+    let attempts = registry.counts().unwrap().attempts;
+    let repeated = campaign_owned_command(&db, &id, &policy, &limits, "100");
+    assert!(repeated.status.success());
+    let repeated: serde_json::Value = serde_json::from_slice(&repeated.stdout).unwrap();
+    assert_eq!(repeated["children_started"], "0");
+    assert_eq!(registry.counts().unwrap().attempts, attempts);
+    assert_eq!(corpus_campaign::status(&registry, &id).unwrap(), status);
+    assert_eq!(fs::read(&config).unwrap(), original);
+    registry.integrity().unwrap();
+    registry.backup(&f.root.join("copy.sqlite")).unwrap();
+    let copied = Registry::open(&f.root.join("copy.sqlite")).unwrap();
+    assert_eq!(corpus_campaign::status(&copied, &id).unwrap(), status);
+    drop(copied);
+    let c = rusqlite::Connection::open(&db).unwrap();
+    assert!(
+        c.execute(
+            "DELETE FROM corpus_campaign_owned_visits WHERE campaign_id=?1",
+            [&id]
+        )
+        .is_err()
+    );
+    c.execute(
+        "UPDATE corpus_campaign_owned_heads SET hash=?2 WHERE campaign_id=?1",
+        rusqlite::params![id, "0".repeat(64)],
+    )
+    .unwrap();
+    assert!(corpus_campaign::status(&registry, &id).is_err());
+    assert!(registry.integrity().is_err());
+}
+#[test]
+fn campaign_owned_publication_failure_preserves_unlinked_parent_and_completed_source() {
+    use rust_strategy_factory::{corpus_campaign, corpus_search, owned_history, storage::Registry};
+    let f = Fixture::new("campaign-owned-rollback", "EURUSD", 1);
+    let (_, db, id, policy, limits) = campaign_owned_fixture(&f, 1);
+    let c = rusqlite::Connection::open(&db).unwrap();
+    c.execute_batch("CREATE TRIGGER injected_campaign_owned BEFORE INSERT ON corpus_campaign_owned_visits WHEN NEW.advance_region IS NOT NULL BEGIN SELECT RAISE(ABORT,'injected owned link failure');END;").unwrap();
+    let failed = campaign_owned_command(&db, &id, &policy, &limits, "100");
+    assert!(!failed.status.success());
+    assert!(String::from_utf8_lossy(&failed.stderr).contains("injected owned link failure"));
+    let registry = Registry::open(&db).unwrap();
+    let before = corpus_campaign::status(&registry, &id).unwrap();
+    assert_eq!(before["execution"]["next_region"], "0");
+    assert!(
+        before["execution"]["completed_regions"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        before["execution"]["owned_visits"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|v| v["advance_hash"].is_null())
+    );
+    assert_eq!(before["execution"]["lease_active"], false);
+    let source = before["regions"][0]["search_id"].as_str().unwrap();
+    assert_eq!(
+        corpus_search::status(&registry, source).unwrap()["state"],
+        "exhausted"
+    );
+    let parents = owned_history::list(&registry).unwrap();
+    assert_eq!(
+        parents.len(),
+        before["execution"]["owned_visits"]
+            .as_array()
+            .unwrap()
+            .len()
+            + 1
+    );
+    assert_eq!(parents[0]["summary"]["reaped"], true);
+    let attempts = registry.counts().unwrap().attempts;
+    c.execute_batch("DROP TRIGGER injected_campaign_owned;")
+        .unwrap();
+    let resumed = campaign_owned_command(&db, &id, &policy, &limits, "100");
+    assert!(
+        resumed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&resumed.stderr)
+    );
+    let resumed: serde_json::Value = serde_json::from_slice(&resumed.stdout).unwrap();
+    assert_eq!(resumed["children_started"], "0");
+    assert_eq!(resumed["stop_reason"], "exhausted");
+    assert_eq!(registry.counts().unwrap().attempts, attempts);
+    assert_eq!(owned_history::list(&registry).unwrap(), parents);
+    registry.integrity().unwrap();
+}
+#[test]
+fn campaign_owned_lease_refusal_backoff_and_operator_holds_start_no_children() {
+    use rust_strategy_factory::{corpus_campaign, corpus_search, owned_history, storage::Registry};
+    let f = Fixture::new("campaign-owned-holds", "EURUSD", 7);
+    let (_, db, id, policy, limits) = campaign_owned_fixture(&f, 1);
+    fs::write(
+        &limits,
+        br#"{"maximum_wall_ms":60000,"shutdown_grace_ms":1000,"maximum_output_bytes":1048576}"#,
+    )
+    .unwrap();
+    let refused = campaign_owned_command(&db, &id, &policy, &limits, "1");
+    assert!(!refused.status.success());
+    let mut registry = Registry::open(&db).unwrap();
+    assert_eq!(
+        corpus_campaign::status(&registry, &id).unwrap()["execution"]["attempt"],
+        "0"
+    );
+    assert!(corpus_search::list(&registry).unwrap().is_empty());
+    assert!(owned_history::list(&registry).unwrap().is_empty());
+    fs::write(
+        &limits,
+        br#"{"maximum_wall_ms":30000,"shutdown_grace_ms":1000,"maximum_output_bytes":1048576}"#,
+    )
+    .unwrap();
+    corpus_campaign::control(&mut registry, &id, "paused").unwrap();
+    let paused = corpus_campaign::status(&registry, &id).unwrap();
+    let held = campaign_owned_command(&db, &id, &policy, &limits, "100");
+    assert!(held.status.success());
+    assert_eq!(corpus_campaign::status(&registry, &id).unwrap(), paused);
+    // Development-only typed fault metadata, not a genuine historical busy episode.
+    let other = Fixture::new("campaign-owned-backoff", "EURUSD", 7);
+    let (config, db, policy, source) = foreground_config(&other);
+    let id = corpus_campaign::register_file(&config, &db, 1).unwrap();
+    let held = campaign_owned_command(&db, &id, &policy, &limits, "100");
+    assert!(
+        held.status.success(),
+        "{}",
+        String::from_utf8_lossy(&held.stderr)
+    );
+    let held: serde_json::Value = serde_json::from_slice(&held.stdout).unwrap();
+    assert_eq!(held["stop_reason"], "backoff");
+    assert_eq!(held["children_started"], "0");
+    let mut registry = Registry::open(&db).unwrap();
+    assert!(owned_history::list(&registry).unwrap().is_empty());
+    assert_eq!(
+        corpus_search::status(&registry, &source).unwrap()["requeue_records"],
+        "0"
+    );
+    corpus_search::control(&mut registry, &source, "paused").unwrap();
+    let source_held = corpus_search::status(&registry, &source).unwrap();
+    let held = campaign_owned_command(&db, &id, &policy, &limits, "100");
+    assert!(held.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&held.stdout).unwrap()["children_started"],
+        "0"
+    );
+    assert_eq!(
+        corpus_search::status(&registry, &source).unwrap(),
+        source_held
+    );
+    registry.integrity().unwrap();
+}
+
+#[test]
+fn campaign_owned_permanent_execution_error_is_not_retried_or_relaunched() {
+    use rust_strategy_factory::{corpus_campaign, corpus_search, owned_history, storage::Registry};
+    let f = Fixture::new("campaign-owned-permanent", "EURUSD", 7);
+    let config = corpus_search_fixture(&f);
+    let mut file: serde_json::Value = serde_json::from_slice(&fs::read(&config).unwrap()).unwrap();
+    file["maximum_candidates"] = 1.into();
+    file["queue_width"] = 1.into();
+    file["budget"]["feature_cells"] = 1.into();
+    file["limits"]["max_parallel_feature_cells"] = 2.into();
+    fs::write(&config, serde_json::to_vec(&file).unwrap()).unwrap();
+    let db = f.root.join("permanent.sqlite");
+    let id = corpus_campaign::register_file(&config, &db, 1).unwrap();
+    let policy = f.root.join("policy.json");
+    let limits = f.root.join("limits.json");
+    fs::write(&policy, br#"{"backoff_ms":1,"maximum_slots":1}"#).unwrap();
+    fs::write(
+        &limits,
+        br#"{"maximum_wall_ms":30000,"shutdown_grace_ms":1000,"maximum_output_bytes":1048576}"#,
+    )
+    .unwrap();
+    let first = campaign_owned_command(&db, &id, &policy, &limits, "100");
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+    let first: serde_json::Value = serde_json::from_slice(&first.stdout).unwrap();
+    assert_eq!(first["stop_reason"], "held");
+    assert_eq!(first["children_started"], "1");
+    let registry = Registry::open(&db).unwrap();
+    let snapshot = corpus_campaign::status(&registry, &id).unwrap();
+    let source = snapshot["regions"][0]["search_id"].as_str().unwrap();
+    let held = corpus_search::status(&registry, source).unwrap();
+    assert_eq!(held["state"], "paused");
+    assert_eq!(held["control"]["pause_origin"], "worker_error");
+    assert_eq!(held["recent_slots"][0]["retry_candidate"], false);
+    let parents = owned_history::list(&registry).unwrap();
+    assert_eq!(parents.len(), 1);
+    let second = campaign_owned_command(&db, &id, &policy, &limits, "100");
+    assert!(second.status.success());
+    let second: serde_json::Value = serde_json::from_slice(&second.stdout).unwrap();
+    assert_eq!(second["children_started"], "0");
+    assert_eq!(second["stop_reason"], "held");
+    assert_eq!(owned_history::list(&registry).unwrap(), parents);
+    assert_eq!(corpus_search::status(&registry, source).unwrap(), held);
+    registry.integrity().unwrap();
+}
