@@ -1,0 +1,7 @@
+# Verified preparation: complete CLI pipeline comparison
+
+The JSON receipt records two source-pinned release binaries, 20,000 synthetic EURUSD quotes in two native artifacts, three market/stop/limit candidates, one worker and three rotated fresh-process pairs. Measured time includes the actual corpus-batch CLI and registry integrity CLI. Median elapsed time is 296.277 ms before and 284.820 ms after; individual after-minus-before comparisons include one regression. Median observed peak child RSS is 24,304 versus 23,488 KiB. This is peak child resource usage within each fresh Python worker, not total host or service memory.
+
+Every run resolves 574 trades and has the same complete financial receipt SHA256. Separate cached calls preserve exact receipts and registry counts and are excluded from first-route time/CPU/RSS. The presentation SHA256 is a measurement fingerprint, not a replacement for native artifact or registry hashes.
+
+Reproduce with `python3 scripts/benchmark-preparation.py BEFORE_RELEASE AFTER_RELEASE NEW_OUTPUT.json`. The script generates disposable synthetic artifacts and fresh registries; the before binary must be retained independently. Source compute revisions and binary hashes are in the receipt. OS cache state is uncontrolled; there is no physical-cold claim. One symbol and three repeated strategies do not establish general throughput, multiworker scale, independent scientific trials, genuine source coverage or qualification. Native remains the default; indexed/blocked policy is unchanged.

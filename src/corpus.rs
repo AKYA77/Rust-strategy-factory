@@ -158,7 +158,69 @@ pub struct Report {
     pub candles: Vec<CandleSummary>,
     pub limitations: &'static str,
 }
+/// Verified immutable candle contexts built alongside inspection in one source pass.
+/// This is a bounded in-memory snapshot, not current eligibility or a resume proof.
+pub struct Prepared {
+    report: Report,
+    frames: std::collections::BTreeMap<Timeframe, Vec<candles::Candle>>,
+}
+impl Prepared {
+    pub fn report(&self) -> &Report {
+        &self.report
+    }
+    pub fn candles(&self, timeframe: Timeframe) -> Result<&[candles::Candle]> {
+        self.frames
+            .get(&timeframe)
+            .map(Vec::as_slice)
+            .ok_or_else(|| "prepared corpus timeframe unavailable".into())
+    }
+    pub fn retained_candles(&self) -> usize {
+        self.frames.values().map(Vec::len).sum()
+    }
+    pub fn signals(
+        &self,
+        strategy: &crate::strategies::Strategy,
+        feature_cells: usize,
+    ) -> Result<crate::indicators::Mask> {
+        let strategy = strategy.canonical()?;
+        let primary = self.candles(strategy.timeframe)?;
+        crate::strategies::Features::with_frames(
+            primary,
+            feature_cells,
+            &self.frames,
+            strategy.timeframe,
+        )?
+        .signal(&strategy.rule)
+    }
+}
+pub fn prepare(
+    base: &Path,
+    spec: &Specification,
+    primary: Timeframe,
+    max_candles: usize,
+) -> Result<Prepared> {
+    if !(1..=1000000).contains(&max_candles) {
+        return Err("invalid aggregate corpus candle budget".into());
+    }
+    inspect_prepared(base, spec, Some((primary, max_candles)))
+}
 pub fn inspect(base: &Path, spec: &Specification) -> Result<Report> {
+    Ok(inspect_prepared(base, spec, None)?.report)
+}
+fn inspect_prepared(
+    base: &Path,
+    spec: &Specification,
+    capture: Option<(Timeframe, usize)>,
+) -> Result<Prepared> {
+    let mut frames = std::collections::BTreeMap::<Timeframe, Vec<candles::Candle>>::new();
+    if let Some((primary, _)) = capture {
+        for tf in Timeframe::ALL {
+            if tf.millis() >= primary.millis() {
+                frames.insert(tf, Vec::new());
+            }
+        }
+    }
+    let mut retained = 0usize;
     let identity = spec.identity()?;
     let mut profile = None;
     let mut source = None;
@@ -198,9 +260,20 @@ pub fn inspect(base: &Path, spec: &Specification) -> Result<Report> {
             if first.is_none() {
                 first = Some(*tick);
             }
-            for (stream, hash) in streams.iter_mut().zip(&mut candle_hashes) {
+            for ((stream, hash), tf) in streams
+                .iter_mut()
+                .zip(&mut candle_hashes)
+                .zip(Timeframe::ALL)
+            {
                 if let Some(c) = stream.push(*tick)? {
                     hash.push(&c)?;
+                    if let Some(output) = frames.get_mut(&tf) {
+                        if capture.is_none_or(|(_, cap)| retained >= cap) {
+                            return Err("aggregate corpus candle budget exceeded".into());
+                        }
+                        output.push(c);
+                        retained += 1;
+                    }
                 }
             }
             events.push(tick)?;
@@ -217,28 +290,31 @@ pub fn inspect(base: &Path, spec: &Specification) -> Result<Report> {
             content_hash: hash.finish(),
         })
         .collect();
-    Ok(Report {
-        version: if spec.version == VERSION {
-            VERSION
-        } else {
-            BLOCK_VERSION
+    Ok(Prepared {
+        report: Report {
+            version: if spec.version == VERSION {
+                VERSION
+            } else {
+                BLOCK_VERSION
+            },
+            corpus_identity: identity,
+            chunks: spec.chunks.len(),
+            profile: profile.ok_or("empty corpus")?,
+            declared_class: class.ok_or("empty corpus")?,
+            source: source.ok_or("empty corpus")?,
+            events: events.count,
+            ordered_events_hash: events.finish(),
+            first: crate::coverage::Event::from(&first.ok_or("empty corpus")?),
+            latest: crate::coverage::Event::from(&previous.ok_or("empty corpus")?),
+            timestamp_ties: ties,
+            identical_quote_events: repeats,
+            gaps_over_hour: gaps,
+            max_resident_chunk_events: peak,
+            max_resident_quote_events: peak,
+            candles,
+            limitations: "Observed ordered native chunks and closed UTC candle fingerprints only. One bounded quote chunk plus seven candle states is retained; metadata and per-chunk validation allocations are additional. No empty/final unfinished candles, missing quotes, source completeness, approved class, acquisition/resume or scientific eligibility is established. Synthetic USD replay is a separate explicitly gated consumer. Source archives/provenance remain separate immutable artifacts; profiles/source/class cannot be mixed.",
         },
-        corpus_identity: identity,
-        chunks: spec.chunks.len(),
-        profile: profile.ok_or("empty corpus")?,
-        declared_class: class.ok_or("empty corpus")?,
-        source: source.ok_or("empty corpus")?,
-        events: events.count,
-        ordered_events_hash: events.finish(),
-        first: crate::coverage::Event::from(&first.ok_or("empty corpus")?),
-        latest: crate::coverage::Event::from(&previous.ok_or("empty corpus")?),
-        timestamp_ties: ties,
-        identical_quote_events: repeats,
-        gaps_over_hour: gaps,
-        max_resident_chunk_events: peak,
-        max_resident_quote_events: peak,
-        candles,
-        limitations: "Observed ordered native chunks and closed UTC candle fingerprints only. One bounded quote chunk plus seven candle states is retained; metadata and per-chunk validation allocations are additional. No empty/final unfinished candles, missing quotes, source completeness, approved class, acquisition/resume or scientific eligibility is established. Synthetic USD replay is a separate explicitly gated consumer. Source archives/provenance remain separate immutable artifacts; profiles/source/class cannot be mixed.",
+        frames,
     })
 }
 

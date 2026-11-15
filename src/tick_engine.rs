@@ -955,16 +955,17 @@ fn replay_corpus_internal(
     if max_receipts == 0 || max_receipts > 1_000_000 {
         return Err("invalid corpus replay receipt budget".into());
     }
-    let observed = crate::corpus::inspect(base, spec)?;
+    let strategy = strategy.canonical()?;
+    let prepared = crate::corpus::prepare(base, spec, strategy.timeframe, max_candles)?;
+    let observed = prepared.report();
     if observed.declared_class != crate::data::DataClass::SyntheticTestOnly
         || observed.profile.quote != "USD"
     {
         return Err("corpus replay currently requires synthetic literal-USD inputs; real/protected exposure and FX conversion streams are not integrated".into());
     }
-    let strategy = strategy.canonical()?;
-    let candles = crate::corpus::candle_context(base, spec, strategy.timeframe, max_candles)?;
-    let mask = crate::corpus::signals(base, spec, &strategy, max_candles, feature_cells)?;
-    let distances = crate::stops::prepare(&strategy, &observed.profile, &candles)?;
+    let candles = prepared.candles(strategy.timeframe)?;
+    let mask = prepared.signals(&strategy, feature_cells)?;
+    let distances = crate::stops::prepare(&strategy, &observed.profile, candles)?;
     let slip = costs
         .slippage_pips
         .checked_mul(observed.profile.pip)
@@ -974,7 +975,7 @@ fn replay_corpus_internal(
         strategy: &strategy,
         distances: &distances,
         costs,
-        candles: &candles,
+        candles,
         mask: &mask,
         window: None,
         slip,
@@ -1049,7 +1050,7 @@ fn replay_corpus_internal(
     Ok(Some(Replay {
         version: crate::ENGINE_VERSION.into(),
         strategy_id: strategy.identity()?,
-        dataset_id: observed.ordered_events_hash,
+        dataset_id: observed.ordered_events_hash.clone(),
         profile_id: crate::data::hash(&observed.profile)?,
         cost_id: crate::data::hash(costs)?,
         conversion_id: conversions.finish(),

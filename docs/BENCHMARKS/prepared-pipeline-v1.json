@@ -1,0 +1,151 @@
+{
+  "class": "SYNTHETIC_DEVELOPMENT_PIPELINE_ONLY",
+  "host": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "available_parallelism": 3
+  },
+  "quotes": 20000,
+  "strategies": 3,
+  "repetitions": 3,
+  "cache_scope": "Fresh worker processes and registries; OS cache uncontrolled, no physical-cold claim. Cached route checked separately and excluded from measured first-route timing/CPU/RSS.",
+  "measurement_scope": "Each timed pipeline includes actual corpus-batch CLI and registry integrity CLI. CPU and RSS are child-resource observations in a fresh worker, not total host/service memory.",
+  "versions": {
+    "before": {
+      "binary_sha256": "8f63b85bf687c2fa950fe24a14749a88cd109567e4a1de56271d05e52b417548",
+      "version": {
+        "compute_revision": "compute-blake3:21c6c34da58bcb51a7af5bfb60b35cd4ed8e787aa39a7720085bd2209b02d538",
+        "engine": "ordered-l1-v6-frozen-atr-stops",
+        "indicators": "causal-primitives-v4-outward-atr",
+        "package": "0.1.0",
+        "signals": "closed-publication-next-event-v3-scoped-features",
+        "software_status": "SOFTWARE_INCOMPLETE"
+      }
+    },
+    "after": {
+      "binary_sha256": "b7e147e1e439259404f31e386daa7707b35b041285e668b70054964715ddfc88",
+      "version": {
+        "compute_revision": "compute-blake3:16eec572a918b0b31998bc38c000e19e8f8b07468b706640ba2b01cb44f36cc8",
+        "engine": "ordered-l1-v6-frozen-atr-stops",
+        "indicators": "causal-primitives-v4-outward-atr",
+        "package": "0.1.0",
+        "signals": "closed-publication-next-event-v3-scoped-features",
+        "software_status": "SOFTWARE_INCOMPLETE"
+      }
+    }
+  },
+  "records": [
+    {
+      "role": "before",
+      "elapsed_ms": 352.182913,
+      "child_user_seconds": 0.257093,
+      "child_system_seconds": 0.067494,
+      "peak_pipeline_child_rss_kib": 24320,
+      "financial_receipt_sha256": "2e7ee0c0139c824c190a4a32e38477690e184fca7f6d0494c4edcfc6df71282c",
+      "resolved_trades": 574,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 3
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 0
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 284.820349,
+      "child_user_seconds": 0.236509,
+      "child_system_seconds": 0.022945999999999998,
+      "peak_pipeline_child_rss_kib": 23376,
+      "financial_receipt_sha256": "2e7ee0c0139c824c190a4a32e38477690e184fca7f6d0494c4edcfc6df71282c",
+      "resolved_trades": 574,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 3
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 0
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 297.192395,
+      "child_user_seconds": 0.239566,
+      "child_system_seconds": 0.030957,
+      "peak_pipeline_child_rss_kib": 23520,
+      "financial_receipt_sha256": "2e7ee0c0139c824c190a4a32e38477690e184fca7f6d0494c4edcfc6df71282c",
+      "resolved_trades": 574,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 3
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 1
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 294.140506,
+      "child_user_seconds": 0.255757,
+      "child_system_seconds": 0.011651,
+      "peak_pipeline_child_rss_kib": 24304,
+      "financial_receipt_sha256": "2e7ee0c0139c824c190a4a32e38477690e184fca7f6d0494c4edcfc6df71282c",
+      "resolved_trades": 574,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 3
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 1
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 296.276838,
+      "child_user_seconds": 0.26348499999999997,
+      "child_system_seconds": 0.007427,
+      "peak_pipeline_child_rss_kib": 24280,
+      "financial_receipt_sha256": "2e7ee0c0139c824c190a4a32e38477690e184fca7f6d0494c4edcfc6df71282c",
+      "resolved_trades": 574,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 3
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 2
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 273.759744,
+      "child_user_seconds": 0.235252,
+      "child_system_seconds": 0.015766,
+      "peak_pipeline_child_rss_kib": 23488,
+      "financial_receipt_sha256": "2e7ee0c0139c824c190a4a32e38477690e184fca7f6d0494c4edcfc6df71282c",
+      "resolved_trades": 574,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 3
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 2
+    }
+  ],
+  "summaries": {
+    "before": {
+      "median_elapsed_ms": 296.276838,
+      "median_peak_pipeline_child_rss_kib": 24304
+    },
+    "after": {
+      "median_elapsed_ms": 284.820349,
+      "median_peak_pipeline_child_rss_kib": 23488
+    }
+  },
+  "limitations": "Small one-symbol synthetic workload with one worker. Repetitions are repeated measurement of three strategies, not independent trials. No genuine data, source approval, qualification, production default or universal throughput/RSS gain is established."
+}

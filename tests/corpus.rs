@@ -5030,3 +5030,146 @@ fn rotation_wait_operator_and_sigterm_intervention_leave_retries_held() {
         registry.integrity().unwrap();
     }
 }
+
+#[test]
+fn prepared_corpus_matches_every_instrument_frame_and_aggregate_budget() {
+    use rust_strategy_factory::contracts::SYMBOLS;
+    for symbol in SYMBOLS {
+        let f = Fixture::new("prepared-frames", symbol, 3);
+        let inspected = corpus::inspect(&f.root, &f.spec).unwrap();
+        for primary in Timeframe::ALL {
+            let prepared = corpus::prepare(&f.root, &f.spec, primary, 1000).unwrap();
+            assert_eq!(
+                serde_json::to_value(prepared.report()).unwrap(),
+                serde_json::to_value(&inspected).unwrap()
+            );
+            let mut total = 0;
+            for tf in Timeframe::ALL {
+                if tf.millis() >= primary.millis() {
+                    let expected = candles::build(&f.data, tf).unwrap();
+                    assert_eq!(prepared.candles(tf).unwrap(), expected);
+                    total += expected.len();
+                } else {
+                    assert!(prepared.candles(tf).is_err());
+                }
+            }
+            assert_eq!(prepared.retained_candles(), total);
+            assert_eq!(
+                corpus::prepare(&f.root, &f.spec, primary, total.max(1))
+                    .unwrap()
+                    .retained_candles(),
+                total
+            );
+            if total > 0 {
+                assert!(corpus::prepare(&f.root, &f.spec, primary, total - 1).is_err());
+            }
+        }
+        for cap in [0, 1000001, usize::MAX] {
+            assert!(corpus::prepare(&f.root, &f.spec, Timeframe::M1, cap).is_err());
+        }
+    }
+}
+#[test]
+fn prepared_corpus_causal_signals_match_materialized_and_block_layouts() {
+    use rust_strategy_factory::strategies::{Features, Rule, Strategy};
+    let f = Fixture::new("prepared-signals", "EURUSD", 2);
+    let prepared = corpus::prepare(&f.root, &f.spec, Timeframe::M1, 1000).unwrap();
+    let path = f.root.join("whole.rsfb");
+    rust_strategy_factory::blocked_native::write(&path, &f.data, 3).unwrap();
+    let blocked_spec = corpus::describe(&[path], 100).unwrap();
+    let blocked = corpus::prepare(&f.root, &blocked_spec, Timeframe::M1, 1000).unwrap();
+    assert_eq!(
+        prepared.report().ordered_events_hash,
+        blocked.report().ordered_events_hash
+    );
+    for tf in Timeframe::ALL {
+        assert_eq!(prepared.candles(tf).unwrap(), blocked.candles(tf).unwrap());
+    }
+    let primary = candles::build(&f.data, Timeframe::M1).unwrap();
+    let mut strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+    for rule in [
+        strategy.rule.clone(),
+        Rule::HigherTimeframe {
+            timeframe: Timeframe::H1,
+            rule: Box::new(Rule::UtcSession {
+                start_hour: 0,
+                end_hour: 23,
+                weekdays: 127,
+            }),
+        },
+        Rule::All(vec![
+            Rule::AboveMean { window: 2 },
+            Rule::HigherTimeframe {
+                timeframe: Timeframe::H1,
+                rule: Box::new(Rule::AboveMean { window: 2 }),
+            },
+        ]),
+    ] {
+        strategy.rule = rule;
+        let expected = Features::with_context(&primary, 10000, &f.data, Timeframe::M1)
+            .unwrap()
+            .signal(&strategy.rule)
+            .unwrap();
+        let actual = prepared.signals(&strategy, 10000).unwrap();
+        assert_eq!(
+            serde_json::to_value(&actual).unwrap(),
+            serde_json::to_value(expected).unwrap()
+        );
+        assert_eq!(
+            serde_json::to_value(actual).unwrap(),
+            serde_json::to_value(blocked.signals(&strategy, 10000).unwrap()).unwrap()
+        );
+    }
+    assert!(prepared.signals(&strategy, 1).is_err());
+    assert!(
+        corpus::prepare(&f.root, &f.spec, Timeframe::H1, 1000)
+            .unwrap()
+            .signals(&strategy, 10000)
+            .is_err()
+    );
+}
+#[test]
+fn prepared_snapshot_is_not_current_byte_eligibility_and_mutated_artifacts_refuse_replay() {
+    use rust_strategy_factory::{
+        strategies::Strategy,
+        tick_engine::{self, CorpusBudget, Costs},
+    };
+    let f = Fixture::new("prepared-mutation", "EURUSD", 3);
+    let prepared = corpus::prepare(&f.root, &f.spec, Timeframe::M1, 1000).unwrap();
+    let original_report = serde_json::to_value(prepared.report()).unwrap();
+    let path = f.root.join(&f.spec.chunks[0].path);
+    let bytes = fs::read(&path).unwrap();
+    let mut corrupt = bytes.clone();
+    *corrupt.last_mut().unwrap() ^= 1;
+    fs::write(&path, corrupt).unwrap();
+    assert_eq!(
+        serde_json::to_value(prepared.report()).unwrap(),
+        original_report
+    );
+    assert!(corpus::prepare(&f.root, &f.spec, Timeframe::M1, 1000).is_err());
+    let strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+    assert!(
+        tick_engine::replay_corpus(
+            &f.root,
+            &f.spec,
+            &strategy,
+            &Costs::default(),
+            CorpusBudget {
+                max_candles: 1000,
+                feature_cells: 10000,
+                max_receipts: 1000
+            }
+        )
+        .is_err()
+    );
+    fs::write(&path, bytes).unwrap();
+    assert_eq!(
+        serde_json::to_value(
+            corpus::prepare(&f.root, &f.spec, Timeframe::M1, 1000)
+                .unwrap()
+                .report()
+        )
+        .unwrap(),
+        original_report
+    );
+}
