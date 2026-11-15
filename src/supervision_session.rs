@@ -33,6 +33,7 @@ pub(crate) fn initialize(c: &mut Connection, migrate: bool) -> Result<()> {
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(|e| e.to_string())?;
     tx.execute_batch("CREATE TABLE IF NOT EXISTS corpus_supervision_sessions(id TEXT PRIMARY KEY,search_id TEXT NOT NULL REFERENCES corpus_searches(id),token TEXT,body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=4096),hash TEXT NOT NULL CHECK(length(hash)=64),stop_at_ms INTEGER);CREATE TABLE IF NOT EXISTS corpus_supervision_receipts(id TEXT PRIMARY KEY REFERENCES corpus_supervision_sessions(id),body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=4096),hash TEXT NOT NULL CHECK(length(hash)=64));CREATE TRIGGER IF NOT EXISTS supervision_session_no_delete BEFORE DELETE ON corpus_supervision_sessions BEGIN SELECT RAISE(ABORT,'session retained');END;CREATE TRIGGER IF NOT EXISTS supervision_session_identity BEFORE UPDATE OF id,search_id ON corpus_supervision_sessions BEGIN SELECT RAISE(ABORT,'session identity immutable');END;CREATE TRIGGER IF NOT EXISTS supervision_session_terminal BEFORE UPDATE ON corpus_supervision_sessions WHEN json_extract(OLD.body,'$.finished_at_ms') IS NOT NULL BEGIN SELECT RAISE(ABORT,'terminal session immutable');END;CREATE TRIGGER IF NOT EXISTS supervision_receipt_no_update BEFORE UPDATE ON corpus_supervision_receipts BEGIN SELECT RAISE(ABORT,'session receipt immutable');END;CREATE TRIGGER IF NOT EXISTS supervision_receipt_no_delete BEFORE DELETE ON corpus_supervision_receipts BEGIN SELECT RAISE(ABORT,'session receipt immutable');END;").map_err(|e|e.to_string())?;
+    tx.execute_batch("CREATE INDEX IF NOT EXISTS supervision_unclosed_owners ON corpus_supervision_sessions(id) WHERE token IS NOT NULL;").map_err(|e|e.to_string())?;
     if migrate {
         tx.execute_batch(
             "UPDATE corpus_searches SET token=NULL,expires_ms=NULL;PRAGMA user_version=15;",
@@ -103,13 +104,13 @@ pub fn start(
     crate::search_control::read(&tx, source)?;
     let count: usize = tx
         .query_row(
-            "SELECT count(*) FROM corpus_supervision_sessions",
+            "SELECT count(*) FROM (SELECT id FROM corpus_supervision_sessions WHERE token IS NOT NULL LIMIT 128)",
             [],
             |r| r.get(0),
         )
         .map_err(|e| e.to_string())?;
     if count >= 128 {
-        return Err("foreground session history full; preserve evidence".into());
+        return Err("unclosed supervision owner admission full; preserve evidence".into());
     }
     let (id, token): (String, String) = tx
         .query_row(
@@ -264,24 +265,41 @@ pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
     tx.commit().map_err(|e| e.to_string())?;
     Ok(value)
 }
+pub fn page(
+    registry: &Registry,
+    after: Option<&str>,
+    limit: usize,
+) -> Result<crate::storage::ProcessHistoryPage> {
+    let (ids, next_cursor) = crate::storage::process_history_ids(
+        registry,
+        crate::storage::ProcessHistory::Supervision,
+        after,
+        limit,
+    )?;
+    let rows = ids
+        .into_iter()
+        .map(|id| status(registry, &id))
+        .collect::<Result<Vec<_>>>()?;
+    Ok(crate::storage::ProcessHistoryPage {
+        rows,
+        next_cursor,
+        maximum_page_size: "128",
+        maximum_unclosed_owners: "128",
+    })
+}
+/// Compatibility view of the latest bounded page; use page() for full history.
 pub fn list(registry: &Registry) -> Result<Vec<serde_json::Value>> {
-    let ids = {
-        let mut q = registry
-            .connection
-            .prepare("SELECT id FROM corpus_supervision_sessions ORDER BY rowid DESC LIMIT 129")
-            .map_err(|e| e.to_string())?;
-        q.query_map([], |r| r.get::<_, String>(0))
-            .map_err(|e| e.to_string())?
-            .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(|e| e.to_string())?
-    };
-    if ids.len() > 128 {
-        return Err("session quota exceeded".into());
-    }
-    ids.into_iter().map(|id| status(registry, &id)).collect()
+    Ok(page(registry, None, 128)?.rows)
 }
 pub(crate) fn integrity(registry: &Registry) -> Result<()> {
-    list(registry)?;
+    let mut after = None;
+    loop {
+        let current = page(registry, after.as_deref(), 128)?;
+        let Some(next) = current.next_cursor else {
+            break;
+        };
+        after = Some(next);
+    }
     Ok(())
 }
 
@@ -322,6 +340,90 @@ pub(crate) mod tests {
         .unwrap();
         let registry = Registry::open(&db).unwrap();
         (root, registry, id)
+    }
+    #[test]
+    fn finished_lifetime_history_pages_are_stable_indexed_and_fully_verified() {
+        let (root, mut registry, source) = fixture("session-lifetime");
+        let mut ids = Vec::new();
+        for _ in 0..260 {
+            let id = {
+                let owner = start(&mut registry, &source, 123, 1, 0, 1000).unwrap();
+                finish(&mut registry, &owner, 0, 0, 0, 1001, "test").unwrap();
+                owner.id
+            };
+            ids.push(id);
+        }
+        let oldest = status(&registry, &ids[0]).unwrap();
+        assert_eq!(list(&registry).unwrap().len(), 128);
+        assert!(page(&registry, None, 0).is_err());
+        assert!(page(&registry, None, 129).is_err());
+        assert!(page(&registry, Some("bad"), 31).is_err());
+        assert!(page(&registry, Some(&"f".repeat(64)), 31).is_err());
+        let first = page(&registry, None, 31).unwrap();
+        let inserted = {
+            let owner = start(&mut registry, &source, 123, 1, 0, 1000).unwrap();
+            finish(&mut registry, &owner, 0, 0, 0, 1001, "test").unwrap();
+            owner.id
+        };
+        let mut seen: Vec<_> = first
+            .rows
+            .into_iter()
+            .map(|r| r["id"].as_str().unwrap().to_string())
+            .collect();
+        let mut cursor = first.next_cursor;
+        while let Some(after) = cursor {
+            let current = page(&registry, Some(&after), 31).unwrap();
+            seen.extend(
+                current
+                    .rows
+                    .into_iter()
+                    .map(|r| r["id"].as_str().unwrap().to_string()),
+            );
+            cursor = current.next_cursor;
+        }
+        assert_eq!(seen, ids.iter().rev().cloned().collect::<Vec<_>>());
+        assert_eq!(page(&registry, None, 1).unwrap().rows[0]["id"], inserted);
+        let plan=registry.connection.prepare("EXPLAIN QUERY PLAN SELECT count(*) FROM (SELECT id FROM corpus_supervision_sessions WHERE token IS NOT NULL LIMIT 128)").unwrap()
+            .query_map([],|r|r.get::<_,String>(3)).unwrap().collect::<std::result::Result<Vec<_>,_>>().unwrap().join(" ");
+        assert!(plan.contains("supervision_unclosed_owners"), "{plan}");
+        let range=registry.connection.prepare("EXPLAIN QUERY PLAN SELECT id FROM corpus_supervision_sessions WHERE rowid < ?1 ORDER BY rowid DESC LIMIT ?2").unwrap()
+            .query_map(rusqlite::params![200,32],|r|r.get::<_,String>(3)).unwrap().collect::<std::result::Result<Vec<_>,_>>().unwrap().join(" ");
+        assert!(
+            range.contains("INTEGER PRIMARY KEY") && range.contains("rowid<?"),
+            "{range}"
+        );
+        registry.integrity().unwrap();
+        let backup = root.join("lifetime-backup.sqlite");
+        registry.backup(&backup).unwrap();
+        let restored = Registry::open(&backup).unwrap();
+        restored.integrity().unwrap();
+        assert_eq!(status(&restored, &ids[0]).unwrap(), oldest);
+        registry
+            .connection
+            .execute_batch("DROP TRIGGER supervision_session_terminal")
+            .unwrap();
+        registry
+            .connection
+            .execute(
+                "UPDATE corpus_supervision_sessions SET hash=?1 WHERE id=?2",
+                rusqlite::params!["0".repeat(64), ids[0]],
+            )
+            .unwrap();
+        assert!(page(&registry, None, 128).is_ok());
+        assert!(registry.integrity().is_err());
+        assert!(
+            registry
+                .backup(&root.join("corrupt-backup.sqlite"))
+                .is_err()
+        );
+        registry.connection.execute("INSERT INTO corpus_supervision_sessions(id,search_id,token,body,hash) SELECT ?1,search_id,NULL,body,hash FROM corpus_supervision_sessions WHERE id=?2",rusqlite::params!["a".repeat(1024*1024),ids[0]]).unwrap();
+        assert!(
+            page(&registry, None, 1).is_err(),
+            "oversized corrupt identities must refuse before retaining their text"
+        );
+        drop(restored);
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
     }
     #[test]
     fn owner_counter_stop_and_terminal_receipt_fences_survive_backup() {
@@ -402,7 +504,11 @@ pub(crate) mod tests {
         assert!(start(&mut registry, &id, 123, 1, 0, 1000).is_err());
         assert!(request_stop(&mut registry, &first.id, 1001).unwrap());
         finish(&mut registry, &first, 0, 0, 0, 1002, "session-stop-request").unwrap();
+        let replacement = start(&mut registry, &id, 123, 1, 0, 1003).unwrap();
+        assert_ne!(replacement.id, first.id);
+        assert!(start(&mut registry, &id, 123, 1, 0, 1004).is_err());
         assert_eq!(list(&registry).unwrap().len(), 128);
+        assert!(status(&registry, &first.id).is_ok());
         registry.integrity().unwrap();
         drop(registry);
         std::fs::remove_dir_all(root).unwrap();

@@ -98,6 +98,89 @@ pub struct Counts {
     pub running: i64,
     pub attempts: i64,
 }
+/// Bounded immutable-ID keyset page; record status remains an observation, not PID liveness.
+#[derive(Debug, Serialize)]
+pub struct ProcessHistoryPage {
+    pub rows: Vec<serde_json::Value>,
+    pub next_cursor: Option<String>,
+    pub maximum_page_size: &'static str,
+    pub maximum_unclosed_owners: &'static str,
+}
+pub(crate) enum ProcessHistory {
+    Owned,
+    Supervision,
+}
+impl ProcessHistory {
+    fn table(&self) -> &'static str {
+        match self {
+            Self::Owned => "corpus_owned_invocations",
+            Self::Supervision => "corpus_supervision_sessions",
+        }
+    }
+}
+pub(crate) fn process_history_ids(
+    registry: &Registry,
+    kind: ProcessHistory,
+    after: Option<&str>,
+    limit: usize,
+) -> Result<(Vec<String>, Option<String>)> {
+    if !(1..=128).contains(&limit) {
+        return Err("process history page limit must be1..128".into());
+    }
+    let table = kind.table();
+    let before: Option<i64> = if let Some(id) = after {
+        if !crate::machine_evidence::hex(id) {
+            return Err("invalid process history cursor".into());
+        }
+        Some(
+            registry
+                .connection
+                .query_row(
+                    &format!("SELECT rowid FROM {table} WHERE id=?1"),
+                    [id],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(db_err)?
+                .ok_or("unknown process history cursor")?,
+        )
+    } else {
+        None
+    };
+    // Separate SQL keeps the after-page query a rowid range, without an OR predicate.
+    let mut ids: Vec<String> = if let Some(before) = before {
+        let mut query = registry
+            .connection
+            .prepare(&format!(
+                "SELECT CASE WHEN length(CAST(id AS BLOB))=64 THEN id END FROM {table} WHERE rowid < ?1 ORDER BY rowid DESC LIMIT ?2"
+            ))
+            .map_err(db_err)?;
+        query
+            .query_map(params![before, limit + 1], |row| row.get(0))
+            .map_err(db_err)?
+            .collect::<std::result::Result<_, _>>()
+            .map_err(db_err)?
+    } else {
+        let mut query = registry
+            .connection
+            .prepare(&format!(
+                "SELECT CASE WHEN length(CAST(id AS BLOB))=64 THEN id END FROM {table} ORDER BY rowid DESC LIMIT ?1"
+            ))
+            .map_err(db_err)?;
+        query
+            .query_map([limit + 1], |row| row.get(0))
+            .map_err(db_err)?
+            .collect::<std::result::Result<_, _>>()
+            .map_err(db_err)?
+    };
+    if ids.iter().any(|id| !crate::machine_evidence::hex(id)) {
+        return Err("invalid process history identity".into());
+    }
+    let more = ids.len() > limit;
+    ids.truncate(limit);
+    let next = if more { ids.last().cloned() } else { None };
+    Ok((ids, next))
+}
 pub const SCHEMA_VERSION: u32 = 22;
 pub struct Registry {
     pub(crate) connection: Connection,

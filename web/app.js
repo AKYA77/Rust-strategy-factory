@@ -142,9 +142,31 @@ async function loadGeneratedSearches(){
  }catch(error){if(request===generatedSearchRequest){byId('generated-search-cards').replaceChildren();byId('generated-search-status').textContent='Generated search inventory unavailable; no verified state established.';failure(error);}}
 }
 let ownedListRequest=0,ownedRequest=0,ownedSelected='',ownedRaw='';
-async function loadOwned(){const ticket=++ownedListRequest;try{const data=await api('/api/owned-invocations').then(r=>r.json());if(ticket!==ownedListRequest)return;const host=byId('owned-cards');host.replaceChildren();for(const row of data.rows){const card=el('article');card.className='card';card.dataset.invocationId=row.id;const inspect=el('button','Inspect process observation');inspect.addEventListener('click',()=>loadOwnedDetail(row.id));card.append(el('h3',row.id.slice(0,12)),el('p',row.observation+(row.summary?' · '+row.summary.stop_reason:'')),inspect);host.append(card);}byId('owned-status').textContent=data.rows.length+' retained parent invocations · maximum '+data.maximum_retained;}catch(error){if(ticket===ownedListRequest){byId('owned-cards').replaceChildren();byId('owned-status').textContent='Verified process history unavailable.';failure(error);}}}
+let ownedAfter=null,ownedNext=null,ownedStack=[];
+function processHistoryButtons(prefix,after,stack,next,busy=false){
+ byId(prefix+'-newer').disabled=busy||stack.length===0;
+ byId(prefix+'-older').disabled=busy||next===null;
+ byId(prefix+'-newest').disabled=busy||after===null;
+}
+async function loadOwned(after=ownedAfter,stack=ownedStack){
+ const ticket=++ownedListRequest,requestedStack=[...stack];
+ processHistoryButtons('owned',ownedAfter,ownedStack,ownedNext,true);
+ byId('owned-cards').replaceChildren();byId('owned-status').textContent='Verifying process history page…';
+ try{
+  const data=await api('/api/owned-invocations?limit=32'+(after?'&after='+encodeURIComponent(after):'')).then(r=>r.json());
+  if(ticket!==ownedListRequest)return;
+  ownedAfter=after;ownedStack=requestedStack;ownedNext=data.next_cursor;
+  const host=byId('owned-cards');host.replaceChildren();
+  for(const row of data.rows){const card=el('article');card.className='card';card.dataset.invocationId=row.id;const inspect=el('button','Inspect process observation');inspect.addEventListener('click',()=>loadOwnedDetail(row.id));card.append(el('h3',row.id.slice(0,12)),el('p',row.observation+(row.summary?' · '+row.summary.stop_reason:'')),inspect);host.append(card);}
+  byId('owned-status').textContent=data.rows.length+' parent invocations in this page · at most '+data.maximum_unclosed_owners+' unclosed owners; PID liveness is not established';
+  processHistoryButtons('owned',ownedAfter,ownedStack,ownedNext);
+ }catch(error){if(ticket===ownedListRequest){ownedNext=null;byId('owned-cards').replaceChildren();byId('owned-status').textContent='Verified process history unavailable.';processHistoryButtons('owned',ownedAfter,ownedStack,null);failure(error);}}
+}
+byId('owned-newest').addEventListener('click',()=>loadOwned(null,[]));
+byId('owned-older').addEventListener('click',()=>{if(ownedNext)loadOwned(ownedNext,[...ownedStack,ownedAfter]);});
+byId('owned-newer').addEventListener('click',()=>{if(ownedStack.length)loadOwned(ownedStack.at(-1),ownedStack.slice(0,-1));});
 async function loadOwnedDetail(id){const ticket=++ownedRequest;ownedSelected=id;ownedRaw='';byId('owned-export').disabled=true;byId('owned-detail').hidden=false;byId('owned-json').textContent='Verifying process observation…';try{const raw=await api('/api/owned-invocations/'+id).then(r=>r.text());if(ticket!==ownedRequest)return;ownedRaw=raw;byId('owned-json').textContent=raw;byId('owned-export').disabled=false;}catch(error){if(ticket===ownedRequest){byId('owned-json').textContent='Verified process observation unavailable.';failure(error);}}}
-byId('owned-refresh').addEventListener('click',loadOwned);byId('owned-detail-refresh').addEventListener('click',()=>{if(ownedSelected)loadOwnedDetail(ownedSelected);});byId('owned-export').addEventListener('click',()=>{if(!ownedRaw)return;const link=el('a'),url=URL.createObjectURL(new Blob([ownedRaw],{type:'application/json'}));link.href=url;link.download='owned-process-'+ownedSelected+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+byId('owned-refresh').addEventListener('click',()=>loadOwned());byId('owned-detail-refresh').addEventListener('click',()=>{if(ownedSelected)loadOwnedDetail(ownedSelected);});byId('owned-export').addEventListener('click',()=>{if(!ownedRaw)return;const link=el('a'),url=URL.createObjectURL(new Blob([ownedRaw],{type:'application/json'}));link.href=url;link.download='owned-process-'+ownedSelected+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 let recoveryListRequest=0,recoveryRequest=0,recoverySelected='',recoveryRaw='',recoveryManifest='',recoveryFresh=false;
 function recoveryPending(id){recoverySelected=id;recoveryRaw='';recoveryManifest='';recoveryFresh=false;byId('recovery-export').disabled=true;byId('recovery-verify').disabled=true;byId('recovery-restore').disabled=true;byId('recovery-detail').hidden=false;byId('recovery-json').textContent='Waiting for verified recovery receipt…';byId('recovery-detail-status').textContent=id+' · verification pending';}
 function recoveryReceipt(raw){const v=JSON.parse(raw);recoverySelected=v.id;recoveryRaw=raw;recoveryManifest=v.manifest_hash;recoveryFresh=v.fresh_content_verified;byId('recovery-json').textContent=raw;byId('recovery-detail-status').textContent=v.id+' · '+(v.fresh_content_verified?'Actual contents verified':'Recorded manifest; verify actual contents before restore')+' · inactive; no service cutover';byId('recovery-export').disabled=false;byId('recovery-verify').disabled=false;byId('recovery-restore').disabled=!v.fresh_content_verified;}
@@ -156,9 +178,26 @@ byId('recovery-verify').addEventListener('click',()=>{if(recoverySelected)recove
 byId('recovery-restore-form').addEventListener('submit',e=>{e.preventDefault();if(!recoverySelected||!recoveryManifest||!recoveryFresh)return;const id=byId('recovery-restore-id').value;recoveryAction('/api/recovery/snapshots/'+recoverySelected+'/restore',{id,expected_manifest_hash:recoveryManifest},id);});
 byId('recovery-refresh').addEventListener('click',loadRecovery);byId('recovery-export').addEventListener('click',()=>{if(!recoveryRaw)return;const link=el('a'),url=URL.createObjectURL(new Blob([recoveryRaw],{type:'application/json'}));link.href=url;link.download='snapshot-'+recoverySelected+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 let supervisionListRequest=0,supervisionRequest=0,supervisionSelected='',supervisionRaw='';
-async function loadSupervision(){const ticket=++supervisionListRequest;try{const data=await api('/api/supervision-sessions').then(r=>r.json());if(ticket!==supervisionListRequest)return;const host=byId('supervision-cards');host.replaceChildren();for(const row of data.rows){const card=el('article');card.className='card';card.dataset.sessionId=row.id;const inspect=el('button','Inspect session');inspect.addEventListener('click',()=>loadSupervisionDetail(row.id));card.append(el('h3',row.id.slice(0,12)),el('p',row.observation+' · '+row.round_attempts+' rounds · '+row.checks+' checks'),inspect);host.append(card);}byId('supervision-status').textContent=data.rows.length+' recorded sessions · maximum '+data.maximum_retained;}catch(error){if(ticket===supervisionListRequest){byId('supervision-cards').replaceChildren();byId('supervision-status').textContent='Verified session inventory unavailable.';failure(error);}}}
+let supervisionAfter=null,supervisionNext=null,supervisionStack=[];
+async function loadSupervision(after=supervisionAfter,stack=supervisionStack){
+ const ticket=++supervisionListRequest,requestedStack=[...stack];
+ processHistoryButtons('supervision',supervisionAfter,supervisionStack,supervisionNext,true);
+ byId('supervision-cards').replaceChildren();byId('supervision-status').textContent='Verifying session history page…';
+ try{
+  const data=await api('/api/supervision-sessions?limit=32'+(after?'&after='+encodeURIComponent(after):'')).then(r=>r.json());
+  if(ticket!==supervisionListRequest)return;
+  supervisionAfter=after;supervisionStack=requestedStack;supervisionNext=data.next_cursor;
+  const host=byId('supervision-cards');host.replaceChildren();
+  for(const row of data.rows){const card=el('article');card.className='card';card.dataset.sessionId=row.id;const inspect=el('button','Inspect session');inspect.addEventListener('click',()=>loadSupervisionDetail(row.id));card.append(el('h3',row.id.slice(0,12)),el('p',row.observation+' · '+row.round_attempts+' rounds · '+row.checks+' checks'),inspect);host.append(card);}
+  byId('supervision-status').textContent=data.rows.length+' sessions in this page · at most '+data.maximum_unclosed_owners+' unclosed owners; PID liveness is not established';
+  processHistoryButtons('supervision',supervisionAfter,supervisionStack,supervisionNext);
+ }catch(error){if(ticket===supervisionListRequest){supervisionNext=null;byId('supervision-cards').replaceChildren();byId('supervision-status').textContent='Verified session inventory unavailable.';processHistoryButtons('supervision',supervisionAfter,supervisionStack,null);failure(error);}}
+}
+byId('supervision-newest').addEventListener('click',()=>loadSupervision(null,[]));
+byId('supervision-older').addEventListener('click',()=>{if(supervisionNext)loadSupervision(supervisionNext,[...supervisionStack,supervisionAfter]);});
+byId('supervision-newer').addEventListener('click',()=>{if(supervisionStack.length)loadSupervision(supervisionStack.at(-1),supervisionStack.slice(0,-1));});
 async function loadSupervisionDetail(id){const ticket=++supervisionRequest;supervisionSelected=id;supervisionRaw='';byId('supervision-export').disabled=true;byId('supervision-stop').disabled=true;byId('supervision-detail').hidden=false;byId('supervision-json').textContent='Verifying session snapshot…';try{const raw=await api('/api/supervision-sessions/'+id).then(r=>r.text());if(ticket!==supervisionRequest)return;const data=JSON.parse(raw);supervisionRaw=raw;byId('supervision-json').textContent=raw;byId('supervision-detail-status').textContent=data.observation+(data.stop_requested_at_ms?' · stop requested':'');byId('supervision-export').disabled=false;byId('supervision-stop').disabled=data.finished_at_ms!==null||data.stop_requested_at_ms!==null;}catch(error){if(ticket===supervisionRequest){byId('supervision-json').textContent='Verified session snapshot unavailable.';byId('supervision-detail-status').textContent='Unavailable';failure(error);}}}
-byId('supervision-refresh').addEventListener('click',loadSupervision);
+byId('supervision-refresh').addEventListener('click',()=>loadSupervision());
 byId('supervision-detail-refresh').addEventListener('click',()=>{if(supervisionSelected)loadSupervisionDetail(supervisionSelected);});
 byId('supervision-stop').addEventListener('click',async()=>{const id=supervisionSelected,ticket=++supervisionRequest;supervisionRaw='';byId('supervision-stop').disabled=true;byId('supervision-export').disabled=true;try{await api('/api/supervision-sessions/'+id+'/stop',{});if(ticket===supervisionRequest)await loadSupervisionDetail(id);await loadSupervision();}catch(error){if(ticket===supervisionRequest){await loadSupervisionDetail(id);failure(error);}}});
 byId('supervision-export').addEventListener('click',()=>{if(!supervisionRaw)return;const link=el('a'),url=URL.createObjectURL(new Blob([supervisionRaw],{type:'application/json'}));link.href=url;link.download='supervision-'+supervisionSelected+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});

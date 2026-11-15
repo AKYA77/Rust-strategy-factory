@@ -1214,17 +1214,65 @@ async fn generated_search_status(
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SessionStopRequest {}
-async fn owned_invocations(State(app): State<Arc<App>>) -> Response {
+#[derive(Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProcessHistoryQuery {
+    after: Option<String>,
+    limit: Option<usize>,
+}
+fn process_history_response(
+    registry: &Registry,
+    query: ProcessHistoryQuery,
+    owned: bool,
+) -> Response {
+    let limit = query.limit.unwrap_or(128);
+    if !(1..=128).contains(&limit) || query.after.as_ref().is_some_and(|id| !catalog_id(id)) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid process history page");
+    }
+    if let Some(id) = &query.after {
+        let table = if owned {
+            "corpus_owned_invocations"
+        } else {
+            "corpus_supervision_sessions"
+        };
+        match registry.connection.query_row(
+            &format!("SELECT EXISTS(SELECT 1 FROM {table} WHERE id=?1)"),
+            [id],
+            |row| row.get::<_, bool>(0),
+        ) {
+            Ok(true) => {}
+            Ok(false) => {
+                return api_error(StatusCode::BAD_REQUEST, "unknown process history cursor");
+            }
+            Err(_) => {
+                return api_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "process history unavailable",
+                );
+            }
+        }
+    }
+    let result = if owned {
+        crate::owned_history::page(registry, query.after.as_deref(), limit)
+    } else {
+        crate::supervision_session::page(registry, query.after.as_deref(), limit)
+    };
+    match result {
+        Ok(page) => Json(page).into_response(),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "verified process history unavailable",
+        ),
+    }
+}
+async fn owned_invocations(
+    State(app): State<Arc<App>>,
+    Query(query): Query<ProcessHistoryQuery>,
+) -> Response {
     let Ok(registry) = app.registry.lock() else {
         return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
     };
-    match crate::owned_history::list(&registry) {
-        Ok(rows) => Json(serde_json::json!({"rows":rows,"maximum_retained":"128"})).into_response(),
-        Err(_) => api_error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "verified owned invocation inventory unavailable",
-        ),
-    }
+    process_history_response(&registry, query, true)
 }
 async fn owned_invocation_status(
     State(app): State<Arc<App>>,
@@ -1258,17 +1306,14 @@ async fn owned_invocation_status(
         ),
     }
 }
-async fn supervision_sessions(State(app): State<Arc<App>>) -> Response {
+async fn supervision_sessions(
+    State(app): State<Arc<App>>,
+    Query(query): Query<ProcessHistoryQuery>,
+) -> Response {
     let Ok(registry) = app.registry.lock() else {
         return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
     };
-    match crate::supervision_session::list(&registry) {
-        Ok(rows) => Json(serde_json::json!({"rows":rows,"maximum_retained":"128"})).into_response(),
-        Err(_) => api_error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "verified session inventory unavailable",
-        ),
-    }
+    process_history_response(&registry, query, false)
 }
 fn session_exists(registry: &Registry, id: &str) -> crate::Result<bool> {
     registry

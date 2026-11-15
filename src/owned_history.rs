@@ -40,6 +40,7 @@ pub(crate) fn initialize(c: &mut Connection, migrate: bool) -> Result<()> {
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(|e| e.to_string())?;
     tx.execute_batch("CREATE TABLE IF NOT EXISTS corpus_owned_invocations(id TEXT PRIMARY KEY,search_id TEXT NOT NULL REFERENCES corpus_searches(id),token TEXT,body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=8192),hash TEXT NOT NULL CHECK(length(hash)=64));CREATE TRIGGER IF NOT EXISTS owned_invocation_no_delete BEFORE DELETE ON corpus_owned_invocations BEGIN SELECT RAISE(ABORT,'owned invocation retained');END;CREATE TRIGGER IF NOT EXISTS owned_invocation_identity BEFORE UPDATE OF id,search_id ON corpus_owned_invocations BEGIN SELECT RAISE(ABORT,'owned identity immutable');END;CREATE TRIGGER IF NOT EXISTS owned_invocation_terminal BEFORE UPDATE ON corpus_owned_invocations WHEN json_extract(OLD.body,'$.finished_at_ms') IS NOT NULL BEGIN SELECT RAISE(ABORT,'owned terminal immutable');END;").map_err(|e|e.to_string())?;
+    tx.execute_batch("CREATE INDEX IF NOT EXISTS owned_unclosed_owners ON corpus_owned_invocations(id) WHERE token IS NOT NULL;").map_err(|e|e.to_string())?;
     if migrate {
         tx.execute_batch(
             "UPDATE corpus_searches SET token=NULL,expires_ms=NULL;PRAGMA user_version=16;",
@@ -121,12 +122,12 @@ pub fn start(
         .map_err(|e| e.to_string())?;
     crate::search_control::read(&tx, source)?;
     let n: usize = tx
-        .query_row("SELECT count(*) FROM corpus_owned_invocations", [], |r| {
+        .query_row("SELECT count(*) FROM (SELECT id FROM corpus_owned_invocations WHERE token IS NOT NULL LIMIT 128)", [], |r| {
             r.get(0)
         })
         .map_err(|e| e.to_string())?;
     if n >= 128 {
-        return Err("owned invocation inventory full; preserve evidence".into());
+        return Err("unclosed owned owner admission full; preserve evidence".into());
     }
     let (id, token): (String, String) = tx
         .query_row(
@@ -322,24 +323,41 @@ pub(crate) fn status_on(c: &Connection, id: &str) -> Result<serde_json::Value> {
     v["observation_hash"] = hash.into();
     Ok(v)
 }
+pub fn page(
+    reg: &Registry,
+    after: Option<&str>,
+    limit: usize,
+) -> Result<crate::storage::ProcessHistoryPage> {
+    let (ids, next_cursor) = crate::storage::process_history_ids(
+        reg,
+        crate::storage::ProcessHistory::Owned,
+        after,
+        limit,
+    )?;
+    let rows = ids
+        .into_iter()
+        .map(|id| status(reg, &id))
+        .collect::<Result<Vec<_>>>()?;
+    Ok(crate::storage::ProcessHistoryPage {
+        rows,
+        next_cursor,
+        maximum_page_size: "128",
+        maximum_unclosed_owners: "128",
+    })
+}
+/// Compatibility view of the latest bounded page; use page() for full history.
 pub fn list(reg: &Registry) -> Result<Vec<serde_json::Value>> {
-    let ids = {
-        let mut q = reg
-            .connection
-            .prepare("SELECT id FROM corpus_owned_invocations ORDER BY rowid DESC LIMIT 129")
-            .map_err(|e| e.to_string())?;
-        q.query_map([], |r| r.get::<_, String>(0))
-            .map_err(|e| e.to_string())?
-            .collect::<std::result::Result<Vec<_>, _>>()
-            .map_err(|e| e.to_string())?
-    };
-    if ids.len() > 128 {
-        return Err("owned inventory quota exceeded".into());
-    }
-    ids.into_iter().map(|id| status(reg, &id)).collect()
+    Ok(page(reg, None, 128)?.rows)
 }
 pub(crate) fn integrity(reg: &Registry) -> Result<()> {
-    list(reg)?;
+    let mut after = None;
+    loop {
+        let current = page(reg, after.as_deref(), 128)?;
+        let Some(next) = current.next_cursor else {
+            break;
+        };
+        after = Some(next);
+    }
     Ok(())
 }
 
@@ -369,6 +387,93 @@ mod tests {
     }
     fn report(id: &str, source: &str) -> serde_json::Value {
         serde_json::json!({"invocation_id":id,"version":"owned-corpus-process-v1","search_id":source,"pid":"123","reaped":true,"stop_reason":"child-exited","child_report":{"synthetic_test_only":true},"session_status":null})
+    }
+    #[test]
+    fn finished_lifetime_history_pages_are_stable_indexed_and_fully_verified() {
+        let (root, mut registry, source) =
+            crate::supervision_session::tests::fixture("owned-lifetime");
+        let mut ids = Vec::new();
+        for _ in 0..260 {
+            let id = {
+                let owner = start_one(&mut registry, &source);
+                attach(&mut registry, &owner, 123).unwrap();
+                finish(&mut registry, &owner, &report(&owner.id, &source)).unwrap();
+                owner.id
+            };
+            ids.push(id);
+        }
+        let oldest = status(&registry, &ids[0]).unwrap();
+        assert_eq!(list(&registry).unwrap().len(), 128);
+        assert!(page(&registry, None, 0).is_err());
+        assert!(page(&registry, None, 129).is_err());
+        assert!(page(&registry, Some("bad"), 31).is_err());
+        assert!(page(&registry, Some(&"f".repeat(64)), 31).is_err());
+        let first = page(&registry, None, 31).unwrap();
+        let inserted = {
+            let owner = start_one(&mut registry, &source);
+            attach(&mut registry, &owner, 123).unwrap();
+            finish(&mut registry, &owner, &report(&owner.id, &source)).unwrap();
+            owner.id
+        };
+        let mut seen: Vec<_> = first
+            .rows
+            .into_iter()
+            .map(|r| r["id"].as_str().unwrap().to_string())
+            .collect();
+        let mut cursor = first.next_cursor;
+        while let Some(after) = cursor {
+            let current = page(&registry, Some(&after), 31).unwrap();
+            seen.extend(
+                current
+                    .rows
+                    .into_iter()
+                    .map(|r| r["id"].as_str().unwrap().to_string()),
+            );
+            cursor = current.next_cursor;
+        }
+        assert_eq!(seen, ids.iter().rev().cloned().collect::<Vec<_>>());
+        assert_eq!(page(&registry, None, 1).unwrap().rows[0]["id"], inserted);
+        let plan=registry.connection.prepare("EXPLAIN QUERY PLAN SELECT count(*) FROM (SELECT id FROM corpus_owned_invocations WHERE token IS NOT NULL LIMIT 128)").unwrap()
+            .query_map([],|r|r.get::<_,String>(3)).unwrap().collect::<std::result::Result<Vec<_>,_>>().unwrap().join(" ");
+        assert!(plan.contains("owned_unclosed_owners"), "{plan}");
+        let range=registry.connection.prepare("EXPLAIN QUERY PLAN SELECT id FROM corpus_owned_invocations WHERE rowid < ?1 ORDER BY rowid DESC LIMIT ?2").unwrap()
+            .query_map(rusqlite::params![200,32],|r|r.get::<_,String>(3)).unwrap().collect::<std::result::Result<Vec<_>,_>>().unwrap().join(" ");
+        assert!(
+            range.contains("INTEGER PRIMARY KEY") && range.contains("rowid<?"),
+            "{range}"
+        );
+        registry.integrity().unwrap();
+        let backup = root.join("lifetime-backup.sqlite");
+        registry.backup(&backup).unwrap();
+        let restored = Registry::open(&backup).unwrap();
+        restored.integrity().unwrap();
+        assert_eq!(status(&restored, &ids[0]).unwrap(), oldest);
+        registry
+            .connection
+            .execute_batch("DROP TRIGGER owned_invocation_terminal")
+            .unwrap();
+        registry
+            .connection
+            .execute(
+                "UPDATE corpus_owned_invocations SET hash=?1 WHERE id=?2",
+                rusqlite::params!["0".repeat(64), ids[0]],
+            )
+            .unwrap();
+        assert!(page(&registry, None, 128).is_ok());
+        assert!(registry.integrity().is_err());
+        assert!(
+            registry
+                .backup(&root.join("corrupt-backup.sqlite"))
+                .is_err()
+        );
+        registry.connection.execute("INSERT INTO corpus_owned_invocations(id,search_id,token,body,hash) SELECT ?1,search_id,NULL,body,hash FROM corpus_owned_invocations WHERE id=?2",rusqlite::params!["a".repeat(1024*1024),ids[0]]).unwrap();
+        assert!(
+            page(&registry, None, 1).is_err(),
+            "oversized corrupt identities must refuse before retaining their text"
+        );
+        drop(restored);
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
     }
     #[test]
     fn input_pin_summary_bindings_refuse_forgery_and_preserve_legacy_reports() {
@@ -511,7 +616,22 @@ mod tests {
         );
         attach(&mut reg, &first, 123).unwrap();
         finish(&mut reg, &first, &report(&first.id, &source)).unwrap();
+        let replacement = start_one(&mut reg, &source);
+        assert_ne!(replacement.id, first.id);
+        assert!(
+            start(
+                &mut reg,
+                &source,
+                &"a".repeat(64),
+                &"b".repeat(64),
+                10,
+                0,
+                &limits()
+            )
+            .is_err()
+        );
         assert_eq!(list(&reg).unwrap().len(), 128);
+        assert!(status(&reg, &first.id).is_ok());
         reg.integrity().unwrap();
         drop(reg);
         std::fs::remove_dir_all(root).unwrap();
