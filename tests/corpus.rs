@@ -2560,3 +2560,125 @@ fn foreground_pressure_and_argument_limits_refuse_before_registry_creation() {
     assert!(!out.status.success());
     assert!(!db.exists());
 }
+
+#[test]
+fn foreground_session_stop_is_cooperative_and_receipted() {
+    foreground_session_interruption(false);
+}
+#[test]
+fn foreground_session_crash_stays_unclosed_and_restart_gets_new_identity() {
+    foreground_session_interruption(true);
+}
+fn foreground_session_interruption(crash: bool) {
+    use std::io::BufRead;
+    let f = Fixture::new(
+        if crash {
+            "session-crash"
+        } else {
+            "session-stop"
+        },
+        "EURUSD",
+        7,
+    );
+    let (config, db, policy, source) = foreground_config(&f);
+    let binary = env!("CARGO_BIN_EXE_rust-strategy-factory");
+    let args = [
+        "corpus-supervise",
+        config.to_str().unwrap(),
+        policy.to_str().unwrap(),
+        db.to_str().unwrap(),
+        "100",
+        "10000",
+    ];
+    let mut child = Command::new(binary)
+        .args(args)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut ready = String::new();
+    std::io::BufReader::new(child.stderr.take().unwrap())
+        .read_line(&mut ready)
+        .unwrap();
+    assert!(ready.contains("corpus supervision ready"));
+    let c = rusqlite::Connection::open(&db).unwrap();
+    let mut id = None;
+    for _ in 0..500 {
+        let count: i64 = c
+            .query_row("SELECT count(*) FROM corpus_retry_decisions", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        if count > 0 {
+            id = Some(
+                c.query_row("SELECT id FROM corpus_supervision_sessions", [], |r| {
+                    r.get::<_, String>(0)
+                })
+                .unwrap(),
+            );
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    let Some(id) = id else {
+        child.kill().unwrap();
+        child.wait().unwrap();
+        panic!("no session/backoff observed");
+    };
+    if crash {
+        child.kill().unwrap();
+        assert!(!child.wait().unwrap().success());
+    } else {
+        let stop = Command::new(binary)
+            .args(["corpus-supervision-stop", db.to_str().unwrap(), &id])
+            .output()
+            .unwrap();
+        assert!(
+            stop.status.success(),
+            "{}",
+            String::from_utf8_lossy(&stop.stderr)
+        );
+        let out = child.wait_with_output().unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(report["stop_reason"], "session-stop-request");
+        assert_eq!(report["round_attempts"], "0");
+        assert!(report["session_status"]["receipt_hash"].is_string());
+    }
+    let first = Command::new(binary)
+        .args(["corpus-supervision-status", db.to_str().unwrap(), &id])
+        .output()
+        .unwrap();
+    assert!(first.status.success());
+    let old: serde_json::Value = serde_json::from_slice(&first.stdout).unwrap();
+    assert!(old.get("token").is_none());
+    assert_eq!(old["finished_at_ms"].is_null(), crash);
+    if crash {
+        assert_eq!(old["observation"], "unclosed; PID liveness not established");
+    }
+    let mut restart = args;
+    restart[5] = "0";
+    let out = Command::new(binary).args(restart).output().unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_ne!(report["session_id"], id);
+    assert_eq!(report["stop_reason"], "retry-backoff");
+    let registry = rust_strategy_factory::storage::Registry::open(&db).unwrap();
+    assert_eq!(
+        rust_strategy_factory::supervision_session::status(&registry, &id).unwrap(),
+        old
+    );
+    assert_eq!(
+        rust_strategy_factory::corpus_search::status(&registry, &source).unwrap()["requeue_records"],
+        "0"
+    );
+    registry.integrity().unwrap();
+}

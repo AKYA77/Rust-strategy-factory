@@ -594,14 +594,13 @@ pub struct SupervisedProgress {
     pub progress: Option<Step>,
     pub status: serde_json::Value,
 }
-pub fn supervised_step(
+pub fn prepare_supervision(
     database: &Path,
-    run: SearchRun<'_>,
-    limits: CorpusBatchLimits,
+    run: &SearchRun<'_>,
     policy: &crate::retry_policy::Policy,
-) -> Result<SupervisedProgress> {
+) -> Result<String> {
     policy.validate()?;
-    let config = configuration(&run)?;
+    let config = configuration(run)?;
     let mut registry = Registry::open(database)?;
     let id = register(&mut registry, &config)?;
     let head = crate::search_control::read(&registry.connection, &id)?;
@@ -610,6 +609,20 @@ pub fn supervised_step(
     {
         return Err("immutable retry policy differs".into());
     }
+    if matches!(head.state.as_str(), "running" | "paused") {
+        crate::retry_policy::configure(&mut registry, &id, policy)?;
+    }
+    Ok(id)
+}
+pub fn supervised_step(
+    database: &Path,
+    run: SearchRun<'_>,
+    limits: CorpusBatchLimits,
+    policy: &crate::retry_policy::Policy,
+) -> Result<SupervisedProgress> {
+    let id = prepare_supervision(database, &run, policy)?;
+    let mut registry = Registry::open(database)?;
+    let head = crate::search_control::read(&registry.connection, &id)?;
     if matches!(head.state.as_str(), "stopped" | "exhausted") {
         return Ok(SupervisedProgress {
             decision: None,
@@ -617,7 +630,6 @@ pub fn supervised_step(
             status: status(&registry, &id)?,
         });
     }
-    crate::retry_policy::configure(&mut registry, &id, policy)?;
     let decision = if head.state == "paused" {
         Some(crate::retry_policy::admit(
             &mut registry,

@@ -55,6 +55,7 @@ fn main() {
         "src/corpus_failure.rs",
         "src/retry_policy.rs",
         "src/retry_audit.rs",
+        "src/supervision_session.rs",
         "src/search_control.rs",
         "src/coordinator.rs",
         "src/operator_config.rs",
