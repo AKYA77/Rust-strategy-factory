@@ -15,6 +15,9 @@ use std::{
 };
 const VERSION: &str = "ordered-native-corpus-v1";
 const BLOCK_VERSION: &str = "ordered-block-corpus-v2";
+/// Explicit per-context aggregate limit; callers must also reserve concurrent objects.
+/// Covers the closed M1-D1 contexts of a continuous two-year UTC fixture.
+pub const MAX_RETAINED_CANDLES: usize = 2_000_000;
 const SPEC_CAP: u64 = 16 * 1024 * 1024;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -207,7 +210,7 @@ pub fn prepare(
     primary: Timeframe,
     max_candles: usize,
 ) -> Result<Prepared> {
-    if !(1..=1000000).contains(&max_candles) {
+    if !(1..=MAX_RETAINED_CANDLES).contains(&max_candles) {
         return Err("invalid aggregate corpus candle budget".into());
     }
     inspect_prepared(base, spec, Some((primary, max_candles)))
@@ -433,8 +436,10 @@ pub fn candle_context(
     timeframe: Timeframe,
     max_candles: usize,
 ) -> Result<Vec<candles::Candle>> {
-    if max_candles == 0 || max_candles > 1_000_000 {
-        return Err("corpus candle context budget must be1..1000000".into());
+    if max_candles == 0 || max_candles > MAX_RETAINED_CANDLES {
+        return Err(format!(
+            "corpus candle context budget must be1..{MAX_RETAINED_CANDLES}"
+        ));
     }
     let mut stream = None;
     let mut output = Vec::new();
@@ -495,7 +500,7 @@ fn signals_internal(
     window: Option<&crate::validation::Interval>,
 ) -> Result<crate::indicators::Mask> {
     let strategy = strategy.canonical()?;
-    if max_candles == 0 || max_candles > 1_000_000 {
+    if max_candles == 0 || max_candles > MAX_RETAINED_CANDLES {
         return Err("invalid aggregate corpus candle budget".into());
     }
     let mut frames = std::collections::BTreeMap::new();

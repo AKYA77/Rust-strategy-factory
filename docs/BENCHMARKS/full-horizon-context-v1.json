@@ -1,0 +1,151 @@
+{
+  "class": "SYNTHETIC_CONTINUOUS_UTC_HORIZON_ONLY",
+  "host": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "available_parallelism": 3
+  },
+  "binary_sha256": "22a01fe5c5ee9899649e39e780b89e614cda86f262f9915025ec6d3dc56b5b3d",
+  "version": {
+    "compute_revision": "compute-blake3:6217a37e24599f696fc35d7432f338d84bef9b8ae9a5796ed569a43c1743d2e6",
+    "engine": "ordered-l1-v6-frozen-atr-stops",
+    "indicators": "causal-primitives-v4-outward-atr",
+    "package": "0.1.0",
+    "signals": "closed-publication-next-event-v3-scoped-features",
+    "software_status": "SOFTWARE_INCOMPLETE"
+  },
+  "quotes": 1051200,
+  "artifacts": 33,
+  "expected_closed_candles": {
+    "M1": 1051199,
+    "M5": 210239,
+    "M15": 70079,
+    "M30": 35039,
+    "H1": 17519,
+    "H4": 4379,
+    "D1": 729
+  },
+  "aggregate_closed_candles": 1389183,
+  "declared_candle_ceiling": 2000000,
+  "new_artifacts_per_round": 8,
+  "records": [
+    {
+      "role": "inventory",
+      "elapsed_ms": 2355.433575,
+      "child_user_seconds": 2.313575,
+      "child_system_seconds": 0.027828,
+      "peak_pipeline_child_rss_kib": 11648,
+      "value_sha256": "6be71b96cc172c94e6a20f556441e978f95efa1c228ad59b8c4a42ffc4bafd70",
+      "inventory": {
+        "version": "ordered-native-corpus-v1",
+        "corpus_identity": "11a0a6104b974161316692b0d118a7092c093a14d36061e4cae444ad9391267f",
+        "chunks": 33,
+        "profile": {
+          "symbol": "EURUSD",
+          "version": "synthetic-v1",
+          "base": "EUR",
+          "quote": "USD",
+          "price_scale": 100000,
+          "tick": 1,
+          "pip": 10,
+          "contract_units": 100000,
+          "min_micro_lots": 10,
+          "step_micro_lots": 10,
+          "max_micro_lots": 1000000,
+          "leverage": 100,
+          "min_stop_ticks": 1,
+          "provenance": "SYNTHETIC_TEST_ONLY; arbitrary test volume/leverage; gold pip=0.01 is a test convention, not approved",
+          "research_only": true
+        },
+        "declared_class": "SYNTHETIC_TEST_ONLY",
+        "source": "SYNTHETIC_CONTINUOUS_UTC_MINUTE_QUOTES_ONLY_NOT_GENUINE",
+        "events": 1051200,
+        "ordered_events_hash": "d805c65d5502b09983877386099715614418c27dafd191aab5eced5685b7be37",
+        "first": {
+          "timestamp_ms": 1735689600000,
+          "sequence": "0"
+        },
+        "latest": {
+          "timestamp_ms": 1798761540000,
+          "sequence": "1051199"
+        },
+        "timestamp_ties": 0,
+        "identical_quote_events": 1051199,
+        "gaps_over_hour": 0,
+        "max_resident_chunk_events": 32768,
+        "max_resident_quote_events": 32768,
+        "candles": [
+          {
+            "timeframe": "M1",
+            "closed_candles": 1051199,
+            "content_hash": "94869f6598f3b16a58ee28e9ab97e61d0a26a32fc75d1c64e0dbde81e38b9e18"
+          },
+          {
+            "timeframe": "M5",
+            "closed_candles": 210239,
+            "content_hash": "21663d9bb0ca71d4f78d8326ef8c42544ebed83f074f8bb0f4788876edc83b78"
+          },
+          {
+            "timeframe": "M15",
+            "closed_candles": 70079,
+            "content_hash": "ce36581defe1f4da7b0f53a7bebc975e5f0089f9fed105ec6541f4ddbcc0adb5"
+          },
+          {
+            "timeframe": "M30",
+            "closed_candles": 35039,
+            "content_hash": "ed38874d11c1d04aeba1794c6eae739eaf99e37e96194817e6afd9953ad1922a"
+          },
+          {
+            "timeframe": "H1",
+            "closed_candles": 17519,
+            "content_hash": "73d55355fd52e4abd41c507d17b0de97f93575c6f86ebdb5ceba5b5edf128cdd"
+          },
+          {
+            "timeframe": "H4",
+            "closed_candles": 4379,
+            "content_hash": "419a94088118d6ca39910018dbd292d2d14bd04468901f8a9f131ed704532b09"
+          },
+          {
+            "timeframe": "D1",
+            "closed_candles": 729,
+            "content_hash": "3f0be00220ac960fa391d47a91d4a79ee5eab40702ed780d6f669bc2e94b5ad1"
+          }
+        ],
+        "limitations": "Observed ordered native chunks and closed UTC candle fingerprints only. One bounded quote chunk plus seven candle states is retained; metadata and per-chunk validation allocations are additional. No empty/final unfinished candles, missing quotes, source completeness, approved class, acquisition/resume or scientific eligibility is established. Synthetic USD replay is a separate explicitly gated consumer. Source archives/provenance remain separate immutable artifacts; profiles/source/class cannot be mixed."
+      }
+    },
+    {
+      "role": "aggregate-refusal",
+      "elapsed_ms": 2624.639596,
+      "child_user_seconds": 2.402917,
+      "child_system_seconds": 0.214357,
+      "peak_pipeline_child_rss_kib": 144848,
+      "value_sha256": "74de6bf611f929ad7e3be64463dde11400084203ac08268c858e913ae19f8c5d"
+    },
+    {
+      "role": "scalar",
+      "elapsed_ms": 3232.982697,
+      "child_user_seconds": 2.907613,
+      "child_system_seconds": 0.301466,
+      "peak_pipeline_child_rss_kib": 170020,
+      "value_sha256": "3dad1d8378691800c75b6ff32a51e34b445e90b68ee96fe0f932f82c070652e9"
+    },
+    {
+      "role": "resumed",
+      "elapsed_ms": 19096.683578,
+      "child_user_seconds": 18.638374,
+      "child_system_seconds": 0.376444,
+      "peak_pipeline_child_rss_kib": 181364,
+      "value_sha256": "3dad1d8378691800c75b6ff32a51e34b445e90b68ee96fe0f932f82c070652e9"
+    },
+    {
+      "role": "cached",
+      "elapsed_ms": 4954.837947,
+      "child_user_seconds": 4.855295,
+      "child_system_seconds": 0.072671,
+      "peak_pipeline_child_rss_kib": 15708,
+      "value_sha256": "3dad1d8378691800c75b6ff32a51e34b445e90b68ee96fe0f932f82c070652e9"
+    }
+  ],
+  "measurement_scope": "Each role uses a fresh Python worker and actual CLI child processes; elapsed/child CPU/peak child RSS include only the declared role. Fixture generation is excluded. OS cache uncontrolled; no physical-cold or whole-host/service RSS claim.",
+  "limitations": "Artificial constant quote once per minute over continuous2025/2026 UTC, with no final unfinished bucket. Zero trading signals/trades are intentional for horizon/context/receipt checks and establish no economic evidence. This is not genuine tick density, actual source/calendar approval, representative throughput, independent trials, OS resource enforcement, protected/non-USD activation, qualification or production/full-history acceptance. Existing resource defaults and experimental codec/index policy remain unchanged."
+}

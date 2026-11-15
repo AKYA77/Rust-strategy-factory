@@ -24,3 +24,5 @@ jobs:
       - run: npm run test:browser
       - run: cargo build --locked --release
       - run: python3 scripts/check-operations.py
+      - name: Verify continuous UTC horizon and declared context ceiling
+        run: python3 scripts/check-full-horizon.py --binary target/release/rust-strategy-factory --output work/full-horizon-context.json

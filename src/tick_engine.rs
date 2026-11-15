@@ -844,7 +844,7 @@ fn corpus_key_from_report(
 ) -> Result<crate::storage::ExperimentKey> {
     costs.validate()?;
     if budget.max_candles == 0
-        || budget.max_candles > 1_000_000
+        || budget.max_candles > crate::corpus::MAX_RETAINED_CANDLES
         || budget.feature_cells == 0
         || budget.max_receipts == 0
         || budget.max_receipts > 1_000_000

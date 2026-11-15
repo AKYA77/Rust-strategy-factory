@@ -300,7 +300,7 @@ fn bounded_candle_context_matches_all_batch_frames_and_refuses_partial_outputs()
             }
         }
     }
-    for cap in [0, 1_000_001, usize::MAX] {
+    for cap in [0, corpus::MAX_RETAINED_CANDLES + 1, usize::MAX] {
         assert!(corpus::candle_context(&f.root, &f.spec, Timeframe::M1, cap).is_err());
     }
     let spec = f.root.join("spec.json");
@@ -5137,7 +5137,7 @@ fn prepared_corpus_matches_every_instrument_frame_and_aggregate_budget() {
                 assert!(corpus::prepare(&f.root, &f.spec, primary, total - 1).is_err());
             }
         }
-        for cap in [0, 1000001, usize::MAX] {
+        for cap in [0, corpus::MAX_RETAINED_CANDLES + 1, usize::MAX] {
             assert!(corpus::prepare(&f.root, &f.spec, Timeframe::M1, cap).is_err());
         }
     }
@@ -6027,4 +6027,58 @@ fn campaign_ledgers_exceed_global128_without_cross_campaign_quota_or_extra_child
         statuses[0]
     );
     assert!(registry.integrity().is_err());
+}
+
+#[test]
+fn declared_corpus_candle_ceiling_is_consistent_across_preparation_signals_and_registry_keys() {
+    use rust_strategy_factory::{
+        strategies::Strategy,
+        tick_engine::{self, CorpusBudget, Costs},
+    };
+    let f = Fixture::new("declared-candle-cap", "EURUSD", 7);
+    let strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+    let cap = corpus::MAX_RETAINED_CANDLES;
+    assert_eq!(cap, 2_000_000);
+    for budget in [0, cap + 1, usize::MAX] {
+        assert!(corpus::prepare(&f.root, &f.spec, Timeframe::M1, budget).is_err());
+        assert!(corpus::candle_context(&f.root, &f.spec, Timeframe::M1, budget).is_err());
+        assert!(corpus::signals(&f.root, &f.spec, &strategy, budget, 10000).is_err());
+        assert!(
+            tick_engine::corpus_key(
+                &f.root,
+                &f.spec,
+                &strategy,
+                &Costs::default(),
+                CorpusBudget {
+                    max_candles: budget,
+                    feature_cells: 10000,
+                    max_receipts: 1000
+                }
+            )
+            .is_err()
+        );
+    }
+    let prepared = corpus::prepare(&f.root, &f.spec, Timeframe::M1, cap).unwrap();
+    assert_eq!(
+        prepared.candles(Timeframe::M1).unwrap(),
+        corpus::candle_context(&f.root, &f.spec, Timeframe::M1, cap).unwrap()
+    );
+    assert_eq!(
+        prepared.signals(&strategy, 10000).unwrap(),
+        corpus::signals(&f.root, &f.spec, &strategy, cap, 10000).unwrap()
+    );
+    assert!(
+        tick_engine::corpus_key(
+            &f.root,
+            &f.spec,
+            &strategy,
+            &Costs::default(),
+            CorpusBudget {
+                max_candles: cap,
+                feature_cells: 10000,
+                max_receipts: 1000
+            }
+        )
+        .is_ok()
+    );
 }
