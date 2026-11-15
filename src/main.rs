@@ -711,6 +711,7 @@ fn run(args: &[String]) -> Result<()> {
             let mut disk_admission = None;
             let mut rounds = 0;
             let mut reason = "round-limit";
+            let mut preparation_session = tick_engine::CorpusBatchSession::default();
             for _ in 0..max_rounds {
                 if shutdown.load(std::sync::atomic::Ordering::Acquire) {
                     reason = "signal";
@@ -735,7 +736,7 @@ fn run(args: &[String]) -> Result<()> {
                     }
                 }
                 let report =
-                    tick_engine::execute_corpus_batch(Path::new(database), &runs, config.limits)?;
+                    preparation_session.round(Path::new(database), &runs, config.limits)?;
                 rounds += 1;
                 let failed = report.worker_failures > 0 || report.jobs.iter().any(Result::is_err);
                 let complete = report
@@ -760,6 +761,7 @@ fn run(args: &[String]) -> Result<()> {
                     break;
                 }
             }
+            preparation_session.release();
             if shutdown.load(std::sync::atomic::Ordering::Acquire) {
                 reason = "signal";
             }

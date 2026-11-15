@@ -1428,12 +1428,56 @@ pub struct CorpusBatchReport {
     /// Aligned with jobs; None for success, typed conservative provenance for errors.
     pub failure_kinds: Vec<Option<crate::corpus_failure::Kind>>,
 }
+/// Invocation-local ownership of at most one immutable context per worker.
+/// No leases, threads, connections or eligibility survive a round through this object.
+#[derive(Default)]
+pub struct CorpusBatchSession {
+    binding: Option<String>,
+    workers: Vec<WorkerPreparation>,
+}
+impl CorpusBatchSession {
+    pub fn release(&mut self) {
+        self.workers.clear();
+        self.binding = None;
+    }
+    /// Retained candle objects only, not total allocation/RSS or hard enforcement.
+    pub fn retained_candles(&self) -> usize {
+        self.workers
+            .iter()
+            .filter_map(|w| w.slot.as_ref())
+            .map(|(_, p)| p.retained_candles())
+            .sum()
+    }
+    pub fn round(
+        &mut self,
+        database: &std::path::Path,
+        runs: &[CorpusRun<'_>],
+        limits: CorpusBatchLimits,
+    ) -> Result<CorpusBatchReport> {
+        let result = execute_corpus_batch_session(database, runs, limits, self);
+        if match &result {
+            Err(_) => true,
+            Ok(report) => report.worker_failures > 0 || report.jobs.iter().any(Result::is_err),
+        } {
+            self.release();
+        }
+        result
+    }
+}
 /// One bounded checkpoint round. Preflight all jobs before opening the registry;
 /// each worker owns a connection and shares only a bounded atomic work cursor.
 pub fn execute_corpus_batch(
     database: &std::path::Path,
     runs: &[CorpusRun<'_>],
     limits: CorpusBatchLimits,
+) -> Result<CorpusBatchReport> {
+    CorpusBatchSession::default().round(database, runs, limits)
+}
+fn execute_corpus_batch_session(
+    database: &std::path::Path,
+    runs: &[CorpusRun<'_>],
+    limits: CorpusBatchLimits,
+    session: &mut CorpusBatchSession,
 ) -> Result<CorpusBatchReport> {
     use std::sync::atomic::{AtomicUsize, Ordering};
     if runs.is_empty()
@@ -1473,6 +1517,7 @@ pub fn execute_corpus_batch(
     }
     let mut identities = std::collections::BTreeSet::new();
     let mut sources = std::collections::BTreeMap::new();
+    let mut invocation_inputs = Vec::with_capacity(runs.len());
     for run in runs {
         let binding = corpus_source_binding(run)?;
         if !sources.contains_key(&binding) {
@@ -1482,11 +1527,23 @@ pub fn execute_corpus_batch(
             .get(&binding)
             .ok_or("missing preflight source report")?;
         let key = corpus_key_from_report(run.spec, run.strategy, run.costs, run.budget, observed)?;
-        if !identities.insert(crate::data::hash(&key)?) {
+        let identity = crate::data::hash(&key)?;
+        invocation_inputs.push((binding, identity.clone()));
+        if !identities.insert(identity) {
             return Err("duplicate frozen corpus job in batch".into());
         }
     }
     drop(sources);
+    let binding = crate::data::hash(&(
+        std::env::current_dir()
+            .map_err(|e| e.to_string())?
+            .join(database),
+        limits,
+        invocation_inputs,
+    ))?;
+    if session.binding.as_ref() != Some(&binding) {
+        session.release();
+    }
     // Initialize sequentially; do not race schema migrations across workers.
     let mut connections = Vec::with_capacity(workers);
     for _ in 0..workers {
@@ -1503,6 +1560,10 @@ pub fn execute_corpus_batch(
             }
         }
     }
+    let mut slots = std::mem::take(&mut session.workers);
+    slots.resize_with(workers, WorkerPreparation::default);
+    slots.truncate(workers);
+    let mut restored: Vec<_> = (0..workers).map(|_| WorkerPreparation::default()).collect();
     let next = AtomicUsize::new(0);
     let mut results: Vec<Option<Result<CorpusProgress>>> = (0..runs.len()).map(|_| None).collect();
     let mut worker_failures = 0;
@@ -1510,13 +1571,22 @@ pub fn execute_corpus_batch(
     let mut preparation = CorpusPreparationStats::default();
     std::thread::scope(|scope| {
         let mut handles = Vec::new();
-        for (i, mut registry) in connections.into_iter().enumerate() {
+        for ((i, mut registry), mut worker_preparation) in
+            connections.into_iter().enumerate().zip(slots)
+        {
             let next = &next;
+            worker_preparation.stats = CorpusPreparationStats {
+                peak_retained_candles_per_worker: worker_preparation
+                    .slot
+                    .as_ref()
+                    .map_or(0, |(_, p)| p.retained_candles()),
+                ..CorpusPreparationStats::default()
+            };
             match std::thread::Builder::new()
                 .name(format!("corpus-{i}"))
                 .spawn_scoped(scope, move || {
                     let mut completed = Vec::new();
-                    let mut preparation = WorkerPreparation::default();
+                    let mut preparation = worker_preparation;
                     loop {
                         let index = next.fetch_add(1, Ordering::Relaxed);
                         let Some(run) = runs.get(index) else {
@@ -1538,18 +1608,20 @@ pub fn execute_corpus_batch(
                         );
                         completed.push((index, result));
                     }
-                    (completed, preparation.stats)
+                    (completed, preparation)
                 }) {
                 Ok(handle) => {
                     workers_started += 1;
-                    handles.push(handle);
+                    handles.push((i, handle));
                 }
                 Err(_) => worker_failures += 1,
             }
         }
-        for handle in handles {
+        for (index, handle) in handles {
             match handle.join() {
-                Ok((completed, stats)) => {
+                Ok((completed, worker_preparation)) => {
+                    let stats = worker_preparation.stats;
+                    restored[index] = worker_preparation;
                     preparation.builds += stats.builds;
                     preparation.reuses += stats.reuses;
                     preparation.current_byte_checks += stats.current_byte_checks;
@@ -1564,6 +1636,8 @@ pub fn execute_corpus_batch(
             }
         }
     });
+    session.workers = restored;
+    session.binding = Some(binding);
     let failure_kinds = results
         .iter()
         .map(|r| match r {
