@@ -832,16 +832,19 @@ pub fn corpus_key(
     costs: &Costs,
     budget: CorpusBudget,
 ) -> Result<crate::storage::ExperimentKey> {
-    let observed = crate::corpus::inspect(base, spec)?;
-    corpus_key_from_report(spec, strategy, costs, budget, &observed)
+    let observed = crate::corpus::source_facts(base, spec)?;
+    corpus_key_from_facts(spec, strategy, costs, budget, &observed)
 }
-fn corpus_key_from_report(
+fn corpus_key_from_facts(
     spec: &crate::corpus::Specification,
     strategy: &Strategy,
     costs: &Costs,
     budget: CorpusBudget,
-    observed: &crate::corpus::Report,
+    observed: &crate::corpus::SourceFacts,
 ) -> Result<crate::storage::ExperimentKey> {
+    if observed.corpus_identity() != spec.identity()? {
+        return Err("source key inventory differs from specification".into());
+    }
     costs.validate()?;
     if budget.max_candles == 0
         || budget.max_candles > crate::corpus::MAX_RETAINED_CANDLES
@@ -851,19 +854,19 @@ fn corpus_key_from_report(
     {
         return Err("invalid corpus execution budget".into());
     }
-    if observed.declared_class != crate::data::DataClass::SyntheticTestOnly
-        || observed.profile.quote != "USD"
+    if observed.declared_class() != crate::data::DataClass::SyntheticTestOnly
+        || observed.profile().quote != "USD"
     {
         return Err("registered corpus execution requires synthetic literal USD".into());
     }
     let strategy = strategy.canonical()?;
     Ok(crate::storage::ExperimentKey {
         concept_hash: strategy.identity()?,
-        instrument: observed.profile.symbol.clone(),
-        dataset_hash: observed.ordered_events_hash.clone(),
-        start_ms: observed.first.timestamp_ms,
+        instrument: observed.profile().symbol.clone(),
+        dataset_hash: observed.ordered_events_hash().to_string(),
+        start_ms: observed.first().timestamp_ms,
         end_exclusive_ms: observed
-            .latest
+            .latest()
             .timestamp_ms
             .checked_add(1)
             .ok_or("corpus end overflow")?,
@@ -871,7 +874,7 @@ fn corpus_key_from_report(
         indicator_version: crate::INDICATOR_VERSION.into(),
         cost_hash: crate::data::hash(costs)?,
         fill_policy: FILL_ASSUMPTION.into(),
-        profile_hash: crate::data::hash(&observed.profile)?,
+        profile_hash: crate::data::hash(&observed.profile())?,
         engine_version: crate::ENGINE_VERSION.into(),
         protocol_hash: "synthetic-corpus-training-v1".into(),
         code_revision: crate::research::compute_revision()?,
@@ -1135,7 +1138,7 @@ pub struct CorpusPreparationStats {
 }
 #[derive(Default)]
 struct WorkerPreparation {
-    key_inventory: Option<(String, crate::corpus::Prepared)>,
+    key_inventory: Option<(String, crate::corpus::SourceFacts)>,
     slot: Option<(String, crate::corpus::Prepared)>,
     stats: CorpusPreparationStats,
 }
@@ -1158,12 +1161,12 @@ impl WorkerPreparation {
                 self.key_inventory = None;
                 return Err(error);
             }
-            return corpus_key_from_report(
+            return corpus_key_from_facts(
                 run.spec,
                 run.strategy,
                 run.costs,
                 run.budget,
-                prepared.report(),
+                &prepared.source_facts(),
             );
         }
         if let Some((stored, inventory)) = &self.key_inventory
@@ -1174,13 +1177,7 @@ impl WorkerPreparation {
                 self.key_inventory = None;
                 return Err(error);
             }
-            return corpus_key_from_report(
-                run.spec,
-                run.strategy,
-                run.costs,
-                run.budget,
-                inventory.report(),
-            );
+            return corpus_key_from_facts(run.spec, run.strategy, run.costs, run.budget, inventory);
         }
         corpus_key(run.base, run.spec, run.strategy, run.costs, run.budget)
     }
@@ -1560,19 +1557,13 @@ fn execute_corpus_batch_session(
         if !sources.contains_key(&binding) {
             sources.insert(
                 binding.clone(),
-                crate::corpus::verified_inventory(run.base, run.spec)?,
+                crate::corpus::source_facts(run.base, run.spec)?,
             );
         }
         let observed = sources
             .get(&binding)
             .ok_or("missing preflight source report")?;
-        let key = corpus_key_from_report(
-            run.spec,
-            run.strategy,
-            run.costs,
-            run.budget,
-            observed.report(),
-        )?;
+        let key = corpus_key_from_facts(run.spec, run.strategy, run.costs, run.budget, observed)?;
         let identity = crate::data::hash(&key)?;
         invocation_inputs.push((binding, identity.clone()));
         if !identities.insert(identity) {
@@ -1647,7 +1638,7 @@ fn execute_corpus_batch_session(
                         };
                         preparation.key_inventory = inventories
                             .get(&binding)
-                            .map(|inventory| (binding, inventory.inventory_copy()));
+                            .map(|inventory| (binding, inventory.clone()));
                         let result = execute_corpus_step_prepared(
                             &mut registry,
                             CorpusRun {
@@ -1789,7 +1780,10 @@ mod worker_preparation_tests {
                 budget: budget(),
             };
             let mut cache = WorkerPreparation {
-                key_inventory: Some((corpus_source_binding(&run).unwrap(), inventory)),
+                key_inventory: Some((
+                    corpus_source_binding(&run).unwrap(),
+                    inventory.source_facts(),
+                )),
                 ..WorkerPreparation::default()
             };
             let mut registry =
@@ -1827,7 +1821,7 @@ mod worker_preparation_tests {
         let expected = corpus_key(&source.root, &source.spec, &strategy, &costs, budget()).unwrap();
         let binding = corpus_source_binding(&run()).unwrap();
         let mut cache = WorkerPreparation {
-            key_inventory: Some((binding.clone(), inventory.inventory_copy())),
+            key_inventory: Some((binding.clone(), inventory.source_facts())),
             ..WorkerPreparation::default()
         };
         assert_eq!(cache.key(&run()).unwrap(), expected);
@@ -1853,7 +1847,7 @@ mod worker_preparation_tests {
                 .is_none()
         );
         fs::write(path, bytes).unwrap();
-        cache.key_inventory = Some((binding, inventory.inventory_copy()));
+        cache.key_inventory = Some((binding, inventory.source_facts()));
         let completed =
             execute_corpus_step_prepared(&mut registry, run(), 64, 60000, &mut || 1001, &mut cache)
                 .unwrap();

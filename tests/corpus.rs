@@ -6114,3 +6114,62 @@ fn verified_no_frame_inventory_preserves_inspection_and_refuses_missing_context_
     fs::write(path, bytes).unwrap();
     inventory.verify_current(&f.root, &f.spec).unwrap();
 }
+
+#[test]
+fn source_facts_match_full_inspection_all_symbols_native_blocked_and_exact_cli_keys() {
+    use rust_strategy_factory::contracts::SYMBOLS;
+    for symbol in SYMBOLS {
+        let f = Fixture::new("source-facts-layout", symbol, 7);
+        let block = f.root.join("whole.rsfb");
+        rust_strategy_factory::blocked_native::write(&block, &f.data, 3).unwrap();
+        let blocked = corpus::describe(&[block], 100).unwrap();
+        for spec in [&f.spec, &blocked] {
+            let facts = corpus::source_facts(&f.root, spec).unwrap();
+            let report = corpus::inspect(&f.root, spec).unwrap();
+            assert_eq!(facts.corpus_identity(), report.corpus_identity);
+            assert_eq!(facts.profile(), &report.profile);
+            assert_eq!(facts.declared_class(), report.declared_class);
+            assert_eq!(facts.source(), report.source);
+            assert_eq!(facts.events(), report.events);
+            assert_eq!(facts.ordered_events_hash(), report.ordered_events_hash);
+            assert_eq!(
+                serde_json::to_value(facts.first()).unwrap(),
+                serde_json::to_value(&report.first).unwrap()
+            );
+            assert_eq!(
+                serde_json::to_value(facts.latest()).unwrap(),
+                serde_json::to_value(&report.latest).unwrap()
+            );
+            assert_eq!(
+                facts.max_resident_quote_events(),
+                report.max_resident_quote_events
+            );
+            facts.verify_current(&f.root, spec).unwrap();
+            let value = serde_json::to_value(&facts).unwrap();
+            assert!(value.get("candles").is_none());
+        }
+        let spec = f.root.join("facts-spec.json");
+        fs::write(&spec, serde_json::to_vec(&f.spec).unwrap()).unwrap();
+        let output = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args(["corpus-source-facts", spec.to_str().unwrap()])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap(),
+            serde_json::to_value(corpus::source_facts(&f.root, &f.spec).unwrap()).unwrap()
+        );
+        let path = &f.spec.chunks[0].path;
+        let bytes = fs::read(path).unwrap();
+        let mut bad = bytes.clone();
+        let index = bad.len() / 2;
+        bad[index] ^= 1;
+        fs::write(path, bad).unwrap();
+        assert!(corpus::source_facts(&f.root, &f.spec).is_err());
+        fs::write(path, bytes).unwrap();
+    }
+}

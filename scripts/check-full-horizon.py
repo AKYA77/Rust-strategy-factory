@@ -50,6 +50,12 @@ if len(sys.argv) > 1 and sys.argv[1] == '--worker':
         assert value['max_resident_quote_events'] <= 32768
         assert int(value['first']['timestamp_ms']) == START
         assert int(value['latest']['timestamp_ms']) == START + (ROWS - 1) * 60000
+    elif role == 'source-facts':
+        value = run(binary, 'corpus-source-facts', base / 'corpus.json')
+        expected = json.loads((base / 'receipt-inventory.json').read_text())['inventory']
+        for key in ['corpus_identity', 'profile', 'declared_class', 'source', 'events', 'ordered_events_hash', 'first', 'latest', 'max_resident_quote_events']:
+            assert value[key] == expected[key]
+        assert 'candles' not in value
     elif role == 'aggregate-refusal':
         destination = base / 'denied.json'
         failed = subprocess.run([binary, 'corpus-replay', str(base / 'corpus.json'), str(base / 'strategy.json'), str(TOTAL - 1), '8000000', '1', str(destination)], capture_output=True, text=True)
@@ -115,7 +121,7 @@ with tempfile.TemporaryDirectory(prefix='factory-full-horizon-') as temp:
     (base / 'strategy.json').write_text(json.dumps(strategy))
     (base / 'batch.json').write_text(json.dumps({'specification': 'corpus.json', 'strategies': [strategy], 'budget': {'max_candles': CAP, 'feature_cells': 8000000, 'max_receipts': 1}, 'limits': {'workers': 1, 'max_parallel_candles': CAP, 'max_parallel_feature_cells': 8000000, 'max_parallel_receipts': 1, 'max_new_chunks': 8, 'lease_ms': 600000}}))
     records = []
-    for role in ['inventory', 'aggregate-refusal', 'scalar', 'resumed', 'cached']:
+    for role in ['inventory', 'source-facts', 'aggregate-refusal', 'scalar', 'resumed', 'cached']:
         result = base / f'receipt-{role}.json'
         subprocess.run([sys.executable, str(Path(__file__).resolve()), '--worker', role, str(binary), str(base), str(result)], check=True)
         records.append(json.loads(result.read_text()))

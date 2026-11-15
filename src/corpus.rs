@@ -161,6 +161,105 @@ pub struct Report {
     pub candles: Vec<CandleSummary>,
     pub limitations: &'static str,
 }
+/// Observed verified source facts only: no candles or scientific eligibility.
+/// Every reuse must check the currently resolved artifacts again.
+/// ```compile_fail
+/// use rust_strategy_factory::corpus::SourceFacts;
+/// let _: SourceFacts = serde_json::from_str("{}").unwrap();
+/// ```
+#[derive(Debug, Clone, Serialize)]
+pub struct SourceFacts {
+    version: &'static str,
+    corpus_identity: String,
+    profile: Profile,
+    declared_class: DataClass,
+    source: String,
+    events: u64,
+    ordered_events_hash: String,
+    first: crate::coverage::Event,
+    latest: crate::coverage::Event,
+    max_resident_quote_events: usize,
+    limitations: &'static str,
+}
+const FACTS_LIMITATIONS: &str = "Observed source identity/profile/declared class and exact ordered events only. No candle, complete coverage, independent approval, execution or scientific eligibility is established. Reuse must verify actual current artifacts; metadata is additional to bounded quote residency.";
+impl SourceFacts {
+    pub fn corpus_identity(&self) -> &str {
+        &self.corpus_identity
+    }
+    pub fn profile(&self) -> &Profile {
+        &self.profile
+    }
+    pub fn declared_class(&self) -> DataClass {
+        self.declared_class
+    }
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+    pub fn events(&self) -> u64 {
+        self.events
+    }
+    pub fn ordered_events_hash(&self) -> &str {
+        &self.ordered_events_hash
+    }
+    pub fn first(&self) -> &crate::coverage::Event {
+        &self.first
+    }
+    pub fn latest(&self) -> &crate::coverage::Event {
+        &self.latest
+    }
+    pub fn max_resident_quote_events(&self) -> usize {
+        self.max_resident_quote_events
+    }
+    pub fn verify_current(&self, base: &Path, spec: &Specification) -> Result<()> {
+        verify_current_identity(base, spec, &self.corpus_identity)
+    }
+}
+fn verify_current_identity(base: &Path, spec: &Specification, identity: &str) -> Result<()> {
+    if identity != spec.identity()? {
+        return Err("verified source identity differs".into());
+    }
+    visit_blocks(base, spec, |_| Ok(()))
+}
+/// Compute only source facts needed for a frozen execution key, without candles.
+pub fn source_facts(base: &Path, spec: &Specification) -> Result<SourceFacts> {
+    let identity = spec.identity()?;
+    let mut profile = None;
+    let mut source = None;
+    let mut class = None;
+    let mut first = None;
+    let mut latest = None;
+    let mut peak = 0;
+    let mut events = SequenceHash::new();
+    visit_blocks(base, spec, |block| {
+        if profile.is_none() {
+            profile = Some(block.profile.clone());
+            source = Some(block.manifest.source.clone());
+            class = Some(block.manifest.class);
+        }
+        peak = peak.max(block.ticks.len());
+        for tick in block.ticks {
+            if first.is_none() {
+                first = Some(*tick);
+            }
+            events.push(tick)?;
+            latest = Some(*tick);
+        }
+        Ok(())
+    })?;
+    Ok(SourceFacts {
+        version: "observed-source-facts-v1",
+        corpus_identity: identity,
+        profile: profile.ok_or("empty source facts")?,
+        declared_class: class.ok_or("empty source facts")?,
+        source: source.ok_or("empty source facts")?,
+        events: events.count,
+        ordered_events_hash: events.finish(),
+        first: crate::coverage::Event::from(&first.ok_or("empty source facts")?),
+        latest: crate::coverage::Event::from(&latest.ok_or("empty source facts")?),
+        max_resident_quote_events: peak,
+        limitations: FACTS_LIMITATIONS,
+    })
+}
 /// Verified immutable candle contexts built alongside inspection in one source pass.
 /// This is a bounded in-memory snapshot, not current eligibility or a resume proof.
 pub struct Prepared {
@@ -168,10 +267,19 @@ pub struct Prepared {
     frames: std::collections::BTreeMap<Timeframe, Vec<candles::Candle>>,
 }
 impl Prepared {
-    pub(crate) fn inventory_copy(&self) -> Self {
-        Self {
-            report: self.report.clone(),
-            frames: std::collections::BTreeMap::new(),
+    pub(crate) fn source_facts(&self) -> SourceFacts {
+        SourceFacts {
+            version: "observed-source-facts-v1",
+            corpus_identity: self.report.corpus_identity.clone(),
+            profile: self.report.profile.clone(),
+            declared_class: self.report.declared_class,
+            source: self.report.source.clone(),
+            events: self.report.events,
+            ordered_events_hash: self.report.ordered_events_hash.clone(),
+            first: self.report.first.clone(),
+            latest: self.report.latest.clone(),
+            max_resident_quote_events: self.report.max_resident_quote_events,
+            limitations: FACTS_LIMITATIONS,
         }
     }
     pub fn report(&self) -> &Report {
@@ -189,10 +297,7 @@ impl Prepared {
     /// Recheck every actual artifact before reusing this immutable context.
     /// Identity alone never establishes that the currently resolved bytes match.
     pub fn verify_current(&self, base: &Path, spec: &Specification) -> Result<()> {
-        if self.report.corpus_identity != spec.identity()? {
-            return Err("prepared corpus identity differs".into());
-        }
-        visit_blocks(base, spec, |_| Ok(()))
+        verify_current_identity(base, spec, &self.report.corpus_identity)
     }
     pub fn signals(
         &self,
