@@ -1048,6 +1048,13 @@ fn parallel_corpus_rounds_match_serial_receipts_and_reject_aggregate_overcommit(
         assert_eq!(report.workers_started, 2);
         assert_eq!(report.worker_failures, 0);
         assert_eq!(report.jobs.len(), 3);
+        assert!((1..=2).contains(&report.preparation.builds));
+        assert_eq!(report.preparation.builds + report.preparation.reuses, 3);
+        assert_eq!(
+            report.preparation.current_byte_checks,
+            report.preparation.reuses
+        );
+        assert!(report.preparation.peak_retained_candles_per_worker <= budget.max_candles);
         for (i, outcome) in report.jobs.into_iter().enumerate() {
             match outcome.unwrap() {
                 CorpusProgress::Pending { cursor, .. } => assert_eq!(cursor, round as i64 + 1),
@@ -1143,6 +1150,31 @@ fn corpus_workers_report_job_failures_without_losing_other_checkpoints() {
         Ok(CorpusProgress::Pending { cursor: 1, .. })
     ));
     Registry::open(&db).unwrap().integrity().unwrap();
+    let serial = tick_engine::execute_corpus_batch(
+        &f.root.join("shared-errors.sqlite"),
+        &runs,
+        CorpusBatchLimits {
+            workers: 1,
+            max_parallel_candles: 100,
+            max_parallel_feature_cells: 10000,
+            max_parallel_receipts: 1000,
+            max_new_chunks: 1,
+            lease_ms: 60000,
+        },
+    )
+    .unwrap();
+    assert!(serial.jobs[0].is_err());
+    assert!(matches!(
+        &serial.jobs[1],
+        Ok(CorpusProgress::Pending { cursor: 1, .. })
+    ));
+    assert_eq!(serial.preparation.builds, 1);
+    assert_eq!(serial.preparation.reuses, 1);
+    assert_eq!(serial.preparation.current_byte_checks, 1);
+    Registry::open(&f.root.join("shared-errors.sqlite"))
+        .unwrap()
+        .integrity()
+        .unwrap();
 }
 
 fn corpus_batch_fixture(f: &Fixture) -> std::path::PathBuf {
@@ -5172,4 +5204,111 @@ fn prepared_snapshot_is_not_current_byte_eligibility_and_mutated_artifacts_refus
         .unwrap(),
         original_report
     );
+}
+
+#[test]
+fn shared_worker_preparation_actual_cli_matches_full_order_receipts_and_cached_restart() {
+    use rust_strategy_factory::{
+        contracts::{Conversion, Side},
+        indicators::Mask,
+        strategies::{EntryPlan, Features, Rule, Strategy},
+        tick_engine::{self, Costs},
+    };
+    let f = Fixture::new("worker-preparation-cli", "EURUSD", 37);
+    let data = data::synthetic_fixture("EURUSD").unwrap();
+    let artifact = f.root.join("complete.rsf");
+    native::write(&artifact, &data).unwrap();
+    let spec = corpus::describe(&[artifact], 10000).unwrap();
+    fs::write(
+        f.root.join("shared.json"),
+        serde_json::to_vec(&spec).unwrap(),
+    )
+    .unwrap();
+    let mut strategies: Vec<_> = [
+        None,
+        Some(EntryPlan::StopMarket {
+            offset_ticks: 2,
+            ttl_ms: 120000,
+            cancel_on_signal_false: true,
+        }),
+        Some(EntryPlan::Limit {
+            offset_ticks: 2,
+            ttl_ms: 120000,
+            cancel_on_signal_false: true,
+        }),
+    ]
+    .into_iter()
+    .map(|entry| Strategy {
+        timeframe: Timeframe::M1,
+        side: Side::Long,
+        stop_ticks: 100,
+        rule: Rule::AboveMean { window: 2 },
+        entry,
+        stop_policy: None,
+    })
+    .collect();
+    let mut higher = strategies[0].clone();
+    higher.timeframe = Timeframe::M5;
+    strategies.push(higher);
+    let config = f.root.join("shared-config.json");
+    fs::write(&config, serde_json::to_vec(&serde_json::json!({"specification":"shared.json","strategies":strategies,"budget":{"max_candles":10000,"feature_cells":100000,"max_receipts":10000},"limits":{"workers":1,"max_parallel_candles":10000,"max_parallel_feature_cells":100000,"max_parallel_receipts":10000,"max_new_chunks":64,"lease_ms":60000}})).unwrap()).unwrap();
+    let database = f.root.join("shared.sqlite");
+    let call = || {
+        let output = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args([
+                "corpus-batch",
+                config.to_str().unwrap(),
+                database.to_str().unwrap(),
+                "1",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap()
+    };
+    let first = call();
+    assert_eq!(first["stop_reason"], "complete");
+    assert_eq!(first["last"]["preparation"]["builds"], 2);
+    assert_eq!(first["last"]["preparation"]["reuses"], 2);
+    assert_eq!(first["last"]["preparation"]["current_byte_checks"], 2);
+    for (index, strategy) in strategies.iter().enumerate() {
+        let candles = candles::build(&data, strategy.timeframe).unwrap();
+        let mask: Mask = Features::new(&candles, 100000)
+            .unwrap()
+            .signal(&strategy.rule)
+            .unwrap();
+        let reference = tick_engine::replay(
+            &data,
+            &candles,
+            &mask,
+            strategy,
+            &Costs::default(),
+            &vec![Conversion::usd(); data.ticks.len()],
+        )
+        .unwrap();
+        assert!(!reference.trades.is_empty());
+        let completed = &first["last"]["jobs"][index]["Ok"]["Completed"];
+        assert_eq!(completed["cached"], false);
+        assert_eq!(
+            completed["result"]["result"]["tick_replay"],
+            serde_json::to_value(reference).unwrap()
+        );
+    }
+    let cached = call();
+    assert_eq!(cached["stop_reason"], "complete");
+    assert_eq!(cached["last"]["preparation"]["builds"], 0);
+    assert_eq!(cached["last"]["preparation"]["reuses"], 0);
+    for (index, original) in first["last"]["jobs"].as_array().unwrap().iter().enumerate() {
+        let result = &cached["last"]["jobs"][index]["Ok"]["Completed"];
+        assert_eq!(result["cached"], true);
+        assert_eq!(result["result"], original["Ok"]["Completed"]["result"]);
+    }
+    rust_strategy_factory::storage::Registry::open(&database)
+        .unwrap()
+        .integrity()
+        .unwrap();
 }

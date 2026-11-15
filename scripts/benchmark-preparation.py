@@ -31,14 +31,15 @@ if len(sys.argv)>1 and sys.argv[1]=='--worker':
     cached=command(binary,'corpus-batch',config,database,'100')
     assert fingerprint(receipts(cached))==fingerprint(values)
     assert command(binary,'registry-check',database)==counts
-    Path(output).write_text(json.dumps({'role':role,'elapsed_ms':elapsed/1e6,'child_user_seconds':cpu.ru_utime,'child_system_seconds':cpu.ru_stime,'peak_pipeline_child_rss_kib':cpu.ru_maxrss,'financial_receipt_sha256':fingerprint(values),'resolved_trades':trades,'counts':counts,'cached_receipt_and_counts_match':True}))
+    Path(output).write_text(json.dumps({'role':role,'elapsed_ms':elapsed/1e6,'child_user_seconds':cpu.ru_utime,'child_system_seconds':cpu.ru_stime,'peak_pipeline_child_rss_kib':cpu.ru_maxrss,'financial_receipt_sha256':fingerprint(values),'resolved_trades':trades,'counts':counts,'preparation':report.get('last',{}).get('preparation'),'cached_preparation':cached.get('last',{}).get('preparation'),'cached_receipt_and_counts_match':True}))
     raise SystemExit(0)
 
 parser=argparse.ArgumentParser()
 parser.add_argument('before',type=Path);parser.add_argument('after',type=Path);parser.add_argument('output',type=Path)
+parser.add_argument('--workers',type=int,default=1)
 parser.add_argument('--repetitions',type=int,default=3);parser.add_argument('--quotes',type=int,default=20000)
 a=parser.parse_args()
-assert 1<=a.repetitions<=10 and 1000<=a.quotes<=100000
+assert 1<=a.repetitions<=10 and 1000<=a.quotes<=100000 and 1<=a.workers<=3
 if a.output.exists():raise SystemExit('output must be new')
 before=a.before.resolve();after=a.after.resolve()
 with tempfile.TemporaryDirectory(prefix='preparation-benchmark-') as tmp:
@@ -58,7 +59,7 @@ with tempfile.TemporaryDirectory(prefix='preparation-benchmark-') as tmp:
     strategies=[]
     for entry in [None,{'StopMarket':{'offset_ticks':2,'ttl_ms':120000,'cancel_on_signal_false':True}},{'Limit':{'offset_ticks':2,'ttl_ms':120000,'cancel_on_signal_false':True}}]:
         strategies.append({'timeframe':'M1','side':'Long','stop_ticks':100,'entry':entry,'rule':{'UtcSession':{'start_hour':0,'end_hour':23,'weekdays':127}}})
-    config=base/'config.json';config.write_text(json.dumps({'specification':'corpus.json','strategies':strategies,'budget':{'max_candles':100000,'feature_cells':1000000,'max_receipts':10000},'limits':{'workers':1,'max_parallel_candles':100000,'max_parallel_feature_cells':1000000,'max_parallel_receipts':10000,'max_new_chunks':64,'lease_ms':600000}}))
+    config=base/'config.json';config.write_text(json.dumps({'specification':'corpus.json','strategies':strategies,'budget':{'max_candles':100000,'feature_cells':1000000,'max_receipts':10000},'limits':{'workers':a.workers,'max_parallel_candles':100000*a.workers,'max_parallel_feature_cells':1000000*a.workers,'max_parallel_receipts':10000*a.workers,'max_new_chunks':64,'lease_ms':600000}}))
     records=[]
     for repetition in range(a.repetitions):
         for role in (['before','after'] if repetition%2==0 else ['after','before']):
@@ -67,6 +68,6 @@ with tempfile.TemporaryDirectory(prefix='preparation-benchmark-') as tmp:
             row=json.loads(result.read_text());row['repetition']=repetition;records.append(row)
     assert len({r['financial_receipt_sha256'] for r in records})==1
     summaries={role:{'median_elapsed_ms':statistics.median(r['elapsed_ms'] for r in records if r['role']==role),'median_peak_pipeline_child_rss_kib':statistics.median(r['peak_pipeline_child_rss_kib'] for r in records if r['role']==role)} for role in ['before','after']}
-    evidence={'class':'SYNTHETIC_DEVELOPMENT_PIPELINE_ONLY','host':{'platform':platform.platform(),'available_parallelism':len(os.sched_getaffinity(0))},'quotes':a.quotes,'strategies':3,'repetitions':a.repetitions,'cache_scope':'Fresh worker processes and registries; OS cache uncontrolled, no physical-cold claim. Cached route checked separately and excluded from measured first-route timing/CPU/RSS.','measurement_scope':'Each timed pipeline includes actual corpus-batch CLI and registry integrity CLI. CPU and RSS are child-resource observations in a fresh worker, not total host/service memory.','versions':{role:{'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'version':command(binary,'version')} for role,binary in [('before',before),('after',after)]},'records':records,'summaries':summaries,'limitations':'Small one-symbol synthetic workload with one worker. Repetitions are repeated measurement of three strategies, not independent trials. No genuine data, source approval, qualification, production default or universal throughput/RSS gain is established.'}
+    evidence={'class':'SYNTHETIC_DEVELOPMENT_PIPELINE_ONLY','host':{'platform':platform.platform(),'available_parallelism':len(os.sched_getaffinity(0))},'quotes':a.quotes,'workers':a.workers,'strategies':3,'repetitions':a.repetitions,'cache_scope':'Fresh worker processes and registries; OS cache uncontrolled, no physical-cold claim. Cached route checked separately and excluded from measured first-route timing/CPU/RSS.','measurement_scope':'Each timed pipeline includes actual corpus-batch CLI and registry integrity CLI. CPU and RSS are child-resource observations in a fresh worker, not total host/service memory.','versions':{role:{'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'version':command(binary,'version')} for role,binary in [('before',before),('after',after)]},'records':records,'summaries':summaries,'limitations':'Small one-symbol synthetic workload; declared worker count is recorded, not an equal CPU-share claim. Repetitions are repeated measurement of three strategies, not independent trials. No genuine data, source approval, qualification, production default or universal throughput/RSS gain is established.'}
     a.output.parent.mkdir(parents=True,exist_ok=True);a.output.write_text(json.dumps(evidence,indent=2)+'\n')
     print(json.dumps(summaries))

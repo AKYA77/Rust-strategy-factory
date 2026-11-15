@@ -177,6 +177,14 @@ impl Prepared {
     pub fn retained_candles(&self) -> usize {
         self.frames.values().map(Vec::len).sum()
     }
+    /// Recheck every actual artifact before reusing this immutable context.
+    /// Identity alone never establishes that the currently resolved bytes match.
+    pub fn verify_current(&self, base: &Path, spec: &Specification) -> Result<()> {
+        if self.report.corpus_identity != spec.identity()? {
+            return Err("prepared corpus identity differs".into());
+        }
+        visit_blocks(base, spec, |_| Ok(()))
+    }
     pub fn signals(
         &self,
         strategy: &crate::strategies::Strategy,

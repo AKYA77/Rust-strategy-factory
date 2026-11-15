@@ -832,6 +832,16 @@ pub fn corpus_key(
     costs: &Costs,
     budget: CorpusBudget,
 ) -> Result<crate::storage::ExperimentKey> {
+    let observed = crate::corpus::inspect(base, spec)?;
+    corpus_key_from_report(spec, strategy, costs, budget, &observed)
+}
+fn corpus_key_from_report(
+    spec: &crate::corpus::Specification,
+    strategy: &Strategy,
+    costs: &Costs,
+    budget: CorpusBudget,
+    observed: &crate::corpus::Report,
+) -> Result<crate::storage::ExperimentKey> {
     costs.validate()?;
     if budget.max_candles == 0
         || budget.max_candles > 1_000_000
@@ -841,7 +851,6 @@ pub fn corpus_key(
     {
         return Err("invalid corpus execution budget".into());
     }
-    let observed = crate::corpus::inspect(base, spec)?;
     if observed.declared_class != crate::data::DataClass::SyntheticTestOnly
         || observed.profile.quote != "USD"
     {
@@ -851,7 +860,7 @@ pub fn corpus_key(
     Ok(crate::storage::ExperimentKey {
         concept_hash: strategy.identity()?,
         instrument: observed.profile.symbol.clone(),
-        dataset_hash: observed.ordered_events_hash,
+        dataset_hash: observed.ordered_events_hash.clone(),
         start_ms: observed.first.timestamp_ms,
         end_exclusive_ms: observed
             .latest
@@ -914,6 +923,7 @@ pub fn advance_corpus(
             max_new_chunks,
             clock: &mut clock,
         }),
+        None,
     )
 }
 pub fn replay_corpus(
@@ -932,12 +942,14 @@ pub fn replay_corpus(
             budget,
         },
         None,
+        None,
     )?
     .ok_or_else(|| "unexpected incomplete corpus replay".into())
 }
 fn replay_corpus_internal(
     run: CorpusRun<'_>,
     mut control: Option<ResumeControl<'_>>,
+    prepared: Option<&crate::corpus::Prepared>,
 ) -> Result<Option<Replay>> {
     let CorpusRun {
         base,
@@ -956,7 +968,19 @@ fn replay_corpus_internal(
         return Err("invalid corpus replay receipt budget".into());
     }
     let strategy = strategy.canonical()?;
-    let prepared = crate::corpus::prepare(base, spec, strategy.timeframe, max_candles)?;
+    let owned;
+    let prepared = match prepared {
+        Some(prepared) => prepared,
+        None => {
+            owned = crate::corpus::prepare(base, spec, strategy.timeframe, max_candles)?;
+            &owned
+        }
+    };
+    if prepared.retained_candles() > max_candles
+        || prepared.report().corpus_identity != spec.identity()?
+    {
+        return Err("prepared corpus budget or identity differs".into());
+    }
     let observed = prepared.report();
     if observed.declared_class != crate::data::DataClass::SyntheticTestOnly
         || observed.profile.quote != "USD"
@@ -1092,6 +1116,80 @@ pub enum CorpusProgress {
         result: crate::storage::StoredResult,
     },
 }
+fn corpus_source_binding(run: &CorpusRun<'_>) -> Result<String> {
+    let base = std::env::current_dir()
+        .map_err(|e| e.to_string())?
+        .join(run.base);
+    crate::data::hash(&(base, run.spec))
+}
+#[derive(Default, Debug, Clone, Copy, Serialize)]
+pub struct CorpusPreparationStats {
+    pub builds: usize,
+    pub reuses: usize,
+    pub current_byte_checks: usize,
+    /// Candle objects, not bytes/RSS or OS-enforced memory.
+    pub peak_retained_candles_per_worker: usize,
+}
+#[derive(Default)]
+struct WorkerPreparation {
+    slot: Option<(String, crate::corpus::Prepared)>,
+    stats: CorpusPreparationStats,
+}
+impl WorkerPreparation {
+    fn binding(run: &CorpusRun<'_>) -> Result<String> {
+        crate::data::hash(&(
+            corpus_source_binding(run)?,
+            run.strategy.canonical()?.timeframe,
+            run.budget.max_candles,
+        ))
+    }
+    fn key(&mut self, run: &CorpusRun<'_>) -> Result<crate::storage::ExperimentKey> {
+        let binding = Self::binding(run)?;
+        if let Some((stored, prepared)) = &self.slot
+            && stored == &binding
+        {
+            self.stats.current_byte_checks += 1;
+            if let Err(error) = prepared.verify_current(run.base, run.spec) {
+                self.slot = None;
+                return Err(error);
+            }
+            return corpus_key_from_report(
+                run.spec,
+                run.strategy,
+                run.costs,
+                run.budget,
+                prepared.report(),
+            );
+        }
+        corpus_key(run.base, run.spec, run.strategy, run.costs, run.budget)
+    }
+    fn prepare(&mut self, run: &CorpusRun<'_>) -> Result<&crate::corpus::Prepared> {
+        let binding = Self::binding(run)?;
+        if self
+            .slot
+            .as_ref()
+            .is_some_and(|(stored, _)| stored == &binding)
+        {
+            self.stats.reuses += 1;
+        } else {
+            // Release the previous buffer BEFORE constructing its replacement.
+            self.slot = None;
+            let prepared = crate::corpus::prepare(
+                run.base,
+                run.spec,
+                run.strategy.canonical()?.timeframe,
+                run.budget.max_candles,
+            )?;
+            self.stats.builds += 1;
+            self.stats.peak_retained_candles_per_worker = self
+                .stats
+                .peak_retained_candles_per_worker
+                .max(prepared.retained_candles());
+            self.slot = Some((binding, prepared));
+        }
+        Ok(&self.slot.as_ref().ok_or("missing worker preparation")?.1)
+    }
+}
 /// A standalone safe checkpoint: reclaim, validate, advance, then yield or
 /// publish through the registry's token-fenced completion transaction.
 pub fn execute_corpus_step(
@@ -1101,10 +1199,27 @@ pub fn execute_corpus_step(
     lease_ms: i64,
     mut clock: impl FnMut() -> i64,
 ) -> Result<CorpusProgress> {
+    execute_corpus_step_prepared(
+        registry,
+        run,
+        max_new_chunks,
+        lease_ms,
+        &mut clock,
+        &mut WorkerPreparation::default(),
+    )
+}
+fn execute_corpus_step_prepared(
+    registry: &mut crate::storage::Registry,
+    run: CorpusRun<'_>,
+    max_new_chunks: usize,
+    lease_ms: i64,
+    clock: &mut dyn FnMut() -> i64,
+    preparation: &mut WorkerPreparation,
+) -> Result<CorpusProgress> {
     if !(1..=64).contains(&max_new_chunks) || !(1..=86_400_000).contains(&lease_ms) {
         return Err("invalid corpus step/lease budget".into());
     }
-    let key = corpus_key(run.base, run.spec, run.strategy, run.costs, run.budget)?;
+    let key = preparation.key(&run)?;
     let id = registry.register(&key)?;
     let control = registry.corpus_control(&id)?;
     if control != "running" {
@@ -1143,7 +1258,21 @@ pub fn execute_corpus_step(
         crate::storage::Claim::Acquired(lease) => lease,
     };
     let corpus_id = run.spec.identity()?;
-    match advance_corpus(registry, &lease, run, max_new_chunks, &mut clock)? {
+    registry.validate_lease(&lease, clock())?;
+    if registry.experiment_key(&id)?.as_ref() != Some(&key) {
+        return Err("registered corpus inputs or build differ".into());
+    }
+    let prepared = preparation.prepare(&run)?;
+    match replay_corpus_internal(
+        run,
+        Some(ResumeControl {
+            registry,
+            lease: &lease,
+            max_new_chunks,
+            clock,
+        }),
+        Some(prepared),
+    )? {
         None => {
             let cursor = registry
                 .replay_checkpoint(&id)?
@@ -1293,6 +1422,7 @@ pub struct CorpusBatchLimits {
 pub struct CorpusBatchReport {
     pub workers_started: usize,
     pub worker_failures: usize,
+    pub preparation: CorpusPreparationStats,
     /// Input order is preserved, including errors and held/busy/terminal jobs.
     pub jobs: Vec<Result<CorpusProgress>>,
     /// Aligned with jobs; None for success, typed conservative provenance for errors.
@@ -1342,12 +1472,21 @@ pub fn execute_corpus_batch(
         }
     }
     let mut identities = std::collections::BTreeSet::new();
+    let mut sources = std::collections::BTreeMap::new();
     for run in runs {
-        let key = corpus_key(run.base, run.spec, run.strategy, run.costs, run.budget)?;
+        let binding = corpus_source_binding(run)?;
+        if !sources.contains_key(&binding) {
+            sources.insert(binding.clone(), crate::corpus::inspect(run.base, run.spec)?);
+        }
+        let observed = sources
+            .get(&binding)
+            .ok_or("missing preflight source report")?;
+        let key = corpus_key_from_report(run.spec, run.strategy, run.costs, run.budget, observed)?;
         if !identities.insert(crate::data::hash(&key)?) {
             return Err("duplicate frozen corpus job in batch".into());
         }
     }
+    drop(sources);
     // Initialize sequentially; do not race schema migrations across workers.
     let mut connections = Vec::with_capacity(workers);
     for _ in 0..workers {
@@ -1357,6 +1496,7 @@ pub fn execute_corpus_batch(
                 return Ok(CorpusBatchReport {
                     workers_started: 0,
                     worker_failures: 1,
+                    preparation: CorpusPreparationStats::default(),
                     jobs: runs.iter().map(|_| Err(error.message.clone())).collect(),
                     failure_kinds: vec![Some(error.kind); runs.len()],
                 });
@@ -1367,6 +1507,7 @@ pub fn execute_corpus_batch(
     let mut results: Vec<Option<Result<CorpusProgress>>> = (0..runs.len()).map(|_| None).collect();
     let mut worker_failures = 0;
     let mut workers_started = 0;
+    let mut preparation = CorpusPreparationStats::default();
     std::thread::scope(|scope| {
         let mut handles = Vec::new();
         for (i, mut registry) in connections.into_iter().enumerate() {
@@ -1375,12 +1516,13 @@ pub fn execute_corpus_batch(
                 .name(format!("corpus-{i}"))
                 .spawn_scoped(scope, move || {
                     let mut completed = Vec::new();
+                    let mut preparation = WorkerPreparation::default();
                     loop {
                         let index = next.fetch_add(1, Ordering::Relaxed);
                         let Some(run) = runs.get(index) else {
                             break;
                         };
-                        let result = execute_corpus_step(
+                        let result = execute_corpus_step_prepared(
                             &mut registry,
                             CorpusRun {
                                 base: run.base,
@@ -1391,11 +1533,12 @@ pub fn execute_corpus_batch(
                             },
                             limits.max_new_chunks,
                             limits.lease_ms,
-                            || chrono::Utc::now().timestamp_millis(),
+                            &mut || chrono::Utc::now().timestamp_millis(),
+                            &mut preparation,
                         );
                         completed.push((index, result));
                     }
-                    completed
+                    (completed, preparation.stats)
                 }) {
                 Ok(handle) => {
                     workers_started += 1;
@@ -1406,7 +1549,13 @@ pub fn execute_corpus_batch(
         }
         for handle in handles {
             match handle.join() {
-                Ok(completed) => {
+                Ok((completed, stats)) => {
+                    preparation.builds += stats.builds;
+                    preparation.reuses += stats.reuses;
+                    preparation.current_byte_checks += stats.current_byte_checks;
+                    preparation.peak_retained_candles_per_worker = preparation
+                        .peak_retained_candles_per_worker
+                        .max(stats.peak_retained_candles_per_worker);
                     for (index, result) in completed {
                         results[index] = Some(result);
                     }
@@ -1426,6 +1575,7 @@ pub fn execute_corpus_batch(
     Ok(CorpusBatchReport {
         workers_started,
         worker_failures,
+        preparation,
         failure_kinds,
         jobs: results
             .into_iter()
@@ -1436,4 +1586,328 @@ pub fn execute_corpus_batch(
             })
             .collect(),
     })
+}
+
+#[cfg(test)]
+mod worker_preparation_tests {
+    use super::*;
+    use crate::{candles::Timeframe, corpus, data, native, strategies::Rule};
+    use std::{fs, path::PathBuf};
+    struct Source {
+        root: PathBuf,
+        spec: corpus::Specification,
+    }
+    impl Source {
+        fn new(name: &str) -> Self {
+            let root =
+                std::env::temp_dir().join(format!("prepared-worker-{name}-{}", std::process::id()));
+            fs::create_dir(&root).unwrap();
+            let path = root.join("source.rsf");
+            native::write(&path, &data::synthetic_fixture("EURUSD").unwrap()).unwrap();
+            let spec = corpus::describe(&[path], 100000).unwrap();
+            Self { root, spec }
+        }
+    }
+    impl Drop for Source {
+        fn drop(&mut self) {
+            fs::remove_dir_all(&self.root).unwrap();
+        }
+    }
+    fn strategy() -> Strategy {
+        Strategy {
+            timeframe: Timeframe::M1,
+            side: Side::Long,
+            stop_ticks: 100,
+            rule: Rule::AboveMean { window: 2 },
+            entry: None,
+            stop_policy: None,
+        }
+    }
+    fn budget() -> CorpusBudget {
+        CorpusBudget {
+            max_candles: 10000,
+            feature_cells: 100000,
+            max_receipts: 10000,
+        }
+    }
+    #[test]
+    fn worker_preparation_refuses_mutation_before_registration_and_recovers_after_restore() {
+        let source = Source::new("mutation");
+        let costs = Costs::default();
+        let first = strategy();
+        let mut second = first.clone();
+        second.stop_ticks += 10;
+        let mut cache = WorkerPreparation::default();
+        let mut registry =
+            crate::storage::Registry::open(&source.root.join("state.sqlite")).unwrap();
+        let run = |strategy| CorpusRun {
+            base: source.root.as_path(),
+            spec: &source.spec,
+            strategy,
+            costs: &costs,
+            budget: budget(),
+        };
+        let completed = execute_corpus_step_prepared(
+            &mut registry,
+            run(&first),
+            64,
+            60000,
+            &mut || 1000,
+            &mut cache,
+        )
+        .unwrap();
+        assert!(matches!(
+            completed,
+            CorpusProgress::Completed { cached: false, .. }
+        ));
+        let next_key = corpus_key(
+            source.root.as_path(),
+            &source.spec,
+            &second,
+            &costs,
+            budget(),
+        )
+        .unwrap();
+        let next_id = next_key.identity().unwrap();
+        assert!(registry.experiment_key(&next_id).unwrap().is_none());
+        let path = &source.spec.chunks[0].path;
+        let bytes = fs::read(path).unwrap();
+        let mut bad = bytes.clone();
+        let index = bad.len() / 2;
+        bad[index] ^= 1;
+        fs::write(path, bad).unwrap();
+        assert!(
+            execute_corpus_step_prepared(
+                &mut registry,
+                run(&second),
+                64,
+                60000,
+                &mut || 1001,
+                &mut cache
+            )
+            .is_err()
+        );
+        assert!(cache.slot.is_none());
+        assert!(registry.experiment_key(&next_id).unwrap().is_none());
+        fs::write(path, &bytes).unwrap();
+        let recovered = execute_corpus_step_prepared(
+            &mut registry,
+            run(&second),
+            64,
+            60000,
+            &mut || 1002,
+            &mut cache,
+        )
+        .unwrap();
+        let CorpusProgress::Completed {
+            result,
+            cached: false,
+            ..
+        } = recovered
+        else {
+            panic!("expected restored completion")
+        };
+        assert_eq!(
+            result.result["tick_replay"],
+            serde_json::to_value(
+                replay_corpus(
+                    source.root.as_path(),
+                    &source.spec,
+                    &second,
+                    &costs,
+                    budget()
+                )
+                .unwrap()
+            )
+            .unwrap()
+        );
+        assert_eq!(cache.stats.builds, 2);
+        assert_eq!(cache.stats.current_byte_checks, 1);
+        assert_eq!(cache.stats.reuses, 0);
+        let cached = execute_corpus_step_prepared(
+            &mut registry,
+            run(&second),
+            64,
+            60000,
+            &mut || 1003,
+            &mut cache,
+        )
+        .unwrap();
+        assert!(matches!(
+            cached,
+            CorpusProgress::Completed { cached: true, .. }
+        ));
+        assert_eq!(cache.stats.current_byte_checks, 2);
+        assert_eq!(cache.stats.reuses, 0); // Cached results start no account replay.
+        registry.integrity().unwrap();
+    }
+    #[test]
+    fn worker_preparation_mutation_after_admission_cannot_publish_checkpoint_or_receipt() {
+        let source = Source::new("after-admission");
+        let costs = Costs::default();
+        let first = strategy();
+        let mut second = first.clone();
+        second.stop_ticks += 10;
+        let mut cache = WorkerPreparation::default();
+        let mut registry =
+            crate::storage::Registry::open(&source.root.join("state.sqlite")).unwrap();
+        let run = |strategy| CorpusRun {
+            base: source.root.as_path(),
+            spec: &source.spec,
+            strategy,
+            costs: &costs,
+            budget: budget(),
+        };
+        execute_corpus_step_prepared(
+            &mut registry,
+            run(&first),
+            64,
+            60000,
+            &mut || 1000,
+            &mut cache,
+        )
+        .unwrap();
+        let id = corpus_key(
+            source.root.as_path(),
+            &source.spec,
+            &second,
+            &costs,
+            budget(),
+        )
+        .unwrap()
+        .identity()
+        .unwrap();
+        let path = &source.spec.chunks[0].path;
+        let bytes = fs::read(path).unwrap();
+        let mut bad = bytes.clone();
+        let index = bad.len() / 2;
+        bad[index] ^= 1;
+        let mut changed = false;
+        let mut clock = || {
+            if !changed {
+                fs::write(path, &bad).unwrap();
+                changed = true;
+            }
+            1001
+        };
+        assert!(
+            execute_corpus_step_prepared(
+                &mut registry,
+                run(&second),
+                64,
+                60000,
+                &mut clock,
+                &mut cache
+            )
+            .is_err()
+        );
+        assert!(changed);
+        assert!(registry.experiment_key(&id).unwrap().is_some());
+        assert!(registry.replay_checkpoint(&id).unwrap().is_none());
+        assert!(registry.result(&id).unwrap().is_none());
+        fs::write(path, &bytes).unwrap();
+        let completed = execute_corpus_step_prepared(
+            &mut registry,
+            run(&second),
+            64,
+            60000,
+            &mut || 100000,
+            &mut cache,
+        )
+        .unwrap();
+        let CorpusProgress::Completed {
+            result,
+            cached: false,
+            ..
+        } = completed
+        else {
+            panic!("expected restored completion")
+        };
+        assert_eq!(
+            result.result["tick_replay"],
+            serde_json::to_value(
+                replay_corpus(
+                    source.root.as_path(),
+                    &source.spec,
+                    &second,
+                    &costs,
+                    budget()
+                )
+                .unwrap()
+            )
+            .unwrap()
+        );
+        assert_eq!(cache.stats.builds, 1);
+        assert_eq!(cache.stats.reuses, 2);
+        assert_eq!(cache.stats.current_byte_checks, 2);
+        registry.integrity().unwrap();
+    }
+    #[test]
+    fn worker_preparation_binds_paths_timeframe_and_cap_and_releases_failed_replacement() {
+        let source = Source::new("binding");
+        let costs = Costs::default();
+        let primary = strategy();
+        let mut budget = budget();
+        let mut cache = WorkerPreparation::default();
+        let run = CorpusRun {
+            base: &source.root,
+            spec: &source.spec,
+            strategy: &primary,
+            costs: &costs,
+            budget,
+        };
+        let binding = WorkerPreparation::binding(&run).unwrap();
+        cache.key(&run).unwrap();
+        cache.prepare(&run).unwrap();
+        let expected = cache.slot.as_ref().unwrap().1.retained_candles();
+        cache.key(&run).unwrap();
+        cache.prepare(&run).unwrap();
+        assert_eq!(cache.stats.builds, 1);
+        assert_eq!(cache.stats.reuses, 1);
+        let moved = source.root.join("moved.rsf");
+        fs::copy(&source.spec.chunks[0].path, &moved).unwrap();
+        let mut relocated = source.spec.clone();
+        relocated.chunks[0].path = moved.to_str().unwrap().into();
+        assert_eq!(
+            source.spec.identity().unwrap(),
+            relocated.identity().unwrap()
+        );
+        let run = CorpusRun {
+            base: &source.root,
+            spec: &relocated,
+            strategy: &primary,
+            costs: &costs,
+            budget,
+        };
+        assert_ne!(binding, WorkerPreparation::binding(&run).unwrap());
+        cache.key(&run).unwrap();
+        cache.prepare(&run).unwrap();
+        assert_eq!(cache.stats.builds, 2);
+        let mut higher = primary.clone();
+        higher.timeframe = Timeframe::M5;
+        let run = CorpusRun {
+            base: &source.root,
+            spec: &relocated,
+            strategy: &higher,
+            costs: &costs,
+            budget,
+        };
+        assert_ne!(binding, WorkerPreparation::binding(&run).unwrap());
+        cache.key(&run).unwrap();
+        cache.prepare(&run).unwrap();
+        assert_eq!(cache.stats.builds, 3);
+        budget.max_candles = 1;
+        let run = CorpusRun {
+            base: &source.root,
+            spec: &source.spec,
+            strategy: &primary,
+            costs: &costs,
+            budget,
+        };
+        assert_ne!(binding, WorkerPreparation::binding(&run).unwrap());
+        cache.key(&run).unwrap();
+        assert!(cache.prepare(&run).is_err());
+        assert!(cache.slot.is_none());
+        assert_eq!(cache.stats.peak_retained_candles_per_worker, expected);
+    }
 }
