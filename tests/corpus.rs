@@ -2244,3 +2244,103 @@ fn actual_sqlite_writer_contention_has_typed_admission_failures_and_no_child_cla
     assert_eq!(completed.failure_kinds, vec![None]);
     Registry::open(&db).unwrap().integrity().unwrap();
 }
+
+#[test]
+fn retry_policy_cli_is_bounded_frozen_and_never_resumes_operator_pause() {
+    let f = Fixture::new("retry-cli", "EURUSD", 7);
+    let config = corpus_search_fixture(&f);
+    let db = f.root.join("retry.sqlite");
+    let mut file: serde_json::Value = serde_json::from_slice(&fs::read(&config).unwrap()).unwrap();
+    file["budget"]["feature_cells"] = 1.into();
+    file["limits"]["max_parallel_feature_cells"] = 2.into();
+    fs::write(&config, serde_json::to_vec(&file).unwrap()).unwrap();
+    let run = |args: &[&str], success: bool| {
+        let result = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args(args)
+            .output()
+            .unwrap();
+        assert_eq!(
+            result.status.success(),
+            success,
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        result.stdout
+    };
+    let first: serde_json::Value = serde_json::from_slice(&run(
+        &[
+            "corpus-search",
+            config.to_str().unwrap(),
+            db.to_str().unwrap(),
+            "1",
+        ],
+        true,
+    ))
+    .unwrap();
+    let id = first["last"]["status"]["search_id"].as_str().unwrap();
+    let epoch = first["last"]["status"]["control"]["epoch"]
+        .as_str()
+        .unwrap();
+    let policy = f.root.join("policy.json");
+    fs::write(&policy, r#"{"backoff_ms":86400000,"maximum_slots":1}"#).unwrap();
+    let configured = run(
+        &[
+            "corpus-retry-configure",
+            db.to_str().unwrap(),
+            id,
+            policy.to_str().unwrap(),
+        ],
+        true,
+    );
+    assert_eq!(
+        run(
+            &[
+                "corpus-retry-configure",
+                db.to_str().unwrap(),
+                id,
+                policy.to_str().unwrap()
+            ],
+            true
+        ),
+        configured
+    );
+    let decision: serde_json::Value = serde_json::from_slice(&run(
+        &["corpus-retry-admit", db.to_str().unwrap(), id, epoch],
+        true,
+    ))
+    .unwrap();
+    assert_eq!(decision["kind"], "backoff");
+    assert_eq!(decision["search_id"], id);
+    assert_eq!(decision["workers_started"], 0);
+    run(
+        &["corpus-retry-admit", db.to_str().unwrap(), id, "-1"],
+        false,
+    );
+    fs::write(&policy, r#"{"backoff_ms":1,"maximum_slots":1}"#).unwrap();
+    run(
+        &[
+            "corpus-retry-configure",
+            db.to_str().unwrap(),
+            id,
+            policy.to_str().unwrap(),
+        ],
+        false,
+    );
+    run(
+        &["corpus-search-control", db.to_str().unwrap(), id, "paused"],
+        true,
+    );
+    let snapshot: serde_json::Value = serde_json::from_slice(&run(
+        &["corpus-search-status", db.to_str().unwrap(), id],
+        true,
+    ))
+    .unwrap();
+    let next = snapshot["control"]["epoch"].as_str().unwrap();
+    let held: serde_json::Value = serde_json::from_slice(&run(
+        &["corpus-retry-admit", db.to_str().unwrap(), id, next],
+        true,
+    ))
+    .unwrap();
+    assert_eq!(held["reason"], "not-worker-error-pause");
+    assert_eq!(snapshot["requeue_records"], "0");
+}

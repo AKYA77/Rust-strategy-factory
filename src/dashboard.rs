@@ -1058,6 +1058,59 @@ async fn generated_search_status(
 struct RequeueRequest {
     maximum_slots: usize,
 }
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RetryEpoch {
+    expected_epoch: String,
+}
+async fn retry_configure(
+    State(app): State<Arc<App>>,
+    Param(id): Param<String>,
+    Json(policy): Json<crate::retry_policy::Policy>,
+) -> Response {
+    if !catalog_id(&id) || policy.validate().is_err() {
+        return api_error(StatusCode::BAD_REQUEST, "invalid retry identity or policy");
+    }
+    let Ok(mut registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match crate::retry_policy::configure(&mut registry, &id, &policy) {
+        Ok(hash) => {
+            Json(serde_json::json!({"search_id":id,"policy_hash":hash,"policy":{"backoff_ms":policy.backoff_ms.to_string(),"maximum_slots":policy.maximum_slots.to_string()},"workers_started":0})).into_response()
+        }
+        Err(_) => api_error(
+            StatusCode::CONFLICT,
+            "retry policy unavailable or immutable policy differs",
+        ),
+    }
+}
+async fn retry_admit(
+    State(app): State<Arc<App>>,
+    Param(id): Param<String>,
+    Json(body): Json<RetryEpoch>,
+) -> Response {
+    let Ok(epoch) = body.expected_epoch.parse::<i64>() else {
+        return api_error(StatusCode::BAD_REQUEST, "invalid retry epoch");
+    };
+    if !catalog_id(&id) || epoch < 0 {
+        return api_error(StatusCode::BAD_REQUEST, "invalid retry identity or epoch");
+    }
+    let Ok(mut registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match crate::retry_policy::admit(
+        &mut registry,
+        &id,
+        epoch,
+        chrono::Utc::now().timestamp_millis(),
+    ) {
+        Ok(value) => Json(value).into_response(),
+        Err(_) => api_error(
+            StatusCode::CONFLICT,
+            "retry admission unavailable; inspect verified state and budgets",
+        ),
+    }
+}
 async fn generated_search_requeue(
     State(app): State<Arc<App>>,
     Param(id): Param<String>,
@@ -1473,6 +1526,11 @@ pub async fn serve_with_reviews(
             post(corpus_fleet_control),
         )
         .route("/api/corpus-searches", get(generated_searches))
+        .route(
+            "/api/corpus-searches/{id}/retry-policy",
+            post(retry_configure),
+        )
+        .route("/api/corpus-searches/{id}/retry-admit", post(retry_admit))
         .route("/api/corpus-searches/{id}", get(generated_search_status))
         .route(
             "/api/corpus-searches/{id}/requeue",

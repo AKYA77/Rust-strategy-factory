@@ -526,7 +526,7 @@ pub(crate) fn retry_admit(
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(|e| e.to_string())?;
     let head = crate::search_control::read(&tx, id)?;
-    let hold = |reason: &str| serde_json::json!({"kind":"held","reason":reason,"epoch":head.epoch.to_string(),"workers_started":0});
+    let hold = |reason: &str| serde_json::json!({"kind":"held","search_id":id,"expected_epoch":expected_epoch.to_string(),"reason":reason,"epoch":head.epoch.to_string(),"workers_started":0});
     if head.epoch != expected_epoch {
         return Ok(hold("stale-epoch"));
     }
@@ -548,10 +548,11 @@ pub(crate) fn retry_admit(
     }
     if now < deadline {
         return Ok(
-            serde_json::json!({"kind":"backoff","retry_at_ms":deadline.to_string(),"epoch":head.epoch.to_string(),"workers_started":0}),
+            serde_json::json!({"kind":"backoff","search_id":id,"expected_epoch":expected_epoch.to_string(),"retry_at_ms":deadline.to_string(),"epoch":head.epoch.to_string(),"workers_started":0}),
         );
     }
     let mut value = requeue_in(&tx, id, policy.maximum_slots, Some(&hash), now)?;
+    value["expected_epoch"] = expected_epoch.to_string().into();
     value["policy_hash"] = hash.into();
     value["workers_started"] = 0.into();
     tx.commit().map_err(|e| e.to_string())?;
@@ -578,7 +579,7 @@ pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
             .filter(|j| j.state == "queued" || j.state == "pending")
             .count(),
     );
-    let recent_requeues:Vec<_>=history.iter().rev().take(32).map(|(record,hash)|serde_json::json!({"candidate_index":record.slot.to_string(),"requeue_number":record.sequence,"at_ms":record.at_ms,"prior_error":record.prior_error,"prior_error_kind":record.prior_error_kind.unwrap_or(crate::corpus_failure::Kind::LegacyUnknown),"hash":hash})).collect();
+    let recent_requeues:Vec<_>=history.iter().rev().take(32).map(|(record,hash)|serde_json::json!({"candidate_index":record.slot.to_string(),"requeue_number":record.sequence,"at_ms":record.at_ms,"prior_error":record.prior_error,"prior_error_kind":record.prior_error_kind.unwrap_or(crate::corpus_failure::Kind::LegacyUnknown),"supervision_policy_hash":record.supervision_policy_hash,"hash":hash})).collect();
     let mut counts = std::collections::BTreeMap::<String, usize>::new();
     for job in &jobs {
         *counts.entry(job.state.clone()).or_default() += 1;
