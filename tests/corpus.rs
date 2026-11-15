@@ -2747,6 +2747,13 @@ fn owned_foreground_child_exit_and_wall_budget_are_reaped_with_exact_receipts() 
         serde_json::from_slice::<serde_json::Value>(&persisted.stdout).unwrap(),
         first["invocation_status"]
     );
+    // Cancellation and normal exit test different contracts. A loaded CI runner
+    // must not turn the normal-exit check into another 100 ms cancellation check.
+    fs::write(
+        &limits,
+        r#"{"maximum_wall_ms":5000,"shutdown_grace_ms":3000,"maximum_output_bytes":1048576}"#,
+    )
+    .unwrap();
     let second = invoke("0");
     assert_eq!(second["stop_reason"], "child-exited");
     assert_eq!(second["child_report"]["stop_reason"], "retry-backoff");

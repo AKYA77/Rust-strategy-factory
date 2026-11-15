@@ -4,7 +4,7 @@ Status: SOFTWARE_INCOMPLETE. Use the existing checkout. Read AGENTS.md, PROJECT_
 
 ## Latest verified local milestone
 
-416 Rust tests/fmt/Clippy pass. Owned parents now pin typed base/effective configuration, policy and expected source before spawning same-executable children; startup verifies the pin before registry/session writes. Explicit expected-ID region overrides preserve original operator files and reuse bounded resource/cancellation/reaping behavior. Persisted terminal pins bind invocation source/configuration/policy while legacy absent pins remain compatible. Two actual process tests and an adversarial summary test cover retuning/limits/policy/unknown fields before registry creation, actual regional identity/session/reaping, exact persistence, backup and re-signed forgery refusal. Hosted CI follows publication. Software remains incomplete.
+416 Rust tests/fmt/Clippy pass. Hosted CI exposed a timing assumption in the owned-process integration test: its normal-exit half reused the100ms cancellation deadline. Normal exit now receives a separate5000ms budget and must still exit normally with unchanged frozen retry deadline and no requeues; the100ms cancellation/cooperative-stop/reap assertions remain intact. Production limits and all financial/source assertions are unchanged. Failed CI run43716708546 is retained as evidence; replacement verification follows publication. Hosted CI follows publication. Software remains incomplete.
 
 ## Implement next
 
