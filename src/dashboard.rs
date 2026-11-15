@@ -77,6 +77,8 @@ struct App {
     catalog_path: Option<PathBuf>,
     review_config: Option<ReviewConfig>,
     review_slots: Arc<tokio::sync::Semaphore>,
+    recovery_slots: Arc<tokio::sync::Semaphore>,
+    recovery_read_slots: Arc<tokio::sync::Semaphore>,
     review_bucket: Mutex<(Instant, u32)>,
     password_hash: String,
     sessions: Mutex<HashMap<String, Session>>,
@@ -1529,6 +1531,142 @@ async fn protocols(State(app): State<Arc<App>>) -> Response {
         ),
     }
 }
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RecoveryCreate {
+    id: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RecoveryRestore {
+    id: String,
+    expected_manifest_hash: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RecoveryVerify {}
+fn recovery_database(app: &App) -> Result<PathBuf> {
+    let reg = app.registry.lock().map_err(|_| "database unavailable")?;
+    let path = reg
+        .connection
+        .path()
+        .filter(|s| !s.is_empty() && *s != ":memory:")
+        .ok_or("filesystem registry unavailable")?;
+    Ok(PathBuf::from(path))
+}
+async fn recovery_inventory(State(app): State<Arc<App>>) -> Response {
+    recovery_read(app, None).await
+}
+async fn recovery_detail(State(app): State<Arc<App>>, Param(id): Param<String>) -> Response {
+    if !crate::recovery::valid_id(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid snapshot identity");
+    }
+    recovery_read(app, Some(id)).await
+}
+async fn recovery_read(app: Arc<App>, id: Option<String>) -> Response {
+    let Ok(path) = recovery_database(&app) else {
+        return api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "filesystem recovery unavailable",
+        );
+    };
+    let Ok(permit) = app.recovery_read_slots.clone().try_acquire_owned() else {
+        return api_error(StatusCode::TOO_MANY_REQUESTS, "recovery inspection busy");
+    };
+    let result = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        if let Some(id) = id {
+            crate::recovery::describe(&path, &id)
+        } else {
+            crate::recovery::list(&path).map(Some)
+        }
+    })
+    .await;
+    match result {
+        Ok(Ok(Some(value))) => Json(value).into_response(),
+        Ok(Ok(None)) => api_error(StatusCode::NOT_FOUND, "complete snapshot not found"),
+        _ => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "verified recovery metadata unavailable; preserve private evidence",
+        ),
+    }
+}
+async fn recovery_create(
+    State(app): State<Arc<App>>,
+    Json(body): Json<RecoveryCreate>,
+) -> Response {
+    if !crate::recovery::valid_id(&body.id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid new snapshot identity");
+    }
+    recovery_action(app, None, body.id, None).await
+}
+async fn recovery_verify(
+    State(app): State<Arc<App>>,
+    Param(id): Param<String>,
+    Json(_body): Json<RecoveryVerify>,
+) -> Response {
+    if !crate::recovery::valid_id(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid snapshot identity");
+    }
+    recovery_action(app, Some(id), String::new(), None).await
+}
+async fn recovery_restore(
+    State(app): State<Arc<App>>,
+    Param(source): Param<String>,
+    Json(body): Json<RecoveryRestore>,
+) -> Response {
+    if !crate::recovery::valid_id(&source)
+        || !crate::recovery::valid_id(&body.id)
+        || source == body.id
+        || !crate::machine_evidence::hex(&body.expected_manifest_hash)
+    {
+        return api_error(
+            StatusCode::BAD_REQUEST,
+            "invalid distinct restore identity or reviewed manifest",
+        );
+    }
+    recovery_action(
+        app,
+        Some(source),
+        body.id,
+        Some(body.expected_manifest_hash),
+    )
+    .await
+}
+async fn recovery_action(
+    app: Arc<App>,
+    source: Option<String>,
+    id: String,
+    expected: Option<String>,
+) -> Response {
+    let Ok(path) = recovery_database(&app) else {
+        return api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "filesystem recovery unavailable",
+        );
+    };
+    let Ok(permit) = app.recovery_slots.clone().try_acquire_owned() else {
+        return api_error(StatusCode::CONFLICT, "another recovery operation is active");
+    };
+    let result = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        match (source, expected) {
+            (None, _) => crate::recovery::backup(&path, &id),
+            (Some(source), None) => crate::recovery::verify(&path, &source),
+            (Some(source), Some(expected)) => {
+                crate::recovery::restore_expected(&path, &source, &id, Some(&expected))
+            }
+        }
+    })
+    .await;
+    match result {
+        Ok(Ok(value)) => Json(value).into_response(),
+        _ => api_error(
+            StatusCode::CONFLICT,
+            "recovery operation refused; inspect private state, existing paths and retained evidence",
+        ),
+    }
+}
 async fn protocol_summary(State(app): State<Arc<App>>, Param(id): Param<String>) -> Response {
     if !catalog_id(&id) {
         return api_error(StatusCode::BAD_REQUEST, "invalid protocol identity");
@@ -1650,6 +1788,8 @@ pub async fn serve_with_reviews(
         catalog_path: catalog.map(Path::to_path_buf),
         review_config,
         review_slots: Arc::new(tokio::sync::Semaphore::new(1)),
+        recovery_slots: Arc::new(tokio::sync::Semaphore::new(1)),
+        recovery_read_slots: Arc::new(tokio::sync::Semaphore::new(2)),
         review_bucket: Mutex::new((Instant::now(), 0)),
         password_hash: auth.password_hash,
         sessions: Mutex::new(HashMap::new()),
@@ -1688,6 +1828,16 @@ pub async fn serve_with_reviews(
         .route("/api/session", get(session_info))
         .route("/api/logout", post(logout))
         .route("/api/overview", get(overview))
+        .route(
+            "/api/recovery/snapshots",
+            get(recovery_inventory).post(recovery_create),
+        )
+        .route("/api/recovery/snapshots/{id}", get(recovery_detail))
+        .route("/api/recovery/snapshots/{id}/verify", post(recovery_verify))
+        .route(
+            "/api/recovery/snapshots/{id}/restore",
+            post(recovery_restore),
+        )
         .route("/api/resources", get(resource_status))
         .route("/api/disk", get(disk_status))
         .route("/api/artifacts", get(artifact_status))

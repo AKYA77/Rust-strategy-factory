@@ -251,7 +251,7 @@ fn read_manifest(directory: &Path, id: &str) -> Result<Manifest> {
     Ok(m)
 }
 fn public(m: &Manifest, fresh: bool) -> serde_json::Value {
-    serde_json::json!({"id":m.body.id,"operation":m.body.operation,"parent_id":m.body.parent_id,"created_at_ms":m.body.created_at_ms.to_string(),"compute_revision":m.body.compute_revision,"schema_version":m.body.schema_version.to_string(),"database_bytes":m.body.database.bytes.to_string(),"database_hash":m.body.database.hash,"artifact_files":m.body.artifacts.len().to_string(),"artifact_bytes":m.body.artifacts.iter().map(|a|a.bytes).sum::<u64>().to_string(),"counts":m.body.counts,"revoked_leases":m.body.revoked_leases.to_string(),"manifest_hash":m.hash,"status":"complete","fresh_content_verified":fresh,"activation_performed":false,"scope":"Registry and referenced receipt artifacts only. Source archives, credentials and deployment configuration are separate. Unclosed process observations remain unknown; no PID ownership or active cutover is granted."})
+    serde_json::json!({"id":m.body.id,"operation":m.body.operation,"parent_id":m.body.parent_id,"created_at_ms":m.body.created_at_ms.to_string(),"compute_revision":m.body.compute_revision,"schema_version":m.body.schema_version.to_string(),"database_bytes":m.body.database.bytes.to_string(),"database_hash":m.body.database.hash,"artifact_files":m.body.artifacts.len().to_string(),"artifact_bytes":m.body.artifacts.iter().map(|a|a.bytes).sum::<u64>().to_string(),"counts":m.body.counts,"revoked_leases":m.body.revoked_leases.to_string(),"manifest_hash":m.hash,"status":"complete","fresh_content_verified":fresh,"verified_at_ms":fresh.then(||chrono::Utc::now().timestamp_millis().to_string()),"compatibility":if m.body.schema_version==crate::storage::SCHEMA_VERSION{"current schema; full registry integrity checked when fresh"}else{"older schema; full current integrity deferred to migrated new copy"},"activation_performed":false,"scope":"Registry and referenced receipt artifacts only. Source archives, credentials and deployment configuration are separate. Unclosed process observations remain unknown; no PID ownership or active cutover is granted."})
 }
 fn tree_size(path: &Path, depth: usize, entries: &mut usize) -> Result<u64> {
     if depth > 3 {
@@ -462,6 +462,25 @@ pub fn list(database: &Path) -> Result<serde_json::Value> {
         serde_json::json!({"rows":rows,"maximum_snapshots":MAX_SNAPSHOTS.to_string(),"maximum_bytes":MAX_ROOT_BYTES.to_string(),"scope":"Manifest inventory only; verify rechecks actual snapshot bytes and registry integrity. No automatic deletion or active service cutover."}),
     )
 }
+pub fn describe(database: &Path, id: &str) -> Result<Option<serde_json::Value>> {
+    if !valid_id(id) {
+        return Err("invalid recovery identity".into());
+    }
+    let root = root(database)?;
+    if !root.exists() {
+        return Ok(None);
+    }
+    private(&root, true)?;
+    let directory = root.join(id);
+    if fs::symlink_metadata(&directory).is_err() {
+        return Ok(None);
+    }
+    private(&directory, true)?;
+    if fs::symlink_metadata(directory.join("manifest.json")).is_err() {
+        return Ok(None);
+    }
+    Ok(Some(public(&read_manifest(&directory, id)?, false)))
+}
 pub fn verify(database: &Path, id: &str) -> Result<serde_json::Value> {
     if !valid_id(id) {
         return Err("invalid recovery identity".into());
@@ -535,6 +554,14 @@ fn copy(source: &Path, destination: &Path, expected: &Artifact) -> Result<()> {
     Ok(())
 }
 pub fn restore(database: &Path, source_id: &str, id: &str) -> Result<serde_json::Value> {
+    restore_expected(database, source_id, id, None)
+}
+pub fn restore_expected(
+    database: &Path,
+    source_id: &str,
+    id: &str,
+    expected_manifest: Option<&str>,
+) -> Result<serde_json::Value> {
     if !valid_id(source_id) || !valid_id(id) || id == source_id {
         return Err("invalid distinct restore identity".into());
     }
@@ -542,6 +569,9 @@ pub fn restore(database: &Path, source_id: &str, id: &str) -> Result<serde_json:
     let _guard = lock(&root)?;
     let source = root.join(source_id);
     let manifest = verify_at(&source, source_id)?;
+    if expected_manifest.is_some_and(|h| h != manifest.hash) {
+        return Err("reviewed snapshot manifest changed".into());
+    }
     let estimate =
         manifest.body.database.bytes + manifest.body.artifacts.iter().map(|a| a.bytes).sum::<u64>();
     admission(&root, estimate)?;
@@ -847,6 +877,23 @@ mod tests {
         );
         assert_eq!(data::file_hash(&snapshot).unwrap(), before);
         verify(&db, "older").unwrap();
+        drop(reg);
+        fs::remove_dir_all(directory).unwrap();
+    }
+    #[test]
+    fn reviewed_manifest_mismatch_cannot_create_a_restore_destination() {
+        let (directory, db, reg) = fixture("reviewed");
+        let receipt = backup(&db, "one").unwrap();
+        assert!(restore_expected(&db, "one", "stale", Some(&"0".repeat(64))).is_err());
+        assert!(!root(&db).unwrap().join("stale").exists());
+        assert_eq!(
+            describe(&db, "one").unwrap().unwrap()["fresh_content_verified"],
+            false
+        );
+        let copied =
+            restore_expected(&db, "one", "accepted", receipt["manifest_hash"].as_str()).unwrap();
+        assert_eq!(copied["activation_performed"], false);
+        assert_eq!(copied["fresh_content_verified"], true);
         drop(reg);
         fs::remove_dir_all(directory).unwrap();
     }

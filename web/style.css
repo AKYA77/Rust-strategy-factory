@@ -10,3 +10,5 @@
 
 #fleet-json{max-height:32rem;overflow:auto}
 #protocol-evidence-status,#protocol-blockers{overflow-wrap:anywhere}#protocol-detail{max-height:36rem;overflow:auto}#protocol-evidence-cards>*{min-width:0}
+
+#recovery-status,#recovery-detail-status{overflow-wrap:anywhere}#recovery-json{max-height:32rem;overflow:auto}#recovery-create-form,#recovery-restore-form{display:flex;gap:.5rem;flex-wrap:wrap}#recovery input{max-width:100%;min-width:0}

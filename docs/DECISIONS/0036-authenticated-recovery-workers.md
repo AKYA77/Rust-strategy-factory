@@ -1,0 +1,9 @@
+# Authenticated managed recovery workers
+
+The dashboard exposes managed snapshot inventory, metadata inspection, explicit content verification and exact public receipt exports. Creation and restore run in a single bounded blocking worker; two bounded readers serve metadata. Work does not hold the application registry mutex. Busy workers refuse additional actions while health remains responsive. Existing authentication, host/origin, CSRF and body limits apply. The API accepts safe labels and a reviewed manifest digest, never arbitrary filesystem paths.
+
+A new-path restore checks the reviewed digest under the recovery lock before creating a destination. Selecting another receipt, pending work or failed verification clears restore/export ownership. Late responses cannot overwrite a newer selection. Metadata inspection does not establish fresh byte verification. Restore never activates a service or starts a worker. Corrupt contents refuse verification and restore, preserving the primary database and source evidence.
+
+Actual disposable Chromium coverage exercises security and malformed requests before writes, private WAL-inclusive creation, exact export, verification, reviewed-digest refusal without destination creation, new-label restore, worker contention with responsive health, delayed response ownership, mobile/restart and corruption. A Rust regression checks digest refusal before destination creation. Integrated verification also runs all eight browser suites, reversible compute-identity checks, optimized build and operations smoke checks; current outcomes are recorded in ACCEPTANCE.md.
+
+Raw source archives, credentials and deployment settings remain separate recovery responsibilities. Production reboot, disk-full, filesystem stalls, manual cutover and target-VPS acceptance remain unfinished; this interface does not grant scientific qualification.
