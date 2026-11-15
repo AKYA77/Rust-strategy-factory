@@ -5912,6 +5912,19 @@ fn campaign_ledgers_exceed_global128_without_cross_campaign_quota_or_extra_child
     );
     let second_links = b["execution"]["owned_visits"].as_array().unwrap().len();
     assert!(second_links >= 3);
+    let legacy = rusqlite::Connection::open(&db).unwrap();
+    legacy.execute_batch("PRAGMA user_version=22;").unwrap();
+    drop(legacy);
+    let upgraded = Registry::open(&db).unwrap();
+    assert_eq!(
+        corpus_campaign::status(&upgraded, &campaigns[0]).unwrap(),
+        a
+    );
+    assert_eq!(
+        corpus_campaign::status(&upgraded, &campaigns[1]).unwrap(),
+        b
+    );
+    drop(upgraded);
     let source = a["regions"][0]["search_id"].as_str().unwrap();
     fn parent_count(registry: &Registry) -> usize {
         let mut count = 0;

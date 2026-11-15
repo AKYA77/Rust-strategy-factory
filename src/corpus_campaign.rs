@@ -43,6 +43,33 @@ pub(crate) fn initialize(connection: &mut Connection, previous: i64) -> Result<(
         PRAGMA user_version=21;").map_err(db)?;
     tx.commit().map_err(db)
 }
+pub(crate) fn initialize_long_ledger(connection: &mut Connection) -> Result<()> {
+    let version: i64 = connection
+        .query_row("PRAGMA user_version", [], |r| r.get(0))
+        .map_err(db)?;
+    if version >= 23 {
+        return Ok(());
+    }
+    let tx = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(db)?;
+    let current: i64 = tx
+        .query_row("PRAGMA user_version", [], |r| r.get(0))
+        .map_err(db)?;
+    if current < 23 {
+        tx.execute_batch("DROP TRIGGER IF EXISTS campaign_owned_head_no_delete;
+            DROP TRIGGER IF EXISTS campaign_owned_head_key;
+            ALTER TABLE corpus_campaign_owned_heads RENAME TO campaign_owned_heads_v22;
+            CREATE TABLE corpus_campaign_owned_heads(campaign_id TEXT PRIMARY KEY REFERENCES corpus_campaign_runs(id),count INTEGER NOT NULL CHECK(count BETWEEN 1 AND 1000000),hash TEXT NOT NULL CHECK(length(hash)=64));
+            INSERT INTO corpus_campaign_owned_heads SELECT campaign_id,count,hash FROM campaign_owned_heads_v22;
+            DROP TABLE campaign_owned_heads_v22;
+            CREATE TRIGGER campaign_owned_head_no_delete BEFORE DELETE ON corpus_campaign_owned_heads BEGIN SELECT RAISE(ABORT,'campaign owned head retained');END;
+            CREATE TRIGGER campaign_owned_head_key BEFORE UPDATE OF campaign_id ON corpus_campaign_owned_heads BEGIN SELECT RAISE(ABORT,'campaign owned head key immutable');END;
+            UPDATE corpus_campaign_runs SET token=NULL,expires_ms=NULL;
+            PRAGMA user_version=23;").map_err(db)?;
+    }
+    tx.commit().map_err(db)
+}
 fn db(e: rusqlite::Error) -> String {
     e.to_string()
 }
@@ -65,13 +92,22 @@ struct Plan {
     regions: Vec<Region>,
     distinct_experiments: usize,
     trial_scope_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    owned_visit_limit: Option<usize>,
 }
+impl Plan {
+    fn owned_limit(&self) -> usize {
+        self.owned_visit_limit.unwrap_or(128)
+    }
+}
+
 fn validate(plan: &Plan) -> Result<()> {
     let total = plan
         .region_width
         .checked_mul(plan.regions.len())
         .ok_or("campaign slot overflow")?;
-    if plan.version != VERSION
+    if !(1..=1_000_000).contains(&plan.owned_limit())
+        || plan.version != VERSION
         || !(1..=16).contains(&plan.regions.len())
         || !(1..=4096).contains(&plan.region_width)
         || total > 4096
@@ -142,6 +178,7 @@ fn plan_file(path: &Path, count: usize) -> Result<Plan> {
         regions,
         distinct_experiments: trials.iter().collect::<BTreeSet<_>>().len(),
         trial_scope_hash: data::hash(&trials)?,
+        owned_visit_limit: None,
     };
     validate(&plan)?;
     Ok(plan)
@@ -161,7 +198,17 @@ fn read(connection: &Connection, id: &str) -> Result<Plan> {
 }
 /// Freeze all region/search/trial identities without registering or starting child work.
 pub fn register_file(path: &Path, database: &Path, regions: usize) -> Result<String> {
-    let plan = plan_file(path, regions)?;
+    register_file_with_owned_limit(path, database, regions, None)
+}
+pub fn register_file_with_owned_limit(
+    path: &Path,
+    database: &Path,
+    regions: usize,
+    owned_limit: Option<usize>,
+) -> Result<String> {
+    let mut plan = plan_file(path, regions)?;
+    plan.owned_visit_limit = owned_limit;
+    validate(&plan)?;
     let body = serde_json::to_string(&plan).map_err(|e| e.to_string())?;
     if body.len() > MAX_BODY {
         return Err("campaign metadata cap exceeded".into());
@@ -225,8 +272,20 @@ fn full_snapshot(
     fresh: bool,
 ) -> Result<serde_json::Value> {
     let mut value = snapshot(plan, id, fresh);
+    if let Some(limit) = plan.owned_visit_limit {
+        value["owned_visit_limit"] = limit.to_string().into();
+    }
     let head = execution(connection, id, plan)?;
     value["execution"] = serde_json::json!({"state":head.state,"next_region":head.cursor.to_string(),"epoch":head.epoch.to_string(),"attempt":head.attempt.to_string(),"lease_active":head.expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"advance_hash":head.last_hash,"completed_regions":head.advances,"owned_visits":head.owned_visits,"owned_visit_hash":head.owned_hash});
+    if head.owned_count > 128 {
+        let execution = &mut value["execution"];
+        execution["owned_visit_count"] = head.owned_count.to_string().into();
+        execution["owned_visits_omitted"] = (head.owned_count - head.owned_visits.len())
+            .to_string()
+            .into();
+        execution["owned_visits_complete"] = false.into();
+        execution["owned_costs"] = head.owned_costs.json();
+    }
     Ok(value)
 }
 pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
@@ -296,7 +355,9 @@ pub(crate) fn owned_binding(
 }
 pub fn verify_inputs(registry: &Registry, id: &str) -> Result<serde_json::Value> {
     let stored = read(&registry.connection, id)?;
-    let current = plan_file(Path::new(&stored.config_path), stored.regions.len())?;
+    let mut current = plan_file(Path::new(&stored.config_path), stored.regions.len())?;
+    current.owned_visit_limit = stored.owned_visit_limit;
+    validate(&current)?;
     if data::hash(&current)? != id {
         return Err("campaign frozen input, build or trial scope changed".into());
     }
@@ -345,13 +406,57 @@ struct OwnedVisit {
 fn owned_root(id: &str) -> Result<String> {
     data::hash(&("campaign-owned-visits-v1", id))
 }
+#[derive(Default)]
+struct VisitCosts {
+    cpu: u128,
+    cpu_known: usize,
+    cpu_unknown: usize,
+    elapsed: u128,
+    elapsed_known: usize,
+    elapsed_unknown: usize,
+}
+impl VisitCosts {
+    fn observe(&mut self, parent: &serde_json::Value) -> Result<()> {
+        if let Some(cpu) = parent["resources"]["last_cpu_ticks"].as_u64() {
+            self.cpu_known += 1;
+            self.cpu = self
+                .cpu
+                .checked_add(cpu as u128)
+                .ok_or("campaign CPU rollup overflow")?;
+        } else {
+            self.cpu_unknown += 1;
+        }
+        if let Some(elapsed) = parent["summary"]["elapsed_ms"]
+            .as_str()
+            .and_then(|n| n.parse::<u128>().ok())
+        {
+            self.elapsed_known += 1;
+            self.elapsed = self
+                .elapsed
+                .checked_add(elapsed)
+                .ok_or("campaign elapsed rollup overflow")?;
+        } else {
+            self.elapsed_unknown += 1;
+        }
+        Ok(())
+    }
+    fn json(&self) -> serde_json::Value {
+        serde_json::json!({"cpu_ticks":self.cpu.to_string(),"cpu_known":self.cpu_known.to_string(),"cpu_unknown":self.cpu_unknown.to_string(),"elapsed_ms":self.elapsed.to_string(),"elapsed_known":self.elapsed_known.to_string(),"elapsed_unknown":self.elapsed_unknown.to_string(),"limitations":"Sealed observed and unknown native parent costs, not equal CPU shares or hard resource enforcement."})
+    }
+}
+struct OwnedLedger {
+    recent: Vec<serde_json::Value>,
+    hash: String,
+    count: usize,
+    costs: VisitCosts,
+}
 fn owned_visits(
     connection: &Connection,
     id: &str,
     plan: &Plan,
     cursor: usize,
     attempt: i64,
-) -> Result<(Vec<serde_json::Value>, String)> {
+) -> Result<OwnedLedger> {
     let head: Option<(usize, String)> = connection
         .query_row(
             "SELECT count,hash FROM corpus_campaign_owned_heads WHERE campaign_id=?1",
@@ -361,8 +466,12 @@ fn owned_visits(
         .optional()
         .map_err(db)?;
     let (count,bytes):(usize,usize)=connection.query_row("SELECT count(*),coalesce(sum(length(CAST(body AS BLOB))),0) FROM corpus_campaign_owned_visits WHERE campaign_id=?1",[id],|r|Ok((r.get(0)?,r.get(1)?))).map_err(db)?;
-    if count > 128
-        || bytes > 128 * 4096
+    if count > plan.owned_limit()
+        || bytes
+            > plan
+                .owned_limit()
+                .checked_mul(4096)
+                .ok_or("campaign ledger byte limit overflow")?
         || head
             .as_ref()
             .map_or(count != 0, |(n, _)| *n != count || *n == 0)
@@ -372,8 +481,10 @@ fn owned_visits(
     let mut previous = owned_root(id)?;
     let mut last_sequence = 0;
     let mut last_region = 0;
-    let mut values = Vec::new();
-    let mut q=connection.prepare("SELECT invocation_id,sequence,region,advance_region,body,hash FROM corpus_campaign_owned_visits WHERE campaign_id=?1 ORDER BY sequence").map_err(db)?;
+    let mut values = std::collections::VecDeque::new();
+    let mut costs = VisitCosts::default();
+    let mut seen = 0usize;
+    let mut q=connection.prepare("SELECT CASE WHEN length(CAST(invocation_id AS BLOB))=64 THEN invocation_id END,sequence,region,advance_region,CASE WHEN length(CAST(body AS BLOB))<=4096 THEN body END,CASE WHEN length(CAST(hash AS BLOB))=64 THEN hash END FROM corpus_campaign_owned_visits WHERE campaign_id=?1 ORDER BY sequence").map_err(db)?;
     let rows = q
         .query_map([id], |r| {
             Ok((
@@ -430,15 +541,79 @@ fn owned_visits(
                 return Err("campaign owned advance binding mismatch".into());
             }
         }
-        values.push(serde_json::json!({"invocation_id":invocation,"sequence":sequence.to_string(),"region":region.to_string(),"created_at_ms":item.created_at_ms.to_string(),"parent_observation_hash":item.parent_observation_hash,"report_hash":item.report_hash,"advance_hash":item.advance_hash,"previous_hash":item.previous_hash,"hash":hash}));
+        costs.observe(&parent)?;
+        seen += 1;
+        values.push_back(serde_json::json!({"invocation_id":invocation,"sequence":sequence.to_string(),"region":region.to_string(),"created_at_ms":item.created_at_ms.to_string(),"parent_observation_hash":item.parent_observation_hash,"report_hash":item.report_hash,"advance_hash":item.advance_hash,"previous_hash":item.previous_hash,"hash":hash}));
+        if values.len() > 128 {
+            values.pop_front();
+        }
         previous = hash;
         last_sequence = sequence;
         last_region = region;
     }
+    if seen != count {
+        return Err("campaign ledger changed during verification".into());
+    }
     if head.as_ref().is_some_and(|(_, hash)| hash != &previous) {
         return Err("campaign owned append head mismatch".into());
     }
-    Ok((values, previous))
+    Ok(OwnedLedger {
+        recent: values.into_iter().collect(),
+        hash: previous,
+        count,
+        costs,
+    })
+}
+/// Bounded ascending keyset page with complete streaming chain/parent verification.
+pub fn owned_visit_page(
+    registry: &Registry,
+    id: &str,
+    after: Option<&str>,
+    limit: usize,
+) -> Result<serde_json::Value> {
+    if !(1..=128).contains(&limit) || after.is_some_and(|a| !crate::machine_evidence::hex(a)) {
+        return Err("invalid campaign owned page".into());
+    }
+    let tx = registry.connection.unchecked_transaction().map_err(db)?;
+    let plan = read(&tx, id)?;
+    let head = execution(&tx, id, &plan)?;
+    let start: i64 = if let Some(after) = after {
+        tx.query_row("SELECT sequence FROM corpus_campaign_owned_visits WHERE campaign_id=?1 AND invocation_id=?2",params![id,after],|r|r.get(0)).optional().map_err(db)?.ok_or("unknown campaign owned cursor")?
+    } else {
+        0
+    };
+    let mut rows = Vec::new();
+    {
+        let mut query=tx.prepare("SELECT CASE WHEN length(CAST(body AS BLOB))<=4096 THEN body END,hash FROM corpus_campaign_owned_visits WHERE campaign_id=?1 AND sequence>?2 ORDER BY sequence LIMIT ?3").map_err(db)?;
+        let values = query
+            .query_map(params![id, start, limit + 1], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(db)?;
+        for row in values {
+            let (body, hash) = row.map_err(db)?;
+            let item: OwnedVisit = serde_json::from_str(&body).map_err(|e| e.to_string())?;
+            if data::hash(&item)? != hash {
+                return Err("campaign owned page digest differs".into());
+            }
+            let mut value = serde_json::to_value(item).map_err(|e| e.to_string())?;
+            value["sequence"] = value["sequence"].to_string().into();
+            value["region"] = value["region"].to_string().into();
+            value["created_at_ms"] = value["created_at_ms"].to_string().into();
+            value["hash"] = hash.into();
+            rows.push(value);
+        }
+    }
+    let more = rows.len() > limit;
+    rows.truncate(limit);
+    let next = if more {
+        rows.last().map(|v| v["invocation_id"].clone())
+    } else {
+        None
+    };
+    let value = serde_json::json!({"campaign_id":id,"rows":rows,"next_cursor":next,"total":head.owned_count.to_string(),"observed_head_hash":head.owned_hash,"owned_visit_limit":plan.owned_limit().to_string(),"costs":head.owned_costs.json(),"limitations":"Verified retained ledger metadata, not current input availability, source approval or worker liveness."});
+    tx.commit().map_err(db)?;
+    Ok(value)
 }
 fn append_owned(
     connection: &Connection,
@@ -464,7 +639,7 @@ fn append_owned(
     {
         return Err("owned campaign report binding mismatch".into());
     }
-    if head.owned_visits.len() >= 128 {
+    if head.owned_count >= plan.owned_limit() {
         return Err("campaign owned visit quota reached".into());
     }
     let item = OwnedVisit {
@@ -484,7 +659,7 @@ fn append_owned(
     };
     let hash = data::hash(&item)?;
     connection.execute("INSERT INTO corpus_campaign_owned_visits(invocation_id,campaign_id,sequence,region,advance_region,body,hash) VALUES(?1,?2,?3,?4,?5,?6,?7)",params![invocation,lease.id,lease.attempt,head.cursor,item.advance_hash.as_ref().map(|_|head.cursor),serde_json::to_string(&item).map_err(|e|e.to_string())?,hash]).map_err(db)?;
-    connection.execute("INSERT INTO corpus_campaign_owned_heads(campaign_id,count,hash) VALUES(?1,?2,?3) ON CONFLICT(campaign_id) DO UPDATE SET count=excluded.count,hash=excluded.hash",params![lease.id,head.owned_visits.len()+1,hash]).map_err(db)?;
+    connection.execute("INSERT INTO corpus_campaign_owned_heads(campaign_id,count,hash) VALUES(?1,?2,?3) ON CONFLICT(campaign_id) DO UPDATE SET count=excluded.count,hash=excluded.hash",params![lease.id,head.owned_count.checked_add(1).ok_or("owned visit count overflow")?,hash]).map_err(db)?;
     Ok(())
 }
 
@@ -506,6 +681,8 @@ struct Execution {
     advances: Vec<serde_json::Value>,
     owned_visits: Vec<serde_json::Value>,
     owned_hash: String,
+    owned_count: usize,
+    owned_costs: VisitCosts,
 }
 type ExecutionRow = (usize, String, i64, i64, Option<String>, Option<i64>, String);
 fn execution(connection: &Connection, id: &str, plan: &Plan) -> Result<Execution> {
@@ -557,7 +734,7 @@ fn execution(connection: &Connection, id: &str, plan: &Plan) -> Result<Execution
     if previous != last_hash {
         return Err("campaign progress head hash mismatch".into());
     }
-    let (owned_visits, owned_hash) = owned_visits(connection, id, plan, cursor, attempt)?;
+    let owned = owned_visits(connection, id, plan, cursor, attempt)?;
     Ok(Execution {
         cursor,
         state,
@@ -566,8 +743,10 @@ fn execution(connection: &Connection, id: &str, plan: &Plan) -> Result<Execution
         expiry,
         last_hash,
         advances,
-        owned_visits,
-        owned_hash,
+        owned_visits: owned.recent,
+        owned_hash: owned.hash,
+        owned_count: owned.count,
+        owned_costs: owned.costs,
     })
 }
 pub fn list(registry: &Registry) -> Result<Vec<serde_json::Value>> {
@@ -661,6 +840,8 @@ fn publish_result(
     if require_exhausted && !exhausted {
         return Err("campaign region advancement requires verified exhaustion".into());
     }
+    // Full ledger verification can outlast a lease; recheck before mutating evidence.
+    crate::coordinator::fence(&tx, lease, chrono::Utc::now().timestamp_millis())?;
     let mut advance_hash = None;
     let mut terminal = false;
     if exhausted {
@@ -837,7 +1018,7 @@ fn step_with(
                 &lease,
                 chrono::Utc::now().timestamp_millis(),
             )?;
-            if head.owned_visits.len() >= 128 {
+            if head.owned_count >= plan.owned_limit() {
                 return Err("campaign owned visit quota reached before child admission".into());
             }
             let parent = crate::owned_process::run_region(
@@ -1025,6 +1206,7 @@ mod tests {
             ],
             distinct_experiments: 4,
             trial_scope_hash: "d".repeat(64),
+            owned_visit_limit: None,
         }
     }
     fn insert_plan(registry: &Registry) -> (Plan, String) {
@@ -1059,6 +1241,51 @@ mod tests {
         let db = root.join("state.sqlite");
         let id = register_file(&config_path, &db, 2).unwrap();
         (root, db, id)
+    }
+    #[test]
+    fn long_ledger_migration_preserves_legacy_shape_and_revokes_only_prior_parent() {
+        use crate::coordinator::{self, Kind};
+        let mut registry = Registry::open(Path::new(":memory:")).unwrap();
+        let (plan, id) = insert_plan(&registry);
+        assert!(
+            serde_json::to_value(&plan)
+                .unwrap()
+                .get("owned_visit_limit")
+                .is_none()
+        );
+        let now = chrono::Utc::now().timestamp_millis();
+        let old = coordinator::claim(&mut registry, Kind::Campaign, &id, now, 60000)
+            .unwrap()
+            .unwrap();
+        let mut expected = status(&registry, &id).unwrap();
+        expected["execution"]["lease_active"] = false.into();
+        registry
+            .connection
+            .execute_batch("PRAGMA user_version=22;")
+            .unwrap();
+        initialize_long_ledger(&mut registry.connection).unwrap();
+        assert_eq!(status(&registry, &id).unwrap(), expected);
+        assert!(coordinator::fence(&registry.connection, &old, now).is_err());
+        let current = coordinator::claim(&mut registry, Kind::Campaign, &id, now, 60000)
+            .unwrap()
+            .unwrap();
+        initialize_long_ledger(&mut registry.connection).unwrap();
+        coordinator::fence(&registry.connection, &current, now).unwrap();
+        assert_eq!(
+            registry
+                .connection
+                .query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
+                .unwrap(),
+            23
+        );
+        let mut explicit = plan.clone();
+        explicit.owned_visit_limit = Some(200);
+        validate(&explicit).unwrap();
+        assert_ne!(data::hash(&explicit).unwrap(), id);
+        for limit in [0, 1_000_001, usize::MAX] {
+            explicit.owned_visit_limit = Some(limit);
+            assert!(validate(&explicit).is_err());
+        }
     }
     #[test]
     fn schema20_upgrade_revokes_old_parent_without_revoking_a_later_current_actor() {
