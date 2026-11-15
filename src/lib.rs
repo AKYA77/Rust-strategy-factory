@@ -86,3 +86,5 @@ mod search_control;
 pub mod corpus_failure;
 
 pub mod retry_policy;
+
+mod retry_audit;

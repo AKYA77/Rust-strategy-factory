@@ -1063,6 +1063,32 @@ struct RequeueRequest {
 struct RetryEpoch {
     expected_epoch: String,
 }
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RetryPageQuery {
+    after: Option<String>,
+    limit: Option<usize>,
+}
+async fn retry_decisions(
+    State(app): State<Arc<App>>,
+    Param(id): Param<String>,
+    Query(query): Query<RetryPageQuery>,
+) -> Response {
+    let limit = query.limit.unwrap_or(16);
+    if !catalog_id(&id) || !(1..=32).contains(&limit) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid retry history scope/limit");
+    }
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match crate::retry_policy::decisions(&registry, &id, query.after.as_deref(), limit) {
+        Ok(value) => Json(value).into_response(),
+        Err(_) => api_error(
+            StatusCode::CONFLICT,
+            "verified retry history/cursor unavailable",
+        ),
+    }
+}
 async fn retry_configure(
     State(app): State<Arc<App>>,
     Param(id): Param<String>,
@@ -1526,6 +1552,10 @@ pub async fn serve_with_reviews(
             post(corpus_fleet_control),
         )
         .route("/api/corpus-searches", get(generated_searches))
+        .route(
+            "/api/corpus-searches/{id}/retry-decisions",
+            get(retry_decisions),
+        )
         .route(
             "/api/corpus-searches/{id}/retry-policy",
             post(retry_configure),

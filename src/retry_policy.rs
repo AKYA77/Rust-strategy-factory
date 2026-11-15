@@ -98,3 +98,18 @@ pub fn admit(
 ) -> Result<serde_json::Value> {
     crate::corpus_search::retry_admit(registry, id, expected_epoch, now)
 }
+
+pub fn decisions(
+    registry: &Registry,
+    id: &str,
+    after: Option<&str>,
+    limit: usize,
+) -> Result<serde_json::Value> {
+    let tx = registry
+        .connection
+        .unchecked_transaction()
+        .map_err(|e| e.to_string())?;
+    let value = crate::retry_audit::page(&tx, id, after, limit)?;
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(value)
+}
