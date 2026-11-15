@@ -76,7 +76,7 @@ fn compatible_event_lookup_upgrade_preserves_history_and_marker_semantics() {
     let version: i64 = c
         .query_row("PRAGMA user_version", [], |r| r.get(0))
         .unwrap();
-    assert_eq!(version, 21);
+    assert_eq!(version, 22);
     drop(c);
     let registry = Registry::open(&path).unwrap();
     registry.integrity().unwrap();

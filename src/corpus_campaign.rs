@@ -231,9 +231,37 @@ fn full_snapshot(
 }
 pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
     let tx = registry.connection.unchecked_transaction().map_err(db)?;
-    let value = full_snapshot(&tx, &read(&tx, id)?, id, false)?;
+    let value = status_on(&tx, id)?;
     tx.commit().map_err(db)?;
     Ok(value)
+}
+pub(crate) fn status_on(connection: &Connection, id: &str) -> Result<serde_json::Value> {
+    full_snapshot(connection, &read(connection, id)?, id, false)
+}
+pub(crate) fn owned_binding(
+    connection: &Connection,
+    invocation: &str,
+) -> Result<(String, String, String, String)> {
+    let (body, hash): (String, String) = connection
+        .query_row(
+            "SELECT body,hash FROM corpus_campaign_owned_visits WHERE invocation_id=?1",
+            [invocation],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .map_err(db)?;
+    if body.len() > 4096 {
+        return Err("campaign owned binding exceeds cap".into());
+    }
+    let item: OwnedVisit = serde_json::from_str(&body).map_err(|e| e.to_string())?;
+    if item.invocation_id != invocation || data::hash(&item)? != hash {
+        return Err("campaign owned binding digest mismatch".into());
+    }
+    Ok((
+        item.campaign_id,
+        item.parent_observation_hash,
+        item.report_hash,
+        hash,
+    ))
 }
 pub fn verify_inputs(registry: &Registry, id: &str) -> Result<serde_json::Value> {
     let stored = read(&registry.connection, id)?;
@@ -828,6 +856,10 @@ fn step_with(
             } else if source_status["state"] == "running"
                 && parent["exit_success"] == true
                 && parent["stop_reason"] == "child-exited"
+                && matches!(
+                    parent["child_report"]["last"]["progress"]["kind"].as_str(),
+                    Some("advanced" | "exhausted")
+                )
             {
                 "advanced"
             } else {

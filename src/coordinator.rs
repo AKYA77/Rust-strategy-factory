@@ -6,6 +6,7 @@ pub(crate) enum Kind {
     Search,
     Fleet,
     Campaign,
+    CampaignRotation,
 }
 impl Kind {
     fn table(self) -> &'static str {
@@ -13,6 +14,7 @@ impl Kind {
             Self::Search => "corpus_searches",
             Self::Fleet => "corpus_fleets",
             Self::Campaign => "corpus_campaign_runs",
+            Self::CampaignRotation => "corpus_campaign_rotations",
         }
     }
 }
@@ -59,6 +61,7 @@ pub(crate) fn claim(
         Kind::Search => Some(crate::search_control::read(&tx, id)?.epoch),
         Kind::Fleet => Some(crate::fleet_control::read(&tx, id)?.epoch),
         Kind::Campaign => Some(crate::corpus_campaign::epoch(&tx, id)?),
+        Kind::CampaignRotation => Some(crate::campaign_rotation::epoch(&tx, id)?),
     };
     let token: String = tx
         .query_row("SELECT lower(hex(randomblob(32)))", [], |r| r.get(0))
@@ -84,6 +87,9 @@ pub(crate) fn fence(connection: &Connection, lease: &Lease, now: i64) -> Result<
         || lease.epoch.is_some_and(|epoch| match lease.kind {
             Kind::Search => crate::search_control::read(connection, &lease.id)
                 .map_or(true, |h| h.epoch != epoch),
+            Kind::CampaignRotation => {
+                crate::campaign_rotation::epoch(connection, &lease.id) != Ok(epoch)
+            }
             Kind::Campaign => crate::corpus_campaign::epoch(connection, &lease.id) != Ok(epoch),
             Kind::Fleet => {
                 crate::fleet_control::read(connection, &lease.id).map_or(true, |h| h.epoch != epoch)

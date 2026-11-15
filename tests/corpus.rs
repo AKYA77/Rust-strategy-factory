@@ -4603,3 +4603,241 @@ fn campaign_owned_permanent_execution_error_is_not_retried_or_relaunched() {
     assert_eq!(corpus_search::status(&registry, source).unwrap(), held);
     registry.integrity().unwrap();
 }
+
+fn rotation_fixture(
+    label: &str,
+) -> (
+    Fixture,
+    Fixture,
+    PathBuf,
+    String,
+    String,
+    String,
+    PathBuf,
+    PathBuf,
+    PathBuf,
+) {
+    let euro = Fixture::new(&format!("rotation-euro-{label}"), "EURUSD", 3);
+    let gold = Fixture::new(&format!("rotation-gold-{label}"), "XAUUSD", 2);
+    let (_, db, first, policy, limits) = campaign_owned_fixture(&euro, 2);
+    let config = corpus_search_fixture(&gold);
+    let mut file: serde_json::Value = serde_json::from_slice(&fs::read(&config).unwrap()).unwrap();
+    file["start_index"] = 20.into();
+    file["maximum_candidates"] = 1.into();
+    file["queue_width"] = 1.into();
+    fs::write(&config, serde_json::to_vec(&file).unwrap()).unwrap();
+    let second = rust_strategy_factory::corpus_campaign::register_file(&config, &db, 2).unwrap();
+    let group = euro.root.join("rotation.json");
+    fs::write(&group,serde_json::to_vec(&serde_json::json!({"campaigns":[{"name":"euro","campaign_id":first},{"name":"gold","campaign_id":second}],"coordinator_lease_ms":60000})).unwrap()).unwrap();
+    let id = rust_strategy_factory::campaign_rotation::register_file(&group, &db).unwrap();
+    (euro, gold, db, id, first, second, policy, limits, group)
+}
+fn rotation_command(
+    db: &std::path::Path,
+    id: &str,
+    policy: &std::path::Path,
+    limits: &std::path::Path,
+    maximum: &str,
+) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "campaign-rotation-run",
+            db.to_str().unwrap(),
+            id,
+            policy.to_str().unwrap(),
+            limits.to_str().unwrap(),
+            maximum,
+        ])
+        .output()
+        .unwrap()
+}
+#[test]
+fn campaign_rotation_isolates_unavailable_input_preserves_fair_cursor_then_recovers_with_exact_costs()
+ {
+    use rust_strategy_factory::{
+        campaign_rotation, corpus_campaign, operator_config, owned_history, research,
+        storage::Registry, tick_engine,
+    };
+    let (_euro, gold, db, id, first, second, policy, limits, _) = rotation_fixture("recovery");
+    let gold_config = gold.root.join("search.json");
+    let missing = gold.root.join("search.held");
+    fs::rename(&gold_config, &missing).unwrap();
+    for _ in 0..2 {
+        let out = rotation_command(&db, &id, &policy, &limits, "1");
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+    let mut registry = Registry::open(&db).unwrap();
+    let visited = campaign_rotation::status(&registry, &id).unwrap();
+    assert_eq!(visited["visits"], "2");
+    assert_eq!(visited["members"][0]["visits"], "1");
+    assert_eq!(visited["members"][1]["last_kind"], "source_error");
+    assert_eq!(visited["members"][1]["unknown_outcome_visits"], "1");
+    assert_eq!(visited["next_member_index"], "0");
+    let out = rotation_command(&db, &id, &policy, &limits, "100");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let idle = campaign_rotation::status(&registry, &id).unwrap();
+    assert_eq!(idle["state"], "paused");
+    assert_eq!(idle["pause_origin"], "scheduler_idle");
+    assert_eq!(
+        corpus_campaign::status(&registry, &first).unwrap()["execution"]["state"],
+        "exhausted"
+    );
+    assert_eq!(
+        corpus_campaign::status(&registry, &second).unwrap()["execution"]["state"],
+        "running"
+    );
+    campaign_rotation::control(&mut registry, &id, "paused").unwrap();
+    assert_eq!(
+        campaign_rotation::status(&registry, &id).unwrap()["pause_origin"],
+        "operator"
+    );
+    fs::rename(&missing, &gold_config).unwrap();
+    let held = rotation_command(&db, &id, &policy, &limits, "100");
+    assert!(held.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&held.stdout).unwrap()["visits"],
+        "0"
+    );
+    campaign_rotation::control(&mut registry, &id, "running").unwrap();
+    let out = rotation_command(&db, &id, &policy, &limits, "100");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let final_status = campaign_rotation::status(&registry, &id).unwrap();
+    assert_eq!(final_status["state"], "exhausted");
+    let parents = owned_history::list(&registry).unwrap();
+    let mut known = 0usize;
+    for member in final_status["members"].as_array().unwrap() {
+        let children = member["known_children"]
+            .as_str()
+            .unwrap()
+            .parse::<usize>()
+            .unwrap();
+        let observed = member["cpu_observed_children"]
+            .as_str()
+            .unwrap()
+            .parse::<usize>()
+            .unwrap();
+        let unknown = member["cpu_unobserved_children"]
+            .as_str()
+            .unwrap()
+            .parse::<usize>()
+            .unwrap();
+        assert_eq!(children, observed + unknown);
+        known += children;
+        assert!(
+            member["observed_native_cpu_ticks"]
+                .as_str()
+                .unwrap()
+                .parse::<u128>()
+                .is_ok()
+        );
+    }
+    assert_eq!(known, parents.len());
+    let loaded = operator_config::load_search(&gold_config).unwrap();
+    for index in 20..22 {
+        let strategy = research::candidate_at(index, 42).unwrap().1;
+        let key = tick_engine::corpus_key(
+            &loaded.base,
+            &loaded.specification,
+            &strategy,
+            &loaded.costs,
+            loaded.file.budget,
+        )
+        .unwrap();
+        let stored = registry.result(&key.identity().unwrap()).unwrap().unwrap();
+        assert_eq!(
+            stored.result["tick_replay"],
+            serde_json::to_value(
+                tick_engine::replay_corpus(
+                    &loaded.base,
+                    &loaded.specification,
+                    &strategy,
+                    &loaded.costs,
+                    loaded.file.budget
+                )
+                .unwrap()
+            )
+            .unwrap()
+        );
+    }
+    registry.integrity().unwrap();
+    registry
+        .backup(&gold.root.join("rotation-copy.sqlite"))
+        .unwrap();
+    let copied = Registry::open(&gold.root.join("rotation-copy.sqlite")).unwrap();
+    assert_eq!(
+        campaign_rotation::status(&copied, &id).unwrap(),
+        final_status
+    );
+    drop(copied);
+    let repeated = rotation_command(&db, &id, &policy, &limits, "100");
+    assert!(repeated.status.success());
+    assert_eq!(
+        campaign_rotation::status(&registry, &id).unwrap(),
+        final_status
+    );
+    assert!(campaign_rotation::control(&mut registry, &id, "running").is_err());
+}
+#[test]
+fn campaign_rotation_pressure_and_outer_publication_failure_preserve_inner_evidence() {
+    use rust_strategy_factory::{
+        campaign_rotation, corpus_campaign, owned_history, storage::Registry,
+    };
+    let (_euro, gold, db, id, first, _second, policy, limits, group) = rotation_fixture("rollback");
+    let mut file: serde_json::Value = serde_json::from_slice(&fs::read(&group).unwrap()).unwrap();
+    file["resource_guard"] =
+        serde_json::json!({"maximum_process_rss_bytes":1,"minimum_host_available_memory_bytes":0});
+    fs::write(&group, serde_json::to_vec(&file).unwrap()).unwrap();
+    let pressure = campaign_rotation::register_file(&group, &db).unwrap();
+    let out = rotation_command(&db, &pressure, &policy, &limits, "100");
+    assert!(out.status.success());
+    let registry = Registry::open(&db).unwrap();
+    assert_eq!(
+        campaign_rotation::status(&registry, &pressure).unwrap()["attempt"],
+        "0"
+    );
+    assert!(owned_history::list(&registry).unwrap().is_empty());
+    let c = rusqlite::Connection::open(&db).unwrap();
+    c.execute_batch("CREATE TRIGGER injected_rotation BEFORE UPDATE OF body ON corpus_campaign_rotations BEGIN SELECT RAISE(ABORT,'injected rotation publication failure');END;").unwrap();
+    let failed = rotation_command(&db, &id, &policy, &limits, "1");
+    assert!(!failed.status.success());
+    assert!(
+        String::from_utf8_lossy(&failed.stderr).contains("injected rotation publication failure")
+    );
+    let group_before = campaign_rotation::status(&registry, &id).unwrap();
+    assert_eq!(group_before["visits"], "0");
+    assert_eq!(group_before["members"][0]["known_children"], "0");
+    assert_eq!(group_before["next_member_index"], "0");
+    assert_eq!(group_before["lease_active"], false);
+    let inner = corpus_campaign::status(&registry, &first).unwrap();
+    assert_eq!(
+        inner["execution"]["owned_visits"].as_array().unwrap().len(),
+        1
+    );
+    assert_eq!(owned_history::list(&registry).unwrap().len(), 1);
+    c.execute_batch("DROP TRIGGER injected_rotation;").unwrap();
+    let out = rotation_command(&db, &id, &policy, &limits, "1");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let after = campaign_rotation::status(&registry, &id).unwrap();
+    assert_eq!(after["visits"], "1");
+    assert_eq!(after["next_member_index"], "1");
+    registry.integrity().unwrap();
+    registry
+        .backup(&gold.root.join("partial-copy.sqlite"))
+        .unwrap();
+}
