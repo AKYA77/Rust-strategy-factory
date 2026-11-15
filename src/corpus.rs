@@ -135,13 +135,13 @@ impl SequenceHash {
         self.hash.finalize().to_hex().to_string()
     }
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CandleSummary {
     pub timeframe: Timeframe,
     pub closed_candles: u64,
     pub content_hash: String,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Report {
     pub version: &'static str,
     pub corpus_identity: String,
@@ -168,6 +168,12 @@ pub struct Prepared {
     frames: std::collections::BTreeMap<Timeframe, Vec<candles::Candle>>,
 }
 impl Prepared {
+    pub(crate) fn inventory_copy(&self) -> Self {
+        Self {
+            report: self.report.clone(),
+            frames: std::collections::BTreeMap::new(),
+        }
+    }
     pub fn report(&self) -> &Report {
         &self.report
     }
@@ -215,8 +221,18 @@ pub fn prepare(
     }
     inspect_prepared(base, spec, Some((primary, max_candles)))
 }
+/// A verified immutable inventory with no retained candle vectors.
+/// Current-byte eligibility requires verify_current on every consumer.
+/// It cannot be reconstructed from a supplied/forged JSON report.
+/// ```compile_fail
+/// use rust_strategy_factory::corpus::Prepared;
+/// let _: Prepared = serde_json::from_str("{}").unwrap();
+/// ```
+pub fn verified_inventory(base: &Path, spec: &Specification) -> Result<Prepared> {
+    inspect_prepared(base, spec, None)
+}
 pub fn inspect(base: &Path, spec: &Specification) -> Result<Report> {
-    Ok(inspect_prepared(base, spec, None)?.report)
+    Ok(verified_inventory(base, spec)?.report)
 }
 fn inspect_prepared(
     base: &Path,

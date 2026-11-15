@@ -7,7 +7,7 @@ use crate::{
 use chrono::{Datelike, TimeZone, Utc};
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Event {
     pub timestamp_ms: i64,
     /// Decimal string preserves the full source sequence in JSON consumers.

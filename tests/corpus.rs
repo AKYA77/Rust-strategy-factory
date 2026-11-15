@@ -6082,3 +6082,35 @@ fn declared_corpus_candle_ceiling_is_consistent_across_preparation_signals_and_r
         .is_ok()
     );
 }
+
+#[test]
+fn verified_no_frame_inventory_preserves_inspection_and_refuses_missing_context_or_changed_paths() {
+    let f = Fixture::new("no-frame-inventory", "EURUSD", 7);
+    let inventory = corpus::verified_inventory(&f.root, &f.spec).unwrap();
+    assert_eq!(inventory.retained_candles(), 0);
+    assert_eq!(
+        serde_json::to_value(inventory.report()).unwrap(),
+        serde_json::to_value(corpus::inspect(&f.root, &f.spec).unwrap()).unwrap()
+    );
+    for timeframe in Timeframe::ALL {
+        assert!(inventory.candles(timeframe).is_err());
+    }
+    inventory.verify_current(&f.root, &f.spec).unwrap();
+    let mut moved = f.spec.clone();
+    moved.chunks[0].path = f.root.join("missing.rsf").to_str().unwrap().into();
+    assert_eq!(moved.identity().unwrap(), f.spec.identity().unwrap());
+    assert!(inventory.verify_current(&f.root, &moved).is_err());
+    let mut limited = f.spec.clone();
+    limited.max_chunk_events = 1;
+    assert_eq!(limited.identity().unwrap(), f.spec.identity().unwrap());
+    assert!(inventory.verify_current(&f.root, &limited).is_err());
+    let path = &f.spec.chunks[0].path;
+    let bytes = fs::read(path).unwrap();
+    let mut bad = bytes.clone();
+    let index = bad.len() / 2;
+    bad[index] ^= 1;
+    fs::write(path, bad).unwrap();
+    assert!(inventory.verify_current(&f.root, &f.spec).is_err());
+    fs::write(path, bytes).unwrap();
+    inventory.verify_current(&f.root, &f.spec).unwrap();
+}

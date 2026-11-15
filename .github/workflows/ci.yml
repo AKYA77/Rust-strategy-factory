@@ -10,6 +10,8 @@ jobs:
       - name: Install pinned toolchain
         run: rustup show
       - run: sh scripts/check.sh
+      - name: Verify trusted inventory cannot deserialize supplied JSON
+        run: cargo test --locked --doc
       - uses: actions/setup-node@v4
         with:
           node-version: '24'

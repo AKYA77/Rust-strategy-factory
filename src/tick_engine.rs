@@ -1126,12 +1126,16 @@ fn corpus_source_binding(run: &CorpusRun<'_>) -> Result<String> {
 pub struct CorpusPreparationStats {
     pub builds: usize,
     pub reuses: usize,
+    /// Verification attempts for warm retained candle contexts.
     pub current_byte_checks: usize,
+    /// Verification attempts using a cold no-frame inventory.
+    pub inventory_byte_checks: usize,
     /// Candle objects, not bytes/RSS or OS-enforced memory.
     pub peak_retained_candles_per_worker: usize,
 }
 #[derive(Default)]
 struct WorkerPreparation {
+    key_inventory: Option<(String, crate::corpus::Prepared)>,
     slot: Option<(String, crate::corpus::Prepared)>,
     stats: CorpusPreparationStats,
 }
@@ -1151,6 +1155,7 @@ impl WorkerPreparation {
             self.stats.current_byte_checks += 1;
             if let Err(error) = prepared.verify_current(run.base, run.spec) {
                 self.slot = None;
+                self.key_inventory = None;
                 return Err(error);
             }
             return corpus_key_from_report(
@@ -1159,6 +1164,22 @@ impl WorkerPreparation {
                 run.costs,
                 run.budget,
                 prepared.report(),
+            );
+        }
+        if let Some((stored, inventory)) = &self.key_inventory
+            && stored == &corpus_source_binding(run)?
+        {
+            self.stats.inventory_byte_checks += 1;
+            if let Err(error) = inventory.verify_current(run.base, run.spec) {
+                self.key_inventory = None;
+                return Err(error);
+            }
+            return corpus_key_from_report(
+                run.spec,
+                run.strategy,
+                run.costs,
+                run.budget,
+                inventory.report(),
             );
         }
         corpus_key(run.base, run.spec, run.strategy, run.costs, run.budget)
@@ -1537,19 +1558,27 @@ fn execute_corpus_batch_session(
     for run in runs {
         let binding = corpus_source_binding(run)?;
         if !sources.contains_key(&binding) {
-            sources.insert(binding.clone(), crate::corpus::inspect(run.base, run.spec)?);
+            sources.insert(
+                binding.clone(),
+                crate::corpus::verified_inventory(run.base, run.spec)?,
+            );
         }
         let observed = sources
             .get(&binding)
             .ok_or("missing preflight source report")?;
-        let key = corpus_key_from_report(run.spec, run.strategy, run.costs, run.budget, observed)?;
+        let key = corpus_key_from_report(
+            run.spec,
+            run.strategy,
+            run.costs,
+            run.budget,
+            observed.report(),
+        )?;
         let identity = crate::data::hash(&key)?;
         invocation_inputs.push((binding, identity.clone()));
         if !identities.insert(identity) {
             return Err("duplicate frozen corpus job in batch".into());
         }
     }
-    drop(sources);
     let binding = crate::data::hash(&(
         std::env::current_dir()
             .map_err(|e| e.to_string())?
@@ -1591,6 +1620,7 @@ fn execute_corpus_batch_session(
             connections.into_iter().enumerate().zip(slots)
         {
             let next = &next;
+            let inventories = &sources;
             worker_preparation.stats = CorpusPreparationStats {
                 peak_retained_candles_per_worker: worker_preparation
                     .slot
@@ -1608,6 +1638,16 @@ fn execute_corpus_batch_session(
                         let Some(run) = runs.get(index) else {
                             break;
                         };
+                        let binding = match corpus_source_binding(run) {
+                            Ok(binding) => binding,
+                            Err(error) => {
+                                completed.push((index, Err(error)));
+                                continue;
+                            }
+                        };
+                        preparation.key_inventory = inventories
+                            .get(&binding)
+                            .map(|inventory| (binding, inventory.inventory_copy()));
                         let result = execute_corpus_step_prepared(
                             &mut registry,
                             CorpusRun {
@@ -1641,6 +1681,7 @@ fn execute_corpus_batch_session(
                     preparation.builds += stats.builds;
                     preparation.reuses += stats.reuses;
                     preparation.current_byte_checks += stats.current_byte_checks;
+                    preparation.inventory_byte_checks += stats.inventory_byte_checks;
                     preparation.peak_retained_candles_per_worker = preparation
                         .peak_retained_candles_per_worker
                         .max(stats.peak_retained_candles_per_worker);
@@ -1719,6 +1760,119 @@ mod worker_preparation_tests {
             feature_cells: 100000,
             max_receipts: 10000,
         }
+    }
+    #[test]
+    fn cold_inventory_never_grants_real_or_non_usd_execution_authority() {
+        for (symbol, synthetic) in [("USDJPY", true), ("EURUSD", false)] {
+            let mut source = Source::new(&format!("inventory-gates-{symbol}"));
+            let generated = data::synthetic_fixture(symbol).unwrap();
+            let dataset = data::dataset(
+                generated.profile,
+                generated.ticks,
+                "SYNTHETIC gate fixture; unreviewed declaration is not genuine evidence",
+                "generated-no-archive".into(),
+                synthetic,
+            )
+            .unwrap();
+            let path = source.root.join("source.rsf");
+            fs::remove_file(&path).unwrap();
+            native::write(&path, &dataset).unwrap();
+            source.spec = corpus::describe(&[path], 100000).unwrap();
+            let inventory = corpus::verified_inventory(&source.root, &source.spec).unwrap();
+            let strategy = strategy();
+            let costs = Costs::default();
+            let run = CorpusRun {
+                base: &source.root,
+                spec: &source.spec,
+                strategy: &strategy,
+                costs: &costs,
+                budget: budget(),
+            };
+            let mut cache = WorkerPreparation {
+                key_inventory: Some((corpus_source_binding(&run).unwrap(), inventory)),
+                ..WorkerPreparation::default()
+            };
+            let mut registry =
+                crate::storage::Registry::open(&source.root.join("state.sqlite")).unwrap();
+            assert!(
+                execute_corpus_step_prepared(
+                    &mut registry,
+                    run,
+                    64,
+                    60000,
+                    &mut || 1000,
+                    &mut cache
+                )
+                .is_err()
+            );
+            assert_eq!(registry.counts().unwrap().registered, 0);
+            assert_eq!(cache.stats.inventory_byte_checks, 1);
+            assert_eq!(cache.stats.builds, 0);
+        }
+    }
+    #[test]
+    fn cold_inventory_key_rechecks_current_bytes_before_registration_and_cached_reuse() {
+        let source = Source::new("cold-inventory");
+        let strategy = strategy();
+        let costs = Costs::default();
+        let run = || CorpusRun {
+            base: &source.root,
+            spec: &source.spec,
+            strategy: &strategy,
+            costs: &costs,
+            budget: budget(),
+        };
+        let inventory = crate::corpus::verified_inventory(&source.root, &source.spec).unwrap();
+        assert_eq!(inventory.retained_candles(), 0);
+        let expected = corpus_key(&source.root, &source.spec, &strategy, &costs, budget()).unwrap();
+        let binding = corpus_source_binding(&run()).unwrap();
+        let mut cache = WorkerPreparation {
+            key_inventory: Some((binding.clone(), inventory.inventory_copy())),
+            ..WorkerPreparation::default()
+        };
+        assert_eq!(cache.key(&run()).unwrap(), expected);
+        assert_eq!(cache.stats.inventory_byte_checks, 1);
+        assert_eq!(cache.stats.builds, 0);
+        let path = &source.spec.chunks[0].path;
+        let bytes = fs::read(path).unwrap();
+        let mut bad = bytes.clone();
+        let index = bad.len() / 2;
+        bad[index] ^= 1;
+        fs::write(path, bad).unwrap();
+        let mut registry =
+            crate::storage::Registry::open(&source.root.join("state.sqlite")).unwrap();
+        assert!(
+            execute_corpus_step_prepared(&mut registry, run(), 64, 60000, &mut || 1000, &mut cache)
+                .is_err()
+        );
+        assert!(cache.key_inventory.is_none());
+        assert!(
+            registry
+                .experiment_key(&expected.identity().unwrap())
+                .unwrap()
+                .is_none()
+        );
+        fs::write(path, bytes).unwrap();
+        cache.key_inventory = Some((binding, inventory.inventory_copy()));
+        let completed =
+            execute_corpus_step_prepared(&mut registry, run(), 64, 60000, &mut || 1001, &mut cache)
+                .unwrap();
+        assert!(matches!(
+            completed,
+            CorpusProgress::Completed { cached: false, .. }
+        ));
+        cache.slot = None;
+        let builds = cache.stats.builds;
+        let cached =
+            execute_corpus_step_prepared(&mut registry, run(), 64, 60000, &mut || 1002, &mut cache)
+                .unwrap();
+        assert!(matches!(
+            cached,
+            CorpusProgress::Completed { cached: true, .. }
+        ));
+        assert_eq!(cache.stats.builds, builds);
+        assert_eq!(cache.stats.inventory_byte_checks, 4);
+        registry.integrity().unwrap();
     }
     #[test]
     fn retained_worker_reservations_cover_dynamic_reassignment_or_release_before_work() {
