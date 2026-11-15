@@ -1027,6 +1027,14 @@ pub fn step(database: &Path, run: SearchRun<'_>, limits: CorpusBatchLimits) -> R
     }
 }
 
+/// Freeze the complete declared region, including canonical duplicate trial identities.
+pub(crate) fn frozen_region(run: &SearchRun<'_>) -> Result<(String, Vec<String>)> {
+    let config = configuration(run)?;
+    let trials = (0..config.maximum_candidates)
+        .map(|slot| definition(&config, slot)?.key.identity())
+        .collect::<Result<Vec<_>>>()?;
+    Ok((data::hash(&config)?, trials))
+}
 pub fn identity(run: &SearchRun<'_>) -> Result<String> {
     data::hash(&configuration(run)?)
 }

@@ -3868,3 +3868,119 @@ fn corpus_search_cli_later_range_reopens_and_reuses_exact_scalar_receipts() {
     );
     registry.integrity().unwrap();
 }
+
+#[test]
+fn frozen_campaign_cli_binds_complete_trial_scope_preserves_holds_and_rejects_retuning() {
+    use rust_strategy_factory::{
+        corpus_campaign, corpus_search, data, operator_config, research, storage::Registry,
+        tick_engine,
+    };
+    let f = Fixture::new("campaign-freeze-cli", "EURUSD", 7);
+    let config = corpus_search_fixture(&f);
+    let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&config).unwrap()).unwrap();
+    value["seed"] = serde_json::json!(u64::MAX);
+    value["start_index"] = 12.into();
+    value["maximum_candidates"] = 2.into();
+    fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+    let db = f.root.join("campaign.sqlite");
+    let call = |args: &[&str]| {
+        let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()
+    };
+    let first = call(&[
+        "corpus-campaign-freeze",
+        config.to_str().unwrap(),
+        db.to_str().unwrap(),
+        "3",
+    ]);
+    let id = first["campaign_id"].as_str().unwrap();
+    assert_eq!(first["seed"], u64::MAX.to_string());
+    assert_eq!(first["declared_slots"], "6");
+    assert_eq!(first["execution_supported"], false);
+    assert_eq!(first["inputs_freshly_verified"], false);
+    assert_eq!(
+        first,
+        call(&[
+            "corpus-campaign-freeze",
+            config.to_str().unwrap(),
+            db.to_str().unwrap(),
+            "3"
+        ])
+    );
+    let registry = Registry::open(&db).unwrap();
+    assert_eq!(registry.counts().unwrap().registered, 0);
+    assert!(corpus_search::list(&registry).unwrap().is_empty());
+    let loaded = operator_config::load_search(&config).unwrap();
+    let mut expected = Vec::new();
+    for index in 12..18 {
+        let strategy = research::candidate_at(index, u64::MAX).unwrap().1;
+        expected.push(
+            tick_engine::corpus_key(
+                &loaded.base,
+                &loaded.specification,
+                &strategy,
+                &loaded.costs,
+                loaded.file.budget,
+            )
+            .unwrap()
+            .identity()
+            .unwrap(),
+        );
+    }
+    assert_eq!(first["trial_scope_hash"], data::hash(&expected).unwrap());
+    assert_eq!(
+        first["distinct_experiments"],
+        expected
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+            .to_string()
+    );
+    assert_eq!(
+        corpus_campaign::verify_inputs(&registry, id).unwrap()["inputs_freshly_verified"],
+        true
+    );
+    registry.backup(&f.root.join("backup.sqlite")).unwrap();
+    let copied = Registry::open(&f.root.join("backup.sqlite")).unwrap();
+    assert_eq!(corpus_campaign::status(&copied, id).unwrap(), first);
+    let region = &first["regions"][1];
+    assert_eq!(region["start_index"], "14");
+    let mut run = loaded.run();
+    run.start_index = 14;
+    assert_eq!(region["search_id"], corpus_search::identity(&run).unwrap());
+    let policy = rust_strategy_factory::retry_policy::Policy {
+        backoff_ms: 1,
+        maximum_slots: 1,
+    };
+    let search_id = corpus_search::prepare_supervision(&db, &run, &policy).unwrap();
+    let mut held_registry = Registry::open(&db).unwrap();
+    corpus_search::control(&mut held_registry, &search_id, "paused").unwrap();
+    let held = corpus_search::status(&held_registry, &search_id).unwrap();
+    assert_eq!(corpus_campaign::register_file(&config, &db, 3).unwrap(), id);
+    corpus_campaign::verify_inputs(&held_registry, id).unwrap();
+    assert_eq!(
+        corpus_search::status(&held_registry, &search_id).unwrap(),
+        held
+    );
+    assert_eq!(held_registry.counts().unwrap().registered, 0);
+    value["seed"] = 0.into();
+    fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+    assert!(corpus_campaign::verify_inputs(&registry, id).is_err());
+    assert_eq!(corpus_campaign::status(&registry, id).unwrap(), first);
+    registry.integrity().unwrap();
+    let invalid_db = f.root.join("invalid.sqlite");
+    value["start_index"] = serde_json::json!(u64::MAX);
+    fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+    assert!(corpus_campaign::register_file(&config, &invalid_db, 3).is_err());
+    assert!(!invalid_db.exists());
+    assert!(corpus_campaign::register_file(&config, &invalid_db, 17).is_err());
+    assert!(!invalid_db.exists());
+}

@@ -106,3 +106,5 @@ pub mod win_evidence;
 pub mod evidence_gates;
 
 pub mod recovery;
+
+pub mod corpus_campaign;

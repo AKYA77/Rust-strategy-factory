@@ -55,6 +55,7 @@ fn main() {
         "src/resource.rs",
         "src/disk.rs",
         "src/corpus_search.rs",
+        "src/corpus_campaign.rs",
         "src/corpus_failure.rs",
         "src/retry_policy.rs",
         "src/retry_audit.rs",
