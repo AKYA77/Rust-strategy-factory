@@ -35,6 +35,7 @@ fn span(start: &str, end: &str) -> Interval {
 }
 fn plan() -> Plan {
     Plan {
+        win_evidence_policy: None,
         uncertainty_block_ms: None,
         robustness_policy: None,
         training: span("2025-01-01T00:00:00Z", "2025-03-01T00:00:00Z"),
@@ -603,5 +604,121 @@ fn robustness_policy_is_frozen_before_oos_and_survives_reopen() {
     assert!(science::execute(&mut registry, &input, &p, "policy-build", &budget).is_err());
     p.robustness_policy = None;
     assert!(science::execute(&mut registry, &input, &p, "policy-build", &budget).is_err());
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn frozen_conditional_win_policy_binds_actual_oos_receipts_reopen_and_prevents_retuning() {
+    use rust_strategy_factory::{tick_engine::Trade, validation::Observation, win_evidence};
+    let directory = dir();
+    let path = directory.join("win-evidence.sqlite");
+    let mut registry = Registry::open(&path).unwrap();
+    let input = input();
+    let mut p = plan();
+    p.win_evidence_policy = Some(win_evidence::Policy {
+        stake_basis_points: 1000,
+        family_error_basis_points: 500,
+        minimum_resolved: 100,
+    });
+    let budget = science::Budget {
+        feature_cells: 100000,
+        ..Default::default()
+    };
+    let first = science::execute(&mut registry, &input, &p, "win-evidence-build", &budget).unwrap();
+    let candidate = &first.report.candidates[0];
+    let diagnostic = candidate.win_evidence.as_ref().unwrap();
+    assert_eq!(
+        diagnostic.observations,
+        candidate.uncertainty.as_ref().unwrap().observations
+    );
+    assert_eq!(
+        diagnostic.net_wins,
+        candidate.pooled_oos_reset_fold_stats.wins
+    );
+    assert!(!diagnostic.qualification_granted);
+    assert_eq!(first.report.status, "INSUFFICIENT_EVIDENCE");
+    let mut observations = Vec::new();
+    for evidence in candidate
+        .experiments
+        .iter()
+        .filter(|e| e.phase.ends_with("out-of-sample"))
+    {
+        let result = registry.result(&evidence.experiment_id).unwrap().unwrap();
+        for raw in result.result["tick_replay"]["trades"].as_array().unwrap() {
+            let t: Trade = serde_json::from_value(raw.clone()).unwrap();
+            observations.push(Observation {
+                exit_ms: t.exit_ms,
+                net_micro_usd: t.net_micro_usd,
+            });
+        }
+    }
+    assert_eq!(
+        win_evidence::diagnose(
+            &observations,
+            p.trial_budget,
+            p.win_evidence_policy.as_ref().unwrap()
+        )
+        .unwrap(),
+        *diagnostic
+    );
+    drop(registry);
+    let mut registry = Registry::open(&path).unwrap();
+    let again = science::execute(&mut registry, &input, &p, "win-evidence-build", &budget).unwrap();
+    assert!(again.reused);
+    assert_eq!(
+        again.report.candidates[0].win_evidence,
+        Some(diagnostic.clone())
+    );
+    p.win_evidence_policy.as_mut().unwrap().stake_basis_points = 2000;
+    assert!(science::execute(&mut registry, &input, &p, "win-evidence-build", &budget).is_err());
+    p.win_evidence_policy = None;
+    assert!(science::execute(&mut registry, &input, &p, "win-evidence-build", &budget).is_err());
+    registry.integrity().unwrap();
+    std::fs::remove_dir_all(directory).unwrap();
+}
+#[test]
+fn absent_win_policy_preserves_legacy_shapes_and_invalid_policy_creates_no_evidence() {
+    let directory = dir();
+    let mut registry = Registry::open(&directory.join("legacy-win.sqlite")).unwrap();
+    let input = input();
+    let mut p = plan();
+    assert!(!serde_json::to_string(&p).unwrap().contains("win_evidence"));
+    p.win_evidence_policy = Some(rust_strategy_factory::win_evidence::Policy {
+        stake_basis_points: 0,
+        family_error_basis_points: 500,
+        minimum_resolved: 100,
+    });
+    assert!(
+        science::execute(
+            &mut registry,
+            &input,
+            &p,
+            "invalid-win",
+            &science::Budget::default()
+        )
+        .is_err()
+    );
+    assert_eq!(registry.counts().unwrap().registered, 0);
+    p.win_evidence_policy = None;
+    let result = science::execute(
+        &mut registry,
+        &input,
+        &p,
+        "legacy-win",
+        &science::Budget {
+            feature_cells: 100000,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let encoded = serde_json::to_string(&result.report).unwrap();
+    assert!(!encoded.contains("win_evidence"));
+    let decoded: science::Report = serde_json::from_str(&encoded).unwrap();
+    assert_eq!(
+        data::hash(&decoded).unwrap(),
+        data::hash(&result.report).unwrap()
+    );
+    assert!(decoded.candidates[0].win_evidence.is_none());
+    registry.integrity().unwrap();
     std::fs::remove_dir_all(directory).unwrap();
 }

@@ -27,6 +27,8 @@ pub struct Plan {
     pub uncertainty_block_ms: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub robustness_policy: Option<crate::robustness::ProbePolicy>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub win_evidence_policy: Option<crate::win_evidence::Policy>,
 }
 impl Plan {
     pub fn canonical(&self) -> Result<Self> {
@@ -34,6 +36,9 @@ impl Plan {
             crate::uncertainty::validate_block_ms(ms)?;
         }
         if let Some(policy) = &self.robustness_policy {
+            policy.validate()?;
+        }
+        if let Some(policy) = &self.win_evidence_policy {
             policy.validate()?;
         }
         self.training.validate()?;
@@ -159,6 +164,8 @@ pub struct CandidateEvidence {
     pub robustness: Vec<crate::robustness::EvidenceSet>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub breakdown: Option<crate::diagnostics::Breakdown>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub win_evidence: Option<crate::win_evidence::Diagnostic>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Report {
@@ -179,6 +186,9 @@ pub struct ProtocolResult {
 }
 fn definition(plan: &Plan, input: &Input, revision: &str) -> Result<serde_json::Value> {
     let mut value = serde_json::json!({"version":"frozen-chronological-protocol-v7","neighborhood_method":crate::neighborhood::VERSION,"regime_method":crate::regimes::VERSION,"breakdown_method":crate::diagnostics::VERSION,"robustness_method":crate::robustness::VERSION,"robustness_cases":plan.candidates.iter().map(|s|crate::robustness::cases(s,&plan.costs)).collect::<Result<Vec<_>>>()?,"uncertainty_method":crate::uncertainty::VERSION,"plan":plan,"dataset_hash":input.dataset.manifest.content_hash,"dataset_identity":data::dataset_identity(&input.dataset.manifest)?,"profile_hash":input.dataset.manifest.profile_hash,"conversions_hash":data::hash(&input.conversions)?,"revision":revision,"engine":crate::ENGINE_VERSION,"indicators":crate::INDICATOR_VERSION,"signals":crate::SIGNAL_VERSION});
+    if plan.win_evidence_policy.is_some() {
+        value["win_evidence_method"] = crate::win_evidence::VERSION.into();
+    }
     if plan.uncertainty_block_ms.is_some() {
         value["block_uncertainty_method"] = serde_json::json!(crate::uncertainty::BLOCK_VERSION);
     }
@@ -446,6 +456,13 @@ pub fn execute(
             })
             .transpose()?;
         candidates.push(CandidateEvidence {
+            win_evidence: plan
+                .win_evidence_policy
+                .as_ref()
+                .map(|policy| {
+                    crate::win_evidence::diagnose(&observations, plan.trial_budget, policy)
+                })
+                .transpose()?,
             concept_id: strategy.identity()?,
             experiments,
             pooled_oos_reset_fold_stats: DescriptiveStats::calculate(&observations)?,

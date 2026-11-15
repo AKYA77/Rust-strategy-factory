@@ -41,6 +41,7 @@ fn main() {
         "src/validation.rs",
         "src/science.rs",
         "src/uncertainty.rs",
+        "src/win_evidence.rs",
         "src/robustness.rs",
         "src/improvement.rs",
         "src/exploration.rs",
