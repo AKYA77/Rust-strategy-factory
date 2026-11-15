@@ -90,3 +90,5 @@ pub mod retry_policy;
 mod retry_audit;
 
 pub mod supervision_session;
+
+pub mod owned_process;

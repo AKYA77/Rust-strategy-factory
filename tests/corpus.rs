@@ -2682,3 +2682,212 @@ fn foreground_session_interruption(crash: bool) {
     );
     registry.integrity().unwrap();
 }
+
+#[test]
+fn owned_foreground_child_exit_and_wall_budget_are_reaped_with_exact_receipts() {
+    let f = Fixture::new("owned-wall", "EURUSD", 7);
+    let (config, db, policy, source) = foreground_config(&f);
+    let limits = f.root.join("parent.json");
+    fs::write(
+        &limits,
+        r#"{"maximum_wall_ms":100,"shutdown_grace_ms":3000,"maximum_output_bytes":1048576}"#,
+    )
+    .unwrap();
+    let invoke = |wait: &str| {
+        let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args([
+                "corpus-supervise-owned",
+                config.to_str().unwrap(),
+                policy.to_str().unwrap(),
+                db.to_str().unwrap(),
+                "100",
+                wait,
+                limits.to_str().unwrap(),
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()
+    };
+    let first = invoke("10000");
+    assert_eq!(first["stop_reason"], "wall-budget");
+    assert_eq!(first["reaped"], true);
+    assert_eq!(first["forced_kill"], false);
+    assert_eq!(first["stop_request_delivered"], true);
+    assert_eq!(first["exit_success"], true);
+    assert_eq!(first["child_report"]["stop_reason"], "session-stop-request");
+    assert_eq!(first["session_status"]["observation"], "finished");
+    assert!(first["session_status"]["receipt_hash"].is_string());
+    let second = invoke("0");
+    assert_eq!(second["stop_reason"], "child-exited");
+    assert_eq!(second["child_report"]["stop_reason"], "retry-backoff");
+    assert_ne!(second["session_id"], first["session_id"]);
+    assert_eq!(
+        second["child_report"]["last"]["decision"]["retry_at_ms"],
+        first["child_report"]["last"]["decision"]["retry_at_ms"]
+    );
+    let registry = rust_strategy_factory::storage::Registry::open(&db).unwrap();
+    assert_eq!(
+        rust_strategy_factory::corpus_search::status(&registry, &source).unwrap()["requeue_records"],
+        "0"
+    );
+    registry.integrity().unwrap();
+}
+#[test]
+#[cfg(unix)]
+fn owned_parent_signal_escalates_only_its_actual_child_and_reaps_it() {
+    let f = Fixture::new("owned-signal", "EURUSD", 7);
+    let (config, db, policy, _) = foreground_config(&f);
+    let limits = f.root.join("parent.json");
+    fs::write(
+        &limits,
+        r#"{"maximum_wall_ms":10000,"shutdown_grace_ms":0,"maximum_output_bytes":1048576}"#,
+    )
+    .unwrap();
+    let mut parent = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-supervise-owned",
+            config.to_str().unwrap(),
+            policy.to_str().unwrap(),
+            db.to_str().unwrap(),
+            "100",
+            "10000",
+            limits.to_str().unwrap(),
+        ])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let c = rusqlite::Connection::open(&db).unwrap();
+    let mut ready = false;
+    for _ in 0..500 {
+        let n: i64 = c
+            .query_row("SELECT count(*) FROM corpus_retry_decisions", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        if n > 0 {
+            ready = true;
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    if !ready {
+        parent.kill().unwrap();
+        parent.wait().unwrap();
+        panic!("owned worker did not wait");
+    }
+    assert!(
+        Command::new("kill")
+            .args(["-TERM", &parent.id().to_string()])
+            .status()
+            .unwrap()
+            .success()
+    );
+    let out = parent.wait_with_output().unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let value: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(value["stop_reason"], "signal");
+    assert_eq!(value["forced_kill"], true);
+    assert_eq!(value["reaped"], true);
+    assert_eq!(value["exit_success"], false);
+    assert_eq!(
+        value["session_status"]["observation"],
+        "unclosed; PID liveness not established"
+    );
+    assert_eq!(value["child_report"], serde_json::Value::Null);
+    assert!(!std::path::Path::new(&format!("/proc/{}", value["pid"].as_str().unwrap())).exists());
+    rust_strategy_factory::storage::Registry::open(&db)
+        .unwrap()
+        .integrity()
+        .unwrap();
+}
+#[test]
+fn owned_parent_refuses_pressure_and_bad_limits_before_creating_registry_or_child() {
+    let f = Fixture::new("owned-refuse", "EURUSD", 7);
+    let config = corpus_search_fixture(&f);
+    let mut file: serde_json::Value = serde_json::from_slice(&fs::read(&config).unwrap()).unwrap();
+    file["disk_guard"] = serde_json::json!({"minimum_available_bytes":u64::MAX});
+    fs::write(&config, serde_json::to_vec(&file).unwrap()).unwrap();
+    let policy = f.root.join("policy.json");
+    fs::write(&policy, r#"{"backoff_ms":1,"maximum_slots":1}"#).unwrap();
+    let limits = f.root.join("parent.json");
+    for (wall, success) in [(0, false), (100, true)] {
+        fs::write(&limits,serde_json::to_vec(&serde_json::json!({"maximum_wall_ms":wall,"shutdown_grace_ms":0,"maximum_output_bytes":1024})).unwrap()).unwrap();
+        let db = f.root.join(format!("refuse-{wall}.sqlite"));
+        let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args([
+                "corpus-supervise-owned",
+                config.to_str().unwrap(),
+                policy.to_str().unwrap(),
+                db.to_str().unwrap(),
+                "10",
+                "0",
+                limits.to_str().unwrap(),
+            ])
+            .output()
+            .unwrap();
+        assert_eq!(out.status.success(), success);
+        assert!(!db.exists());
+        if success {
+            assert_eq!(
+                serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()["stop_reason"],
+                "disk-pressure"
+            );
+        }
+    }
+}
+
+#[test]
+fn owned_child_output_overflow_is_bounded_and_reaped_without_partial_json() {
+    let f = Fixture::new("owned-output", "EURUSD", 7);
+    let (config, db, policy, _) = foreground_config(&f);
+    let limits = f.root.join("parent.json");
+    fs::write(
+        &limits,
+        r#"{"maximum_wall_ms":10000,"shutdown_grace_ms":100,"maximum_output_bytes":1024}"#,
+    )
+    .unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-supervise-owned",
+            config.to_str().unwrap(),
+            policy.to_str().unwrap(),
+            db.to_str().unwrap(),
+            "1",
+            "0",
+            limits.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let value: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(value["stdout_truncated"], true);
+    assert!(
+        value["stdout_bytes"]
+            .as_str()
+            .unwrap()
+            .parse::<usize>()
+            .unwrap()
+            > 1024
+    );
+    assert_eq!(value["child_report"], serde_json::Value::Null);
+    assert_eq!(value["reaped"], true);
+    assert!(out.stdout.len() < 16384);
+    rust_strategy_factory::storage::Registry::open(&db)
+        .unwrap()
+        .integrity()
+        .unwrap();
+}
