@@ -63,6 +63,7 @@ fn main() {
         "src/operator_config.rs",
         "src/corpus_fleet.rs",
         "src/fleet_control.rs",
+        "src/fleet_loop.rs",
         "src/storage.rs",
         "src/result_artifact.rs",
     ] {

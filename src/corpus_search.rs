@@ -394,23 +394,20 @@ pub fn requeue_errors(
     tx.commit().map_err(|e| e.to_string())?;
     Ok(value)
 }
-fn requeue_in(
+enum RequeuePlan {
+    Held(&'static str),
+    Ready(Vec<(RequeueRecord, String)>),
+}
+fn requeue_plan(
     tx: &Connection,
     id: &str,
     maximum_slots: usize,
     policy_hash: Option<&str>,
     now: i64,
-) -> Result<serde_json::Value> {
+) -> Result<RequeuePlan> {
     if !(1..=32).contains(&maximum_slots) {
         return Err("requeue request must contain1..32 slots".into());
     }
-    let held = |reason: &str| -> Result<serde_json::Value> {
-        if policy_hash.is_some() {
-            Ok(serde_json::json!({"kind":"held","reason":reason}))
-        } else {
-            Err(reason.into())
-        }
-    };
     let (config, cursor, state, _, expiry, jobs) = read(tx, id)?;
     if state != "paused" || expiry.is_some_and(|t| t > now) {
         return Err("requeue requires a paused search without an active coordinator".into());
@@ -426,7 +423,9 @@ fn requeue_in(
         .count();
     let capacity = config.queue_width.saturating_sub(active).min(maximum_slots);
     if capacity == 0 {
-        return held("no retry queue capacity; reconcile pending slots first");
+        return Ok(RequeuePlan::Held(
+            "no retry queue capacity; reconcile pending slots first",
+        ));
     }
     let mut eligible = Vec::new();
     for job in &jobs {
@@ -458,7 +457,9 @@ fn requeue_in(
         }
     }
     if eligible.is_empty() {
-        return held("no admissible error slots or requeue budget exhausted");
+        return Ok(RequeuePlan::Held(
+            "no admissible error slots or requeue budget exhausted",
+        ));
     }
     let (count,size):(usize,usize)=tx.query_row("SELECT count(*),coalesce(sum(length(CAST(body AS BLOB))),0) FROM corpus_search_requeues",[],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|e|e.to_string())?;
     let mut incoming = Vec::new();
@@ -488,8 +489,27 @@ fn requeue_in(
         incoming.push((record, body));
     }
     if count + incoming.len() > 10000 || size + bytes > 40 * 1024 * 1024 {
-        return held("global requeue history quota reached");
+        return Ok(RequeuePlan::Held("global requeue history quota reached"));
     }
+    Ok(RequeuePlan::Ready(incoming))
+}
+fn requeue_in(
+    tx: &Connection,
+    id: &str,
+    maximum_slots: usize,
+    policy_hash: Option<&str>,
+    now: i64,
+) -> Result<serde_json::Value> {
+    let incoming = match requeue_plan(tx, id, maximum_slots, policy_hash, now)? {
+        RequeuePlan::Ready(rows) => rows,
+        RequeuePlan::Held(reason) => {
+            return if policy_hash.is_some() {
+                Ok(serde_json::json!({"kind":"held","reason":reason}))
+            } else {
+                Err(reason.into())
+            };
+        }
+    };
     let mut slots = Vec::new();
     for (record, body) in incoming {
         tx.execute("INSERT INTO corpus_search_requeues(search_id,slot,sequence,body,hash) VALUES(?1,?2,?3,?4,?5)",params![id,record.slot,record.sequence,body,data::hash(&record)?]).map_err(|e|e.to_string())?;
@@ -996,6 +1016,49 @@ pub fn list(registry: &Registry) -> Result<Vec<serde_json::Value>> {
         return Err("corpus search inventory quota exceeded".into());
     }
     ids.iter().map(|id| status(registry, id)).collect()
+}
+
+/// Pure scheduling hint. Actual admission repeats all checks transactionally.
+pub(crate) fn retry_wakeup_in(tx: &Connection, id: &str, now: i64) -> Result<Option<i64>> {
+    if chrono::DateTime::from_timestamp_millis(now).is_none() {
+        return Err("invalid retry hint clock".into());
+    }
+    let head = crate::search_control::read(tx, id)?;
+    if head.state != "paused"
+        || head.origin != Some(crate::search_control::Origin::WorkerError)
+        || head.paused_at.is_none_or(|t| now < t)
+    {
+        return Ok(None);
+    }
+    let Some((policy, hash)) = crate::retry_policy::read(tx, id)? else {
+        return Ok(None);
+    };
+    let deadline = head
+        .paused_at
+        .ok_or("retry pause time missing")?
+        .checked_add(policy.backoff_ms)
+        .ok_or("retry hint deadline overflow")?;
+    if chrono::DateTime::from_timestamp_millis(deadline).is_none() {
+        return Err("retry hint deadline unsupported".into());
+    }
+    if !crate::retry_audit::capacity(tx, id)? {
+        return Ok(None);
+    }
+    let planned_at = deadline.max(now);
+    let expiry: Option<i64> = tx
+        .query_row(
+            "SELECT expires_ms FROM corpus_searches WHERE id=?1",
+            [id],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if expiry.is_some_and(|t| t > planned_at) {
+        return Ok(None);
+    }
+    match requeue_plan(tx, id, policy.maximum_slots, Some(&hash), planned_at)? {
+        RequeuePlan::Ready(_) => Ok(Some(deadline)),
+        RequeuePlan::Held(_) => Ok(None),
+    }
 }
 
 #[cfg(test)]
@@ -2178,6 +2241,57 @@ mod tests {
         assert_eq!(status(&registry, &id).unwrap()["requeue_records"], "1");
         registry.integrity().unwrap();
         drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn retry_wakeup_preview_is_pure_exact_and_excludes_nonretryable_or_owned_children() {
+        use crate::{
+            retry_policy::{self, Policy},
+            storage::{Claim, Outcome},
+        };
+        let (root, id) = policy_fixture("wakeup-preview");
+        let mut reg = Registry::open(&root.join("state.sqlite")).unwrap();
+        assert_eq!(retry_wakeup_in(&reg.connection, &id, 1000).unwrap(), None);
+        retry_policy::configure(
+            &mut reg,
+            &id,
+            &Policy {
+                backoff_ms: 50,
+                maximum_slots: 1,
+            },
+        )
+        .unwrap();
+        let before = status(&reg, &id).unwrap();
+        assert_eq!(retry_wakeup_in(&reg.connection, &id, 999).unwrap(), None);
+        for _ in 0..100 {
+            assert_eq!(
+                retry_wakeup_in(&reg.connection, &id, 1000).unwrap(),
+                Some(1050)
+            );
+        }
+        assert_eq!(status(&reg, &id).unwrap(), before);
+        let (_, _, _, _, _, jobs) = read(&reg.connection, &id).unwrap();
+        let job = &jobs[0];
+        let error = job.error.as_ref().unwrap();
+        reg.connection.execute("UPDATE corpus_search_jobs SET error_kind='unclassified',failure_hash=?2 WHERE search_id=?1",params![id,crate::corpus_failure::fingerprint(&id,0,&data::hash(&job.definition).unwrap(),crate::corpus_failure::Kind::Unclassified,error).unwrap()]).unwrap();
+        assert_eq!(retry_wakeup_in(&reg.connection, &id, 1000).unwrap(), None);
+        reg.connection.execute("UPDATE corpus_search_jobs SET error_kind='registry_admission_busy',failure_hash=?2 WHERE search_id=?1",params![id,crate::corpus_failure::fingerprint(&id,0,&data::hash(&job.definition).unwrap(),crate::corpus_failure::Kind::RegistryAdmissionBusy,error).unwrap()]).unwrap();
+        let child = reg.register(&job.definition.key).unwrap();
+        let Claim::Acquired(lease) = reg.claim(&child, 1000, 10000).unwrap() else {
+            panic!()
+        };
+        assert_eq!(retry_wakeup_in(&reg.connection, &id, 1000).unwrap(), None);
+        reg.finish(
+            &lease,
+            1001,
+            Outcome::Failed,
+            &serde_json::json!({"synthetic_test_only":"terminal hold"}),
+        )
+        .unwrap();
+        assert_eq!(retry_wakeup_in(&reg.connection, &id, 12000).unwrap(), None);
+        assert_eq!(status(&reg, &id).unwrap()["requeue_records"], "0");
+        reg.integrity().unwrap();
+        drop(reg);
         std::fs::remove_dir_all(root).unwrap();
     }
 }

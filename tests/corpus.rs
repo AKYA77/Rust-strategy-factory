@@ -3215,3 +3215,256 @@ fn owned_fleet_isolates_missing_input_and_never_overrides_operator_source_pause(
     );
     registry.integrity().unwrap();
 }
+
+// Development-only typed-admission fault metadata, without copying or deleting any child receipt.
+fn retryable_fleet_fixture(
+    f: &Fixture,
+    backoff: i64,
+) -> (PathBuf, PathBuf, PathBuf, String, String) {
+    let (config, template, policy, source) = foreground_config(f);
+    fs::write(
+        &policy,
+        serde_json::to_vec(&serde_json::json!({"backoff_ms":backoff,"maximum_slots":2})).unwrap(),
+    )
+    .unwrap();
+    let db = f.root.join("loop.sqlite");
+    drop(rust_strategy_factory::storage::Registry::open(&db).unwrap());
+    let c = rusqlite::Connection::open(&db).unwrap();
+    c.execute_batch("PRAGMA foreign_keys=ON;").unwrap();
+    c.execute(
+        "ATTACH DATABASE ?1 AS fixture",
+        [template.to_str().unwrap()],
+    )
+    .unwrap();
+    for table in [
+        "corpus_searches",
+        "corpus_search_runtime",
+        "corpus_search_transitions",
+        "corpus_search_jobs",
+        "corpus_retry_audit_heads",
+    ] {
+        c.execute(
+            &format!("INSERT INTO {table} SELECT * FROM fixture.{table}"),
+            [],
+        )
+        .unwrap();
+    }
+    c.execute_batch("DETACH DATABASE fixture;").unwrap();
+    let fleet = f.root.join("loop-fleet.json");
+    fs::write(&fleet,serde_json::to_vec(&serde_json::json!({"sources":[{"name":"synthetic-admission-fault","config":config}],"coordinator_lease_ms":60000})).unwrap()).unwrap();
+    let id = rust_strategy_factory::corpus_fleet::register_file(&fleet, &db).unwrap();
+    let (_, limits) = owned_fleet_files(&f.root);
+    rust_strategy_factory::storage::Registry::open(&db)
+        .unwrap()
+        .integrity()
+        .unwrap();
+    (db, policy, limits, id, source)
+}
+fn fleet_loop_command(
+    db: &std::path::Path,
+    id: &str,
+    policy: &std::path::Path,
+    limits: &std::path::Path,
+    wait: &str,
+) -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"));
+    c.args([
+        "corpus-fleet-loop",
+        db.to_str().unwrap(),
+        id,
+        policy.to_str().unwrap(),
+        limits.to_str().unwrap(),
+        "100",
+        wait,
+    ]);
+    c
+}
+#[test]
+fn fleet_loop_wait_budget_restart_and_pure_polling_preserve_frozen_deadline() {
+    let f = Fixture::new("loop-wait", "EURUSD", 7);
+    let (db, policy, limits, id, source) = retryable_fleet_fixture(&f, 86400000);
+    let first = fleet_loop_command(&db, &id, &policy, &limits, "100")
+        .output()
+        .unwrap();
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&first.stdout).unwrap();
+    assert_eq!(report["stop_reason"], "wait-budget");
+    assert_eq!(report["wakeups"], "0");
+    assert_eq!(report["visits"], "1");
+    let c = rusqlite::Connection::open(&db).unwrap();
+    let count = || {
+        c.query_row("SELECT count(*) FROM corpus_retry_decisions", [], |r| {
+            r.get::<_, i64>(0)
+        })
+        .unwrap()
+    };
+    assert_eq!(count(), 1);
+    let second = fleet_loop_command(&db, &id, &policy, &limits, "0")
+        .output()
+        .unwrap();
+    assert!(second.status.success());
+    let next: serde_json::Value = serde_json::from_slice(&second.stdout).unwrap();
+    assert_eq!(next["stop_reason"], "retry-backoff");
+    assert_eq!(next["last_wakeup"], report["last_wakeup"]);
+    assert_eq!(next["visits"], "0");
+    assert_eq!(count(), 1);
+    let reg = rust_strategy_factory::storage::Registry::open(&db).unwrap();
+    assert_eq!(
+        rust_strategy_factory::corpus_search::status(&reg, &source).unwrap()["requeue_records"],
+        "0"
+    );
+    assert_eq!(
+        rust_strategy_factory::owned_history::list(&reg)
+            .unwrap()
+            .len(),
+        1
+    );
+    reg.integrity().unwrap();
+}
+#[test]
+fn fleet_loop_ready_retry_executes_once_then_preserves_new_permanent_failure_hold() {
+    let f = Fixture::new("loop-ready", "EURUSD", 7);
+    let (db, policy, limits, id, source) = retryable_fleet_fixture(&f, 1000);
+    let out = fleet_loop_command(&db, &id, &policy, &limits, "10000")
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(report["stop_reason"], "retry-held");
+    assert_eq!(report["wakeups"], "1");
+    let reg = rust_strategy_factory::storage::Registry::open(&db).unwrap();
+    let status = rust_strategy_factory::corpus_search::status(&reg, &source).unwrap();
+    assert_eq!(status["requeue_records"], "2");
+    assert!(
+        status["recent_slots"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|j| j["error_kind"] == "unclassified")
+    );
+    assert_eq!(
+        rust_strategy_factory::owned_history::list(&reg)
+            .unwrap()
+            .len(),
+        2
+    );
+    reg.integrity().unwrap();
+}
+#[test]
+fn fleet_loop_operator_pause_interrupts_wait_without_resuming_or_spawning_more_children() {
+    fleet_loop_intervention(false);
+}
+#[test]
+#[cfg(unix)]
+fn fleet_loop_sigterm_interrupts_wait_without_fabricating_progress() {
+    fleet_loop_intervention(true);
+}
+fn fleet_loop_intervention(signal: bool) {
+    use std::io::BufRead;
+    let f = Fixture::new(
+        if signal {
+            "loop-signal"
+        } else {
+            "loop-operator"
+        },
+        "EURUSD",
+        7,
+    );
+    let (db, policy, limits, id, _) = retryable_fleet_fixture(&f, 86400000);
+    let mut child = fleet_loop_command(&db, &id, &policy, &limits, "10000")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut line = String::new();
+    std::io::BufReader::new(child.stderr.take().unwrap())
+        .read_line(&mut line)
+        .unwrap();
+    assert!(line.contains("fleet supervision waiting"));
+    if signal {
+        assert!(
+            Command::new("kill")
+                .args(["-TERM", &child.id().to_string()])
+                .status()
+                .unwrap()
+                .success()
+        );
+    } else {
+        rust_strategy_factory::corpus_fleet::control(
+            &mut rust_strategy_factory::storage::Registry::open(&db).unwrap(),
+            &id,
+            "paused",
+        )
+        .unwrap();
+    }
+    let out = child.wait_with_output().unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(
+        report["stop_reason"],
+        if signal {
+            "signal"
+        } else {
+            "fleet-control-changed"
+        }
+    );
+    assert_eq!(report["wakeups"], "0");
+    let reg = rust_strategy_factory::storage::Registry::open(&db).unwrap();
+    assert_eq!(
+        rust_strategy_factory::owned_history::list(&reg)
+            .unwrap()
+            .len(),
+        1
+    );
+    if !signal {
+        assert_eq!(report["status"]["control"]["pause_origin"], "operator");
+    }
+    reg.integrity().unwrap();
+}
+
+#[test]
+fn fleet_loop_refuses_policy_retuning_and_invalid_wait_before_new_work() {
+    let f = Fixture::new("loop-policy", "EURUSD", 7);
+    let (db, policy, limits, id, _) = retryable_fleet_fixture(&f, 86400000);
+    let out = fleet_loop_command(&db, &id, &policy, &limits, "0")
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let reg = rust_strategy_factory::storage::Registry::open(&db).unwrap();
+    let before = rust_strategy_factory::corpus_fleet::status(&reg, &id).unwrap();
+    let owners = rust_strategy_factory::owned_history::list(&reg).unwrap();
+    assert!(
+        !fleet_loop_command(&db, &id, &policy, &limits, "3600001")
+            .output()
+            .unwrap()
+            .status
+            .success()
+    );
+    fs::write(&policy, r#"{"backoff_ms":1,"maximum_slots":2}"#).unwrap();
+    let out = fleet_loop_command(&db, &id, &policy, &limits, "100")
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("immutable source retry policy"));
+    assert_eq!(
+        rust_strategy_factory::corpus_fleet::status(&reg, &id).unwrap(),
+        before
+    );
+    assert_eq!(
+        rust_strategy_factory::owned_history::list(&reg).unwrap(),
+        owners
+    );
+    reg.integrity().unwrap();
+}

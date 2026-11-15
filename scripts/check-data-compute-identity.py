@@ -16,7 +16,7 @@ base=build()
 records=[]
 # These inputs cover admission, permissions, eligibility, streaming and resource paths.
 # Changing a comment deliberately exercises byte-level source fingerprinting.
-for name in ['src/catalog.rs','src/machine_evidence.rs','src/review_authority.rs','src/data_approval.rs','src/corpus.rs','src/resource.rs','src/corpus_search.rs','src/search_control.rs','src/corpus_failure.rs','src/retry_policy.rs','src/retry_audit.rs','src/supervision_session.rs', 'src/owned_process.rs','src/owned_history.rs','src/storage.rs','src/tick_engine.rs','src/corpus_fleet.rs','src/fleet_control.rs','src/coordinator.rs','src/operator_config.rs','src/result_artifact.rs','src/disk.rs','web/style.css']:
+for name in ['src/catalog.rs','src/machine_evidence.rs','src/review_authority.rs','src/data_approval.rs','src/corpus.rs','src/resource.rs','src/corpus_search.rs','src/search_control.rs','src/corpus_failure.rs','src/retry_policy.rs','src/retry_audit.rs','src/supervision_session.rs', 'src/owned_process.rs','src/owned_history.rs','src/storage.rs','src/tick_engine.rs','src/corpus_fleet.rs','src/fleet_control.rs','src/fleet_loop.rs','src/coordinator.rs','src/operator_config.rs','src/result_artifact.rs','src/disk.rs','web/style.css']:
     path=root/name
     original=path.read_bytes()
     changed=(original+b'\n/* reversible compute identity fixture */\n') if name.endswith('.css') else (original+b'\n// reversible compute identity fixture\n')

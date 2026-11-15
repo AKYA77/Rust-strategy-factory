@@ -671,6 +671,20 @@ fn owned_visit(
             ));
         }
     }
+    if exists
+        && crate::retry_policy::read(&registry.connection, &reference.search_id)?.is_some()
+        && corpus_search::retry_wakeup_in(
+            &registry.connection,
+            &reference.search_id,
+            chrono::Utc::now().timestamp_millis(),
+        )?
+        .is_none()
+    {
+        let status = corpus_search::status(registry, &reference.search_id)?;
+        if status["state"] == "paused" {
+            return Ok(("paused".into(), false, None, Some(status), None));
+        }
+    }
     let config = Path::new(&reference.config_path);
     let loaded = operator_config::load_search(config)?;
     if corpus_search::identity(&loaded.run())? != reference.search_id {
@@ -926,4 +940,74 @@ pub(crate) mod tests {
         drop(registry);
         std::fs::remove_dir_all(root).unwrap();
     }
+}
+
+#[derive(Serialize)]
+pub struct Wakeup {
+    pub epoch: i64,
+    pub deadline_ms: i64,
+    pub sources: Vec<String>,
+}
+pub fn retry_wakeup(registry: &Registry, id: &str, now: i64) -> Result<Option<Wakeup>> {
+    if chrono::DateTime::from_timestamp_millis(now).is_none() {
+        return Err("invalid fleet hint clock".into());
+    }
+    let tx = registry
+        .connection
+        .unchecked_transaction()
+        .map_err(|e| e.to_string())?;
+    let snapshot = read(&tx, id)?;
+    let head = crate::fleet_control::read(&tx, id)?;
+    if head.state != "paused"
+        || head.origin != Some(crate::fleet_control::Origin::SchedulerIdle)
+        || crate::fleet_control::status(&tx, id)?["history_complete"] != true
+    {
+        return Ok(None);
+    }
+    let mut deadlines = Vec::new();
+    let mut sources = Vec::new();
+    for source in &snapshot.definition.sources {
+        let exists: bool = tx
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM corpus_searches WHERE id=?1)",
+                [&source.search_id],
+                |r| r.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        if exists
+            && let Some(deadline) = corpus_search::retry_wakeup_in(&tx, &source.search_id, now)?
+        {
+            deadlines.push(deadline);
+            sources.push(source.search_id.clone());
+        }
+    }
+    let Some(deadline) = deadlines.into_iter().min() else {
+        return Ok(None);
+    };
+    let deadline = deadline.max(now.checked_add(100).ok_or("fleet wakeup clock overflow")?);
+    if chrono::DateTime::from_timestamp_millis(deadline).is_none() {
+        return Err("fleet hint deadline unsupported".into());
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(Some(Wakeup {
+        epoch: head.epoch,
+        deadline_ms: deadline,
+        sources,
+    }))
+}
+pub fn verify_supervision_policy(
+    registry: &Registry,
+    id: &str,
+    policy: &crate::retry_policy::Policy,
+) -> Result<()> {
+    let snapshot = read(&registry.connection, id)?;
+    policy.validate()?;
+    for source in snapshot.definition.sources {
+        if let Some((old, _)) = crate::retry_policy::read(&registry.connection, &source.search_id)?
+            && old != *policy
+        {
+            return Err("immutable source retry policy differs from fleet loop policy".into());
+        }
+    }
+    Ok(())
 }
