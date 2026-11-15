@@ -8,3 +8,5 @@
 
 /work/
 /dev-data/
+
+*.recovery/

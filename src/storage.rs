@@ -98,6 +98,7 @@ pub struct Counts {
     pub running: i64,
     pub attempts: i64,
 }
+pub const SCHEMA_VERSION: u32 = 18;
 pub struct Registry {
     pub(crate) connection: Connection,
 }
@@ -124,7 +125,7 @@ impl Registry {
         let version: i64 = connection
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .map_err(crate::corpus_failure::AdmissionFailure::from)?;
-        if version > 18 {
+        if version > i64::from(SCHEMA_VERSION) {
             return Err("database schema newer than supported".into());
         }
         if version == 0 {

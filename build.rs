@@ -68,6 +68,7 @@ fn main() {
         "src/fleet_control.rs",
         "src/fleet_loop.rs",
         "src/storage.rs",
+        "src/recovery.rs",
         "src/result_artifact.rs",
     ] {
         println!("cargo:rerun-if-changed={path}");
