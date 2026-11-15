@@ -1,0 +1,9 @@
+# Authenticated rotation controls and cost exports
+
+The dashboard exposes quota-bounded rotation inventory and consistent selected snapshots. Counts, cursor, epochs, observed native CPU ticks and elapsed observations remain exact strings. Missing cost observations and unavailable member metadata remain distinct from zero or verified input eligibility. Inventory/inspection reads no operator paths or source archives, and exports no lease nonce. A corrupt member can remain an availability observation while retained rotation evidence verifies; a corrupt rotation refuses verified inventory/detail/export.
+
+Control requests compare a canonical reviewed epoch in the same immediate transaction before even an idempotent action. Scheduler-idle pause may be explicitly asserted as operator intent; stale clients cannot override the newer hold. Terminal intent and member/source controls remain independent. Authentication, CSRF/origin/body guards apply, and no execution or metrics-submission endpoint is added.
+
+Selected snapshots own pending metadata/control requests and raw exports. Changing selection or receiving a current error clears stale controls/exports; delayed responses cannot replace a newer selection. Cards label published visits and actual known/unknown child observations without claiming simulations, CPU equality, legal data approval or qualification.
+
+One added Rust test covers reviewed epochs, idempotence, held inventory and nonce preservation. The tenth disposable Chromium suite covers actual linked cost strings and exact exports, security and invalid epochs, stale controls/metadata responses, idle/operator intent, member/source hold preservation, no execution endpoint, terminal controls, member metadata isolation, mobile/restart and corrupt rotation refusal. Integrated outcomes are recorded in ACCEPTANCE.md.

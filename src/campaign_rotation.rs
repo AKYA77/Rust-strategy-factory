@@ -425,6 +425,25 @@ pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
     tx.commit().map_err(db)?;
     Ok(value)
 }
+pub fn list(registry: &Registry) -> Result<Vec<serde_json::Value>> {
+    let tx = registry.connection.unchecked_transaction().map_err(db)?;
+    integrity(&tx)?;
+    let ids = {
+        let mut q = tx
+            .prepare("SELECT id FROM corpus_campaign_rotations ORDER BY id LIMIT 17")
+            .map_err(db)?;
+        q.query_map([], |r| r.get::<_, String>(0))
+            .map_err(db)?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(db)?
+    };
+    let rows = ids
+        .iter()
+        .map(|id| snapshot(&tx, id, &read(&tx, id)?))
+        .collect::<Result<Vec<_>>>()?;
+    tx.commit().map_err(db)?;
+    Ok(rows)
+}
 pub(crate) fn epoch(connection: &Connection, id: &str) -> Result<i64> {
     Ok(read(connection, id)?.epoch)
 }
@@ -437,6 +456,22 @@ fn write(connection: &Connection, s: &Snapshot) -> Result<()> {
     Ok(())
 }
 pub fn control(registry: &mut Registry, id: &str, state: &str) -> Result<()> {
+    control_at(registry, id, state, None)
+}
+pub fn control_expected(
+    registry: &mut Registry,
+    id: &str,
+    state: &str,
+    expected_epoch: i64,
+) -> Result<()> {
+    control_at(registry, id, state, Some(expected_epoch))
+}
+fn control_at(
+    registry: &mut Registry,
+    id: &str,
+    state: &str,
+    expected_epoch: Option<i64>,
+) -> Result<()> {
     if !["running", "paused", "stopped"].contains(&state) {
         return Err("invalid rotation control".into());
     }
@@ -445,6 +480,9 @@ pub fn control(registry: &mut Registry, id: &str, state: &str) -> Result<()> {
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(db)?;
     let mut s = read(&tx, id)?;
+    if expected_epoch.is_some_and(|epoch| epoch != s.epoch) {
+        return Err("stale rotation control epoch".into());
+    }
     if s.state == state && (state != "paused" || s.origin.as_deref() == Some("operator")) {
         return tx.commit().map_err(db);
     }
@@ -943,6 +981,26 @@ mod tests {
         };
         registry.connection.execute("INSERT INTO corpus_campaign_rotations(id,configuration,body,hash,state) VALUES(?1,?2,?3,?4,'running')",params![id,serde_json::to_string(&definition).unwrap(),serde_json::to_string(&body).unwrap(),data::hash(&body).unwrap()]).unwrap();
         (registry, id)
+    }
+    #[test]
+    fn reviewed_rotation_epoch_rejects_stale_idempotence_and_preserves_current_nonce() {
+        use crate::coordinator::{self, Kind};
+        let (mut registry, id) = fixture();
+        let now = chrono::Utc::now().timestamp_millis();
+        let lease = coordinator::claim(&mut registry, Kind::CampaignRotation, &id, now, 60000)
+            .unwrap()
+            .unwrap();
+        control_expected(&mut registry, &id, "running", 0).unwrap();
+        coordinator::fence(&registry.connection, &lease, now).unwrap();
+        control_expected(&mut registry, &id, "paused", 0).unwrap();
+        let held = status(&registry, &id).unwrap();
+        for state in ["running", "paused", "stopped"] {
+            assert!(control_expected(&mut registry, &id, state, 0).is_err());
+            assert_eq!(status(&registry, &id).unwrap(), held);
+        }
+        assert_eq!(list(&registry).unwrap(), vec![held]);
+        control_expected(&mut registry, &id, "running", 1).unwrap();
+        assert!(coordinator::fence(&registry.connection, &lease, now).is_err());
     }
     #[test]
     fn automatic_idle_resume_requires_same_epoch_and_cannot_override_operator_intent() {
