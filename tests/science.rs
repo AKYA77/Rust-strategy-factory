@@ -779,3 +779,36 @@ fn frozen_oos_evidence_gates_hold_real_receipt_shortfalls_and_preserve_reopen_po
     registry.integrity().unwrap();
     std::fs::remove_dir_all(directory).unwrap();
 }
+
+#[test]
+fn scientific_summary_preserves_full_width_counts_and_net_without_qualification() {
+    let directory = dir();
+    let mut registry = Registry::open(&directory.join("summary.sqlite")).unwrap();
+    let mut p = plan();
+    p.trial_budget = u64::MAX;
+    let mut report = science::execute(
+        &mut registry,
+        &input(),
+        &p,
+        "summary-build",
+        &science::Budget {
+            feature_cells: 100000,
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .report;
+    report.candidates[0]
+        .pooled_oos_reset_fold_stats
+        .sum_net_micro_usd = i128::MIN;
+    let summary = science::summary(&report).unwrap();
+    assert_eq!(summary["declared_trials"], u64::MAX.to_string());
+    assert_eq!(
+        summary["candidates"][0]["reset_fold_net_micro_usd"],
+        i128::MIN.to_string()
+    );
+    assert_eq!(summary["report_hash"], data::hash(&report).unwrap());
+    assert_eq!(summary["qualification_granted"], false);
+    assert!(summary["candidates"][0]["evidence_gate"].is_null());
+    std::fs::remove_dir_all(directory).unwrap();
+}

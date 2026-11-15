@@ -1529,6 +1529,24 @@ async fn protocols(State(app): State<Arc<App>>) -> Response {
         ),
     }
 }
+async fn protocol_summary(State(app): State<Arc<App>>, Param(id): Param<String>) -> Response {
+    if !catalog_id(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid protocol identity");
+    }
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match crate::science::read_report(&registry, &id)
+        .and_then(|r| r.map(|v| crate::science::summary(&v)).transpose())
+    {
+        Ok(Some(value)) => Json(value).into_response(),
+        Ok(None) => api_error(StatusCode::NOT_FOUND, "protocol report is not complete"),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "verified scientific summary unavailable",
+        ),
+    }
+}
 async fn protocol_detail(State(app): State<Arc<App>>, Param(id): Param<String>) -> Response {
     if id.len() != 64 || !id.bytes().all(|b| b.is_ascii_hexdigit()) {
         return api_error(StatusCode::BAD_REQUEST, "invalid protocol identity");
@@ -1722,6 +1740,7 @@ pub async fn serve_with_reviews(
         .route("/api/run-history", get(run_history))
         .route("/api/corpus/{id}/status", get(corpus_status))
         .route("/api/corpus/{id}/control", post(corpus_control))
+        .route("/api/protocols/{id}/summary", get(protocol_summary))
         .route("/api/protocols/{id}", get(protocol_detail))
         .route("/api/experiments/{id}", get(detail))
         .route("/api/experiments/{id}/trades", get(trades))

@@ -220,6 +220,15 @@ fn definition(plan: &Plan, input: &Input, revision: &str) -> Result<serde_json::
     }
     Ok(value)
 }
+
+/// Exact presentation fields derived only from a hash-verified immutable report.
+pub fn summary(report: &Report) -> Result<serde_json::Value> {
+    let candidates=report.candidates.iter().map(|c|{let s=&c.pooled_oos_reset_fold_stats;serde_json::json!({"concept_id":c.concept_id,"closed":s.closed.to_string(),"wins":s.wins.to_string(),"losses":s.losses.to_string(),"breakevens":s.breakeven.to_string(),"maximum_losing_streak":s.maximum_losing_streak.to_string(),"reset_fold_net_micro_usd":s.sum_net_micro_usd.to_string(),"unresolved_oos_positions":c.unresolved_oos_positions.to_string(),"failed_windows":c.failed_windows.to_string(),"conditional_evidence":c.win_evidence.as_ref().map(|d|serde_json::json!({"method":d.method,"observations":d.observations.to_string(),"declared_trials":d.declared_trials.to_string(),"statistical_stake_basis_points":d.policy.stake_basis_points.to_string(),"family_error_basis_points":d.policy.family_error_basis_points.to_string(),"log_final_evidence":d.log_final_evidence.to_string(),"log_threshold":d.log_family_threshold.to_string(),"numerical_margin":d.numerical_margin.to_string(),"fixed_horizon_gate_passed":d.fixed_horizon_gate_passed,"warnings":d.warnings})),"robustness":c.robustness_assessment.as_ref().map(|a|serde_json::json!({"method":a.method,"state":a.state,"cases":a.cases.len().to_string(),"limitations":a.limitations})),"evidence_gate":c.evidence_gate.as_ref().map(|a|serde_json::json!({"method":a.method,"state":a.state,"criteria_passed":a.criteria_passed,"decisions":a.decisions,"remaining_blockers":a.remaining_blockers})),"qualification_granted":false})}).collect::<Vec<_>>();
+    Ok(
+        serde_json::json!({"protocol_id":report.protocol_id,"report_hash":data::hash(report)?,"compute_revision":report.compute_revision,"status":report.status,"declared_data_class":report.data_class,"declared_trials":report.trial_budget.to_string(),"candidates":candidates,"missing_requirements":report.missing_requirements,"qualification_granted":false,"scope":"Verified report presentation; descriptive/numerical evidence never replaces independent source, exposure, full-period and final qualification."}),
+    )
+}
+
 /// Immutable report lookup verifies stored scientific evidence integrity.
 pub fn read_report(registry: &Registry, id: &str) -> Result<Option<Report>> {
     let row:Option<(String,String)>=registry.connection.query_row("SELECT report_json,report_hash FROM scientific_protocols WHERE id=?1 AND report_json IS NOT NULL",[id],|r|Ok((r.get(0)?,r.get(1)?))).optional().map_err(|e|e.to_string())?;
