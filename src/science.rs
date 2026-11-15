@@ -29,6 +29,8 @@ pub struct Plan {
     pub robustness_policy: Option<crate::robustness::ProbePolicy>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub win_evidence_policy: Option<crate::win_evidence::Policy>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence_gate_policy: Option<crate::evidence_gates::Policy>,
 }
 impl Plan {
     pub fn canonical(&self) -> Result<Self> {
@@ -40,6 +42,21 @@ impl Plan {
         }
         if let Some(policy) = &self.win_evidence_policy {
             policy.validate()?;
+        }
+        if let Some(policy) = &self.evidence_gate_policy {
+            policy.validate()?;
+            if self.win_evidence_policy.is_none()
+                || self.robustness_policy.is_none()
+                || self.folds.len() < policy.minimum_folds
+                || self.robustness_policy.as_ref().is_some_and(|p| {
+                    p.minimum_resolved_per_probe < policy.minimum_resolved_per_fold
+                        || p.minimum_net_win_rate_bps < policy.minimum_net_win_rate_bps
+                        || p.maximum_consecutive_losses > policy.maximum_consecutive_losses
+                        || p.minimum_sum_net_micro_usd < policy.minimum_net_micro_usd
+                })
+            {
+                return Err("evidence gates require frozen win/robustness policies and enough declared folds".into());
+            }
         }
         self.training.validate()?;
         self.holdout.validate()?;
@@ -166,6 +183,8 @@ pub struct CandidateEvidence {
     pub breakdown: Option<crate::diagnostics::Breakdown>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub win_evidence: Option<crate::win_evidence::Diagnostic>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence_gate: Option<crate::evidence_gates::Assessment>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Report {
@@ -186,6 +205,9 @@ pub struct ProtocolResult {
 }
 fn definition(plan: &Plan, input: &Input, revision: &str) -> Result<serde_json::Value> {
     let mut value = serde_json::json!({"version":"frozen-chronological-protocol-v7","neighborhood_method":crate::neighborhood::VERSION,"regime_method":crate::regimes::VERSION,"breakdown_method":crate::diagnostics::VERSION,"robustness_method":crate::robustness::VERSION,"robustness_cases":plan.candidates.iter().map(|s|crate::robustness::cases(s,&plan.costs)).collect::<Result<Vec<_>>>()?,"uncertainty_method":crate::uncertainty::VERSION,"plan":plan,"dataset_hash":input.dataset.manifest.content_hash,"dataset_identity":data::dataset_identity(&input.dataset.manifest)?,"profile_hash":input.dataset.manifest.profile_hash,"conversions_hash":data::hash(&input.conversions)?,"revision":revision,"engine":crate::ENGINE_VERSION,"indicators":crate::INDICATOR_VERSION,"signals":crate::SIGNAL_VERSION});
+    if plan.evidence_gate_policy.is_some() {
+        value["evidence_gate_method"] = crate::evidence_gates::VERSION.into();
+    }
     if plan.win_evidence_policy.is_some() {
         value["win_evidence_method"] = crate::win_evidence::VERSION.into();
     }
@@ -455,7 +477,8 @@ pub fn execute(
                 )
             })
             .transpose()?;
-        candidates.push(CandidateEvidence {
+        let mut candidate = CandidateEvidence {
+            evidence_gate: None,
             win_evidence: plan
                 .win_evidence_policy
                 .as_ref()
@@ -479,7 +502,22 @@ pub fn execute(
                 &observations,
                 plan.trial_budget,
             )?),
-        });
+        };
+        if let Some(policy) = &plan.evidence_gate_policy {
+            candidate.evidence_gate = Some(crate::evidence_gates::assess(
+                &candidate,
+                plan.folds.len(),
+                plan.trial_budget,
+                policy,
+                plan.win_evidence_policy
+                    .as_ref()
+                    .ok_or("frozen win policy missing")?,
+                plan.robustness_policy
+                    .as_ref()
+                    .ok_or("frozen probe policy missing")?,
+            )?);
+        }
+        candidates.push(candidate);
     }
     // Numerical/descriptive execution alone cannot certify independent research qualification.
     let report=Report {protocol_id:id.clone(),dataset_hash:input.dataset.manifest.content_hash.clone(),dataset_identity:data::dataset_identity(&input.dataset.manifest)?,compute_revision:revision.into(),status:"INSUFFICIENT_EVIDENCE".into(),data_class:input.dataset.manifest.class,trial_budget:plan.trial_budget,candidates,

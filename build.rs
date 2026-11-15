@@ -42,6 +42,7 @@ fn main() {
         "src/science.rs",
         "src/uncertainty.rs",
         "src/win_evidence.rs",
+        "src/evidence_gates.rs",
         "src/robustness.rs",
         "src/improvement.rs",
         "src/exploration.rs",

@@ -78,6 +78,47 @@ pub fn diagnose(
     let value = score.exp();
     Ok(Diagnostic{method:VERSION.into(),policy:policy.clone(),observations:trades.len(),net_wins:wins,declared_trials,log_final_evidence:score,log_maximum_evidence:maximum,log_family_threshold:threshold,numerical_margin:margin,final_evidence_if_representable:(value.is_finite()&&value>0.0).then_some(value),anytime_crossed:maximum-margin>=threshold,fixed_horizon_gate_passed:trades.len()>=policy.minimum_resolved&&score-margin>=threshold,qualification_granted:false,warnings:vec!["Conditional null: each resolved outcome's success probability given all prior information is at most1/2. This differs from an IID/common-probability win-rate claim.".into(),"Candidate, stake, outcome definition, horizon and complete multiplicity family must be frozen before exposure. A declared budget alone does not prove complete search accounting.".into(),"Breakevens are nonwins; unresolved positions, failed windows, annual samples, chronological coverage and full-period financial gates remain separate.".into(),"Final-horizon evidence alone is used; an earlier crossing cannot rescue a failed final gate. Synthetic evidence never qualifies a strategy.".into()]})
 }
+
+/// Check final evidence from exact counts; no earlier crossing can authorize a final gate.
+pub fn verify_final(d: &Diagnostic) -> Result<()> {
+    d.policy.validate()?;
+    if d.method != VERSION
+        || d.observations > 1000000
+        || d.net_wins > d.observations
+        || d.declared_trials == 0
+        || d.qualification_granted
+    {
+        return Err("conditional evidence scope/counters invalid".into());
+    }
+    let lambda = f64::from(d.policy.stake_basis_points) / 10000.0;
+    let positive = lambda.ln_1p();
+    let negative = (-lambda).ln_1p();
+    let score = d.net_wins as f64 * positive + (d.observations - d.net_wins) as f64 * negative;
+    let threshold = (d.declared_trials as f64).ln()
+        - (f64::from(d.policy.family_error_basis_points) / 10000.0).ln();
+    let margin = 64.0
+        * f64::EPSILON
+        * (d.observations as f64 * (positive.abs() + negative.abs()) + threshold.abs() + 1.0);
+    if !d.log_final_evidence.is_finite()
+        || !d.log_maximum_evidence.is_finite()
+        || !d.log_family_threshold.is_finite()
+        || !d.numerical_margin.is_finite()
+        || (d.log_final_evidence - score).abs() > margin
+        || (d.log_family_threshold - threshold).abs() > margin
+        || (d.numerical_margin - margin).abs() > 64.0 * f64::EPSILON * margin
+        || d.log_maximum_evidence < 0.0
+        || d.log_maximum_evidence + margin < score
+        || d.log_maximum_evidence > d.net_wins as f64 * positive + margin
+        || d.fixed_horizon_gate_passed
+            != (d.observations >= d.policy.minimum_resolved && score - margin >= threshold)
+        || d.anytime_crossed
+            != (d.log_maximum_evidence - d.numerical_margin >= d.log_family_threshold)
+    {
+        return Err("conditional final evidence consistency mismatch".into());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

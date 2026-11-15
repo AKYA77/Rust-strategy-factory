@@ -36,6 +36,7 @@ fn span(start: &str, end: &str) -> Interval {
 fn plan() -> Plan {
     Plan {
         win_evidence_policy: None,
+        evidence_gate_policy: None,
         uncertainty_block_ms: None,
         robustness_policy: None,
         training: span("2025-01-01T00:00:00Z", "2025-03-01T00:00:00Z"),
@@ -719,6 +720,62 @@ fn absent_win_policy_preserves_legacy_shapes_and_invalid_policy_creates_no_evide
         data::hash(&result.report).unwrap()
     );
     assert!(decoded.candidates[0].win_evidence.is_none());
+    registry.integrity().unwrap();
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn frozen_oos_evidence_gates_hold_real_receipt_shortfalls_and_preserve_reopen_policy() {
+    let directory = dir();
+    let path = directory.join("gates.sqlite");
+    let mut registry = Registry::open(&path).unwrap();
+    let input = input();
+    let mut p = plan();
+    p.evidence_gate_policy = Some(rust_strategy_factory::evidence_gates::Policy {
+        minimum_folds: 2,
+        minimum_resolved_per_fold: 20,
+        minimum_resolved_per_year: 50,
+        minimum_net_win_rate_bps: 5000,
+        maximum_consecutive_losses: 5,
+        minimum_net_micro_usd: 1,
+    });
+    assert!(p.canonical().is_err());
+    p.win_evidence_policy = Some(rust_strategy_factory::win_evidence::Policy {
+        stake_basis_points: 1000,
+        family_error_basis_points: 500,
+        minimum_resolved: 100,
+    });
+    p.robustness_policy = Some(rust_strategy_factory::robustness::ProbePolicy {
+        minimum_resolved_per_probe: 20,
+        minimum_net_win_rate_bps: 5000,
+        minimum_sum_net_micro_usd: 1,
+        maximum_consecutive_losses: 5,
+    });
+    let budget = science::Budget {
+        feature_cells: 100000,
+        ..Default::default()
+    };
+    let first = science::execute(&mut registry, &input, &p, "gate-build", &budget).unwrap();
+    let gate = first.report.candidates[0].evidence_gate.as_ref().unwrap();
+    assert_eq!(gate.state, "HELD");
+    assert!(!gate.criteria_passed);
+    assert!(!gate.qualification_granted);
+    assert!(
+        gate.decisions
+            .iter()
+            .any(|d| d.criterion == "year-2026-samples-net-and-win-rate" && !d.passed)
+    );
+    assert_eq!(first.report.status, "INSUFFICIENT_EVIDENCE");
+    drop(registry);
+    let mut registry = Registry::open(&path).unwrap();
+    let again = science::execute(&mut registry, &input, &p, "gate-build", &budget).unwrap();
+    assert!(again.reused);
+    assert_eq!(again.report.candidates[0].evidence_gate, Some(gate.clone()));
+    p.evidence_gate_policy
+        .as_mut()
+        .unwrap()
+        .minimum_resolved_per_year = 51;
+    assert!(science::execute(&mut registry, &input, &p, "gate-build", &budget).is_err());
     registry.integrity().unwrap();
     std::fs::remove_dir_all(directory).unwrap();
 }
