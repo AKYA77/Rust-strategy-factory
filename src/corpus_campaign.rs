@@ -238,6 +238,37 @@ pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
 pub(crate) fn status_on(connection: &Connection, id: &str) -> Result<serde_json::Value> {
     full_snapshot(connection, &read(connection, id)?, id, false)
 }
+pub(crate) fn retry_wakeup_in(
+    connection: &Connection,
+    id: &str,
+    policy: &crate::retry_policy::Policy,
+    now: i64,
+) -> Result<Option<i64>> {
+    policy.validate()?;
+    let plan = read(connection, id)?;
+    let head = execution(connection, id, &plan)?;
+    if head.state != "running" || head.expiry.is_some_and(|n| n > now) {
+        return Ok(None);
+    }
+    let source = &plan.regions[head.cursor].search_id;
+    let exists: bool = connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM corpus_searches WHERE id=?1)",
+            [source],
+            |r| r.get(0),
+        )
+        .map_err(db)?;
+    if !exists {
+        return Ok(None);
+    }
+    if let Some((stored, _)) = crate::retry_policy::read(connection, source)?
+        && stored != *policy
+    {
+        return Err("rotation source retry policy differs".into());
+    }
+    corpus_search::retry_wakeup_in(connection, source, now)
+}
+
 pub(crate) fn owned_binding(
     connection: &Connection,
     invocation: &str,

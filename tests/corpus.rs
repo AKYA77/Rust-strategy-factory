@@ -4841,3 +4841,192 @@ fn campaign_rotation_pressure_and_outer_publication_failure_preserve_inner_evide
         .backup(&gold.root.join("partial-copy.sqlite"))
         .unwrap();
 }
+
+// Typed-admission synthetic fault metadata; this is not an actual historical busy event.
+fn rotation_retry_fixture(
+    f: &Fixture,
+    backoff: i64,
+) -> (PathBuf, PathBuf, PathBuf, String, String) {
+    let (db, policy, limits, _fleet, source) = retryable_fleet_fixture(f, backoff);
+    let campaign =
+        rust_strategy_factory::corpus_campaign::register_file(&f.root.join("search.json"), &db, 1)
+            .unwrap();
+    let file = f.root.join("retry-rotation.json");
+    fs::write(&file,serde_json::to_vec(&serde_json::json!({"campaigns":[{"name":"typed-retry-fixture","campaign_id":campaign}],"coordinator_lease_ms":60000})).unwrap()).unwrap();
+    let id = rust_strategy_factory::campaign_rotation::register_file(&file, &db).unwrap();
+    (db, policy, limits, id, source)
+}
+fn rotation_wait_command(
+    db: &std::path::Path,
+    id: &str,
+    policy: &std::path::Path,
+    limits: &std::path::Path,
+    maximum: &str,
+    wait: &str,
+) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "campaign-rotation-loop",
+            db.to_str().unwrap(),
+            id,
+            policy.to_str().unwrap(),
+            limits.to_str().unwrap(),
+            maximum,
+            wait,
+        ])
+        .output()
+        .unwrap()
+}
+#[test]
+fn rotation_wait_budget_restarts_preserve_frozen_deadline_without_process_or_journal_spam() {
+    use rust_strategy_factory::{
+        campaign_rotation, corpus_search, owned_history, storage::Registry,
+    };
+    let f = Fixture::new("rotation-wait-budget", "EURUSD", 7);
+    let (db, policy, limits, id, source) = rotation_retry_fixture(&f, 60000);
+    let first = rotation_wait_command(&db, &id, &policy, &limits, "10", "0");
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+    let first: serde_json::Value = serde_json::from_slice(&first.stdout).unwrap();
+    assert_eq!(first["stop_reason"], "backoff");
+    let registry = Registry::open(&db).unwrap();
+    let before = corpus_search::status(&registry, &source).unwrap();
+    let epoch = campaign_rotation::status(&registry, &id).unwrap()["epoch"].clone();
+    let second = rotation_wait_command(&db, &id, &policy, &limits, "10", "30");
+    assert!(
+        second.status.success(),
+        "{}",
+        String::from_utf8_lossy(&second.stderr)
+    );
+    let second: serde_json::Value = serde_json::from_slice(&second.stdout).unwrap();
+    assert_eq!(second["stop_reason"], "wait_budget");
+    assert_eq!(second["retry_at_ms"], first["retry_at_ms"]);
+    assert!(
+        second["waited_ms"]
+            .as_str()
+            .unwrap()
+            .parse::<u64>()
+            .unwrap()
+            >= 30
+    );
+    assert_eq!(corpus_search::status(&registry, &source).unwrap(), before);
+    assert_eq!(
+        campaign_rotation::status(&registry, &id).unwrap()["epoch"],
+        epoch
+    );
+    assert!(owned_history::list(&registry).unwrap().is_empty());
+    registry.integrity().unwrap();
+}
+#[test]
+fn rotation_wait_wakes_once_then_holds_actual_permanent_execution_failure() {
+    use rust_strategy_factory::{
+        campaign_rotation, corpus_search, owned_history, storage::Registry,
+    };
+    let f = Fixture::new("rotation-wait-ready", "EURUSD", 7);
+    let (db, policy, limits, id, source) = rotation_retry_fixture(&f, 800);
+    let out = rotation_wait_command(&db, &id, &policy, &limits, "10", "3000");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(report["stop_reason"], "idle", "{report}");
+    let registry = Registry::open(&db).unwrap();
+    let held = corpus_search::status(&registry, &source).unwrap();
+    assert_eq!(held["requeue_records"], "2");
+    assert!(
+        held["recent_slots"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|v| v["retry_candidate"] == false)
+    );
+    let parents = owned_history::list(&registry).unwrap();
+    assert_eq!(parents.len(), 1);
+    assert_eq!(
+        campaign_rotation::status(&registry, &id).unwrap()["pause_origin"],
+        "scheduler_idle"
+    );
+    let again = rotation_wait_command(&db, &id, &policy, &limits, "10", "3000");
+    assert!(again.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&again.stdout).unwrap()["stop_reason"],
+        "idle"
+    );
+    assert_eq!(owned_history::list(&registry).unwrap(), parents);
+    assert_eq!(corpus_search::status(&registry, &source).unwrap(), held);
+    registry.integrity().unwrap();
+}
+#[test]
+fn rotation_wait_operator_and_sigterm_intervention_leave_retries_held() {
+    use rust_strategy_factory::{
+        campaign_rotation, corpus_search, owned_history, storage::Registry,
+    };
+    for signal in [false, true] {
+        let f = Fixture::new(
+            if signal {
+                "rotation-wait-signal"
+            } else {
+                "rotation-wait-operator"
+            },
+            "EURUSD",
+            7,
+        );
+        let (db, policy, limits, id, source) = rotation_retry_fixture(&f, 60000);
+        let mut child = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args([
+                "campaign-rotation-loop",
+                db.to_str().unwrap(),
+                &id,
+                policy.to_str().unwrap(),
+                limits.to_str().unwrap(),
+                "10",
+                "5000",
+            ])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut registry = Registry::open(&db).unwrap();
+        let start = std::time::Instant::now();
+        loop {
+            let current = campaign_rotation::status(&registry, &id).unwrap();
+            if current["pause_origin"] == "scheduler_idle" {
+                break;
+            }
+            assert!(start.elapsed() < std::time::Duration::from_secs(10));
+            assert!(child.try_wait().unwrap().is_none());
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        if signal {
+            let status = Command::new("kill")
+                .args(["-TERM", &child.id().to_string()])
+                .status()
+                .unwrap();
+            assert!(status.success());
+        } else {
+            campaign_rotation::control(&mut registry, &id, "paused").unwrap();
+        }
+        let out = child.wait_with_output().unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(
+            report["stop_reason"],
+            if signal { "signal" } else { "held" }
+        );
+        assert_eq!(
+            corpus_search::status(&registry, &source).unwrap()["requeue_records"],
+            "0"
+        );
+        assert!(owned_history::list(&registry).unwrap().is_empty());
+        registry.integrity().unwrap();
+    }
+}

@@ -732,6 +732,174 @@ pub(crate) fn integrity(connection: &Connection) -> Result<()> {
     Ok(())
 }
 
+fn retry_wakeup(
+    connection: &Connection,
+    s: &Snapshot,
+    policy: &crate::retry_policy::Policy,
+    now: i64,
+) -> Option<i64> {
+    s.definition
+        .campaigns
+        .iter()
+        .zip(&s.body.members)
+        .filter(|(_, m)| m.last_kind != "source_error")
+        .filter_map(|(m, _)| {
+            corpus_campaign::retry_wakeup_in(connection, &m.campaign_id, policy, now)
+                .ok()
+                .flatten()
+        })
+        .min()
+}
+fn resume_idle(registry: &mut Registry, id: &str, expected_epoch: i64) -> Result<bool> {
+    let tx = registry
+        .connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(db)?;
+    let mut s = read(&tx, id)?;
+    if s.state != "paused"
+        || s.origin.as_deref() != Some("scheduler_idle")
+        || s.epoch != expected_epoch
+    {
+        return Ok(false);
+    }
+    s.state = "running".into();
+    s.origin = None;
+    s.epoch = s.epoch.checked_add(1).ok_or("rotation epoch overflow")?;
+    s.body.idle = 0;
+    write(&tx, &s)?;
+    tx.execute(
+        "UPDATE corpus_campaign_rotations SET token=NULL,expires_ms=NULL WHERE id=?1",
+        [id],
+    )
+    .map_err(db)?;
+    tx.commit().map_err(db)?;
+    Ok(true)
+}
+/// Cooperative wait budget, not a hard invocation/filesystem deadline.
+pub fn run_wait(
+    database: &Path,
+    id: &str,
+    supervision: &corpus_campaign::Supervision<'_>,
+    maximum: usize,
+    total_wait_ms: u64,
+) -> Result<serde_json::Value> {
+    use std::sync::atomic::Ordering;
+    use std::time::{Duration, Instant};
+    if !(1..=10000).contains(&maximum) || total_wait_ms > 3600000 {
+        return Err("rotation loop requires 1..10000 visits and 0..3600000 wait ms".into());
+    }
+    supervision.limits.validate()?;
+    let policy: crate::retry_policy::Policy = operator_config::read(supervision.policy)?;
+    policy.validate()?;
+    let policy_hash = data::hash(&policy)?;
+    let mut visits = 0usize;
+    let mut checks = 0usize;
+    let mut waited = Duration::ZERO;
+    let budget = Duration::from_millis(total_wait_ms);
+    let mut last = None;
+    let mut retry_at = None;
+    let mut reason = "check_limit";
+    'outer: while checks < maximum * 2 + 1 && visits < maximum {
+        if supervision.shutdown.load(Ordering::Acquire) {
+            reason = "signal";
+            break;
+        }
+        let current_policy: crate::retry_policy::Policy =
+            operator_config::read(supervision.policy)?;
+        if data::hash(&current_policy)? != policy_hash {
+            return Err("rotation loop policy changed during invocation".into());
+        }
+        let mut registry = Registry::open(database)?;
+        let state = read(&registry.connection, id)?;
+        checks += 1;
+        if state.state == "exhausted" {
+            reason = "exhausted";
+            break;
+        }
+        if state.state == "paused" && state.origin.as_deref() == Some("scheduler_idle") {
+            let now = chrono::Utc::now().timestamp_millis();
+            let Some(deadline) = retry_wakeup(&registry.connection, &state, &policy, now) else {
+                reason = "idle";
+                break;
+            };
+            retry_at = Some(deadline);
+            if now >= deadline {
+                if !resume_idle(&mut registry, id, state.epoch)? {
+                    reason = "held";
+                    break;
+                }
+                continue;
+            }
+            if budget.is_zero() {
+                reason = "backoff";
+                break;
+            }
+            let remaining = budget.saturating_sub(waited);
+            if remaining.is_zero() {
+                reason = "wait_budget";
+                break;
+            }
+            let target = Duration::from_millis((deadline - now) as u64)
+                .max(Duration::from_millis(100))
+                .min(remaining);
+            let started = Instant::now();
+            while started.elapsed() < target {
+                if supervision.shutdown.load(Ordering::Acquire) {
+                    waited += started.elapsed();
+                    reason = "signal";
+                    break 'outer;
+                }
+                let live_policy: crate::retry_policy::Policy =
+                    operator_config::read(supervision.policy)?;
+                if data::hash(&live_policy)? != policy_hash {
+                    return Err("rotation loop policy changed during wait".into());
+                }
+                let current = read(&registry.connection, id)?;
+                if current.state != "paused"
+                    || current.origin.as_deref() != Some("scheduler_idle")
+                    || current.epoch != state.epoch
+                {
+                    waited += started.elapsed();
+                    reason = "held";
+                    break 'outer;
+                }
+                std::thread::sleep(
+                    Duration::from_millis(50).min(target.saturating_sub(started.elapsed())),
+                );
+            }
+            waited += started.elapsed();
+            continue;
+        }
+        if state.state != "running" {
+            reason = "held";
+            break;
+        }
+        drop(registry);
+        let value = step(database, id, supervision)?;
+        let visited = value["kind"] == "visited";
+        visits += usize::from(visited);
+        if !visited {
+            reason = match value["kind"].as_str() {
+                Some("pressure") => "pressure",
+                Some("busy_or_held") => "busy_or_held",
+                Some("signal") => "signal",
+                _ => "held",
+            };
+            last = Some(value);
+            break;
+        }
+        last = Some(value);
+    }
+    if supervision.shutdown.load(Ordering::Acquire) {
+        reason = "signal";
+    } else if visits >= maximum {
+        reason = "visit_limit";
+    }
+    Ok(
+        serde_json::json!({"rotation_id":id,"visits":visits.to_string(),"checks":checks.to_string(),"waited_ms":waited.as_millis().to_string(),"retry_at_ms":retry_at.map(|n|n.to_string()),"stop_reason":reason,"last":last,"qualification_granted":false,"limitations":"Foreground cumulative cooperative waiting for typed eligible source retries only. Source errors and operator/terminal holds do not auto-resume; no hard filesystem/kernel deadline or new simulation count is implied."}),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -775,6 +943,31 @@ mod tests {
         };
         registry.connection.execute("INSERT INTO corpus_campaign_rotations(id,configuration,body,hash,state) VALUES(?1,?2,?3,?4,'running')",params![id,serde_json::to_string(&definition).unwrap(),serde_json::to_string(&body).unwrap(),data::hash(&body).unwrap()]).unwrap();
         (registry, id)
+    }
+    #[test]
+    fn automatic_idle_resume_requires_same_epoch_and_cannot_override_operator_intent() {
+        let (mut registry, id) = fixture();
+        let mut s = read(&registry.connection, &id).unwrap();
+        s.state = "paused".into();
+        s.origin = Some("scheduler_idle".into());
+        s.body.idle = 2;
+        write(&registry.connection, &s).unwrap();
+        control(&mut registry, &id, "paused").unwrap();
+        assert!(!resume_idle(&mut registry, &id, 0).unwrap());
+        assert_eq!(
+            read(&registry.connection, &id).unwrap().origin.as_deref(),
+            Some("operator")
+        );
+        control(&mut registry, &id, "running").unwrap();
+        let mut s = read(&registry.connection, &id).unwrap();
+        s.state = "paused".into();
+        s.origin = Some("scheduler_idle".into());
+        s.body.idle = 2;
+        s.epoch += 1;
+        write(&registry.connection, &s).unwrap();
+        assert!(!resume_idle(&mut registry, &id, s.epoch - 1).unwrap());
+        assert!(resume_idle(&mut registry, &id, s.epoch).unwrap());
+        assert_eq!(read(&registry.connection, &id).unwrap().state, "running");
     }
     #[test]
     fn rotation_epoch_and_actual_schema_fence_competing_and_stale_actors() {
