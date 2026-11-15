@@ -352,16 +352,6 @@ fn owned_visits(
     cursor: usize,
     attempt: i64,
 ) -> Result<(Vec<serde_json::Value>, String)> {
-    let total: usize = connection
-        .query_row(
-            "SELECT count(*) FROM corpus_campaign_owned_visits",
-            [],
-            |r| r.get(0),
-        )
-        .map_err(db)?;
-    if total > 128 {
-        return Err("campaign owned visit global quota exceeded".into());
-    }
     let head: Option<(usize, String)> = connection
         .query_row(
             "SELECT count,hash FROM corpus_campaign_owned_heads WHERE campaign_id=?1",
@@ -474,14 +464,7 @@ fn append_owned(
     {
         return Err("owned campaign report binding mismatch".into());
     }
-    let total: usize = connection
-        .query_row(
-            "SELECT count(*) FROM corpus_campaign_owned_visits",
-            [],
-            |r| r.get(0),
-        )
-        .map_err(db)?;
-    if total >= 128 {
+    if head.owned_visits.len() >= 128 {
         return Err("campaign owned visit quota reached".into());
     }
     let item = OwnedVisit {
@@ -854,6 +837,9 @@ fn step_with(
                 &lease,
                 chrono::Utc::now().timestamp_millis(),
             )?;
+            if head.owned_visits.len() >= 128 {
+                return Err("campaign owned visit quota reached before child admission".into());
+            }
             let parent = crate::owned_process::run_region(
                 crate::owned_process::RegionInput {
                     config: Path::new(&plan.config_path),

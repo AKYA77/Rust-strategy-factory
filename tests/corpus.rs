@@ -4480,7 +4480,41 @@ fn campaign_owned_publication_failure_preserves_unlinked_parent_and_completed_so
     let (_, db, id, policy, limits) = campaign_owned_fixture(&f, 1);
     let c = rusqlite::Connection::open(&db).unwrap();
     c.execute_batch("CREATE TRIGGER injected_campaign_owned BEFORE INSERT ON corpus_campaign_owned_visits WHEN NEW.advance_region IS NOT NULL BEGIN SELECT RAISE(ABORT,'injected owned link failure');END;").unwrap();
-    let failed = campaign_owned_command(&db, &id, &policy, &limits, "100");
+    let mut injected_failure = None;
+    for _ in 0..100 {
+        let attempt = campaign_owned_command(&db, &id, &policy, &limits, "100");
+        if !attempt.status.success() {
+            injected_failure = Some(attempt);
+            break;
+        }
+        let report: serde_json::Value = serde_json::from_slice(&attempt.stdout).unwrap();
+        let observed = Registry::open(&db).unwrap();
+        let campaign = corpus_campaign::status(&observed, &id).unwrap();
+        assert!(
+            campaign["execution"]["completed_regions"]
+                .as_array()
+                .unwrap()
+                .is_empty(),
+            "{report}"
+        );
+        let source = corpus_search::status(
+            &observed,
+            campaign["regions"][0]["search_id"].as_str().unwrap(),
+        )
+        .unwrap();
+        let running = source["state"] == "running" && source["lease_active"] == false;
+        let retryable = source["state"] == "paused"
+            && source["control"]["pause_origin"] == "worker_error"
+            && source["recent_slots"][0]["error_kind"] == "registry_admission_busy"
+            && source["recent_slots"][0]["retry_candidate"] == true;
+        assert!(
+            running || retryable,
+            "rollback fixture stopped before its fault: {report}; source {source}"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    let failed = injected_failure
+        .expect("bounded source progress must exercise injected owned-link rollback");
     assert!(!failed.status.success());
     assert!(String::from_utf8_lossy(&failed.stderr).contains("injected owned link failure"));
     let registry = Registry::open(&db).unwrap();
@@ -5744,4 +5778,253 @@ fn mixed_budget_sessions_drop_prior_slots_before_parallel_resume_without_new_ref
         .unwrap()
         .integrity()
         .unwrap();
+}
+
+#[test]
+fn campaign_ledgers_exceed_global128_without_cross_campaign_quota_or_extra_children_at_own_cap() {
+    use rust_strategy_factory::{
+        corpus_campaign, corpus_search, operator_config, owned_history, research,
+        storage::Registry, tick_engine,
+    };
+    let f = Fixture::new("campaign-ledger-lifetime", "EURUSD", 37);
+    let profile = Profile::synthetic("EURUSD").unwrap();
+    let mut paths = Vec::new();
+    for i in 0..129u64 {
+        let phase = i % 20;
+        let wave = if phase < 10 { phase } else { 20 - phase };
+        let bid = 10000 + wave as i64 * 300;
+        let part = data::dataset(
+            profile.clone(),
+            vec![Tick {
+                timestamp_ms: 1735689600000 + i as i64 * 60000,
+                sequence: i,
+                bid,
+                ask: bid + 10,
+            }],
+            "SYNTHETIC campaign ledger lifetime fixture",
+            "generated-no-archive".into(),
+            true,
+        )
+        .unwrap();
+        let path = f.root.join(format!("lifetime-{i}.rsf"));
+        native::write(&path, &part).unwrap();
+        paths.push(path);
+    }
+    let spec = corpus::describe(&paths, 100).unwrap();
+    fs::write(
+        f.root.join("lifetime.json"),
+        serde_json::to_vec(&spec).unwrap(),
+    )
+    .unwrap();
+    let (db, policy, limits) = (
+        f.root.join("lifetime.sqlite"),
+        f.root.join("policy.json"),
+        f.root.join("limits.json"),
+    );
+    fs::write(&policy, br#"{"backoff_ms":1,"maximum_slots":1}"#).unwrap();
+    fs::write(
+        &limits,
+        br#"{"maximum_wall_ms":30000,"shutdown_grace_ms":1000,"maximum_output_bytes":1048576}"#,
+    )
+    .unwrap();
+    let mut configs = Vec::new();
+    let mut campaigns = Vec::new();
+    for (index, chunks) in [1, 64].into_iter().enumerate() {
+        let config = f.root.join(format!("lifetime-config-{index}.json"));
+        fs::write(&config,serde_json::to_vec(&serde_json::json!({"specification":"lifetime.json","seed":42,"start_index":21,"maximum_candidates":1,"queue_width":1,"budget":{"max_candles":1000+index,"feature_cells":100000,"max_receipts":10000},"limits":{"workers":1,"max_parallel_candles":1001,"max_parallel_feature_cells":100000,"max_parallel_receipts":10000,"max_new_chunks":chunks,"lease_ms":60000}})).unwrap()).unwrap();
+        campaigns.push(corpus_campaign::register_file(&config, &db, 1).unwrap());
+        configs.push(config);
+    }
+    let invoke = |id: &str, n: &str| {
+        let output = campaign_owned_command(&db, id, &policy, &limits, n);
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap()
+    };
+    fn drive(
+        database: &std::path::Path,
+        id: &str,
+        policy: &std::path::Path,
+        limits: &std::path::Path,
+        target: Option<usize>,
+    ) {
+        for _ in 0..100 {
+            let registry = Registry::open(database).unwrap();
+            let status = corpus_campaign::status(&registry, id).unwrap();
+            let count = status["execution"]["owned_visits"]
+                .as_array()
+                .unwrap()
+                .len();
+            if target.is_some_and(|n| count == n)
+                || (target.is_none() && status["execution"]["state"] == "exhausted")
+            {
+                return;
+            }
+            let remaining = target.map_or(100, |n| n.checked_sub(count).unwrap());
+            let output =
+                campaign_owned_command(database, id, policy, limits, &remaining.to_string());
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let current = corpus_campaign::status(&registry, id).unwrap();
+            if target.is_some_and(|n| {
+                current["execution"]["owned_visits"]
+                    .as_array()
+                    .unwrap()
+                    .len()
+                    == n
+            }) || (target.is_none() && current["execution"]["state"] == "exhausted")
+            {
+                return;
+            }
+            let source = corpus_search::status(
+                &registry,
+                current["regions"][0]["search_id"].as_str().unwrap(),
+            )
+            .unwrap();
+            let running = source["state"] == "running" && source["lease_active"] == false;
+            let retryable = source["state"] == "paused"
+                && source["control"]["pause_origin"] == "worker_error"
+                && source["recent_slots"][0]["error_kind"] == "registry_admission_busy"
+                && source["recent_slots"][0]["retry_candidate"] == true;
+            assert!(
+                running || retryable,
+                "unexpected ledger fixture hold: {source}; {}",
+                String::from_utf8_lossy(&output.stdout)
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        panic!("bounded ledger fixture did not reach its declared target");
+    }
+    drive(&db, &campaigns[0], &policy, &limits, Some(128));
+    drive(&db, &campaigns[1], &policy, &limits, None);
+    let mut registry = Registry::open(&db).unwrap();
+    let a = corpus_campaign::status(&registry, &campaigns[0]).unwrap();
+    let b = corpus_campaign::status(&registry, &campaigns[1]).unwrap();
+    assert_eq!(
+        a["execution"]["owned_visits"].as_array().unwrap().len(),
+        128
+    );
+    let second_links = b["execution"]["owned_visits"].as_array().unwrap().len();
+    assert!(second_links >= 3);
+    let source = a["regions"][0]["search_id"].as_str().unwrap();
+    fn parent_count(registry: &Registry) -> usize {
+        let mut count = 0;
+        let mut after = None;
+        loop {
+            let page = owned_history::page(registry, after.as_deref(), 128).unwrap();
+            count += page.rows.len();
+            let Some(next) = page.next_cursor else { break };
+            after = Some(next);
+        }
+        count
+    }
+    let parents = parent_count(&registry);
+    assert_eq!(parents, 128 + second_links);
+    assert!(parents > 128);
+    let attempts = registry.counts().unwrap().attempts;
+    let blocked = campaign_owned_command(&db, &campaigns[0], &policy, &limits, "1");
+    assert!(!blocked.status.success());
+    assert!(String::from_utf8_lossy(&blocked.stderr).contains("before child admission"));
+    assert_eq!(registry.counts().unwrap().attempts, attempts);
+    assert_eq!(parent_count(&registry), parents);
+    assert_eq!(
+        corpus_campaign::status(&registry, &campaigns[0]).unwrap()["execution"]["owned_visits"],
+        a["execution"]["owned_visits"]
+    );
+    corpus_search::control(&mut registry, source, "paused").unwrap();
+    let held = invoke(&campaigns[0], "1");
+    assert_eq!(held["children_started"], "0");
+    corpus_search::control(&mut registry, source, "running").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-search",
+            configs[0].to_str().unwrap(),
+            db.to_str().unwrap(),
+            "100",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let finalized = invoke(&campaigns[0], "8");
+    assert_eq!(finalized["children_started"], "0");
+    assert_eq!(finalized["stop_reason"], "exhausted");
+    assert_eq!(parent_count(&registry), parents);
+    let statuses: Vec<_> = campaigns
+        .iter()
+        .map(|id| corpus_campaign::status(&registry, id).unwrap())
+        .collect();
+    for status in &statuses {
+        assert_eq!(
+            status["execution"]["completed_regions"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        for visit in status["execution"]["owned_visits"].as_array().unwrap() {
+            let parent =
+                owned_history::status(&registry, visit["invocation_id"].as_str().unwrap()).unwrap();
+            assert_eq!(parent["summary"]["reaped"], true);
+            assert_eq!(parent["observation_hash"], visit["parent_observation_hash"]);
+            assert_eq!(parent["summary"]["report_hash"], visit["report_hash"]);
+        }
+    }
+    for config in &configs {
+        let loaded = operator_config::load_search(config).unwrap();
+        let strategy = research::candidate_at(21, 42).unwrap().1;
+        let key = tick_engine::corpus_key(
+            &loaded.base,
+            &loaded.specification,
+            &strategy,
+            &loaded.costs,
+            loaded.file.budget,
+        )
+        .unwrap();
+        let stored = registry.result(&key.identity().unwrap()).unwrap().unwrap();
+        let reference = tick_engine::replay_corpus(
+            &loaded.base,
+            &loaded.specification,
+            &strategy,
+            &loaded.costs,
+            loaded.file.budget,
+        )
+        .unwrap();
+        assert!(!reference.trades.is_empty());
+        assert_eq!(
+            stored.result["tick_replay"],
+            serde_json::to_value(reference).unwrap()
+        );
+    }
+    registry.integrity().unwrap();
+    let backup = f.root.join("lifetime-backup.sqlite");
+    registry.backup(&backup).unwrap();
+    let restored = Registry::open(&backup).unwrap();
+    for (index, id) in campaigns.iter().enumerate() {
+        assert_eq!(
+            corpus_campaign::status(&restored, id).unwrap(),
+            statuses[index]
+        );
+    }
+    let c = rusqlite::Connection::open(&db).unwrap();
+    c.execute(
+        "UPDATE corpus_campaign_owned_heads SET hash=?2 WHERE campaign_id=?1",
+        rusqlite::params![campaigns[1], "0".repeat(64)],
+    )
+    .unwrap();
+    assert!(corpus_campaign::status(&registry, &campaigns[1]).is_err());
+    assert_eq!(
+        corpus_campaign::status(&registry, &campaigns[0]).unwrap(),
+        statuses[0]
+    );
+    assert!(registry.integrity().is_err());
 }
