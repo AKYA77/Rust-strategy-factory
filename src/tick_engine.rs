@@ -1436,6 +1436,14 @@ pub struct CorpusBatchSession {
     workers: Vec<WorkerPreparation>,
 }
 impl CorpusBatchSession {
+    fn constrain_retention(&mut self, workers: usize, largest: usize, cap: usize) {
+        // Across rounds a prior large context can move to another worker while
+        // its old copy is still retained. Reserve that worst case for EVERY
+        // worker, or discard old slots before dynamic assignment begins.
+        if largest.checked_mul(workers).is_none_or(|total| total > cap) {
+            self.release();
+        }
+    }
     pub fn release(&mut self) {
         self.workers.clear();
         self.binding = None;
@@ -1515,6 +1523,14 @@ fn execute_corpus_batch_session(
             return Err("corpus concurrent budget exceeds declared cap".into());
         }
     }
+    session.constrain_retention(
+        workers,
+        runs.iter()
+            .map(|run| run.budget.max_candles)
+            .max()
+            .ok_or("empty corpus batch")?,
+        limits.max_parallel_candles,
+    );
     let mut identities = std::collections::BTreeSet::new();
     let mut sources = std::collections::BTreeMap::new();
     let mut invocation_inputs = Vec::with_capacity(runs.len());
@@ -1703,6 +1719,44 @@ mod worker_preparation_tests {
             feature_cells: 100000,
             max_receipts: 10000,
         }
+    }
+    #[test]
+    fn retained_worker_reservations_cover_dynamic_reassignment_or_release_before_work() {
+        let source = Source::new("retention-reservations");
+        let costs = Costs::default();
+        let strategy = strategy();
+        let mut budget = budget();
+        budget.max_candles = 500;
+        let run = CorpusRun {
+            base: &source.root,
+            spec: &source.spec,
+            strategy: &strategy,
+            costs: &costs,
+            budget,
+        };
+        let mut worker = WorkerPreparation::default();
+        worker.prepare(&run).unwrap();
+        let retained = worker.slot.as_ref().unwrap().1.retained_candles();
+        assert!(retained * 2 > 520);
+        let mut session = CorpusBatchSession {
+            binding: Some("fixture".into()),
+            workers: vec![worker],
+        };
+        session.constrain_retention(2, 500, 1000);
+        assert_eq!(session.retained_candles(), retained);
+        assert!(session.binding.is_some());
+        // Top-two jobs could be500 and20. That520 admission does NOT reserve
+        // two500 slots if the large job moves workers on the following round.
+        session.constrain_retention(2, 500, 520);
+        assert_eq!(session.retained_candles(), 0);
+        assert!(session.binding.is_none());
+        let mut worker = WorkerPreparation::default();
+        worker.prepare(&run).unwrap();
+        session.workers.push(worker);
+        session.binding = Some("fixture".into());
+        session.constrain_retention(2, usize::MAX, usize::MAX);
+        assert_eq!(session.retained_candles(), 0);
+        assert!(session.binding.is_none());
     }
     #[test]
     fn worker_preparation_refuses_mutation_before_registration_and_recovers_after_restore() {

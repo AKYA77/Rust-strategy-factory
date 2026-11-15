@@ -5627,3 +5627,121 @@ fn multi_round_cli_preparation_session_reuses_after_restart_and_preserves_full_r
         .integrity()
         .unwrap();
 }
+
+#[test]
+fn mixed_budget_sessions_drop_prior_slots_before_parallel_resume_without_new_refusal() {
+    use rust_strategy_factory::{
+        contracts::{Conversion, Side},
+        strategies::{Features, Rule, Strategy},
+        tick_engine::{
+            self, CorpusBatchLimits, CorpusBatchSession, CorpusBudget, CorpusProgress, CorpusRun,
+            Costs,
+        },
+    };
+    let f = Fixture::new("mixed-reservation-resume", "EURUSD", 37);
+    let data = data::synthetic_fixture("EURUSD").unwrap();
+    let mut paths = Vec::new();
+    for (index, ticks) in data.ticks.chunks(500).enumerate() {
+        let part = data::dataset(
+            data.profile.clone(),
+            ticks.to_vec(),
+            &data.manifest.source,
+            data.manifest.archive_hash.clone(),
+            true,
+        )
+        .unwrap();
+        let path = f.root.join(format!("mixed-{index}.rsf"));
+        native::write(&path, &part).unwrap();
+        paths.push(path);
+    }
+    let spec = corpus::describe(&paths, 10000).unwrap();
+    let strategies = [Timeframe::M1, Timeframe::H1].map(|timeframe| Strategy {
+        timeframe,
+        side: Side::Long,
+        stop_ticks: 100,
+        rule: Rule::AboveMean { window: 2 },
+        entry: None,
+        stop_policy: None,
+    });
+    let budgets = [500, 20].map(|max_candles| CorpusBudget {
+        max_candles,
+        feature_cells: 100000,
+        max_receipts: 10000,
+    });
+    let prepared = corpus::prepare(&f.root, &spec, Timeframe::M1, 500).unwrap();
+    assert!(
+        prepared.retained_candles() * 2 > 520,
+        "duplicating this actual large context would exceed the admitted top-two job budget"
+    );
+    drop(prepared);
+    let costs = Costs::default();
+    let runs: Vec<_> = strategies
+        .iter()
+        .zip(budgets)
+        .map(|(strategy, budget)| CorpusRun {
+            base: &f.root,
+            spec: &spec,
+            strategy,
+            costs: &costs,
+            budget,
+        })
+        .collect();
+    let limits = CorpusBatchLimits {
+        workers: 2,
+        max_parallel_candles: 520,
+        max_parallel_feature_cells: 200000,
+        max_parallel_receipts: 20000,
+        max_new_chunks: 1,
+        lease_ms: 60000,
+    };
+    let mut session = CorpusBatchSession::default();
+    let db = f.root.join("mixed.sqlite");
+    for round in 0..spec.chunks.len() {
+        let report = session.round(&db, &runs, limits).unwrap();
+        assert_eq!(report.worker_failures, 0);
+        assert_eq!(report.preparation.builds, 2);
+        assert_eq!(report.preparation.reuses, 0);
+        assert_eq!(report.preparation.current_byte_checks, 0);
+        assert!(session.retained_candles() <= 520);
+        for (index, outcome) in report.jobs.into_iter().enumerate() {
+            match outcome.unwrap() {
+                CorpusProgress::Pending { cursor, .. } => assert_eq!(cursor, round as i64 + 1),
+                CorpusProgress::Completed {
+                    result,
+                    cached: false,
+                    ..
+                } => {
+                    assert_eq!(round + 1, spec.chunks.len());
+                    let candles = candles::build(&data, strategies[index].timeframe).unwrap();
+                    let mask = Features::new(&candles, 100000)
+                        .unwrap()
+                        .signal(&strategies[index].rule)
+                        .unwrap();
+                    let reference = tick_engine::replay(
+                        &data,
+                        &candles,
+                        &mask,
+                        &strategies[index],
+                        &costs,
+                        &vec![Conversion::usd(); data.ticks.len()],
+                    )
+                    .unwrap();
+                    if index == 0 {
+                        assert!(!reference.trades.is_empty());
+                    }
+                    assert_eq!(
+                        result.result["tick_replay"],
+                        serde_json::to_value(reference).unwrap()
+                    );
+                }
+                other => panic!("unexpected {other:?}"),
+            }
+        }
+    }
+    session.release();
+    assert_eq!(session.retained_candles(), 0);
+    rust_strategy_factory::storage::Registry::open(&db)
+        .unwrap()
+        .integrity()
+        .unwrap();
+}
