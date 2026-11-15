@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "test:browser": "node scripts/browser-check.cjs && node scripts/browser-review-check.cjs && node scripts/browser-corpus-check.cjs && node scripts/browser-ledger-check.cjs && node scripts/browser-trades-check.cjs && node scripts/browser-search-check.cjs && node scripts/browser-fleet-check.cjs && node scripts/browser-recovery-check.cjs"
+    "test:browser": "node scripts/browser-check.cjs && node scripts/browser-review-check.cjs && node scripts/browser-corpus-check.cjs && node scripts/browser-ledger-check.cjs && node scripts/browser-trades-check.cjs && node scripts/browser-search-check.cjs && node scripts/browser-fleet-check.cjs && node scripts/browser-recovery-check.cjs && node scripts/browser-campaign-check.cjs"
   },
   "devDependencies": {
     "playwright": "1.62.1"

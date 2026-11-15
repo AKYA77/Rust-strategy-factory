@@ -1,0 +1,9 @@
+# Authenticated campaign scope and progress controls
+
+Bounded campaign inventory and selected scope/progress snapshots now use authenticated dashboard endpoints. Metadata reads stay within registry quotas and consistent SQLite snapshots, expose exact decimal counters/seeds and omit filesystem paths and lease nonces. They verify stored definitions/progress, not current source eligibility. No HTTP endpoint accepts a campaign configuration, starts execution or writes scientific metrics.
+
+Control requests require the reviewed epoch as a canonical nonnegative signed-64 decimal string. The same immediate transaction compares the epoch before even an idempotent action, then applies the existing parent-state/nonce fence. Stale requests cannot silently resume a newer hold. Auth/session, CSRF/origin and request-body protections remain shared. Child source holds and terminal states remain independent and authoritative.
+
+The selected receipt owns pending metadata and control requests. Selection changes or pending/error responses clear controls and exact raw export ownership; delayed responses cannot replace another campaign. Cards distinguish declared candidate slots, distinct experiment identities and completed regions. Pause/resume changes parent intent; execution remains an explicit foreground CLI operation. Stop and exhaustion remain terminal.
+
+One Rust test exercises stale/idempotent reviewed epochs, active nonce preservation, inventory and held-state parity. A dedicated disposable Chromium suite exercises security/unknown metrics and invalid epochs, exact u64-max seed strings and raw export, stale metadata/control response ownership, source-hold/count preservation, no execution endpoint, terminal controls, mobile/restart and corruption refusal. Current verified outcomes are recorded in ACCEPTANCE.md. No synthetic scope or completed campaign grants qualification.

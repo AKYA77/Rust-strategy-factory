@@ -1,0 +1,192 @@
+{
+  "class": "SYNTHETIC_DEVELOPMENT_BROWSER_ONLY",
+  "version": {
+    "compute_revision": "compute-blake3:783fb835d73c9f06bc6d77571507310e74acec82add295d79ab4f159b9485d82",
+    "engine": "ordered-l1-v6-frozen-atr-stops",
+    "indicators": "causal-primitives-v4-outward-atr",
+    "package": "0.1.0",
+    "signals": "closed-publication-next-event-v3-scoped-features",
+    "software_status": "SOFTWARE_INCOMPLETE"
+  },
+  "browser_suites": [
+    {
+      "browser": "Chromium",
+      "passed": [
+        "authentication",
+        "body limit",
+        "HttpOnly/SameSite session",
+        "CSRF and origin rejection",
+        "metrics write rejection",
+        "persisted pause control",
+        "bounded improvement queue counters",
+        "strategy/trades/equity",
+        "raw receipt export",
+        "desktop/mobile",
+        "restart persistence",
+        "logout",
+        "login rate limit",
+        "auth file permissions/no overwrite",
+        "host rejection",
+        "numeric diagnostics",
+        "frozen protocol evidence",
+        "exact u64 scientific summaries and report exports",
+        "held criteria and independent blockers",
+        "stale scientific response ownership",
+        "protocol mobile/restart and corrupt-export refusal",
+        "unsafe diagnostic integer guard",
+        "exact safe-boundary currency",
+        "extreme-loss raw export",
+        "cursor history beyond100",
+        "server instrument history filter",
+        "concurrent-insert cursor stability",
+        "history query bounds",
+        "desktop/mobile history navigation",
+        "stale history response rejection",
+        "authenticated training lineage",
+        "actual parent/proposal/review links",
+        "exact training evidence exports",
+        "unsafe training integer guard and raw export",
+        "proof-only rejection view and exact export",
+        "exact u64 event-ID display, legacy guard and raw export",
+        "explicit indexed batch reference-audit detail and export",
+        "persisted audit failure monitoring desktop/mobile and read-only API",
+        "optional authenticated catalog desktop/mobile pagination, exact receipt export, declared approval limits and corrupt-state refusal"
+      ],
+      "synthetic": true
+    },
+    {
+      "browser": "Chromium",
+      "synthetic": true,
+      "passed": [
+        "legacy unconfigured reviews",
+        "owner authentication and CSRF/origin",
+        "independent credential and scope enforcement",
+        "immutable decision pages and exact export",
+        "synthetic approval refusal",
+        "actual reviewer revocation and stale-head refusal",
+        "live changed-artifact refusal",
+        "desktop/mobile layout",
+        "restart history",
+        "current authority permission failure"
+      ]
+    },
+    {
+      "browser": "Chromium",
+      "passed": [
+        "authenticated corpus status and controls",
+        "authenticated read-only exact runtime resource observations",
+        "CSRF/origin refusal",
+        "pause/resume/irreversible stop",
+        "checkpoint metadata redaction and exact export",
+        "desktop/mobile recovery controls",
+        "restart persistence",
+        "stopped CLI held without advancing checkpoint"
+      ],
+      "synthetic": true
+    },
+    {
+      "browser": "Chromium",
+      "synthetic": true,
+      "passed": [
+        "authenticated run/protocol pages beyond100",
+        "bounded invalid-query refusal",
+        "read-only routes",
+        "concurrent-insert keyset stability",
+        "exact run counters and string cursors",
+        "desktop/mobile page navigation",
+        "stale history response refusal",
+        "run controls preserve selected history page",
+        "overview omits redundant run scan on request"
+      ]
+    },
+    {
+      "browser": "Chromium",
+      "synthetic": true,
+      "actual_resolved_trades": 1600,
+      "passed": [
+        "authenticated receipt-bound trade pages beyond500",
+        "exact full-u64 event IDs on every page",
+        "query/cross-receipt cursor refusal",
+        "desktop/mobile next/previous navigation",
+        "byte-exact file-backed receipt export after pagination/restart",
+        "authenticated artifact inventory and corrupt-content refusal",
+        "stale experiment/trade response refusal and export binding",
+        "bounded200000-trade chart component with exact ending sum"
+      ]
+    },
+    {
+      "browser": "Chromium",
+      "synthetic": true,
+      "passed": [
+        "durable owned parent summaries and exact authenticated export, restart and corruption refusal",
+        "authenticated foreground session inventory, exact receipt export and cooperative stop security",
+        "stale session response ownership and restart/mobile persistence",
+        "authenticated generated queue inventory and snapshots",
+        "durable operator/worker pause origin and exact epoch/history exports",
+        "typed nonretryable execution failures and prior-kind exports",
+        "CSRF/origin/read-only enforcement",
+        "actual CLI pause/resume/replenish/exhaust",
+        "irreversible stop and no active coordinator after exit",
+        "exact snapshot export and token redaction",
+        "bounded explicit error requeue and immutable prior-error export",
+        "immutable retry policy UI and epoch-fenced admission/exact decision export",
+        "immutable paginated retry observations and exact history export",
+        "stale retry-response rejection and export ownership",
+        "active child leases preserved without busy-spin or extra attempts",
+        "desktop/mobile and restart persistence",
+        "corrupt queue refuses verified status/export"
+      ]
+    },
+    {
+      "browser": "Chromium",
+      "synthetic": true,
+      "passed": [
+        "explicit fleet loop preserves browser operator hold without work",
+        "fleet scheduler-idle/operator intent and exact epoch/transition exports",
+        "owned child rotation, linked cost observations and exact exports",
+        "authenticated multi-corpus inventory/control/snapshots",
+        "exact read-only filesystem observations and mobile cards",
+        "global disk reserve refuses before claim and exposes exact frozen policy",
+        "CSRF/origin/read-only enforcement",
+        "actual fair input rotation and returned-source-error isolation",
+        "restored source resumes under frozen identities",
+        "exact snapshot export/token redaction",
+        "irreversible rotation stop without new processes",
+        "desktop/mobile/restart",
+        "corrupt rotation refuses verified status/export"
+      ]
+    },
+    {
+      "browser": "Chromium",
+      "synthetic": true,
+      "passed": [
+        "auth/CSRF/origin/body/path/unknown-field refusal before filesystem writes",
+        "actual private WAL-inclusive snapshot and exact receipt export",
+        "reviewed-manifest restore and no active cutover/primary changes",
+        "no-overwrite/stale-manifest refusal",
+        "bounded concurrent background recovery while health responds",
+        "stale receipt/export ownership",
+        "mobile/restart persistence",
+        "corrupt contents refuse verify/restore/export without destination"
+      ]
+    },
+    {
+      "browser": "Chromium",
+      "synthetic": true,
+      "passed": [
+        "authenticated bounded campaign inventory and exact scope/progress exports",
+        "full-u64 seed strings",
+        "CSRF/origin/unknown-metrics/epoch refusal",
+        "stale epoch and delayed control/metadata ownership",
+        "no process execution endpoint or source-hold override",
+        "terminal controls and counts preservation",
+        "mobile/restart persistence",
+        "corrupt progress disables verified export and controls"
+      ]
+    }
+  ],
+  "release_build": "passed",
+  "artifact_aware_operations": "passed",
+  "live_systemd_and_target_vps": "NOT_RUN",
+  "limitations": "Disposable local synthetic fixtures and exact control/export acceptance only; not genuine market data, production operation or strategy qualification."
+}

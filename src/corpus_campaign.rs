@@ -332,11 +332,46 @@ fn execution(connection: &Connection, id: &str, plan: &Plan) -> Result<Execution
         advances,
     })
 }
+pub fn list(registry: &Registry) -> Result<Vec<serde_json::Value>> {
+    let tx = registry.connection.unchecked_transaction().map_err(db)?;
+    integrity(&tx)?;
+    let ids = {
+        let mut q = tx
+            .prepare("SELECT id FROM corpus_campaigns ORDER BY id LIMIT 17")
+            .map_err(db)?;
+        q.query_map([], |r| r.get::<_, String>(0))
+            .map_err(db)?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(db)?
+    };
+    let rows = ids
+        .iter()
+        .map(|id| full_snapshot(&tx, &read(&tx, id)?, id, false))
+        .collect::<Result<Vec<_>>>()?;
+    tx.commit().map_err(db)?;
+    Ok(rows)
+}
 pub(crate) fn epoch(connection: &Connection, id: &str) -> Result<i64> {
     Ok(execution(connection, id, &read(connection, id)?)?.epoch)
 }
 /// Controls revoke the current parent nonce; an in-flight child may finish its bounded round.
 pub fn control(registry: &mut Registry, id: &str, state: &str) -> Result<()> {
+    control_at(registry, id, state, None)
+}
+pub fn control_expected(
+    registry: &mut Registry,
+    id: &str,
+    state: &str,
+    expected_epoch: i64,
+) -> Result<()> {
+    control_at(registry, id, state, Some(expected_epoch))
+}
+fn control_at(
+    registry: &mut Registry,
+    id: &str,
+    state: &str,
+    expected_epoch: Option<i64>,
+) -> Result<()> {
     if !["running", "paused", "stopped"].contains(&state) {
         return Err("invalid campaign control".into());
     }
@@ -345,6 +380,9 @@ pub fn control(registry: &mut Registry, id: &str, state: &str) -> Result<()> {
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(db)?;
     let head = execution(&tx, id, &read(&tx, id)?)?;
+    if expected_epoch.is_some_and(|epoch| epoch != head.epoch) {
+        return Err("stale campaign control epoch".into());
+    }
     if head.state == state {
         return tx.commit().map_err(db);
     }
@@ -588,6 +626,27 @@ mod tests {
         let db = root.join("state.sqlite");
         let id = register_file(&config_path, &db, 2).unwrap();
         (root, db, id)
+    }
+    #[test]
+    fn expected_epoch_controls_and_bounded_inventory_preserve_holds_and_active_nonce() {
+        use crate::coordinator::{self, Kind};
+        let mut registry = Registry::open(Path::new(":memory:")).unwrap();
+        let (_, id) = insert_plan(&registry);
+        let now = chrono::Utc::now().timestamp_millis();
+        let lease = coordinator::claim(&mut registry, Kind::Campaign, &id, now, 60000)
+            .unwrap()
+            .unwrap();
+        control_expected(&mut registry, &id, "running", 0).unwrap();
+        coordinator::fence(&registry.connection, &lease, now).unwrap();
+        control_expected(&mut registry, &id, "paused", 0).unwrap();
+        let held = status(&registry, &id).unwrap();
+        assert!(control_expected(&mut registry, &id, "running", 0).is_err());
+        assert!(control_expected(&mut registry, &id, "paused", 0).is_err());
+        assert_eq!(status(&registry, &id).unwrap(), held);
+        assert_eq!(list(&registry).unwrap(), vec![held]);
+        control_expected(&mut registry, &id, "running", 1).unwrap();
+        assert!(coordinator::fence(&registry.connection, &lease, now).is_err());
+        assert_eq!(status(&registry, &id).unwrap()["execution"]["epoch"], "2");
     }
     #[test]
     fn publication_failure_rolls_back_advance_and_reuses_completed_source_on_restart() {

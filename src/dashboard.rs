@@ -964,6 +964,79 @@ async fn trades(
         ),
     }
 }
+async fn campaigns(State(app): State<Arc<App>>) -> Response {
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match crate::corpus_campaign::list(&registry) {
+        Ok(value) => Json(value).into_response(),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "campaign inventory integrity unavailable",
+        ),
+    }
+}
+async fn campaign_status(State(app): State<Arc<App>>, Param(id): Param<String>) -> Response {
+    if !catalog_id(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid campaign identity");
+    }
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    let exists: std::result::Result<bool, _> = registry.connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM corpus_campaigns WHERE id=?1)",
+        [&id],
+        |r| r.get(0),
+    );
+    if matches!(exists, Ok(false)) {
+        return api_error(StatusCode::NOT_FOUND, "campaign not found");
+    }
+    match crate::corpus_campaign::status(&registry, &id) {
+        Ok(value) => Json(value).into_response(),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "campaign snapshot integrity unavailable",
+        ),
+    }
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CampaignControl {
+    state: String,
+    expected_epoch: String,
+}
+async fn campaign_control(
+    State(app): State<Arc<App>>,
+    Param(id): Param<String>,
+    Json(body): Json<CampaignControl>,
+) -> Response {
+    if !catalog_id(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid campaign identity");
+    }
+    let Ok(epoch) = body.expected_epoch.parse::<i64>() else {
+        return api_error(StatusCode::BAD_REQUEST, "invalid campaign epoch");
+    };
+    if epoch < 0 || epoch.to_string() != body.expected_epoch {
+        return api_error(StatusCode::BAD_REQUEST, "invalid campaign epoch");
+    }
+    let Ok(mut registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match crate::corpus_campaign::control_expected(&mut registry, &id, &body.state, epoch) {
+        Ok(()) => match crate::corpus_campaign::status(&registry, &id) {
+            Ok(value) => Json(value).into_response(),
+            Err(_) => api_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "campaign snapshot integrity unavailable",
+            ),
+        },
+        Err(_) => api_error(
+            StatusCode::CONFLICT,
+            "campaign epoch or control transition refused",
+        ),
+    }
+}
+
 async fn corpus_fleets(State(app): State<Arc<App>>) -> Response {
     let Ok(registry) = app.registry.lock() else {
         return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
@@ -1841,6 +1914,9 @@ pub async fn serve_with_reviews(
         .route("/api/resources", get(resource_status))
         .route("/api/disk", get(disk_status))
         .route("/api/artifacts", get(artifact_status))
+        .route("/api/campaigns", get(campaigns))
+        .route("/api/campaigns/{id}", get(campaign_status))
+        .route("/api/campaigns/{id}/control", post(campaign_control))
         .route("/api/corpus-fleets", get(corpus_fleets))
         .route("/api/corpus-fleets/{id}", get(corpus_fleet_status))
         .route(
