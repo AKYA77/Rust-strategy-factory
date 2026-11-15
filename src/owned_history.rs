@@ -280,7 +280,10 @@ pub fn finish(
     status(reg, &owner.id)
 }
 pub fn status(reg: &Registry, id: &str) -> Result<serde_json::Value> {
-    let (b, _, hash) = read(&reg.connection, id)?;
+    status_on(&reg.connection, id)
+}
+pub(crate) fn status_on(c: &Connection, id: &str) -> Result<serde_json::Value> {
+    let (b, _, hash) = read(c, id)?;
     let mut v = serde_json::to_value(&b).map_err(|e| e.to_string())?;
     for field in [
         "parent_pid",

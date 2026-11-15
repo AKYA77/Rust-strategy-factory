@@ -2967,3 +2967,251 @@ fn owned_child_rss_threshold_cancels_and_preserves_actual_resource_observations(
     let registry = rust_strategy_factory::storage::Registry::open(&db).unwrap();
     registry.integrity().unwrap();
 }
+
+fn owned_fleet_files(root: &std::path::Path) -> (std::path::PathBuf, std::path::PathBuf) {
+    let policy = root.join("owned-policy.json");
+    let limits = root.join("owned-limits.json");
+    fs::write(&policy, r#"{"backoff_ms":1,"maximum_slots":1}"#).unwrap();
+    fs::write(
+        &limits,
+        r#"{"maximum_wall_ms":10000,"shutdown_grace_ms":100,"maximum_output_bytes":1048576}"#,
+    )
+    .unwrap();
+    (policy, limits)
+}
+fn owned_fleet_call(
+    db: &std::path::Path,
+    id: &str,
+    policy: &std::path::Path,
+    limits: &std::path::Path,
+    maximum: &str,
+) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-fleet-supervise",
+            db.to_str().unwrap(),
+            id,
+            policy.to_str().unwrap(),
+            limits.to_str().unwrap(),
+            maximum,
+        ])
+        .output()
+        .unwrap()
+}
+#[test]
+fn owned_fleet_rotation_preserves_scalar_receipts_exact_cost_observations_and_backup() {
+    use rust_strategy_factory::{corpus_fleet, operator_config, storage::Registry, tick_engine};
+    let first = Fixture::new("owned-fleet-parity", "EURUSD", 7);
+    let second = Fixture::new("owned-fleet-parity", "XAUUSD", 7);
+    let file = corpus_fleet_fixture(&first, &second);
+    let db = first.root.join("fleet.sqlite");
+    let id = corpus_fleet::register_file(&file, &db).unwrap();
+    let (policy, limits) = owned_fleet_files(&first.root);
+    let out = owned_fleet_call(&db, &id, &policy, &limits, "100");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(report["stop_reason"], "exhausted");
+    let registry = Registry::open(&db).unwrap();
+    let status = corpus_fleet::status(&registry, &id).unwrap();
+    assert_eq!(status["lease_active"], false);
+    for observation in status["owned_observations"].as_array().unwrap() {
+        let n = |field: &str| observation[field].as_str().unwrap().parse::<u64>().unwrap();
+        assert!(n("owned_visits") > 0);
+        assert_eq!(
+            n("cpu_observed_visits") + n("cpu_unobserved_visits"),
+            n("owned_visits")
+        );
+        assert!(n("observed_parent_elapsed_ms") > 0);
+        assert!(observation["last_invocation_id"].is_string());
+    }
+    let c = rusqlite::Connection::open(&db).unwrap();
+    let mut query=c.prepare("SELECT source_index,visit_sequence FROM corpus_fleet_owned_visits WHERE fleet_id=?1 ORDER BY visit_sequence").unwrap();
+    let links = query
+        .query_map([&id], |r| {
+            Ok((r.get::<_, usize>(0)?, r.get::<_, usize>(1)?))
+        })
+        .unwrap()
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .unwrap();
+    assert!(!links.is_empty());
+    for (index, sequence) in links {
+        assert_eq!(index, (sequence - 1) % 2);
+    }
+    for config in [
+        first.root.join("search.json"),
+        second.root.join("search.json"),
+    ] {
+        let loaded = operator_config::load_search(&config).unwrap();
+        for slot in 0..4 {
+            let (_, strategy) = rust_strategy_factory::research::candidate_at(slot, 42).unwrap();
+            let key = tick_engine::corpus_key(
+                &loaded.base,
+                &loaded.specification,
+                &strategy,
+                &loaded.costs,
+                loaded.file.budget,
+            )
+            .unwrap();
+            let result = registry.result(&key.identity().unwrap()).unwrap().unwrap();
+            assert_eq!(
+                result.result["tick_replay"],
+                serde_json::to_value(
+                    tick_engine::replay_corpus(
+                        &loaded.base,
+                        &loaded.specification,
+                        &strategy,
+                        &loaded.costs,
+                        loaded.file.budget
+                    )
+                    .unwrap()
+                )
+                .unwrap()
+            );
+        }
+    }
+    let backup = first.root.join("fleet-backup.sqlite");
+    registry.backup(&backup).unwrap();
+    let restored = Registry::open(&backup).unwrap();
+    assert_eq!(corpus_fleet::status(&restored, &id).unwrap(), status);
+    restored.integrity().unwrap();
+    assert!(
+        c.execute(
+            "UPDATE corpus_fleet_owned_visits SET source_index=1 WHERE fleet_id=?1",
+            [&id]
+        )
+        .is_err()
+    );
+    c.execute_batch("DROP TRIGGER fleet_owned_no_update;")
+        .unwrap();
+    c.execute(
+        "UPDATE corpus_fleet_owned_visits SET visit_sequence=visit_sequence+1000 WHERE fleet_id=?1",
+        [&id],
+    )
+    .unwrap();
+    assert!(registry.integrity().is_err());
+}
+#[test]
+fn owned_fleet_rejects_insufficient_coordinator_lease_before_claim_or_spawn() {
+    use rust_strategy_factory::{corpus_fleet, storage::Registry};
+    let first = Fixture::new("owned-fleet-lease", "EURUSD", 7);
+    let second = Fixture::new("owned-fleet-lease", "XAUUSD", 7);
+    let file = corpus_fleet_fixture(&first, &second);
+    let db = first.root.join("fleet.sqlite");
+    let id = corpus_fleet::register_file(&file, &db).unwrap();
+    let (policy, limits) = owned_fleet_files(&first.root);
+    fs::write(
+        &limits,
+        r#"{"maximum_wall_ms":50000,"shutdown_grace_ms":100,"maximum_output_bytes":1048576}"#,
+    )
+    .unwrap();
+    let out = owned_fleet_call(&db, &id, &policy, &limits, "1");
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("coordinator lease"));
+    let registry = Registry::open(&db).unwrap();
+    let s = corpus_fleet::status(&registry, &id).unwrap();
+    assert_eq!(s["visits"], "0");
+    assert_eq!(s["attempt"], "0");
+    assert!(
+        rust_strategy_factory::owned_history::list(&registry)
+            .unwrap()
+            .is_empty()
+    );
+    registry.integrity().unwrap();
+}
+#[test]
+fn owned_fleet_link_failure_keeps_child_evidence_and_rolls_back_rotation_prefix() {
+    use rust_strategy_factory::{corpus_fleet, storage::Registry};
+    let first = Fixture::new("owned-fleet-link", "EURUSD", 7);
+    let second = Fixture::new("owned-fleet-link", "XAUUSD", 7);
+    let file = corpus_fleet_fixture(&first, &second);
+    let db = first.root.join("fleet.sqlite");
+    let id = corpus_fleet::register_file(&file, &db).unwrap();
+    let (policy, limits) = owned_fleet_files(&first.root);
+    let c = rusqlite::Connection::open(&db).unwrap();
+    c.execute_batch("CREATE TRIGGER fail_fleet_link BEFORE INSERT ON corpus_fleet_owned_visits BEGIN SELECT RAISE(ABORT,'injected link failure');END;").unwrap();
+    let out = owned_fleet_call(&db, &id, &policy, &limits, "1");
+    assert!(!out.status.success());
+    let registry = Registry::open(&db).unwrap();
+    let s = corpus_fleet::status(&registry, &id).unwrap();
+    assert_eq!(s["visits"], "0");
+    assert_eq!(s["next_source_index"], "0");
+    assert_eq!(s["lease_active"], false);
+    let history = rust_strategy_factory::owned_history::list(&registry).unwrap();
+    assert_eq!(history.len(), 1);
+    assert!(history[0]["finished_at_ms"].is_string());
+    registry.integrity().unwrap();
+    c.execute_batch("DROP TRIGGER fail_fleet_link;").unwrap();
+    let out = owned_fleet_call(&db, &id, &policy, &limits, "1");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(report["last"]["visit"]["source_index"], "0");
+    let s = corpus_fleet::status(&registry, &id).unwrap();
+    assert_eq!(s["visits"], "1");
+    assert_eq!(s["owned_observations"][0]["owned_visits"], "1");
+    assert_eq!(
+        rust_strategy_factory::owned_history::list(&registry)
+            .unwrap()
+            .len(),
+        2
+    );
+    registry.integrity().unwrap();
+}
+
+#[test]
+fn owned_fleet_isolates_missing_input_and_never_overrides_operator_source_pause() {
+    use rust_strategy_factory::{corpus_fleet, corpus_search, storage::Registry};
+    let first = Fixture::new("owned-fleet-isolation", "EURUSD", 7);
+    let second = Fixture::new("owned-fleet-isolation", "XAUUSD", 7);
+    let file = corpus_fleet_fixture(&first, &second);
+    let db = first.root.join("fleet.sqlite");
+    let id = corpus_fleet::register_file(&file, &db).unwrap();
+    let (policy, limits) = owned_fleet_files(&first.root);
+    let artifact = std::path::Path::new(&first.spec.chunks[0].path);
+    let hidden = first.root.join("unavailable.rsf");
+    fs::rename(artifact, &hidden).unwrap();
+    let invoke = || {
+        let out = owned_fleet_call(&db, &id, &policy, &limits, "1");
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()
+    };
+    let blocked = invoke();
+    assert_eq!(blocked["last"]["visit"]["source_index"], "0");
+    assert_eq!(blocked["last"]["visit"]["kind"], "blocked");
+    let healthy = invoke();
+    assert_eq!(healthy["last"]["visit"]["source_index"], "1");
+    assert_eq!(
+        healthy["last"]["status"]["owned_observations"][1]["owned_visits"],
+        "1"
+    );
+    fs::rename(&hidden, artifact).unwrap();
+    let recovered = invoke();
+    let source = recovered["last"]["status"]["sources"][0]["search_id"]
+        .as_str()
+        .unwrap();
+    let mut registry = Registry::open(&db).unwrap();
+    corpus_search::control(&mut registry, source, "paused").unwrap();
+    invoke();
+    let held = invoke();
+    assert_eq!(held["last"]["visit"]["kind"], "paused");
+    assert_eq!(
+        held["last"]["status"]["owned_observations"][0]["owned_visits"],
+        "1"
+    );
+    assert_eq!(
+        corpus_search::status(&registry, source).unwrap()["control"]["pause_origin"],
+        "operator"
+    );
+    registry.integrity().unwrap();
+}

@@ -269,10 +269,11 @@ pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
         .unchecked_transaction()
         .map_err(|e| e.to_string())?;
     let snapshot = read(&tx, id)?;
+    let owned_observations = owned_observations(&tx, id, &snapshot)?;
     let sources:Vec<_>=snapshot.sources.iter().map(|source|{let reference=&snapshot.definition.sources[source.index];serde_json::json!({"index":source.index.to_string(),"name":reference.name,"search_id":reference.search_id,"visits":source.visits.to_string(),"progress_visits":source.progress.to_string(),"last_kind":source.kind,"last_obstacle":source.obstacle,"obstacle_at_visit":source.obstacle_at.map(|n|n.to_string())})}).collect();
     tx.commit().map_err(|e| e.to_string())?;
     Ok(
-        serde_json::json!({"fleet_id":id,"state":snapshot.state,"next_source_index":snapshot.cursor.to_string(),"visits":snapshot.visits.to_string(),"idle_visits":snapshot.idle.to_string(),"attempt":snapshot.attempt.to_string(),"lease_active":snapshot.expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"sources":sources,"disk_reserve_bytes":snapshot.definition.disk_guard.as_ref().map(|g|g.minimum_available_bytes.to_string()),"qualification_granted":false,"limitations":"Round-robin bounded source visits, not equal CPU allocation, new simulation counts, complete error history or qualification. Returned source errors are isolated; filesystem-stall deadlines and hard OS enforcement remain separate."}),
+        serde_json::json!({"fleet_id":id,"owned_observations":owned_observations,"state":snapshot.state,"next_source_index":snapshot.cursor.to_string(),"visits":snapshot.visits.to_string(),"idle_visits":snapshot.idle.to_string(),"attempt":snapshot.attempt.to_string(),"lease_active":snapshot.expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"sources":sources,"disk_reserve_bytes":snapshot.definition.disk_guard.as_ref().map(|g|g.minimum_available_bytes.to_string()),"qualification_granted":false,"limitations":"Round-robin bounded source visits, not equal CPU allocation, new simulation counts, complete error history or qualification. Returned source errors are isolated; filesystem-stall deadlines and hard OS enforcement remain separate."}),
     )
 }
 pub fn control(registry: &mut Registry, id: &str, state: &str) -> Result<()> {
@@ -348,6 +349,7 @@ fn publish(
     kind: &str,
     progressed: bool,
     obstacle: Option<&str>,
+    invocation: Option<&str>,
 ) -> Result<()> {
     let tx = registry
         .connection
@@ -362,6 +364,15 @@ fn publish(
         .visits
         .checked_add(1)
         .ok_or("fleet visit counter overflow")?;
+    if let Some(invocation) = invocation {
+        let observation = crate::owned_history::status_on(&tx, invocation)?;
+        if observation["search_id"] != snapshot.definition.sources[index].search_id
+            || observation["finished_at_ms"].is_null()
+        {
+            return Err("owned fleet publication identity/terminal mismatch".into());
+        }
+        tx.execute("INSERT INTO corpus_fleet_owned_visits(invocation_id,fleet_id,source_index,visit_sequence) VALUES(?1,?2,?3,?4)",params![invocation,lease.id,index,visits]).map_err(|e|e.to_string())?;
+    }
     let source = &snapshot.sources[index];
     let count = source
         .visits
@@ -401,8 +412,24 @@ fn publish(
     tx.commit().map_err(|e| e.to_string())
 }
 pub fn step(database: &Path, id: &str) -> Result<Step> {
+    step_internal(database, id, None)
+}
+fn step_internal(database: &Path, id: &str, supervision: Option<&Supervision<'_>>) -> Result<Step> {
     let mut registry = Registry::open(database)?;
     let snapshot = read(&registry.connection, id)?;
+    if let Some(supervision) = supervision {
+        let required = supervision
+            .limits
+            .maximum_wall_ms
+            .checked_add(supervision.limits.shutdown_grace_ms)
+            .and_then(|n| n.checked_add(10000))
+            .ok_or("fleet child lease budget overflow")?;
+        if required >= snapshot.definition.coordinator_lease_ms as u64 {
+            return Err(
+                "fleet coordinator lease must exceed child wall/grace plus10000ms margin".into(),
+            );
+        }
+    }
     let disk_admission = snapshot
         .definition
         .disk_guard
@@ -466,15 +493,21 @@ pub fn step(database: &Path, id: &str) -> Result<Step> {
         )?;
         let index = snapshot.cursor;
         let reference = &snapshot.definition.sources[index];
-        let (kind, progressed, obstacle, child) = match visit(&registry, database, reference) {
-            Ok(value) => value,
-            Err(error) => (
-                "blocked".into(),
-                false,
-                Some(error.chars().take(512).collect::<String>()),
-                None,
-            ),
-        };
+        let (kind, progressed, obstacle, child, invocation) =
+            match if let Some(supervision) = supervision {
+                owned_visit(&registry, database, reference, supervision)
+            } else {
+                visit(&registry, database, reference).map(|(k, p, o, c)| (k, p, o, c, None))
+            } {
+                Ok(value) => value,
+                Err(error) => (
+                    "blocked".into(),
+                    false,
+                    Some(error.chars().take(512).collect::<String>()),
+                    None,
+                    None,
+                ),
+            };
         publish(
             &mut registry,
             &lease,
@@ -482,6 +515,7 @@ pub fn step(database: &Path, id: &str) -> Result<Step> {
             &kind,
             progressed,
             obstacle.as_deref(),
+            invocation.as_deref(),
         )?;
         let status = status(&registry, id)?;
         let visit = serde_json::json!({"source_index":index.to_string(),"name":reference.name,"search_id":reference.search_id,"kind":kind,"progressed":progressed,"obstacle":obstacle,"child":child});
@@ -529,7 +563,8 @@ pub(crate) fn integrity(registry: &Registry) -> Result<()> {
         return Err("fleet inventory quota exceeded".into());
     }
     for id in ids {
-        read(&tx, &id)?;
+        let snapshot = read(&tx, &id)?;
+        owned_observations(&tx, &id, &snapshot)?;
     }
     tx.commit().map_err(|e| e.to_string())
 }
@@ -550,6 +585,183 @@ pub fn list(registry: &Registry) -> Result<Vec<serde_json::Value>> {
         return Err("fleet inventory quota exceeded".into());
     }
     ids.iter().map(|id| status(registry, id)).collect()
+}
+
+pub(crate) fn initialize_owned(connection: &mut Connection, migrate: bool) -> Result<()> {
+    let tx = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|e| e.to_string())?;
+    tx.execute_batch("CREATE TABLE IF NOT EXISTS corpus_fleet_owned_visits(invocation_id TEXT PRIMARY KEY REFERENCES corpus_owned_invocations(id),fleet_id TEXT NOT NULL REFERENCES corpus_fleets(id),source_index INTEGER NOT NULL,visit_sequence INTEGER NOT NULL CHECK(visit_sequence>0),UNIQUE(fleet_id,visit_sequence),FOREIGN KEY(fleet_id,source_index) REFERENCES corpus_fleet_sources(fleet_id,source_index));CREATE TRIGGER IF NOT EXISTS fleet_owned_no_update BEFORE UPDATE ON corpus_fleet_owned_visits BEGIN SELECT RAISE(ABORT,'owned fleet visit immutable');END;CREATE TRIGGER IF NOT EXISTS fleet_owned_no_delete BEFORE DELETE ON corpus_fleet_owned_visits BEGIN SELECT RAISE(ABORT,'owned fleet visit retained');END;").map_err(|e|e.to_string())?;
+    if migrate {
+        tx.execute_batch("UPDATE corpus_fleets SET token=NULL,expires_ms=NULL;UPDATE corpus_searches SET token=NULL,expires_ms=NULL;PRAGMA user_version=17;").map_err(|e|e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())
+}
+pub struct Supervision<'a> {
+    pub policy: &'a Path,
+    pub limits: &'a crate::owned_process::Limits,
+    pub shutdown: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+type OwnedVisit = (
+    String,
+    bool,
+    Option<String>,
+    Option<serde_json::Value>,
+    Option<String>,
+);
+fn owned_visit(
+    registry: &Registry,
+    database: &Path,
+    reference: &Reference,
+    supervision: &Supervision<'_>,
+) -> Result<OwnedVisit> {
+    let exists: bool = registry
+        .connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM corpus_searches WHERE id=?1)",
+            [&reference.search_id],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if exists {
+        let s = corpus_search::status(registry, &reference.search_id)?;
+        if s["state"] == "stopped"
+            || s["state"] == "exhausted"
+            || s["state"] == "paused" && s["control"]["pause_origin"] != "worker_error"
+        {
+            return Ok((
+                s["state"].as_str().ok_or("source state missing")?.into(),
+                false,
+                None,
+                Some(s),
+                None,
+            ));
+        }
+    }
+    let config = Path::new(&reference.config_path);
+    let loaded = operator_config::load_search(config)?;
+    if corpus_search::identity(&loaded.run())? != reference.search_id {
+        return Err("operator source no longer matches frozen search identity/build".into());
+    }
+    let report = crate::owned_process::run(
+        config,
+        supervision.policy,
+        database,
+        1,
+        0,
+        supervision.limits,
+        supervision.shutdown.clone(),
+    )?;
+    let invocation = report["invocation_id"].as_str().map(str::to_owned);
+    if invocation.is_none() {
+        let kind = match report["stop_reason"].as_str() {
+            Some("disk-pressure") => "disk-pressure",
+            Some("resource-pressure") => "resource-pressure",
+            _ => "blocked",
+        };
+        return Ok((
+            kind.into(),
+            false,
+            Some("owned child refused before spawn".into()),
+            Some(report),
+            None,
+        ));
+    }
+    let child = &report["child_report"];
+    let status = &child["last"]["status"];
+    let progressed = child["last"]["progress"]["kind"] == "advanced"
+        || child["last"]["progress"]["kind"] == "exhausted";
+    let (kind, obstacle) =
+        if report["exit_success"] != true || status["search_id"] != reference.search_id {
+            (
+                "blocked".into(),
+                Some(format!(
+                    "owned child: {}",
+                    report["stop_reason"].as_str().unwrap_or("unknown outcome")
+                )),
+            )
+        } else if status["state"] == "exhausted" {
+            ("exhausted".into(), None)
+        } else if status["state"] == "paused" {
+            ("paused".into(), None)
+        } else if status["state"] == "stopped" {
+            ("stopped".into(), None)
+        } else if progressed {
+            ("advanced".into(), None)
+        } else {
+            ("held-or-busy".into(), None)
+        };
+    Ok((kind, progressed, obstacle, Some(report), invocation))
+}
+fn owned_observations(
+    c: &Connection,
+    id: &str,
+    snapshot: &Snapshot,
+) -> Result<Vec<serde_json::Value>> {
+    let rows = {
+        let mut q=c.prepare("SELECT invocation_id,source_index,visit_sequence FROM corpus_fleet_owned_visits WHERE fleet_id=?1 ORDER BY visit_sequence LIMIT 129").map_err(|e|e.to_string())?;
+        q.query_map([id], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, usize>(1)?,
+                r.get::<_, i64>(2)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?
+    };
+    if rows.len() > 128 {
+        return Err("owned fleet link quota exceeded".into());
+    }
+    let mut counts = vec![(0u64, 0u64, 0u64, 0u64, None::<String>); snapshot.sources.len()];
+    for (invocation, index, sequence) in rows {
+        let reference = snapshot
+            .definition
+            .sources
+            .get(index)
+            .ok_or("owned fleet source outside definition")?;
+        if sequence > snapshot.visits
+            || sequence <= 0
+            || index != (sequence as usize - 1) % snapshot.sources.len()
+        {
+            return Err("owned visit outside fleet prefix".into());
+        }
+        let observation = crate::owned_history::status_on(c, &invocation)?;
+        if observation["search_id"] != reference.search_id
+            || observation["finished_at_ms"].is_null()
+        {
+            return Err("owned fleet invocation identity/terminal mismatch".into());
+        }
+        let total = &mut counts[index];
+        total.0 += 1;
+        total.4 = Some(invocation);
+        let summary = &observation["summary"];
+        if let Some(cpu) = summary["child_resources"]["last_observed_cpu_ticks"].as_str() {
+            total.1 += 1;
+            total.2 = total
+                .2
+                .checked_add(cpu.parse::<u64>().map_err(|_| "owned CPU ticks invalid")?)
+                .ok_or("owned CPU sum overflow")?;
+        }
+        total.3 = total
+            .3
+            .checked_add(
+                summary["elapsed_ms"]
+                    .as_str()
+                    .ok_or("owned elapsed missing")?
+                    .parse::<u64>()
+                    .map_err(|_| "owned elapsed invalid")?,
+            )
+            .ok_or("owned elapsed sum overflow")?;
+    }
+    counts.into_iter().enumerate().map(|(index,(visits,measured,cpu,elapsed,last))|{if visits>snapshot.sources[index].visits as u64{return Err("owned links exceed source visits".into());}Ok(serde_json::json!({"source_index":index.to_string(),"owned_visits":visits.to_string(),"cpu_observed_visits":measured.to_string(),"cpu_unobserved_visits":(visits-measured).to_string(),"observed_cpu_ticks":cpu.to_string(),"observed_parent_elapsed_ms":elapsed.to_string(),"last_invocation_id":last}))}).collect()
+}
+pub fn supervised_step(database: &Path, id: &str, supervision: &Supervision<'_>) -> Result<Step> {
+    supervision.limits.validate()?;
+    let policy: crate::retry_policy::Policy = operator_config::read(supervision.policy)?;
+    policy.validate()?;
+    step_internal(database, id, Some(supervision))
 }
 #[cfg(test)]
 mod tests {
@@ -602,7 +814,8 @@ mod tests {
                 0,
                 "blocked",
                 false,
-                Some("stale actor")
+                Some("stale actor"),
+                None
             )
             .is_err()
         );
@@ -610,9 +823,9 @@ mod tests {
         coordinator::fence(&registry.connection, &second, now + 102).unwrap();
         assert_eq!(status(&registry, &id).unwrap()["visits"], "0");
         control(&mut registry, &id, "paused").unwrap();
-        assert!(publish(&mut registry, &second, 0, "blocked", false, None).is_err());
+        assert!(publish(&mut registry, &second, 0, "blocked", false, None, None).is_err());
         control(&mut registry, &id, "running").unwrap();
-        assert!(publish(&mut registry, &second, 0, "blocked", false, None).is_err());
+        assert!(publish(&mut registry, &second, 0, "blocked", false, None, None).is_err());
         let resumed = coordinator::claim(&mut registry, Kind::Fleet, &id, now + 102, 100)
             .unwrap()
             .unwrap();

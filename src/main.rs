@@ -763,6 +763,62 @@ fn run(args: &[String]) -> Result<()> {
                 &serde_json::json!({"visits":visits,"stop_reason":reason,"last":last,"limitations":"Bounded round-robin input visits, not equal CPU allocation or new simulation counts. No process remains running after exit."}),
             )
         }
+        [
+            "corpus-fleet-supervise",
+            database,
+            id,
+            policy,
+            limits,
+            maximum,
+        ] => {
+            let maximum: usize = maximum.parse().map_err(|_| "invalid fleet visit bound")?;
+            if !(1..=10000).contains(&maximum) {
+                return Err("fleet requires1..10000 visits".into());
+            }
+            let limits: rust_strategy_factory::owned_process::Limits =
+                read_operator_config(limits)?;
+            let (_signals, shutdown) = checkpoint_shutdown()?;
+            let supervision = rust_strategy_factory::corpus_fleet::Supervision {
+                policy: Path::new(policy),
+                limits: &limits,
+                shutdown: shutdown.clone(),
+            };
+            let mut visits = 0;
+            let mut last = None;
+            let mut reason = "visit-limit";
+            for _ in 0..maximum {
+                if shutdown.load(std::sync::atomic::Ordering::Acquire) {
+                    reason = "signal";
+                    break;
+                }
+                let result = rust_strategy_factory::corpus_fleet::supervised_step(
+                    Path::new(database),
+                    id,
+                    &supervision,
+                )?;
+                visits += usize::from(result.visit.is_some());
+                let advance = result.kind == "visited";
+                if !advance {
+                    reason = if result.kind == "exhausted" {
+                        "exhausted"
+                    } else if result.kind == "no-ready-sources" {
+                        "no-ready-sources"
+                    } else {
+                        "held-or-pressure"
+                    };
+                }
+                last = Some(result);
+                if !advance {
+                    break;
+                }
+            }
+            if shutdown.load(std::sync::atomic::Ordering::Acquire) {
+                reason = "signal";
+            }
+            print(
+                &serde_json::json!({"visits":visits.to_string(),"stop_reason":reason,"last":last,"limitations":"Explicit foreground owned child visits in deterministic round order; one bounded round per visit, zero retry waiting. Measured CPU ticks do not establish equal CPU allocation or kernel enforcement."}),
+            )
+        }
         ["corpus-fleet-status", database, id] => {
             print(&rust_strategy_factory::corpus_fleet::status(
                 &Registry::open(Path::new(database))?,
@@ -1409,7 +1465,7 @@ fn run(args: &[String]) -> Result<()> {
         }
         [] | ["--help"] | ["help"] => {
             println!(
-                "Rust Strategy Factory — historical research only; SOFTWARE_INCOMPLETE\n\nvalidate-protocol <input-config.json> <plan.json> <registry.sqlite>\nreview-training <input-config.json> <registry.sqlite> <diagnosis-id>\ntraining-review-report <registry.sqlite> <review-id>\ndiagnose <registry.sqlite> <training-experiment-id>\ndiagnosis-report <registry.sqlite> <diagnosis-id>\nprotocol-report <registry.sqlite> <protocol-id>\nauth-init <new-auth.json> (password from stdin)\nserve <registry.sqlite> <auth.json> <port> [catalog.sqlite [review-config.json]]\nprofiles\nfixture <symbol> <new-dataset.json>\ngenerate\nimport <normalized.csv> <profile.json> <source-url-or-description> <new-dataset.json> <real|synthetic>\nimport-step <normalized.csv> <profile.json> <source> <import-directory> <real|synthetic> <chunk-events>\nimport-status <import-directory>\nimport-export <complete-import-directory> <new-dataset.rsf>\npack-native <dataset.json|dataset.rsf|dataset.rsfz> <new-dataset.rsf>\npack-parquet <dataset.json|dataset.rsf|dataset.rsfz> <new-dataset.parquet>\nunpack-parquet <dataset.parquet> <new-dataset.json>\ncompress-native <dataset.rsf> <new-dataset.rsfz>\ndecompress-native <dataset.rsfz> <new-dataset.rsf>\nunpack-native <dataset.rsf> <new-dataset.json>\ninspect <dataset.json|dataset.rsf>\ncatalog-record <dataset> <catalog.sqlite>\ncatalog-entry <catalog.sqlite> <dataset-identity>\narchive-evidence <normalized.csv> <dataset> <catalog.sqlite> <identity>\ncalendar-evidence <dataset> <catalog.sqlite> <identity> <declaration.json>\nmachine-admit <archive.csv> <dataset> <catalog.sqlite> <identity> <calendar.json> <claim.json>\nmachine-report <catalog.sqlite> <admission-id>\nmachine-revalidate <catalog.sqlite> <admission-id> <archive.csv> <dataset>\nreview-authority-init <reviewers.json> <new-authority.secret>\ndata-review-decide <catalog.sqlite> <authority.secret> <reviewer> <request.json> (password from stdin)\ndata-review-state <catalog.sqlite> <authority.secret> <identity>\ndata-eligibility <catalog.sqlite> <authority.secret> <machine-id> <archive.csv> <dataset>\ncatalog-review <catalog.sqlite> <request.json>\ncatalog-review-report <catalog.sqlite> <review-hash>\ncatalog-reviews <catalog.sqlite> <dataset-identity> <after-hash-or--> <limit>\ncatalog-correction <dataset> <catalog.sqlite> <parent-identity> <evidence-reason>\ncatalog-list <catalog.sqlite> [after-identity-or-- limit]\ncatalog-backup <catalog.sqlite> <new-snapshot.sqlite>\ncatalog-restore <snapshot.sqlite> <new-catalog.sqlite>\ncorpus-create <new-corpus.json> <chunk.rsf>...\nresource-status\ndisk-status <registry.sqlite-or-new-path>\ncorpus-fleet-init <fleet.json> <registry.sqlite>\ncorpus-fleet <registry.sqlite> <fleet-id> <maximum-visits>\ncorpus-fleet-status <registry.sqlite> <fleet-id>\ncorpus-fleet-control <registry.sqlite> <fleet-id> <running|paused|stopped>\ncorpus-search <config.json> <registry.sqlite> <max-rounds>\ncorpus-owned-invocations <registry.sqlite>\ncorpus-owned-status <registry.sqlite> <invocation-id>\ncorpus-supervision-sessions <registry.sqlite>\ncorpus-supervision-status <registry.sqlite> <session-id>\ncorpus-supervision-stop <registry.sqlite> <session-id>\ncorpus-supervise-owned <config.json> <policy.json> <registry.sqlite> <max-rounds> <total-wait-ms> <parent-limits.json>\ncorpus-supervise <config.json> <policy.json> <registry.sqlite> <max-rounds> <total-wait-ms>\ncorpus-retry-decisions <registry.sqlite> <search-id> <after-or--> <limit>\ncorpus-retry-configure <registry.sqlite> <search-id> <policy.json>\ncorpus-retry-admit <registry.sqlite> <search-id> <expected-epoch>\ncorpus-search-requeue <registry.sqlite> <search-id> <maximum-slots>\ncorpus-search-status <registry.sqlite> <search-id>\ncorpus-search-control <registry.sqlite> <search-id> <running|paused|stopped>\ncorpus-batch <config.json> <registry.sqlite> <max-rounds>\ncorpus-control <registry.sqlite> <experiment-id> <running|paused|stopped>\ncorpus-status <registry.sqlite> <experiment-id>\ncorpus-step <spec.json> <strategy.json> <registry.sqlite> <max-candles> <feature-cells> <max-receipts> <new-chunks> <lease-ms>\ncorpus-inspect <ordered-corpus.json>\ncoverage <dataset> <start-ms> <end-exclusive-ms> <gap-threshold-ms>\ncandles <dataset.json|dataset.rsf> <M1|M5|M15|M30|H1|H4|D1>\nevaluate <dataset.json|dataset.rsf> <strategy.json> <new-result.json>\nexperiment <dataset.json|dataset.rsf> <strategy.json> <registry.sqlite>\nregistry-check <registry.sqlite>\nregistry-artifacts <registry.sqlite>\nbackup <registry.sqlite> <new-backup.sqlite>\nresearch <config.json> <registry.sqlite> [max-steps]\nbatch-experiments <one-input-config.json> <same-timeframe-strategies.json> <registry.sqlite>\nimprovement-jobs <registry.sqlite> <run-id>\nresearch-status <registry.sqlite> <run-id>\nresearch-control <registry.sqlite> <run-id> <running|paused|stopped>\n\nSynthetic profiles do not establish broker feasibility. No strategy qualification is implemented."
+                "Rust Strategy Factory — historical research only; SOFTWARE_INCOMPLETE\n\nvalidate-protocol <input-config.json> <plan.json> <registry.sqlite>\nreview-training <input-config.json> <registry.sqlite> <diagnosis-id>\ntraining-review-report <registry.sqlite> <review-id>\ndiagnose <registry.sqlite> <training-experiment-id>\ndiagnosis-report <registry.sqlite> <diagnosis-id>\nprotocol-report <registry.sqlite> <protocol-id>\nauth-init <new-auth.json> (password from stdin)\nserve <registry.sqlite> <auth.json> <port> [catalog.sqlite [review-config.json]]\nprofiles\nfixture <symbol> <new-dataset.json>\ngenerate\nimport <normalized.csv> <profile.json> <source-url-or-description> <new-dataset.json> <real|synthetic>\nimport-step <normalized.csv> <profile.json> <source> <import-directory> <real|synthetic> <chunk-events>\nimport-status <import-directory>\nimport-export <complete-import-directory> <new-dataset.rsf>\npack-native <dataset.json|dataset.rsf|dataset.rsfz> <new-dataset.rsf>\npack-parquet <dataset.json|dataset.rsf|dataset.rsfz> <new-dataset.parquet>\nunpack-parquet <dataset.parquet> <new-dataset.json>\ncompress-native <dataset.rsf> <new-dataset.rsfz>\ndecompress-native <dataset.rsfz> <new-dataset.rsf>\nunpack-native <dataset.rsf> <new-dataset.json>\ninspect <dataset.json|dataset.rsf>\ncatalog-record <dataset> <catalog.sqlite>\ncatalog-entry <catalog.sqlite> <dataset-identity>\narchive-evidence <normalized.csv> <dataset> <catalog.sqlite> <identity>\ncalendar-evidence <dataset> <catalog.sqlite> <identity> <declaration.json>\nmachine-admit <archive.csv> <dataset> <catalog.sqlite> <identity> <calendar.json> <claim.json>\nmachine-report <catalog.sqlite> <admission-id>\nmachine-revalidate <catalog.sqlite> <admission-id> <archive.csv> <dataset>\nreview-authority-init <reviewers.json> <new-authority.secret>\ndata-review-decide <catalog.sqlite> <authority.secret> <reviewer> <request.json> (password from stdin)\ndata-review-state <catalog.sqlite> <authority.secret> <identity>\ndata-eligibility <catalog.sqlite> <authority.secret> <machine-id> <archive.csv> <dataset>\ncatalog-review <catalog.sqlite> <request.json>\ncatalog-review-report <catalog.sqlite> <review-hash>\ncatalog-reviews <catalog.sqlite> <dataset-identity> <after-hash-or--> <limit>\ncatalog-correction <dataset> <catalog.sqlite> <parent-identity> <evidence-reason>\ncatalog-list <catalog.sqlite> [after-identity-or-- limit]\ncatalog-backup <catalog.sqlite> <new-snapshot.sqlite>\ncatalog-restore <snapshot.sqlite> <new-catalog.sqlite>\ncorpus-create <new-corpus.json> <chunk.rsf>...\nresource-status\ndisk-status <registry.sqlite-or-new-path>\ncorpus-fleet-init <fleet.json> <registry.sqlite>\ncorpus-fleet <registry.sqlite> <fleet-id> <maximum-visits>\ncorpus-fleet-supervise <registry.sqlite> <fleet-id> <policy.json> <parent-limits.json> <maximum-visits>\ncorpus-fleet-status <registry.sqlite> <fleet-id>\ncorpus-fleet-control <registry.sqlite> <fleet-id> <running|paused|stopped>\ncorpus-search <config.json> <registry.sqlite> <max-rounds>\ncorpus-owned-invocations <registry.sqlite>\ncorpus-owned-status <registry.sqlite> <invocation-id>\ncorpus-supervision-sessions <registry.sqlite>\ncorpus-supervision-status <registry.sqlite> <session-id>\ncorpus-supervision-stop <registry.sqlite> <session-id>\ncorpus-supervise-owned <config.json> <policy.json> <registry.sqlite> <max-rounds> <total-wait-ms> <parent-limits.json>\ncorpus-supervise <config.json> <policy.json> <registry.sqlite> <max-rounds> <total-wait-ms>\ncorpus-retry-decisions <registry.sqlite> <search-id> <after-or--> <limit>\ncorpus-retry-configure <registry.sqlite> <search-id> <policy.json>\ncorpus-retry-admit <registry.sqlite> <search-id> <expected-epoch>\ncorpus-search-requeue <registry.sqlite> <search-id> <maximum-slots>\ncorpus-search-status <registry.sqlite> <search-id>\ncorpus-search-control <registry.sqlite> <search-id> <running|paused|stopped>\ncorpus-batch <config.json> <registry.sqlite> <max-rounds>\ncorpus-control <registry.sqlite> <experiment-id> <running|paused|stopped>\ncorpus-status <registry.sqlite> <experiment-id>\ncorpus-step <spec.json> <strategy.json> <registry.sqlite> <max-candles> <feature-cells> <max-receipts> <new-chunks> <lease-ms>\ncorpus-inspect <ordered-corpus.json>\ncoverage <dataset> <start-ms> <end-exclusive-ms> <gap-threshold-ms>\ncandles <dataset.json|dataset.rsf> <M1|M5|M15|M30|H1|H4|D1>\nevaluate <dataset.json|dataset.rsf> <strategy.json> <new-result.json>\nexperiment <dataset.json|dataset.rsf> <strategy.json> <registry.sqlite>\nregistry-check <registry.sqlite>\nregistry-artifacts <registry.sqlite>\nbackup <registry.sqlite> <new-backup.sqlite>\nresearch <config.json> <registry.sqlite> [max-steps]\nbatch-experiments <one-input-config.json> <same-timeframe-strategies.json> <registry.sqlite>\nimprovement-jobs <registry.sqlite> <run-id>\nresearch-status <registry.sqlite> <run-id>\nresearch-control <registry.sqlite> <run-id> <running|paused|stopped>\n\nSynthetic profiles do not establish broker feasibility. No strategy qualification is implemented."
             );
             Ok(())
         }
