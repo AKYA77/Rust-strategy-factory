@@ -306,6 +306,7 @@ pub(crate) mod tests {
                 max_receipts: 10000,
             },
             seed: 42,
+            start_index: 0,
             maximum_candidates: 1,
             queue_width: 1,
         };

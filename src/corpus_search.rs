@@ -25,6 +25,7 @@ pub struct SearchRun<'a> {
     pub costs: &'a Costs,
     pub budget: CorpusBudget,
     pub seed: u64,
+    pub start_index: u64,
     pub maximum_candidates: usize,
     pub queue_width: usize,
 }
@@ -34,6 +35,8 @@ struct Configuration {
     version: String,
     generator: String,
     seed: u64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    start_index: u64,
     maximum_candidates: usize,
     queue_width: usize,
     source_identity: String,
@@ -61,15 +64,24 @@ pub struct Step {
     pub kind: String,
     pub status: serde_json::Value,
 }
+fn is_zero(value: &u64) -> bool {
+    *value == 0
+}
 fn configuration(run: &SearchRun<'_>) -> Result<Configuration> {
     if !(1..=4096).contains(&run.maximum_candidates) || !(1..=32).contains(&run.queue_width) {
         return Err("invalid corpus search candidate/queue limits".into());
     }
-    let (_, first) = research::candidate_at(0, run.seed)?;
+    let last = run
+        .start_index
+        .checked_add(run.maximum_candidates as u64 - 1)
+        .ok_or("corpus search candidate range overflow")?;
+    research::candidate_at(last, run.seed)?;
+    let (_, first) = research::candidate_at(run.start_index, run.seed)?;
     Ok(Configuration {
         version: VERSION.into(),
         generator: GENERATOR.into(),
         seed: run.seed,
+        start_index: run.start_index,
         maximum_candidates: run.maximum_candidates,
         queue_width: run.queue_width,
         source_identity: run.specification.identity()?,
@@ -97,7 +109,13 @@ fn frozen_key(config: &Configuration, strategy: &Strategy) -> Result<ExperimentK
     Ok(key)
 }
 fn definition(config: &Configuration, slot: usize) -> Result<Definition> {
-    let (family, strategy) = research::candidate_at(slot as u64, config.seed)?;
+    let (family, strategy) = research::candidate_at(
+        config
+            .start_index
+            .checked_add(slot as u64)
+            .ok_or("corpus search candidate index overflow")?,
+        config.seed,
+    )?;
     let key = frozen_key(config, &strategy)?;
     Ok(Definition {
         slot,
@@ -119,8 +137,14 @@ fn register(registry: &mut Registry, config: &Configuration) -> Result<String> {
         .map_err(|e| e.to_string())?;
     if !exists {
         for slot in 0..config.maximum_candidates {
-            research::candidate_at(slot as u64, config.seed)
-                .map_err(|error| format!("frozen candidate slot {slot} refused: {error}"))?;
+            research::candidate_at(
+                config
+                    .start_index
+                    .checked_add(slot as u64)
+                    .ok_or("corpus search candidate index overflow")?,
+                config.seed,
+            )
+            .map_err(|error| format!("frozen candidate slot {slot} refused: {error}"))?;
         }
     }
     let tx = registry
@@ -207,6 +231,11 @@ fn read(connection: &Connection, id: &str) -> Result<SearchSnapshot> {
     {
         return Err("corpus search identity/cursor integrity failure".into());
     }
+    let last = config
+        .start_index
+        .checked_add(config.maximum_candidates as u64 - 1)
+        .ok_or("persisted corpus search range overflow")?;
+    research::candidate_at(last, config.seed)?;
     let (rows,bytes):(usize,usize)=connection.query_row("SELECT count(*),coalesce(sum(length(CAST(body AS BLOB))),0) FROM corpus_search_jobs WHERE search_id=?1",[id],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|e|e.to_string())?;
     if rows != cursor || bytes > 16 * 1024 * 1024 {
         return Err("corpus search persisted queue budget/cursor mismatch".into());
@@ -242,6 +271,7 @@ fn read(connection: &Connection, id: &str) -> Result<SearchSnapshot> {
         if slot != jobs.len()
             || definition.slot != slot
             || data::hash(&definition)? != hash
+            || data::hash(&self::definition(&config, slot)?)? != hash
             || definition.strategy.identity()? != definition.key.concept_hash
             || data::hash(&definition.key)?
                 != data::hash(&frozen_key(&config, &definition.strategy)?)?
@@ -709,18 +739,18 @@ pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
             .filter(|j| j.state == "queued" || j.state == "pending")
             .count(),
     );
-    let recent_requeues:Vec<_>=history.iter().rev().take(32).map(|(record,hash)|serde_json::json!({"candidate_index":record.slot.to_string(),"requeue_number":record.sequence,"at_ms":record.at_ms,"prior_error":record.prior_error,"prior_error_kind":record.prior_error_kind.unwrap_or(crate::corpus_failure::Kind::LegacyUnknown),"supervision_policy_hash":record.supervision_policy_hash,"hash":hash})).collect();
+    let recent_requeues:Vec<_>=history.iter().rev().take(32).map(|(record,hash)|serde_json::json!({"candidate_index":(config.start_index + record.slot as u64).to_string(),"slot":record.slot.to_string(),"requeue_number":record.sequence,"at_ms":record.at_ms,"prior_error":record.prior_error,"prior_error_kind":record.prior_error_kind.unwrap_or(crate::corpus_failure::Kind::LegacyUnknown),"supervision_policy_hash":record.supervision_policy_hash,"hash":hash})).collect();
     let mut counts = std::collections::BTreeMap::<String, usize>::new();
     for job in &jobs {
         *counts.entry(job.state.clone()).or_default() += 1;
     }
-    let recent:Vec<_>=jobs.iter().rev().take(32).map(|j|serde_json::json!({"candidate_index":j.definition.slot.to_string(),"family":j.definition.family,"experiment_id":j.definition.key.identity().ok(),"state":j.state,"error":j.error,"error_kind":j.error_kind,"retry_candidate":j.error_kind.is_some_and(|k|k.retry_candidate())})).collect();
+    let recent:Vec<_>=jobs.iter().rev().take(32).map(|j|serde_json::json!({"candidate_index":(config.start_index + j.definition.slot as u64).to_string(),"slot":j.definition.slot.to_string(),"family":j.definition.family,"experiment_id":j.definition.key.identity().ok(),"state":j.state,"error":j.error,"error_kind":j.error_kind,"retry_candidate":j.error_kind.is_some_and(|k|k.retry_candidate())})).collect();
     let control = crate::search_control::status(&tx, id)?;
     let retry_decisions = crate::retry_audit::status(&tx, id)?;
     let retry_policy=crate::retry_policy::read(&tx,id)?.map(|(p,hash)|serde_json::json!({"hash":hash,"backoff_ms":p.backoff_ms.to_string(),"maximum_slots":p.maximum_slots.to_string()}));
     tx.commit().map_err(|e| e.to_string())?;
     Ok(
-        serde_json::json!({"control":control,"search_id":id,"state":state,"generated_slots":cursor.to_string(),"maximum_candidates":config.maximum_candidates.to_string(),"attempt":attempt.to_string(),"lease_active":expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"slot_states":counts,"recent_slots":recent,"requeue_records":history.len().to_string(),"retry_eligible_slots":retry_eligible.to_string(),"retry_capacity":retry_capacity.to_string(),"maximum_requeues_per_slot":3,"recent_requeues":recent_requeues,"retry_decisions":retry_decisions,"retry_policy":retry_policy,"automatic_retry_enabled":false,"automatic_retry_scope":"dashboard/background","foreground_retry_supported":true,"qualification_granted":false,"limitations":"Generated slots are not new tick simulations; canonical duplicates can share immutable experiment receipts. Synthetic USD training search only."}),
+        serde_json::json!({"control":control,"search_id":id,"state":state,"generated_slots":cursor.to_string(),"start_index":config.start_index.to_string(),"maximum_candidates":config.maximum_candidates.to_string(),"attempt":attempt.to_string(),"lease_active":expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"slot_states":counts,"recent_slots":recent,"requeue_records":history.len().to_string(),"retry_eligible_slots":retry_eligible.to_string(),"retry_capacity":retry_capacity.to_string(),"maximum_requeues_per_slot":3,"recent_requeues":recent_requeues,"retry_decisions":retry_decisions,"retry_policy":retry_policy,"automatic_retry_enabled":false,"automatic_retry_scope":"dashboard/background","foreground_retry_supported":true,"qualification_granted":false,"limitations":"Generated slots are not new tick simulations; canonical duplicates can share immutable experiment receipts. Synthetic USD training search only."}),
     )
 }
 pub(crate) fn integrity(registry: &Registry) -> Result<()> {
@@ -1089,9 +1119,117 @@ mod tests {
                 max_receipts: 10000,
             },
             seed: 42,
+            start_index: 0,
             maximum_candidates: 4,
             queue_width: 2,
         }
+    }
+    #[test]
+    fn frozen_range_preserves_legacy_bytes_and_binds_deterministic_later_candidates() {
+        let (root, spec) = fixture("ranges");
+        let costs = Costs::default();
+        let mut input = run(&root, &spec, &costs);
+        let original = configuration(&input).unwrap();
+        let body = serde_json::to_value(&original).unwrap();
+        assert!(body.get("start_index").is_none());
+        let reopened: Configuration = serde_json::from_value(body.clone()).unwrap();
+        assert_eq!(
+            data::hash(&reopened).unwrap(),
+            data::hash(&original).unwrap()
+        );
+        let mut explicit_zero = body;
+        explicit_zero["start_index"] = 0.into();
+        let zero: Configuration = serde_json::from_value(explicit_zero).unwrap();
+        assert_eq!(data::hash(&zero).unwrap(), data::hash(&original).unwrap());
+        input.start_index = 12;
+        let later = configuration(&input).unwrap();
+        assert_ne!(data::hash(&later).unwrap(), data::hash(&original).unwrap());
+        for slot in 0..input.maximum_candidates {
+            let candidate = definition(&later, slot).unwrap();
+            assert_eq!(
+                candidate.strategy.identity().unwrap(),
+                research::candidate_at(12 + slot as u64, input.seed)
+                    .unwrap()
+                    .1
+                    .identity()
+                    .unwrap()
+            );
+            assert_eq!(
+                candidate.key.identity().unwrap(),
+                tick_engine::corpus_key(&root, &spec, &candidate.strategy, &costs, input.budget)
+                    .unwrap()
+                    .identity()
+                    .unwrap()
+            );
+        }
+        let mut registry = Registry::open(&root.join("state.sqlite")).unwrap();
+        let first_id = register(&mut registry, &original).unwrap();
+        control(&mut registry, &first_id, "paused").unwrap();
+        let later_id = register(&mut registry, &later).unwrap();
+        assert_eq!(later_id, register(&mut registry, &later).unwrap());
+        assert_eq!(status(&registry, &first_id).unwrap()["state"], "paused");
+        assert_eq!(status(&registry, &later_id).unwrap()["start_index"], "12");
+        registry.integrity().unwrap();
+        registry.backup(&root.join("backup.sqlite")).unwrap();
+        drop(registry);
+        let restored = Registry::open(&root.join("backup.sqlite")).unwrap();
+        assert_eq!(status(&restored, &later_id).unwrap()["start_index"], "12");
+        drop(restored);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn resigned_valid_candidate_from_another_range_cannot_replace_a_frozen_slot() {
+        let (root, spec) = fixture("range-substitution");
+        let costs = Costs::default();
+        let mut input = run(&root, &spec, &costs);
+        input.start_index = 12;
+        let config = configuration(&input).unwrap();
+        let mut registry = Registry::open(&root.join("state.sqlite")).unwrap();
+        let id = register(&mut registry, &config).unwrap();
+        let mut forged = definition(&config, 0).unwrap();
+        forged.strategy = research::candidate_at(0, input.seed).unwrap().1;
+        forged.key = frozen_key(&config, &forged.strategy).unwrap();
+        assert_ne!(
+            data::hash(&forged).unwrap(),
+            data::hash(&definition(&config, 0).unwrap()).unwrap()
+        );
+        registry.connection.execute("INSERT INTO corpus_search_jobs(search_id,slot,body,hash,state) VALUES(?1,0,?2,?3,'queued')", params![id,serde_json::to_string(&forged).unwrap(),data::hash(&forged).unwrap()]).unwrap();
+        registry
+            .connection
+            .execute("UPDATE corpus_searches SET cursor=1 WHERE id=?1", [&id])
+            .unwrap();
+        assert!(status(&registry, &id).is_err());
+        assert!(registry.integrity().is_err());
+        assert!(registry.backup(&root.join("refused.sqlite")).is_err());
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn range_overflow_and_grammar_exhaustion_refuse_before_registry_creation() {
+        let (root, spec) = fixture("range-overflow");
+        let costs = Costs::default();
+        let db = root.join("must-not-exist.sqlite");
+        for start_index in [u64::MAX, u64::MAX - 1, 1_000_000_000] {
+            let mut input = run(&root, &spec, &costs);
+            input.start_index = start_index;
+            assert!(
+                step(
+                    &db,
+                    input,
+                    CorpusBatchLimits {
+                        workers: 1,
+                        max_parallel_candles: 10000,
+                        max_parallel_feature_cells: 1000000,
+                        max_parallel_receipts: 10000,
+                        max_new_chunks: 1,
+                        lease_ms: 60000
+                    }
+                )
+                .is_err()
+            );
+            assert!(!db.exists());
+        }
+        std::fs::remove_dir_all(root).unwrap();
     }
     #[test]
     fn pause_intent_epochs_and_backup_preserve_operator_override() {

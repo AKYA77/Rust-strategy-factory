@@ -1370,6 +1370,7 @@ fn durable_corpus_search_reopens_drains_then_replenishes_and_matches_scalar_rece
         costs: &costs,
         budget,
         seed: 42,
+        start_index: 0,
         maximum_candidates: 4,
         queue_width: 2,
     };
@@ -1455,6 +1456,7 @@ fn durable_search_backup_and_terminal_controls_preserve_original_queue() {
         costs: &costs,
         budget,
         seed: 42,
+        start_index: 0,
         maximum_candidates: 2,
         queue_width: 2,
     };
@@ -1512,6 +1514,7 @@ fn corpus_search_worker_errors_pause_without_becoming_completed_evidence() {
                 max_receipts: 1000,
             },
             seed: 42,
+            start_index: 0,
             maximum_candidates: 2,
             queue_width: 2,
         },
@@ -3791,4 +3794,77 @@ fn blocked_artifact_above_legacy_chunk_cap_has_bounded_resident_quotes() {
     let old = f.root.join("large.rsf");
     native::write(&old, &d).unwrap();
     assert!(corpus::describe(&[old, path], 2000000).is_err());
+}
+
+#[test]
+fn corpus_search_cli_later_range_reopens_and_reuses_exact_scalar_receipts() {
+    use rust_strategy_factory::{
+        corpus_search, operator_config, research, storage::Registry, tick_engine,
+    };
+    let f = Fixture::new("later-range-cli", "EURUSD", 7);
+    let config = corpus_search_fixture(&f);
+    let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&config).unwrap()).unwrap();
+    value["start_index"] = 12.into();
+    value["maximum_candidates"] = 2.into();
+    fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+    let db = f.root.join("later.sqlite");
+    let call = || {
+        let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args([
+                "corpus-search",
+                config.to_str().unwrap(),
+                db.to_str().unwrap(),
+                "100",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()
+    };
+    let first = call();
+    let loaded = operator_config::load_search(&config).unwrap();
+    let id = corpus_search::identity(&loaded.run()).unwrap();
+    let registry = Registry::open(&db).unwrap();
+    let before = registry.counts().unwrap();
+    let snapshot = corpus_search::status(&registry, &id).unwrap();
+    assert_eq!(snapshot["state"], "exhausted", "{first}");
+    assert_eq!(snapshot["start_index"], "12");
+    for index in 12..14 {
+        let strategy = research::candidate_at(index, 42).unwrap().1;
+        let key = tick_engine::corpus_key(
+            &loaded.base,
+            &loaded.specification,
+            &strategy,
+            &loaded.costs,
+            loaded.file.budget,
+        )
+        .unwrap();
+        let stored = registry.result(&key.identity().unwrap()).unwrap().unwrap();
+        assert_eq!(
+            stored.result["tick_replay"],
+            serde_json::to_value(
+                tick_engine::replay_corpus(
+                    &loaded.base,
+                    &loaded.specification,
+                    &strategy,
+                    &loaded.costs,
+                    loaded.file.budget
+                )
+                .unwrap()
+            )
+            .unwrap()
+        );
+    }
+    drop(registry);
+    call();
+    let registry = Registry::open(&db).unwrap();
+    assert_eq!(
+        serde_json::to_value(before).unwrap(),
+        serde_json::to_value(registry.counts().unwrap()).unwrap()
+    );
+    registry.integrity().unwrap();
 }

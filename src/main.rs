@@ -963,6 +963,7 @@ fn run(args: &[String]) -> Result<()> {
                         costs: &costs,
                         budget: file.budget,
                         seed: file.seed,
+                        start_index: file.start_index,
                         maximum_candidates: file.maximum_candidates,
                         queue_width: file.queue_width,
                     },

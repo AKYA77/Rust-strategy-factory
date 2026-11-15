@@ -28,6 +28,8 @@ pub struct SearchFile {
     pub disk_guard: Option<crate::disk::Guard>,
     pub specification: String,
     pub seed: u64,
+    #[serde(default)]
+    pub start_index: u64,
     pub maximum_candidates: usize,
     pub queue_width: usize,
     pub budget: tick_engine::CorpusBudget,
@@ -47,6 +49,7 @@ impl LoadedSearch {
             costs: &self.costs,
             budget: self.file.budget,
             seed: self.file.seed,
+            start_index: self.file.start_index,
             maximum_candidates: self.file.maximum_candidates,
             queue_width: self.file.queue_width,
         }
