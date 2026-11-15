@@ -286,9 +286,9 @@ pub(crate) fn integrity(registry: &Registry) -> Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
-    fn fixture(name: &str) -> (std::path::PathBuf, Registry, String) {
+    pub(crate) fn fixture(name: &str) -> (std::path::PathBuf, Registry, String) {
         let root = std::env::temp_dir().join(format!("session-unit-{name}-{}", std::process::id()));
         std::fs::create_dir(&root).unwrap();
         let data = crate::data::synthetic_fixture("EURUSD").unwrap();

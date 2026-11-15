@@ -2722,6 +2722,28 @@ fn owned_foreground_child_exit_and_wall_budget_are_reaped_with_exact_receipts() 
     assert_eq!(first["child_report"]["stop_reason"], "session-stop-request");
     assert_eq!(first["session_status"]["observation"], "finished");
     assert!(first["session_status"]["receipt_hash"].is_string());
+    let mut hashed_report = first.clone();
+    hashed_report
+        .as_object_mut()
+        .unwrap()
+        .remove("invocation_status");
+    assert_eq!(
+        first["invocation_status"]["summary"]["report_hash"],
+        rust_strategy_factory::data::hash(&hashed_report).unwrap()
+    );
+    let persisted = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-owned-status",
+            db.to_str().unwrap(),
+            first["invocation_id"].as_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(persisted.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&persisted.stdout).unwrap(),
+        first["invocation_status"]
+    );
     let second = invoke("0");
     assert_eq!(second["stop_reason"], "child-exited");
     assert_eq!(second["child_report"]["stop_reason"], "retry-backoff");

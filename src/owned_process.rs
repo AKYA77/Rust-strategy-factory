@@ -127,6 +127,15 @@ pub fn run(
         .connection
         .busy_timeout(Duration::from_millis(10))
         .map_err(|e| e.to_string())?;
+    let invocation = crate::owned_history::start(
+        &mut registry,
+        &source,
+        &crate::data::hash(&loaded.file)?,
+        &crate::data::hash(&policy)?,
+        rounds,
+        wait_ms,
+        limits,
+    )?;
     let executable = std::env::current_exe().map_err(|e| e.to_string())?;
     let started_at = chrono::Utc::now().timestamp_millis();
     let start = Instant::now();
@@ -145,6 +154,7 @@ pub fn run(
             .map_err(|e| e.to_string())?,
     );
     let pid = owned.0.id();
+    crate::owned_history::attach(&mut registry, &invocation, pid)?;
     let fault = Arc::new(AtomicBool::new(false));
     let (send, receive) = mpsc::sync_channel(1);
     let stdout = owned.0.stdout.take().ok_or("child stdout missing")?;
@@ -230,9 +240,11 @@ pub fn run(
         Ok(value) => (value, None),
         Err(e) => (None, Some(e)),
     };
-    Ok(
-        serde_json::json!({"version":"owned-corpus-process-v1","search_id":source,"pid":pid.to_string(),"started_at_ms":started_at.to_string(),"finished_at_ms":chrono::Utc::now().timestamp_millis().to_string(),"elapsed_ms":start.elapsed().as_millis().to_string(),"stop_reason":cancellation.map(|v|v.0).unwrap_or(if status.success(){"child-exited"}else{"child-failed"}),"reaped":true,"forced_kill":forced,"stop_request_delivered":stop_delivered,"stop_error":stop_error,"exit_success":status.success(),"exit_code":status.code().map(|n|n.to_string()),"stdout_bytes":output.total.to_string(),"stderr_bytes":errors.total.to_string(),"stdout_truncated":output.total>cap as u64,"stderr_truncated":errors.total>cap as u64,"stdout_read_error":output.error,"stderr_read_error":errors.error,"child_report":child_report,"session_id":session,"session_status":session_status,"session_status_error":session_status_error,"limits":limits,"limitations":"Explicit foreground parent, same executable only; sampled wall budget plus cooperative grace. Forced termination can leave an unclosed session and fenced work. No hard kernel/filesystem deadline or survival after parent death is claimed."}),
-    )
+    let mut report = serde_json::json!({"invocation_id":invocation.id,"version":"owned-corpus-process-v1","search_id":source,"pid":pid.to_string(),"started_at_ms":started_at.to_string(),"finished_at_ms":chrono::Utc::now().timestamp_millis().to_string(),"elapsed_ms":start.elapsed().as_millis().to_string(),"stop_reason":cancellation.map(|v|v.0).unwrap_or(if status.success(){"child-exited"}else{"child-failed"}),"reaped":true,"forced_kill":forced,"stop_request_delivered":stop_delivered,"stop_error":stop_error,"exit_success":status.success(),"exit_code":status.code().map(|n|n.to_string()),"stdout_bytes":output.total.to_string(),"stderr_bytes":errors.total.to_string(),"stdout_truncated":output.total>cap as u64,"stderr_truncated":errors.total>cap as u64,"stdout_read_error":output.error,"stderr_read_error":errors.error,"child_report":child_report,"session_id":session,"session_status":session_status,"session_status_error":session_status_error,"limits":limits,"limitations":"Explicit foreground parent, same executable only; sampled wall budget plus cooperative grace. Forced termination can leave an unclosed session and fenced work. No hard kernel/filesystem deadline or survival after parent death is claimed."});
+
+    report["invocation_status"] =
+        crate::owned_history::finish(&mut registry, &invocation, &report)?;
+    Ok(report)
 }
 #[cfg(test)]
 mod tests {

@@ -92,3 +92,5 @@ mod retry_audit;
 pub mod supervision_session;
 
 pub mod owned_process;
+
+pub mod owned_history;

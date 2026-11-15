@@ -1056,6 +1056,50 @@ async fn generated_search_status(
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SessionStopRequest {}
+async fn owned_invocations(State(app): State<Arc<App>>) -> Response {
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match crate::owned_history::list(&registry) {
+        Ok(rows) => Json(serde_json::json!({"rows":rows,"maximum_retained":"128"})).into_response(),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "verified owned invocation inventory unavailable",
+        ),
+    }
+}
+async fn owned_invocation_status(
+    State(app): State<Arc<App>>,
+    Param(id): Param<String>,
+) -> Response {
+    if !catalog_id(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid invocation identity");
+    }
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match registry.connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM corpus_owned_invocations WHERE id=?1)",
+        [&id],
+        |r| r.get::<_, bool>(0),
+    ) {
+        Ok(false) => return api_error(StatusCode::NOT_FOUND, "invocation not found"),
+        Ok(true) => {}
+        Err(_) => {
+            return api_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "invocation inventory unavailable",
+            );
+        }
+    }
+    match crate::owned_history::status(&registry, &id) {
+        Ok(value) => Json(value).into_response(),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "verified owned invocation unavailable",
+        ),
+    }
+}
 async fn supervision_sessions(State(app): State<Arc<App>>) -> Response {
     let Ok(registry) = app.registry.lock() else {
         return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
@@ -1634,6 +1678,8 @@ pub async fn serve_with_reviews(
             "/api/corpus-fleets/{id}/control",
             post(corpus_fleet_control),
         )
+        .route("/api/owned-invocations", get(owned_invocations))
+        .route("/api/owned-invocations/{id}", get(owned_invocation_status))
         .route("/api/supervision-sessions", get(supervision_sessions))
         .route("/api/supervision-sessions/{id}", get(supervision_status))
         .route(
