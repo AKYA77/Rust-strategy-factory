@@ -14,6 +14,7 @@ use std::{
     path::Path,
 };
 const VERSION: &str = "ordered-native-corpus-v1";
+const BLOCK_VERSION: &str = "ordered-block-corpus-v2";
 const SPEC_CAP: u64 = 16 * 1024 * 1024;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -21,6 +22,8 @@ pub struct Artifact {
     pub path: String,
     pub dataset_identity: String,
     pub file_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub block_root: Option<String>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -31,10 +34,16 @@ pub struct Specification {
 }
 impl Specification {
     pub fn identity(&self) -> Result<String> {
-        if self.version != VERSION
+        if ![VERSION, BLOCK_VERSION].contains(&self.version.as_str())
             || self.chunks.is_empty()
             || self.chunks.len() > 10000
-            || !(1..=100000).contains(&self.max_chunk_events)
+            || self.max_chunk_events == 0
+            || self.max_chunk_events
+                > if self.version == VERSION {
+                    100000
+                } else {
+                    2000000
+                }
         {
             return Err("invalid corpus version/chunk/event budget".into());
         }
@@ -43,9 +52,25 @@ impl Specification {
                 || c.path.len() > 4096
                 || !crate::machine_evidence::hex(&c.dataset_identity)
                 || !crate::machine_evidence::hex(&c.file_hash)
+                || c.block_root
+                    .as_ref()
+                    .is_some_and(|r| !crate::machine_evidence::hex(r))
+                || self.version == VERSION && c.block_root.is_some()
             {
                 return Err("invalid corpus artifact identity/path".into());
             }
+        }
+        if self.version == BLOCK_VERSION {
+            if !self.chunks.iter().any(|c| c.block_root.is_some()) {
+                return Err("block corpus requires a pinned block artifact".into());
+            }
+            return data::hash(&(
+                BLOCK_VERSION,
+                self.chunks
+                    .iter()
+                    .map(|c| (&c.dataset_identity, &c.file_hash, &c.block_root))
+                    .collect::<Vec<_>>(),
+            ));
         }
         // Moving unchanged artifacts does not change semantic/provenance identity.
         data::hash(&(
@@ -129,6 +154,7 @@ pub struct Report {
     pub identical_quote_events: u64,
     pub gaps_over_hour: u64,
     pub max_resident_chunk_events: usize,
+    pub max_resident_quote_events: usize,
     pub candles: Vec<CandleSummary>,
     pub limitations: &'static str,
 }
@@ -149,7 +175,7 @@ pub fn inspect(base: &Path, spec: &Specification) -> Result<Report> {
     let mut repeats = 0;
     let mut gaps = 0;
     let mut peak = 0;
-    visit_chunks(base, spec, |_, d| {
+    visit_blocks(base, spec, |d| {
         if profile.is_none() {
             for tf in Timeframe::ALL {
                 streams.push(candles::Stream::new(d.profile.clone(), tf)?);
@@ -159,7 +185,7 @@ pub fn inspect(base: &Path, spec: &Specification) -> Result<Report> {
             class = Some(d.manifest.class);
         }
         peak = peak.max(d.ticks.len());
-        for tick in &d.ticks {
+        for tick in d.ticks {
             if let Some(p) = previous {
                 if tick.timestamp_ms < p.timestamp_ms || tick.sequence <= p.sequence {
                     return Err("corpus cross-chunk timestamp/sequence order invalid".into());
@@ -192,7 +218,11 @@ pub fn inspect(base: &Path, spec: &Specification) -> Result<Report> {
         })
         .collect();
     Ok(Report {
-        version: VERSION,
+        version: if spec.version == VERSION {
+            VERSION
+        } else {
+            BLOCK_VERSION
+        },
         corpus_identity: identity,
         chunks: spec.chunks.len(),
         profile: profile.ok_or("empty corpus")?,
@@ -206,29 +236,45 @@ pub fn inspect(base: &Path, spec: &Specification) -> Result<Report> {
         identical_quote_events: repeats,
         gaps_over_hour: gaps,
         max_resident_chunk_events: peak,
+        max_resident_quote_events: peak,
         candles,
-        limitations: "Observed ordered native chunks and closed UTC candle fingerprints only. One bounded quote chunk plus seven candle states is retained; metadata and per-chunk validation allocations are additional. No empty/final unfinished candles, missing quotes, source completeness, approved class, acquisition/resume, scientific eligibility or strategy/replay streaming is established. Source archives/provenance remain separate immutable artifacts; profiles/source/class cannot be mixed.",
+        limitations: "Observed ordered native chunks and closed UTC candle fingerprints only. One bounded quote chunk plus seven candle states is retained; metadata and per-chunk validation allocations are additional. No empty/final unfinished candles, missing quotes, source completeness, approved class, acquisition/resume or scientific eligibility is established. Synthetic USD replay is a separate explicitly gated consumer. Source archives/provenance remain separate immutable artifacts; profiles/source/class cannot be mixed.",
     })
 }
 
 /// Describe existing immutable artifacts without copying them. The caller can
 /// inspect the result and publish it with the normal no-replace artifact writer.
 pub fn describe(paths: &[std::path::PathBuf], max_chunk_events: usize) -> Result<Specification> {
-    if paths.is_empty() || paths.len() > 10000 || !(1..=100000).contains(&max_chunk_events) {
+    let blocked = paths
+        .iter()
+        .any(|p| p.extension().is_some_and(|e| e == "rsfb"));
+    if paths.is_empty()
+        || paths.len() > 10000
+        || max_chunk_events == 0
+        || max_chunk_events > if blocked { 2000000 } else { 100000 }
+    {
         return Err("invalid corpus chunk budget".into());
     }
     let mut chunks = Vec::new();
     for path in paths {
         let path = std::fs::canonicalize(path).map_err(|e| e.to_string())?;
-        let (d, file_hash) = native::read_bounded(&path, max_chunk_events)?;
+        let (dataset_identity, file_hash, block_root) =
+            if path.extension().is_some_and(|e| e == "rsfb") {
+                let report = crate::blocked_native::inspect(&path, max_chunk_events)?;
+                (report.dataset_identity, report.file_hash, Some(report.root))
+            } else {
+                let (d, hash) = native::read_bounded(&path, max_chunk_events.min(100000))?;
+                (data::dataset_identity(&d.manifest)?, hash, None)
+            };
         chunks.push(Artifact {
             path: path.to_str().ok_or("non-UTF8 corpus path")?.into(),
-            dataset_identity: data::dataset_identity(&d.manifest)?,
+            dataset_identity,
             file_hash,
+            block_root,
         });
     }
     let spec = Specification {
-        version: VERSION.into(),
+        version: if blocked { BLOCK_VERSION } else { VERSION }.into(),
         max_chunk_events,
         chunks,
     };
@@ -251,8 +297,18 @@ pub fn visit_chunks(
     let mut context: Option<(Profile, String, DataClass)> = None;
     let mut previous: Option<Tick> = None;
     for (index, chunk) in spec.chunks.iter().enumerate() {
-        let (dataset, fingerprint) =
-            native::read_bounded(&base.join(&chunk.path), spec.max_chunk_events)?;
+        let (dataset, fingerprint) = if let Some(root) = &chunk.block_root {
+            let (d, report) = crate::blocked_native::read_bounded(
+                &base.join(&chunk.path),
+                spec.max_chunk_events.min(100000),
+            )?;
+            if &report.root != root {
+                return Err("blocked artifact root differs from corpus".into());
+            }
+            (d, report.file_hash)
+        } else {
+            native::read_bounded(&base.join(&chunk.path), spec.max_chunk_events.min(100000))?
+        };
         if fingerprint != chunk.file_hash
             || data::dataset_identity(&dataset.manifest)? != chunk.dataset_identity
         {
@@ -298,12 +354,12 @@ pub fn candle_context(
     }
     let mut stream = None;
     let mut output = Vec::new();
-    visit_chunks(base, spec, |_, dataset| {
+    visit_blocks(base, spec, |dataset| {
         if stream.is_none() {
             stream = Some(candles::Stream::new(dataset.profile.clone(), timeframe)?);
         }
         let stream = stream.as_mut().ok_or("candle stream unavailable")?;
-        for tick in &dataset.ticks {
+        for tick in dataset.ticks {
             if let Some(candle) = stream.push(*tick)? {
                 if output.len() >= max_candles {
                     return Err("corpus candle context budget exceeded".into());
@@ -361,7 +417,7 @@ fn signals_internal(
     let mut frames = std::collections::BTreeMap::new();
     let mut streams = Vec::new();
     let mut total = 0;
-    visit_chunks(base, spec, |_, dataset| {
+    visit_blocks(base, spec, |dataset| {
         if streams.is_empty() {
             for tf in Timeframe::ALL {
                 if tf.millis() >= strategy.timeframe.millis() {
@@ -370,7 +426,7 @@ fn signals_internal(
                 }
             }
         }
-        for tick in &dataset.ticks {
+        for tick in dataset.ticks {
             if window.is_some_and(|w| tick.timestamp_ms >= w.end_exclusive_ms) {
                 break;
             }
@@ -391,4 +447,105 @@ fn signals_internal(
         .ok_or("primary frame missing")?;
     crate::strategies::Features::with_frames(candles, feature_cells, &frames, strategy.timeframe)?
         .signal(&strategy.rule)
+}
+
+/// A verified quote block; its manifest describes the complete source artifact, not a partial Dataset.
+pub struct QuoteBlock<'a> {
+    pub chunk_index: usize,
+    pub block_index: usize,
+    pub last_in_chunk: bool,
+    pub profile: &'a Profile,
+    pub manifest: &'a data::Manifest,
+    pub ticks: &'a [Tick],
+}
+fn accept_block(
+    context: &mut Option<(Profile, String, DataClass)>,
+    previous: &mut Option<Tick>,
+    block: QuoteBlock<'_>,
+    visit: &mut impl FnMut(QuoteBlock<'_>) -> Result<()>,
+) -> Result<()> {
+    if let Some((profile, source, class)) = context {
+        if profile != block.profile
+            || source != &block.manifest.source
+            || class != &block.manifest.class
+        {
+            return Err("corpus profile/source/class mismatch".into());
+        }
+    } else {
+        *context = Some((
+            block.profile.clone(),
+            block.manifest.source.clone(),
+            block.manifest.class,
+        ));
+    }
+    let first = block.ticks.first().ok_or("empty corpus quote block")?;
+    if previous.is_some_and(|p| first.timestamp_ms < p.timestamp_ms || first.sequence <= p.sequence)
+    {
+        return Err("corpus cross-block timestamp/sequence order invalid".into());
+    }
+    *previous = block.ticks.last().copied();
+    visit(block)
+}
+/// Stream complete verified artifacts in bounded quote blocks. Publish only after full successful return.
+pub fn visit_blocks(
+    base: &Path,
+    spec: &Specification,
+    mut visit: impl FnMut(QuoteBlock<'_>) -> Result<()>,
+) -> Result<()> {
+    spec.identity()?;
+    let mut context = None;
+    let mut previous = None;
+    for (chunk_index, chunk) in spec.chunks.iter().enumerate() {
+        if let Some(root) = &chunk.block_root {
+            let mut reader = crate::blocked_native::Reader::open(
+                &base.join(&chunk.path),
+                spec.max_chunk_events,
+                Some(root),
+            )?;
+            if data::dataset_identity(reader.manifest())? != chunk.dataset_identity {
+                return Err("corpus blocked dataset identity differs".into());
+            }
+            let count = reader.block_count();
+            let report = reader.visit(|block_index, profile, manifest, ticks| {
+                accept_block(
+                    &mut context,
+                    &mut previous,
+                    QuoteBlock {
+                        chunk_index,
+                        block_index,
+                        last_in_chunk: block_index + 1 == count,
+                        profile,
+                        manifest,
+                        ticks,
+                    },
+                    &mut visit,
+                )
+            })?;
+            if report.file_hash != chunk.file_hash {
+                return Err("corpus blocked consumed fingerprint differs".into());
+            }
+        } else {
+            let (dataset, fingerprint) =
+                native::read_bounded(&base.join(&chunk.path), spec.max_chunk_events.min(100000))?;
+            if fingerprint != chunk.file_hash
+                || data::dataset_identity(&dataset.manifest)? != chunk.dataset_identity
+            {
+                return Err("corpus artifact revision/fingerprint mismatch".into());
+            }
+            accept_block(
+                &mut context,
+                &mut previous,
+                QuoteBlock {
+                    chunk_index,
+                    block_index: 0,
+                    last_in_chunk: true,
+                    profile: &dataset.profile,
+                    manifest: &dataset.manifest,
+                    ticks: &dataset.ticks,
+                },
+                &mut visit,
+            )?;
+        }
+    }
+    Ok(())
 }

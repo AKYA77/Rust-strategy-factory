@@ -391,17 +391,23 @@ pub fn inspect(path: &Path, maximum_events: usize) -> Result<Report> {
     Reader::open(path, maximum_events, None)?.visit(|_, _, _, _| Ok(()))
 }
 pub fn read(path: &Path, maximum_events: usize) -> Result<Dataset> {
+    Ok(read_bounded(path, maximum_events)?.0)
+}
+pub fn read_bounded(path: &Path, maximum_events: usize) -> Result<(Dataset, Report)> {
     let mut reader = Reader::open(path, maximum_events, None)?;
     let mut ticks = Vec::new();
-    reader.visit(|_, _, _, rows| {
+    let report = reader.visit(|_, _, _, rows| {
         ticks.extend_from_slice(rows);
         Ok(())
     })?;
-    Ok(Dataset {
-        profile: reader.profile,
-        manifest: reader.manifest,
-        ticks,
-    })
+    Ok((
+        Dataset {
+            profile: reader.profile,
+            manifest: reader.manifest,
+            ticks,
+        },
+        report,
+    ))
 }
 
 #[cfg(test)]

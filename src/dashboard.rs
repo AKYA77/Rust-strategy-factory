@@ -392,6 +392,7 @@ impl ReviewConfig {
 fn review_dataset(path: &Path) -> Result<crate::data::Dataset> {
     match path.extension().and_then(|e| e.to_str()) {
         Some("rsf") => crate::native::read(path),
+        Some("rsfb") => crate::blocked_native::read(path, 2000000),
         Some("rsfz") => crate::compressed::read(path),
         Some("parquet") => crate::parquet_store::read(path),
         _ => {

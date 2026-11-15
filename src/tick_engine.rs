@@ -998,11 +998,12 @@ fn replay_corpus_internal(
     let mut state = AccountState::initial();
     let mut previous = None;
     let mut conversions = crate::corpus::SequenceHash::new();
-    crate::corpus::visit_chunks(base, spec, |index, dataset| {
+    crate::corpus::visit_blocks(base, spec, |dataset| {
+        let index = dataset.chunk_index;
         if index >= stop {
             return Ok(());
         }
-        for tick in &dataset.ticks {
+        for tick in dataset.ticks {
             let fx = Conversion::usd();
             state.advance(tick, fx, previous, &context)?;
             if state
@@ -1017,6 +1018,9 @@ fn replay_corpus_internal(
             events += 1;
             conversions.push(&fx)?;
             previous = Some(tick.timestamp_ms);
+        }
+        if !dataset.last_in_chunk {
+            return Ok(());
         }
         boundary = index + 1;
         if boundary == old_cursor as usize {

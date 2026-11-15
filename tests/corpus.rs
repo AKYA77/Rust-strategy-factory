@@ -3468,3 +3468,327 @@ fn fleet_loop_refuses_policy_retuning_and_invalid_wait_before_new_work() {
     );
     reg.integrity().unwrap();
 }
+
+fn block_spec(f: &Fixture, mixed: bool) -> Specification {
+    let paths = f
+        .spec
+        .chunks
+        .iter()
+        .enumerate()
+        .map(|(i, chunk)| {
+            let native = std::path::Path::new(&chunk.path);
+            if mixed && i % 2 == 1 {
+                return native.to_path_buf();
+            }
+            let path = f.root.join(format!("block-{i}.rsfb"));
+            rust_strategy_factory::blocked_native::write(&path, &native::read(native).unwrap(), 2)
+                .unwrap();
+            path
+        })
+        .collect::<Vec<_>>();
+    corpus::describe(&paths, 2000000).unwrap()
+}
+#[test]
+fn block_corpora_preserve_all_instrument_contexts_signals_and_legacy_identity() {
+    for symbol in rust_strategy_factory::contracts::SYMBOLS {
+        let f = Fixture::new("blocks-context", symbol, 7);
+        let spec = block_spec(&f, false);
+        assert_eq!(spec.version, "ordered-block-corpus-v2");
+        let actual = corpus::inspect(&f.root, &spec).unwrap();
+        let reference = corpus::inspect(&f.root, &f.spec).unwrap();
+        assert_eq!(actual.ordered_events_hash, reference.ordered_events_hash);
+        assert_eq!(actual.events, reference.events);
+        assert_eq!(actual.max_resident_quote_events, 2);
+        assert_eq!(
+            data::hash(&actual.candles).unwrap(),
+            data::hash(&reference.candles).unwrap()
+        );
+        assert_eq!(
+            f.spec.identity().unwrap(),
+            data::hash(&(
+                "ordered-native-corpus-v1",
+                f.spec
+                    .chunks
+                    .iter()
+                    .map(|c| (&c.dataset_identity, &c.file_hash))
+                    .collect::<Vec<_>>()
+            ))
+            .unwrap()
+        );
+        assert!(
+            !serde_json::to_string(&f.spec)
+                .unwrap()
+                .contains("block_root")
+        );
+        for slot in 0..18 {
+            let (_, strategy) = rust_strategy_factory::research::candidate_at(slot, 42).unwrap();
+            assert_eq!(
+                data::hash(&corpus::signals(&f.root, &spec, &strategy, 10000, 100000).unwrap())
+                    .unwrap(),
+                data::hash(&corpus::signals(&f.root, &f.spec, &strategy, 10000, 100000).unwrap())
+                    .unwrap()
+            );
+        }
+        let mut changed = spec.clone();
+        changed.chunks[0].block_root = Some("0".repeat(64));
+        assert_ne!(changed.identity().unwrap(), spec.identity().unwrap());
+        assert!(corpus::inspect(&f.root, &changed).is_err());
+    }
+}
+#[test]
+fn block_account_replay_preserves_every_market_stop_limit_receipt_and_nonzero_trades() {
+    use rust_strategy_factory::{
+        strategies::{EntryPlan, Strategy},
+        tick_engine::{self, CorpusBudget, Costs},
+    };
+    let mut trades = 0;
+    for symbol in ["EURUSD", "XAUUSD"] {
+        let f = Fixture::new("blocks-account", symbol, 7);
+        let spec = block_spec(&f, false);
+        for entry in [
+            None,
+            Some(EntryPlan::StopMarket {
+                offset_ticks: 2,
+                ttl_ms: 120000,
+                cancel_on_signal_false: true,
+            }),
+            Some(EntryPlan::Limit {
+                offset_ticks: 2,
+                ttl_ms: 120000,
+                cancel_on_signal_false: true,
+            }),
+        ] {
+            let mut strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+            strategy.entry = entry;
+            let budget = CorpusBudget {
+                max_candles: 100,
+                feature_cells: 10000,
+                max_receipts: 1000,
+            };
+            let reference =
+                tick_engine::replay_corpus(&f.root, &f.spec, &strategy, &Costs::default(), budget)
+                    .unwrap();
+            let actual =
+                tick_engine::replay_corpus(&f.root, &spec, &strategy, &Costs::default(), budget)
+                    .unwrap();
+            trades += actual.trades.len();
+            assert_eq!(
+                serde_json::to_value(actual).unwrap(),
+                serde_json::to_value(reference).unwrap()
+            );
+        }
+    }
+    assert!(trades > 0);
+}
+#[test]
+fn mixed_block_native_reopen_checkpoints_advance_only_complete_artifacts() {
+    use rust_strategy_factory::{
+        storage::Registry,
+        strategies::Strategy,
+        tick_engine::{self, CorpusBudget, CorpusProgress, CorpusRun, Costs},
+    };
+    let f = Fixture::new("blocks-checkpoint", "EURUSD", 7);
+    let spec = block_spec(&f, true);
+    let strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+    let costs = Costs::default();
+    let budget = CorpusBudget {
+        max_candles: 100,
+        feature_cells: 10000,
+        max_receipts: 1000,
+    };
+    let db = f.root.join("blocks.sqlite");
+    let mut completed = false;
+    for index in 0..spec.chunks.len() {
+        let mut reg = Registry::open(&db).unwrap();
+        let progress = tick_engine::execute_corpus_step(
+            &mut reg,
+            CorpusRun {
+                base: &f.root,
+                spec: &spec,
+                strategy: &strategy,
+                costs: &costs,
+                budget,
+            },
+            1,
+            10000,
+            || 1,
+        )
+        .unwrap();
+        match progress {
+            CorpusProgress::Pending { experiment_id, .. } => {
+                assert_eq!(
+                    reg.replay_checkpoint(&experiment_id)
+                        .unwrap()
+                        .unwrap()
+                        .0
+                        .cursor,
+                    index as i64 + 1
+                );
+            }
+            CorpusProgress::Completed { result, .. } => {
+                assert_eq!(
+                    result.result["tick_replay"],
+                    serde_json::to_value(
+                        tick_engine::replay_corpus(&f.root, &f.spec, &strategy, &costs, budget)
+                            .unwrap()
+                    )
+                    .unwrap()
+                );
+                completed = true;
+            }
+            _ => panic!("unexpected held/busy"),
+        };
+        reg.integrity().unwrap();
+    }
+    assert!(completed);
+    let mut visited = 0;
+    corpus::visit_chunks(&f.root, &spec, |_, d| {
+        d.verify()?;
+        visited += d.ticks.len();
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(visited, f.data.ticks.len());
+}
+#[test]
+fn blocked_late_corruption_preserves_committed_checkpoint_and_attempt_counts() {
+    use rust_strategy_factory::{
+        storage::Registry,
+        strategies::Strategy,
+        tick_engine::{self, CorpusBudget, CorpusProgress, CorpusRun, Costs},
+    };
+    let f = Fixture::new("blocks-corruption", "EURUSD", 7);
+    let spec = block_spec(&f, false);
+    let strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+    let costs = Costs::default();
+    let budget = CorpusBudget {
+        max_candles: 100,
+        feature_cells: 10000,
+        max_receipts: 1000,
+    };
+    let mut reg = Registry::open(&f.root.join("blocks.sqlite")).unwrap();
+    let run = || CorpusRun {
+        base: &f.root,
+        spec: &spec,
+        strategy: &strategy,
+        costs: &costs,
+        budget,
+    };
+    let CorpusProgress::Pending { experiment_id, .. } =
+        tick_engine::execute_corpus_step(&mut reg, run(), 1, 10000, || 1).unwrap()
+    else {
+        panic!()
+    };
+    let saved = reg.replay_checkpoint(&experiment_id).unwrap().unwrap();
+    let attempts = reg.counts().unwrap().attempts;
+    let path = std::path::Path::new(&spec.chunks.last().unwrap().path);
+    let mut bytes = fs::read(path).unwrap();
+    let end = bytes.len() - 1;
+    bytes[end] ^= 1;
+    fs::write(path, bytes).unwrap();
+    assert!(tick_engine::execute_corpus_step(&mut reg, run(), 1, 10000, || 2).is_err());
+    let after = reg.replay_checkpoint(&experiment_id).unwrap().unwrap();
+    assert_eq!(data::hash(&saved).unwrap(), data::hash(&after).unwrap());
+    assert_eq!(reg.counts().unwrap().attempts, attempts);
+    reg.integrity().unwrap();
+}
+#[test]
+fn actual_block_corpus_cli_and_materialized_loader_preserve_canonical_experiment_reuse() {
+    let f = Fixture::new("blocks-cli", "EURUSD", 7);
+    let path = f.root.join("full.rsfb");
+    rust_strategy_factory::blocked_native::write(&path, &f.data, 3).unwrap();
+    let json = f.root.join("full.json");
+    fs::write(&json, serde_json::to_vec(&f.data).unwrap()).unwrap();
+    let strategy = f.root.join("strategy.json");
+    fs::write(
+        &strategy,
+        r#"{"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}}"#,
+    )
+    .unwrap();
+    let db = f.root.join("materialized.sqlite");
+    let binary = env!("CARGO_BIN_EXE_rust-strategy-factory");
+    let invoke = |args: &[&str]| {
+        let out = Command::new(binary).args(args).output().unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()
+    };
+    let first = invoke(&[
+        "experiment",
+        json.to_str().unwrap(),
+        strategy.to_str().unwrap(),
+        db.to_str().unwrap(),
+    ]);
+    let second = invoke(&[
+        "experiment",
+        path.to_str().unwrap(),
+        strategy.to_str().unwrap(),
+        db.to_str().unwrap(),
+    ]);
+    assert_eq!(first["experiment_id"], second["experiment_id"]);
+    assert_eq!(second["reused"], true);
+    let spec = f.root.join("block-corpus.json");
+    let out = Command::new(binary)
+        .args([
+            "corpus-create-bounded",
+            spec.to_str().unwrap(),
+            "2000000",
+            path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report = invoke(&["corpus-inspect", spec.to_str().unwrap()]);
+    assert_eq!(report["max_resident_quote_events"], 3);
+    let source = corpus::load(&spec).unwrap();
+    assert!(source.chunks[0].block_root.is_some());
+}
+#[test]
+fn blocked_artifact_above_legacy_chunk_cap_has_bounded_resident_quotes() {
+    let f = Fixture::new("blocks-large", "EURUSD", 7);
+    let p = f.data.profile.clone();
+    let ticks = (0..100001u64)
+        .map(|i| Tick {
+            timestamp_ms: 1735689600000 + (i / 2) as i64 * 1000,
+            sequence: u64::MAX - 100000 + i,
+            bid: p.price_scale + (i % 10) as i64 * p.pip,
+            ask: p.price_scale + (i % 10) as i64 * p.pip + p.pip,
+        })
+        .collect();
+    let d = data::dataset(
+        p,
+        ticks,
+        "SYNTHETIC_TEST_ONLY block resident fixture",
+        "generated".into(),
+        true,
+    )
+    .unwrap();
+    let path = f.root.join("large.rsfb");
+    rust_strategy_factory::blocked_native::write(&path, &d, 256).unwrap();
+    let spec = corpus::describe(std::slice::from_ref(&path), 2000000).unwrap();
+    let report = corpus::inspect(&f.root, &spec).unwrap();
+    assert_eq!(report.events, 100001);
+    assert_eq!(report.max_resident_quote_events, 256);
+    assert_eq!(report.ordered_events_hash, data::hash(&d.ticks).unwrap());
+    let mut rows = 0;
+    let mut endings = 0;
+    corpus::visit_blocks(&f.root, &spec, |block| {
+        assert!(block.ticks.len() <= 256);
+        rows += block.ticks.len();
+        endings += usize::from(block.last_in_chunk);
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(rows, 100001);
+    assert_eq!(endings, 1);
+    let old = f.root.join("large.rsf");
+    native::write(&old, &d).unwrap();
+    assert!(corpus::describe(&[old, path], 2000000).is_err());
+}
