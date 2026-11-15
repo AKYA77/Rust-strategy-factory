@@ -2344,3 +2344,219 @@ fn retry_policy_cli_is_bounded_frozen_and_never_resumes_operator_pause() {
     assert_eq!(held["reason"], "not-worker-error-pause");
     assert_eq!(snapshot["requeue_records"], "0");
 }
+
+fn foreground_config(f: &Fixture) -> (PathBuf, PathBuf, PathBuf, String) {
+    let config = corpus_search_fixture(f);
+    let db = f.root.join("foreground.sqlite");
+    let policy = f.root.join("retry-policy.json");
+    fs::write(&policy, r#"{"backoff_ms":86400000,"maximum_slots":1}"#).unwrap();
+    let mut file: serde_json::Value = serde_json::from_slice(&fs::read(&config).unwrap()).unwrap();
+    file["budget"]["feature_cells"] = 1.into();
+    file["limits"]["max_parallel_feature_cells"] = 2.into();
+    fs::write(&config, serde_json::to_vec(&file).unwrap()).unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-search",
+            config.to_str().unwrap(),
+            db.to_str().unwrap(),
+            "1",
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let id = report["last"]["status"]["search_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    // Synthetic fault metadata only: exercise waiting without performing a retry.
+    let c = rusqlite::Connection::open(&db).unwrap();
+    let rows = {
+        let mut q = c
+            .prepare("SELECT slot,hash,error FROM corpus_search_jobs WHERE search_id=?1")
+            .unwrap();
+        q.query_map([&id], |r| {
+            Ok((
+                r.get::<_, usize>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+            ))
+        })
+        .unwrap()
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .unwrap()
+    };
+    for (slot, hash, error) in rows {
+        let fingerprint = rust_strategy_factory::data::hash(&(
+            "corpus-failure-v1",
+            &id,
+            slot,
+            &hash,
+            rust_strategy_factory::corpus_failure::Kind::RegistryAdmissionBusy,
+            &error,
+        ))
+        .unwrap();
+        c.execute("UPDATE corpus_search_jobs SET error_kind='registry_admission_busy',failure_hash=?3 WHERE search_id=?1 AND slot=?2",rusqlite::params![id,slot,fingerprint]).unwrap();
+    }
+    drop(c);
+    (config, db, policy, id)
+}
+#[test]
+fn foreground_supervision_bounds_wait_and_preserves_operator_pause_across_processes() {
+    let f = Fixture::new("foreground-wait", "EURUSD", 7);
+    let (config, db, policy, id) = foreground_config(&f);
+    let invoke = |wait: &str| {
+        let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args([
+                "corpus-supervise",
+                config.to_str().unwrap(),
+                policy.to_str().unwrap(),
+                db.to_str().unwrap(),
+                "10",
+                wait,
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()
+    };
+    let first = invoke("100");
+    assert_eq!(first["stop_reason"], "wait-budget");
+    assert_eq!(first["round_attempts"], "0");
+    assert_eq!(first["checks"], "1");
+    let second = invoke("0");
+    assert_eq!(second["stop_reason"], "retry-backoff");
+    assert_eq!(
+        second["last"]["decision"]["retry_at_ms"],
+        first["last"]["decision"]["retry_at_ms"]
+    );
+    let mut registry = rust_strategy_factory::storage::Registry::open(&db).unwrap();
+    rust_strategy_factory::corpus_search::control(&mut registry, &id, "paused").unwrap();
+    let held = invoke("100");
+    assert_eq!(held["stop_reason"], "retry-held");
+    assert_eq!(held["round_attempts"], "0");
+    assert_eq!(
+        rust_strategy_factory::corpus_search::status(&registry, &id).unwrap()["requeue_records"],
+        "0"
+    );
+    registry.integrity().unwrap();
+}
+#[test]
+#[cfg(unix)]
+fn foreground_supervision_sigterm_reaps_its_foreground_session_at_wait_boundary() {
+    use std::io::BufRead;
+    let f = Fixture::new("foreground-signal", "EURUSD", 7);
+    let (config, db, policy, _id) = foreground_config(&f);
+    let mut child = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-supervise",
+            config.to_str().unwrap(),
+            policy.to_str().unwrap(),
+            db.to_str().unwrap(),
+            "100",
+            "10000",
+        ])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut ready = String::new();
+    std::io::BufReader::new(child.stderr.take().unwrap())
+        .read_line(&mut ready)
+        .unwrap();
+    assert!(ready.contains("corpus supervision ready"));
+    let c = rusqlite::Connection::open(&db).unwrap();
+    let mut observed = false;
+    for _ in 0..500 {
+        let count: i64 = c
+            .query_row("SELECT count(*) FROM corpus_retry_decisions", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        if count > 0 {
+            observed = true;
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    if !observed {
+        child.kill().unwrap();
+        child.wait().unwrap();
+        panic!("foreground never reached a backoff observation");
+    }
+    assert!(
+        Command::new("kill")
+            .args(["-TERM", &child.id().to_string()])
+            .status()
+            .unwrap()
+            .success()
+    );
+    let out = child.wait_with_output().unwrap();
+    assert!(out.status.success());
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(report["stop_reason"], "signal");
+    assert_eq!(report["round_attempts"], "0");
+    rust_strategy_factory::storage::Registry::open(&db)
+        .unwrap()
+        .integrity()
+        .unwrap();
+}
+
+#[test]
+fn foreground_pressure_and_argument_limits_refuse_before_registry_creation() {
+    let f = Fixture::new("foreground-pressure", "EURUSD", 7);
+    let config = corpus_search_fixture(&f);
+    let policy = f.root.join("policy.json");
+    fs::write(&policy, r#"{"backoff_ms":1,"maximum_slots":1}"#).unwrap();
+    let mut file: serde_json::Value = serde_json::from_slice(&fs::read(&config).unwrap()).unwrap();
+    for (name, guard) in [
+        (
+            "disk",
+            serde_json::json!({"minimum_available_bytes":u64::MAX}),
+        ),
+        (
+            "resource",
+            serde_json::json!({"maximum_process_rss_bytes":1,"minimum_host_available_memory_bytes":0}),
+        ),
+    ] {
+        file.as_object_mut().unwrap().remove("disk_guard");
+        file.as_object_mut().unwrap().remove("resource_guard");
+        file[format!("{name}_guard")] = guard;
+        fs::write(&config, serde_json::to_vec(&file).unwrap()).unwrap();
+        let db = f.root.join(format!("{name}.sqlite"));
+        let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args([
+                "corpus-supervise",
+                config.to_str().unwrap(),
+                policy.to_str().unwrap(),
+                db.to_str().unwrap(),
+                "10",
+                "0",
+            ])
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        let value: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(value["stop_reason"], format!("{name}-pressure"));
+        assert_eq!(value["checks"], "0");
+        assert!(!db.exists());
+    }
+    let db = f.root.join("bad-args.sqlite");
+    let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-supervise",
+            config.to_str().unwrap(),
+            policy.to_str().unwrap(),
+            db.to_str().unwrap(),
+            "0",
+            "3600001",
+        ])
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert!(!db.exists());
+}

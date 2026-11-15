@@ -588,6 +588,75 @@ fn retry_admit_in(
     Ok(value)
 }
 
+#[derive(Serialize)]
+pub struct SupervisedProgress {
+    pub decision: Option<serde_json::Value>,
+    pub progress: Option<Step>,
+    pub status: serde_json::Value,
+}
+pub fn supervised_step(
+    database: &Path,
+    run: SearchRun<'_>,
+    limits: CorpusBatchLimits,
+    policy: &crate::retry_policy::Policy,
+) -> Result<SupervisedProgress> {
+    policy.validate()?;
+    let config = configuration(&run)?;
+    let mut registry = Registry::open(database)?;
+    let id = register(&mut registry, &config)?;
+    let head = crate::search_control::read(&registry.connection, &id)?;
+    if let Some((old, _)) = crate::retry_policy::read(&registry.connection, &id)?
+        && old != *policy
+    {
+        return Err("immutable retry policy differs".into());
+    }
+    if matches!(head.state.as_str(), "stopped" | "exhausted") {
+        return Ok(SupervisedProgress {
+            decision: None,
+            progress: None,
+            status: status(&registry, &id)?,
+        });
+    }
+    crate::retry_policy::configure(&mut registry, &id, policy)?;
+    let decision = if head.state == "paused" {
+        Some(crate::retry_policy::admit(
+            &mut registry,
+            &id,
+            head.epoch,
+            chrono::Utc::now().timestamp_millis(),
+        )?)
+    } else {
+        None
+    };
+    if decision.as_ref().is_some_and(|v| v["kind"] != "requeued") {
+        return Ok(SupervisedProgress {
+            decision,
+            progress: None,
+            status: status(&registry, &id)?,
+        });
+    }
+    drop(registry);
+    let progress = step(database, run, limits)?;
+    let snapshot = progress.status.clone();
+    Ok(SupervisedProgress {
+        decision,
+        progress: Some(progress),
+        status: snapshot,
+    })
+}
+pub fn control_status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
+    let tx = registry
+        .connection
+        .unchecked_transaction()
+        .map_err(|e| e.to_string())?;
+    let head = crate::search_control::read(&tx, id)?;
+    let mut value = crate::search_control::status(&tx, id)?;
+    value["search_id"] = id.into();
+    value["state"] = head.state.into();
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(value)
+}
+
 pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
     let tx = registry
         .connection
@@ -619,7 +688,7 @@ pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
     let retry_policy=crate::retry_policy::read(&tx,id)?.map(|(p,hash)|serde_json::json!({"hash":hash,"backoff_ms":p.backoff_ms.to_string(),"maximum_slots":p.maximum_slots.to_string()}));
     tx.commit().map_err(|e| e.to_string())?;
     Ok(
-        serde_json::json!({"control":control,"search_id":id,"state":state,"generated_slots":cursor.to_string(),"maximum_candidates":config.maximum_candidates.to_string(),"attempt":attempt.to_string(),"lease_active":expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"slot_states":counts,"recent_slots":recent,"requeue_records":history.len().to_string(),"retry_eligible_slots":retry_eligible.to_string(),"retry_capacity":retry_capacity.to_string(),"maximum_requeues_per_slot":3,"recent_requeues":recent_requeues,"retry_decisions":retry_decisions,"retry_policy":retry_policy,"automatic_retry_enabled":false,"qualification_granted":false,"limitations":"Generated slots are not new tick simulations; canonical duplicates can share immutable experiment receipts. Synthetic USD training search only."}),
+        serde_json::json!({"control":control,"search_id":id,"state":state,"generated_slots":cursor.to_string(),"maximum_candidates":config.maximum_candidates.to_string(),"attempt":attempt.to_string(),"lease_active":expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"slot_states":counts,"recent_slots":recent,"requeue_records":history.len().to_string(),"retry_eligible_slots":retry_eligible.to_string(),"retry_capacity":retry_capacity.to_string(),"maximum_requeues_per_slot":3,"recent_requeues":recent_requeues,"retry_decisions":retry_decisions,"retry_policy":retry_policy,"automatic_retry_enabled":false,"automatic_retry_scope":"dashboard/background","foreground_retry_supported":true,"qualification_granted":false,"limitations":"Generated slots are not new tick simulations; canonical duplicates can share immutable experiment receipts. Synthetic USD training search only."}),
     )
 }
 pub(crate) fn integrity(registry: &Registry) -> Result<()> {
@@ -1398,6 +1467,54 @@ mod tests {
         tx.commit().unwrap();
         drop(registry);
         (root, id)
+    }
+    #[test]
+    fn foreground_supervised_step_retries_same_key_and_matches_scalar_receipt() {
+        let (root, id) = policy_fixture("foreground-step");
+        let spec = crate::corpus::describe(&[root.join("source.rsf")], 10000).unwrap();
+        let costs = Costs::default();
+        let mut search = run(&root, &spec, &costs);
+        search.maximum_candidates = 1;
+        search.queue_width = 1;
+        let db = root.join("state.sqlite");
+        let registry = Registry::open(&db).unwrap();
+        let (_, _, _, _, _, jobs) = read(&registry.connection, &id).unwrap();
+        let key = jobs[0].definition.key.identity().unwrap();
+        let strategy = jobs[0].definition.strategy.clone();
+        let budget = search.budget;
+        drop(registry);
+        let result = supervised_step(
+            &db,
+            search,
+            CorpusBatchLimits {
+                workers: 1,
+                max_parallel_candles: 10000,
+                max_parallel_feature_cells: 1000000,
+                max_parallel_receipts: 10000,
+                max_new_chunks: 64,
+                lease_ms: 60000,
+            },
+            &crate::retry_policy::Policy {
+                backoff_ms: 1,
+                maximum_slots: 1,
+            },
+        )
+        .unwrap();
+        assert_eq!(result.decision.unwrap()["kind"], "requeued");
+        assert_eq!(result.status["state"], "exhausted");
+        let registry = Registry::open(&db).unwrap();
+        let stored = registry.result(&key).unwrap().unwrap();
+        assert_eq!(
+            stored.result["tick_replay"],
+            serde_json::to_value(
+                tick_engine::replay_corpus(&root, &spec, &strategy, &costs, budget).unwrap()
+            )
+            .unwrap()
+        );
+        assert_eq!(registry.counts().unwrap().attempts, 1);
+        registry.integrity().unwrap();
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
     }
     #[test]
     fn retry_history_pages_bind_source_and_immutable_rows_across_appends() {

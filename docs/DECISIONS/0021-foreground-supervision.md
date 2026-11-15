@@ -1,0 +1,9 @@
+# Bounded explicit foreground supervision
+
+`corpus-supervise CONFIG POLICY DB MAX_ROUNDS TOTAL_WAIT_MS` opts into the frozen policy for a foreground process. Bounds are1..10000 round attempts, at most twice that many checks plus one, and0..3600000 ms cumulative requested backoff waiting. Zero waiting exits immediately on backoff. The ordinary corpus-search command remains an ordinary bounded search session.
+
+A supervised step registers/verifies the original search, freezes/checks policy, applies epoch/origin/type/backoff/lifetime admission only when paused, and executes at most one ordinary bounded pool round after successful requeue. It does not retune source/strategy/budgets or reset terminal child receipts. Operator/unknown/permanent holds stop; exhausted/stopped searches remain terminal. Reports distinguish retry observations, round attempts and actual source receipts. They are not simulation counters.
+
+Backoff waiting polls lightweight verified controls and the signal flag in short intervals, consumes one cumulative monotonic wait budget, and stops/rechecks on a control epoch change. Disk/RSS/host-memory admission runs before every new round/admission cycle. SIGINT/SIGTERM exits at a safe round/wait boundary. No busy polling fills the decision journal while waiting. Filesystem stalls and hard OS deadlines remain outside this guarantee.
+
+Tests verify a ready supervised retry under the same key with exact full scalar receipt parity, bounded wait and unchanged deadline across separate processes, preservation of operator pause, actual SIGTERM/reaping at a wait boundary, zero registry creation under forced disk/memory pressure and argument refusal. Synthetic metadata fault fixtures used for waiting do not claim actual historical failures. Dashboard metadata identifies explicit foreground capability and no dashboard/background autostart; running process/session lifecycle and owned child supervision remain unfinished.
