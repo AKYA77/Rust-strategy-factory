@@ -24,6 +24,8 @@ struct Body {
     maximum_wait_ms: u64,
     limits: Limits,
     summary: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    resources: Option<crate::resource::ProcessObservation>,
 }
 fn hex(s: &str) -> bool {
     s.len() == 64
@@ -73,6 +75,12 @@ fn read(c: &Connection, id: &str) -> Result<(Body, Option<String>, String)> {
         || data::hash(&b)? != hash
     {
         return Err("owned invocation integrity mismatch".into());
+    }
+    if let Some(resources) = &b.resources {
+        resources.validate()?;
+        if b.child_pid.is_none() {
+            return Err("unattached process resources refused".into());
+        }
     }
     if let Some(s) = &b.summary {
         validate_summary(&b, s)?;
@@ -142,6 +150,7 @@ pub fn start(
         maximum_wait_ms: wait,
         limits: limits.clone(),
         summary: None,
+        resources: None,
     };
     tx.execute(
         "INSERT INTO corpus_owned_invocations(id,search_id,token,body,hash) VALUES(?1,?2,?3,?4,?5)",
@@ -170,6 +179,32 @@ pub fn attach(reg: &mut Registry, owner: &Owner, pid: u32) -> Result<()> {
     write(&tx, &b, &owner.token, false)?;
     tx.commit().map_err(|e| e.to_string())
 }
+pub fn observe_resources(
+    reg: &mut Registry,
+    owner: &Owner,
+    observation: &crate::resource::ProcessObservation,
+) -> Result<()> {
+    observation.validate()?;
+    let tx = reg
+        .connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|e| e.to_string())?;
+    let (mut b, token, _) = read(&tx, &owner.id)?;
+    if token.as_deref() != Some(&owner.token)
+        || b.child_pid.is_none()
+        || b.resources.as_ref().is_some_and(|old| {
+            observation.samples < old.samples
+                || observation.peak_rss_bytes < old.peak_rss_bytes
+                || old.start_ticks.is_some() && observation.start_ticks != old.start_ticks
+                || observation.last_cpu_ticks < old.last_cpu_ticks
+        })
+    {
+        return Err("owned resource observation fence refused".into());
+    }
+    b.resources = Some(observation.clone());
+    write(&tx, &b, &owner.token, false)?;
+    tx.commit().map_err(|e| e.to_string())
+}
 fn validate_summary(b: &Body, s: &serde_json::Value) -> Result<()> {
     if s["invocation_id"] != b.id
         || s["search_id"] != b.search_id
@@ -185,6 +220,10 @@ fn validate_summary(b: &Body, s: &serde_json::Value) -> Result<()> {
                 "signal"
                     | "wall-budget"
                     | "output-limit-or-read-error"
+                    | "child-rss-pressure"
+                    | "child-cpu-budget"
+                    | "child-resource-observation-unavailable"
+                    | "parent-resource-journal-unavailable"
                     | "child-exited"
                     | "child-failed"
             )
@@ -217,6 +256,7 @@ pub fn finish(
         "stdout_read_error",
         "stderr_read_error",
         "session_status_error",
+        "resource_journal_error",
     ] {
         if let Some(value) = object.get_mut(field)
             && let Some(s) = value.as_str()
@@ -258,6 +298,19 @@ pub fn status(reg: &Registry, id: &str) -> Result<serde_json::Value> {
         "unclosed; parent and child liveness not established"
     }
     .into();
+    v["resources"] = b.resources.as_ref().map(|r| r.exact()).transpose()?.into();
+    for field in [
+        "maximum_wall_ms",
+        "shutdown_grace_ms",
+        "maximum_output_bytes",
+        "maximum_child_rss_bytes",
+        "maximum_child_cpu_ticks",
+    ] {
+        if !v["limits"][field].is_null() {
+            v["limits"][field] = v["limits"][field].to_string().into();
+        }
+    }
+    v["resources_scope"]="Sampled owned-child RSS bytes and raw native kernel user+system CPU ticks; no elapsed-time conversion, unsampled peak or kernel enforcement is implied.".into();
     v["observation_hash"] = hash.into();
     Ok(v)
 }
@@ -289,6 +342,8 @@ mod tests {
         Limits {
             maximum_wall_ms: 1000,
             shutdown_grace_ms: 100,
+            maximum_child_rss_bytes: None,
+            maximum_child_cpu_ticks: None,
             maximum_output_bytes: 1024,
         }
     }
@@ -398,6 +453,81 @@ mod tests {
         finish(&mut reg, &first, &report(&first.id, &source)).unwrap();
         assert_eq!(list(&reg).unwrap().len(), 128);
         reg.integrity().unwrap();
+        drop(reg);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod resource_tests {
+    use super::*;
+    #[test]
+    fn legacy_limit_digests_and_monotonic_owned_resource_backup_remain_verifiable() {
+        #[derive(Serialize)]
+        struct LegacyLimits {
+            maximum_wall_ms: u64,
+            shutdown_grace_ms: u64,
+            maximum_output_bytes: usize,
+        }
+        let limits = Limits {
+            maximum_wall_ms: 1000,
+            shutdown_grace_ms: 100,
+            maximum_output_bytes: 1024,
+            maximum_child_rss_bytes: None,
+            maximum_child_cpu_ticks: None,
+        };
+        assert_eq!(
+            data::hash(&limits).unwrap(),
+            data::hash(&LegacyLimits {
+                maximum_wall_ms: 1000,
+                shutdown_grace_ms: 100,
+                maximum_output_bytes: 1024
+            })
+            .unwrap()
+        );
+        let (root, mut reg, source) =
+            crate::supervision_session::tests::fixture("owned-resource-fences");
+        let owner = start(
+            &mut reg,
+            &source,
+            &"a".repeat(64),
+            &"b".repeat(64),
+            10,
+            0,
+            &limits,
+        )
+        .unwrap();
+        let observation = crate::resource::ProcessObservation {
+            samples: 2,
+            peak_rss_bytes: u64::MAX,
+            last_cpu_ticks: Some(100),
+            start_ticks: Some(42),
+            observed_at_ms: 1000,
+            observation_error: None,
+        };
+        assert!(observe_resources(&mut reg, &owner, &observation).is_err());
+        attach(&mut reg, &owner, 123).unwrap();
+        observe_resources(&mut reg, &owner, &observation).unwrap();
+        let mut stale = observation.clone();
+        stale.samples = 1;
+        assert!(observe_resources(&mut reg, &owner, &stale).is_err());
+        stale = observation.clone();
+        stale.last_cpu_ticks = Some(99);
+        assert!(observe_resources(&mut reg, &owner, &stale).is_err());
+        stale = observation.clone();
+        stale.start_ticks = Some(43);
+        assert!(observe_resources(&mut reg, &owner, &stale).is_err());
+        let expected = status(&reg, &owner.id).unwrap();
+        assert_eq!(
+            expected["resources"]["peak_rss_bytes"],
+            u64::MAX.to_string()
+        );
+        let backup = root.join("resource-backup.sqlite");
+        reg.backup(&backup).unwrap();
+        let restored = Registry::open(&backup).unwrap();
+        assert_eq!(status(&restored, &owner.id).unwrap(), expected);
+        restored.integrity().unwrap();
+        drop(restored);
         drop(reg);
         std::fs::remove_dir_all(root).unwrap();
     }

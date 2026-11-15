@@ -2913,3 +2913,57 @@ fn owned_child_output_overflow_is_bounded_and_reaped_without_partial_json() {
         .integrity()
         .unwrap();
 }
+
+#[test]
+fn owned_child_rss_threshold_cancels_and_preserves_actual_resource_observations() {
+    let f = Fixture::new("owned-rss", "EURUSD", 7);
+    let (config, db, policy, _) = foreground_config(&f);
+    let limits = f.root.join("parent.json");
+    fs::write(&limits,r#"{"maximum_wall_ms":10000,"shutdown_grace_ms":3000,"maximum_output_bytes":1048576,"maximum_child_rss_bytes":1}"#).unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-supervise-owned",
+            config.to_str().unwrap(),
+            policy.to_str().unwrap(),
+            db.to_str().unwrap(),
+            "100",
+            "10000",
+            limits.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(report["stop_reason"], "child-rss-pressure");
+    assert_eq!(report["reaped"], true);
+    assert!(
+        report["child_resources"]["peak_observed_rss_bytes"]
+            .as_str()
+            .unwrap()
+            .parse::<u64>()
+            .unwrap()
+            > 1
+    );
+    assert!(
+        report["child_resources"]["samples"]
+            .as_str()
+            .unwrap()
+            .parse::<u64>()
+            .unwrap()
+            > 0
+    );
+    assert_eq!(
+        report["invocation_status"]["resources"]["peak_rss_bytes"],
+        report["child_resources"]["peak_observed_rss_bytes"]
+    );
+    assert_eq!(
+        report["invocation_status"]["limits"]["maximum_child_rss_bytes"],
+        "1"
+    );
+    let registry = rust_strategy_factory::storage::Registry::open(&db).unwrap();
+    registry.integrity().unwrap();
+}

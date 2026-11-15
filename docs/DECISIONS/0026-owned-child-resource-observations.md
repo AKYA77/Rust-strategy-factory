@@ -1,0 +1,9 @@
+# Sampled owned-child resource admission
+
+The foreground parent observes `/proc/CHILD/stat` and status only while it owns the unreaped child. PID and start-clock identity are verified across the read and subsequent samples. Parsing preserves parentheses in command names, full-u64 counters and checked CPU sums. RSS is bytes; CPU is raw kernel user+system clock ticks. No assumed HZ, CPU percentage or tick-to-millisecond conversion is used.
+
+Parent limits optionally set positive `maximum_child_rss_bytes` and `maximum_child_cpu_ticks`. At a sampled threshold, the parent requests the same cooperative stop and grace/escalation/reap path. If a configured limit cannot be observed for a still-unreaped child, cancellation fails closed. Optional observations without a configured threshold remain explicitly unknown when unavailable. A normal exit race is reaped before treating a missing `/proc` record as pressure. Sampling does not enforce a hard kernel limit or capture unsampled peaks.
+
+Bounded owner-fenced resource snapshots persist at most once per second and at completion. Counts/peaks/CPU cannot regress or change the observed start identity. Public observations use exact strings, retain errors and never establish post-restart liveness. Journal failure requests cancellation and remains explicit in terminal reports; terminal failure leaves unclosed evidence. New optional limits/snapshots omit absent fields from stored serialization, preserving existing schema16 hashes.
+
+Four new tests cover adversarial stat parsing/full-width arithmetic, actual current-process observations and missing IDs, legacy limit digest parity/monotonic resource fences/backup, and actual child RSS-pressure cancellation/reaping with persisted observations. Existing five owned-process scenarios and actual session/history Chromium checks pass. Kernel/cgroup enforcement and representative target-host measurements remain separate acceptance.

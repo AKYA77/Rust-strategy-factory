@@ -18,12 +18,18 @@ pub struct Limits {
     pub maximum_wall_ms: u64,
     pub shutdown_grace_ms: u64,
     pub maximum_output_bytes: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub maximum_child_rss_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub maximum_child_cpu_ticks: Option<u64>,
 }
 impl Limits {
     pub fn validate(&self) -> Result<()> {
         if !(1..=86_400_000).contains(&self.maximum_wall_ms)
             || self.shutdown_grace_ms > 60_000
             || !(1024..=1024 * 1024).contains(&self.maximum_output_bytes)
+            || self.maximum_child_rss_bytes == Some(0)
+            || self.maximum_child_cpu_ticks == Some(0)
         {
             return Err("invalid owned-process limits".into());
         }
@@ -165,6 +171,15 @@ pub fn run(
     let f = fault.clone();
     let errors = std::thread::spawn(move || capture(stderr, cap, f, Some(send)));
     let mut session = None;
+    let mut sample_at = Instant::now();
+    let mut sample_count = 0u64;
+    let mut peak_rss = 0u64;
+    let mut last_cpu_ticks = None;
+    let mut child_start_ticks = None;
+    let mut observation_error = None;
+    let mut resource_stop = None;
+    let mut resource_journal_at = Instant::now();
+    let mut resource_journal_error = None;
     let mut cancellation: Option<(&str, Instant)> = None;
     let mut stop_delivered = false;
     let mut stop_error = None;
@@ -176,8 +191,64 @@ pub fn run(
         if let Some(status) = owned.0.try_wait().map_err(|e| e.to_string())? {
             break status;
         }
+        if Instant::now() >= sample_at && cancellation.is_none() {
+            sample_at = Instant::now() + Duration::from_millis(100);
+            match crate::resource::observe_process(pid) {
+                Ok(sample) if child_start_ticks.is_none_or(|n| n == sample.start_ticks) => {
+                    sample_count += 1;
+                    child_start_ticks = Some(sample.start_ticks);
+                    peak_rss = peak_rss.max(sample.rss_bytes);
+                    let cpu = sample.user_ticks + sample.system_ticks;
+                    last_cpu_ticks = Some(cpu);
+                    observation_error = None;
+                    if limits
+                        .maximum_child_rss_bytes
+                        .is_some_and(|n| sample.rss_bytes >= n)
+                    {
+                        resource_stop = Some("child-rss-pressure");
+                    }
+                    if limits.maximum_child_cpu_ticks.is_some_and(|n| cpu >= n) {
+                        resource_stop = Some("child-cpu-budget");
+                    }
+                }
+                result => {
+                    if let Some(status) = owned.0.try_wait().map_err(|e| e.to_string())? {
+                        break status;
+                    }
+                    observation_error = Some(
+                        result
+                            .err()
+                            .unwrap_or_else(|| "owned child start identity changed".into()),
+                    );
+                    if limits.maximum_child_rss_bytes.is_some()
+                        || limits.maximum_child_cpu_ticks.is_some()
+                    {
+                        resource_stop = Some("child-resource-observation-unavailable");
+                    }
+                }
+            }
+        }
+        if Instant::now() >= resource_journal_at {
+            resource_journal_at = Instant::now() + Duration::from_secs(1);
+            let observation = crate::resource::ProcessObservation {
+                samples: sample_count,
+                peak_rss_bytes: peak_rss,
+                last_cpu_ticks,
+                start_ticks: child_start_ticks,
+                observed_at_ms: chrono::Utc::now().timestamp_millis(),
+                observation_error: observation_error.clone(),
+            };
+            if let Err(e) =
+                crate::owned_history::observe_resources(&mut registry, &invocation, &observation)
+            {
+                resource_journal_error = Some(e);
+                resource_stop = Some("parent-resource-journal-unavailable");
+            }
+        }
         if cancellation.is_none() {
-            let reason = if shutdown.load(Ordering::Acquire) {
+            let reason = if resource_stop.is_some() {
+                resource_stop
+            } else if shutdown.load(Ordering::Acquire) {
                 Some("signal")
             } else if fault.load(Ordering::Acquire) {
                 Some("output-limit-or-read-error")
@@ -240,7 +311,20 @@ pub fn run(
         Ok(value) => (value, None),
         Err(e) => (None, Some(e)),
     };
-    let mut report = serde_json::json!({"invocation_id":invocation.id,"version":"owned-corpus-process-v1","search_id":source,"pid":pid.to_string(),"started_at_ms":started_at.to_string(),"finished_at_ms":chrono::Utc::now().timestamp_millis().to_string(),"elapsed_ms":start.elapsed().as_millis().to_string(),"stop_reason":cancellation.map(|v|v.0).unwrap_or(if status.success(){"child-exited"}else{"child-failed"}),"reaped":true,"forced_kill":forced,"stop_request_delivered":stop_delivered,"stop_error":stop_error,"exit_success":status.success(),"exit_code":status.code().map(|n|n.to_string()),"stdout_bytes":output.total.to_string(),"stderr_bytes":errors.total.to_string(),"stdout_truncated":output.total>cap as u64,"stderr_truncated":errors.total>cap as u64,"stdout_read_error":output.error,"stderr_read_error":errors.error,"child_report":child_report,"session_id":session,"session_status":session_status,"session_status_error":session_status_error,"limits":limits,"limitations":"Explicit foreground parent, same executable only; sampled wall budget plus cooperative grace. Forced termination can leave an unclosed session and fenced work. No hard kernel/filesystem deadline or survival after parent death is claimed."});
+    let observation = crate::resource::ProcessObservation {
+        samples: sample_count,
+        peak_rss_bytes: peak_rss,
+        last_cpu_ticks,
+        start_ticks: child_start_ticks,
+        observed_at_ms: chrono::Utc::now().timestamp_millis(),
+        observation_error: observation_error.clone(),
+    };
+    if let Err(e) =
+        crate::owned_history::observe_resources(&mut registry, &invocation, &observation)
+    {
+        resource_journal_error = Some(e);
+    }
+    let mut report = serde_json::json!({"invocation_id":invocation.id,"version":"owned-corpus-process-v1","resource_journal_error":resource_journal_error,"child_resources":{"samples":sample_count.to_string(),"peak_observed_rss_bytes":peak_rss.to_string(),"last_observed_cpu_ticks":last_cpu_ticks.map(|n|n.to_string()),"start_ticks":child_start_ticks.map(|n|n.to_string()),"observation_error":observation_error,"scope":"Owned child only; sampled RSS and native kernel user+system CPU ticks. No tick-to-time conversion, unsampled peak, cgroup aggregate or hard OS limit is implied."},"search_id":source,"pid":pid.to_string(),"started_at_ms":started_at.to_string(),"finished_at_ms":chrono::Utc::now().timestamp_millis().to_string(),"elapsed_ms":start.elapsed().as_millis().to_string(),"stop_reason":cancellation.map(|v|v.0).unwrap_or(if status.success(){"child-exited"}else{"child-failed"}),"reaped":true,"forced_kill":forced,"stop_request_delivered":stop_delivered,"stop_error":stop_error,"exit_success":status.success(),"exit_code":status.code().map(|n|n.to_string()),"stdout_bytes":output.total.to_string(),"stderr_bytes":errors.total.to_string(),"stdout_truncated":output.total>cap as u64,"stderr_truncated":errors.total>cap as u64,"stdout_read_error":output.error,"stderr_read_error":errors.error,"child_report":child_report,"session_id":session,"session_status":session_status,"session_status_error":session_status_error,"limits":limits,"limitations":"Explicit foreground parent, same executable only; sampled wall budget plus cooperative grace. Forced termination can leave an unclosed session and fenced work. No hard kernel/filesystem deadline or survival after parent death is claimed."});
 
     report["invocation_status"] =
         crate::owned_history::finish(&mut registry, &invocation, &report)?;
@@ -269,18 +353,38 @@ mod tests {
     fn owned_limits_are_bounded() {
         for limits in [
             Limits {
+                maximum_wall_ms: 1,
+                shutdown_grace_ms: 0,
+                maximum_output_bytes: 1024,
+                maximum_child_rss_bytes: Some(0),
+                maximum_child_cpu_ticks: None,
+            },
+            Limits {
+                maximum_wall_ms: 1,
+                shutdown_grace_ms: 0,
+                maximum_output_bytes: 1024,
+                maximum_child_rss_bytes: None,
+                maximum_child_cpu_ticks: Some(0),
+            },
+            Limits {
                 maximum_wall_ms: 0,
                 shutdown_grace_ms: 0,
+                maximum_child_rss_bytes: None,
+                maximum_child_cpu_ticks: None,
                 maximum_output_bytes: 1024,
             },
             Limits {
                 maximum_wall_ms: 1,
                 shutdown_grace_ms: 60001,
+                maximum_child_rss_bytes: None,
+                maximum_child_cpu_ticks: None,
                 maximum_output_bytes: 1024,
             },
             Limits {
                 maximum_wall_ms: 1,
                 shutdown_grace_ms: 0,
+                maximum_child_rss_bytes: None,
+                maximum_child_cpu_ticks: None,
                 maximum_output_bytes: 1024 * 1024 + 1,
             },
         ] {
