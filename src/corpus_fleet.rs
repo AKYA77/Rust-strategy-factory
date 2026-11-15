@@ -173,6 +173,7 @@ pub fn register_file(config_path: &Path, database: &Path) -> Result<String> {
             params![id, body],
         )
         .map_err(|e| e.to_string())?;
+        crate::fleet_control::register(&tx, &id, "running")?;
         for index in 0..definition.sources.len() {
             tx.execute(
                 "INSERT INTO corpus_fleet_sources(fleet_id,source_index) VALUES(?1,?2)",
@@ -252,6 +253,7 @@ fn read(connection: &Connection, id: &str) -> Result<Snapshot> {
     if sources.len() != definition.sources.len() || sum != visits {
         return Err("fleet source/visit count mismatch".into());
     }
+    crate::fleet_control::read(connection, id)?;
     Ok(Snapshot {
         definition,
         cursor,
@@ -270,22 +272,41 @@ pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
         .map_err(|e| e.to_string())?;
     let snapshot = read(&tx, id)?;
     let owned_observations = owned_observations(&tx, id, &snapshot)?;
+    let control = crate::fleet_control::status(&tx, id)?;
     let sources:Vec<_>=snapshot.sources.iter().map(|source|{let reference=&snapshot.definition.sources[source.index];serde_json::json!({"index":source.index.to_string(),"name":reference.name,"search_id":reference.search_id,"visits":source.visits.to_string(),"progress_visits":source.progress.to_string(),"last_kind":source.kind,"last_obstacle":source.obstacle,"obstacle_at_visit":source.obstacle_at.map(|n|n.to_string())})}).collect();
     tx.commit().map_err(|e| e.to_string())?;
     Ok(
-        serde_json::json!({"fleet_id":id,"owned_observations":owned_observations,"state":snapshot.state,"next_source_index":snapshot.cursor.to_string(),"visits":snapshot.visits.to_string(),"idle_visits":snapshot.idle.to_string(),"attempt":snapshot.attempt.to_string(),"lease_active":snapshot.expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"sources":sources,"disk_reserve_bytes":snapshot.definition.disk_guard.as_ref().map(|g|g.minimum_available_bytes.to_string()),"qualification_granted":false,"limitations":"Round-robin bounded source visits, not equal CPU allocation, new simulation counts, complete error history or qualification. Returned source errors are isolated; filesystem-stall deadlines and hard OS enforcement remain separate."}),
+        serde_json::json!({"fleet_id":id,"control":control,"owned_observations":owned_observations,"state":snapshot.state,"next_source_index":snapshot.cursor.to_string(),"visits":snapshot.visits.to_string(),"idle_visits":snapshot.idle.to_string(),"attempt":snapshot.attempt.to_string(),"lease_active":snapshot.expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"sources":sources,"disk_reserve_bytes":snapshot.definition.disk_guard.as_ref().map(|g|g.minimum_available_bytes.to_string()),"qualification_granted":false,"limitations":"Round-robin bounded source visits, not equal CPU allocation, new simulation counts, complete error history or qualification. Returned source errors are isolated; filesystem-stall deadlines and hard OS enforcement remain separate."}),
     )
 }
 pub fn control(registry: &mut Registry, id: &str, state: &str) -> Result<()> {
     if !["running", "paused", "stopped"].contains(&state) {
         return Err("invalid fleet control".into());
     }
-    let n=registry.connection.execute("UPDATE corpus_fleets SET token=CASE WHEN state=?2 AND ?2='running' THEN token ELSE NULL END,expires_ms=CASE WHEN state=?2 AND ?2='running' THEN expires_ms ELSE NULL END,state=?2,idle_visits=CASE WHEN ?2='running' THEN 0 ELSE idle_visits END WHERE id=?1 AND state IN ('running','paused')",params![id,state]).map_err(|e|e.to_string())?;
-    if n != 1 {
-        return Err("unknown or terminal fleet".into());
+    let tx = registry
+        .connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|e| e.to_string())?;
+    crate::fleet_control::transition(
+        &tx,
+        id,
+        state,
+        crate::fleet_control::Cause::Operator,
+        chrono::Utc::now().timestamp_millis(),
+    )?;
+    if state == "running" {
+        tx.execute("UPDATE corpus_fleets SET idle_visits=0 WHERE id=?1", [id])
+            .map_err(|e| e.to_string())?;
     }
-    Ok(())
+    tx.commit().map_err(|e| e.to_string())
 }
+pub fn control_status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
+    let head = crate::fleet_control::read(&registry.connection, id)?;
+    let mut value = crate::fleet_control::status(&registry.connection, id)?;
+    value["state"] = head.state.into();
+    Ok(value)
+}
+
 fn visit(
     registry: &Registry,
     database: &Path,
@@ -399,16 +420,28 @@ fn publish(
         "running"
     };
     tx.execute(
-        "UPDATE corpus_fleets SET cursor=?2,visits=?3,idle_visits=?4,state=?5 WHERE id=?1",
+        "UPDATE corpus_fleets SET cursor=?2,visits=?3,idle_visits=?4 WHERE id=?1",
         params![
             lease.id,
             (index + 1) % snapshot.definition.sources.len(),
             visits,
-            idle,
-            state
+            idle
         ],
     )
     .map_err(|e| e.to_string())?;
+    if state != "running" {
+        crate::fleet_control::transition(
+            &tx,
+            &lease.id,
+            state,
+            if state == "exhausted" {
+                crate::fleet_control::Cause::Exhausted
+            } else {
+                crate::fleet_control::Cause::SchedulerIdle
+            },
+            chrono::Utc::now().timestamp_millis(),
+        )?;
+    }
     tx.commit().map_err(|e| e.to_string())
 }
 pub fn step(database: &Path, id: &str) -> Result<Step> {
@@ -764,9 +797,9 @@ pub fn supervised_step(database: &Path, id: &str, supervision: &Supervision<'_>)
     step_internal(database, id, Some(supervision))
 }
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
-    fn fixture(name: &str) -> (std::path::PathBuf, std::path::PathBuf, String) {
+    pub(crate) fn fixture(name: &str) -> (std::path::PathBuf, std::path::PathBuf, String) {
         let root =
             std::env::temp_dir().join(format!("corpus-fleet-unit-{name}-{}", std::process::id()));
         std::fs::create_dir(&root).unwrap();
