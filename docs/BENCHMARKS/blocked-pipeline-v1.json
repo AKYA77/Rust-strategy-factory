@@ -1,0 +1,775 @@
+{
+  "available_parallelism": 2,
+  "class": "SYNTHETIC_FRESH_PROCESS_STREAMING_CHECKPOINT_PIPELINE",
+  "compute_revision": "compute-blake3:a7fc62c358983e12e70a6d7c55e1ba552fa2e9d1edeb0832494e1b5b3068c5c3",
+  "encodings": [
+    {
+      "encode_and_verified_describe_ns": "53798132",
+      "format": "native",
+      "total_artifact_bytes": "3214769"
+    },
+    {
+      "encode_and_verified_describe_ns": "82855234",
+      "format": "block256",
+      "total_artifact_bytes": "3240169"
+    },
+    {
+      "encode_and_verified_describe_ns": "80804452",
+      "format": "block8192",
+      "total_artifact_bytes": "3215849"
+    }
+  ],
+  "events_per_instrument": 20000,
+  "host_cpu": "AMD EPYC 9V74 80-Core Processor",
+  "kernel": "Linux 6.18.57 x86_64 GNU/Linux",
+  "limitations": "Synthetic literal-USD profiles only; no real, full-history, scientific or target-VPS acceptance. Fresh child peak RSS includes new sessions, cached routes and warmed diagnostics, excluding parent artifact generation/cache helpers. Native kernel CPU ticks are not milliseconds. New-pipeline timer includes source verification, compilation, prefix reconstruction, checkpoint/replay/persistence and registry integrity. Cached routes still revalidate source context. Stage diagnostics run after the pipeline and are warm. Advisory eviction does not prove physical cold storage. Full financial receipt hashes/nonzero trade totals must match across all layouts; physical corpus/experiment identities intentionally differ. No format default or universal speedup claim.",
+  "measurements": [
+    {
+      "cache_condition": "advisory_eviction_requested",
+      "cached_receipt_reads": "15",
+      "cached_route_ns": "297728298",
+      "checkpoint_steps": "45",
+      "child_cpu_ticks": "427",
+      "closed_synthetic_trades": "10166",
+      "eviction_syscall_succeeded": true,
+      "format": "native",
+      "fresh_child_peak_rss_bytes": "18366464",
+      "full_tick_receipts_hash": "00e38fca5cd154bcc7cdfa63bdbb6cf17d31559374c043d08f4a90ca38feaadc",
+      "lease_acquisitions": "45",
+      "maximum_decoded_quote_block_events": "8192",
+      "new_completed_experiments": "15",
+      "new_pipeline_ns": "3933702919",
+      "new_pipeline_storage_read_bytes": "3256320",
+      "physical_cold_verified": false,
+      "post_pipeline_warm_stage_diagnostics": [
+        {
+          "warmed_inspect_ns": "17780972",
+          "warmed_three_signal_compilations_ns": "14518300"
+        },
+        {
+          "warmed_inspect_ns": "17389453",
+          "warmed_three_signal_compilations_ns": "14108303"
+        },
+        {
+          "warmed_inspect_ns": "17626255",
+          "warmed_three_signal_compilations_ns": "14051546"
+        },
+        {
+          "warmed_inspect_ns": "17299214",
+          "warmed_three_signal_compilations_ns": "14276260"
+        },
+        {
+          "warmed_inspect_ns": "17312645",
+          "warmed_three_signal_compilations_ns": "13970731"
+        }
+      ],
+      "repetition": "0"
+    },
+    {
+      "cache_condition": "warm",
+      "cached_receipt_reads": "15",
+      "cached_route_ns": "295842936",
+      "checkpoint_steps": "45",
+      "child_cpu_ticks": "428",
+      "closed_synthetic_trades": "10166",
+      "eviction_syscall_succeeded": false,
+      "format": "native",
+      "fresh_child_peak_rss_bytes": "18268160",
+      "full_tick_receipts_hash": "00e38fca5cd154bcc7cdfa63bdbb6cf17d31559374c043d08f4a90ca38feaadc",
+      "lease_acquisitions": "45",
+      "maximum_decoded_quote_block_events": "8192",
+      "new_completed_experiments": "15",
+      "new_pipeline_ns": "3895164209",
+      "new_pipeline_storage_read_bytes": "4096",
+      "physical_cold_verified": false,
+      "post_pipeline_warm_stage_diagnostics": [
+        {
+          "warmed_inspect_ns": "17291211",
+          "warmed_three_signal_compilations_ns": "14112599"
+        },
+        {
+          "warmed_inspect_ns": "17107029",
+          "warmed_three_signal_compilations_ns": "14127922"
+        },
+        {
+          "warmed_inspect_ns": "17831488",
+          "warmed_three_signal_compilations_ns": "14186672"
+        },
+        {
+          "warmed_inspect_ns": "17123385",
+          "warmed_three_signal_compilations_ns": "14020558"
+        },
+        {
+          "warmed_inspect_ns": "17049862",
+          "warmed_three_signal_compilations_ns": "14222688"
+        }
+      ],
+      "repetition": "0"
+    },
+    {
+      "cache_condition": "advisory_eviction_requested",
+      "cached_receipt_reads": "15",
+      "cached_route_ns": "386588084",
+      "checkpoint_steps": "45",
+      "child_cpu_ticks": "612",
+      "closed_synthetic_trades": "10166",
+      "eviction_syscall_succeeded": true,
+      "format": "block256",
+      "fresh_child_peak_rss_bytes": "18345984",
+      "full_tick_receipts_hash": "00e38fca5cd154bcc7cdfa63bdbb6cf17d31559374c043d08f4a90ca38feaadc",
+      "lease_acquisitions": "45",
+      "maximum_decoded_quote_block_events": "256",
+      "new_completed_experiments": "15",
+      "new_pipeline_ns": "5572617205",
+      "new_pipeline_storage_read_bytes": "3256320",
+      "physical_cold_verified": false,
+      "post_pipeline_warm_stage_diagnostics": [
+        {
+          "warmed_inspect_ns": "23333894",
+          "warmed_three_signal_compilations_ns": "32283495"
+        },
+        {
+          "warmed_inspect_ns": "23616998",
+          "warmed_three_signal_compilations_ns": "32314752"
+        },
+        {
+          "warmed_inspect_ns": "23647043",
+          "warmed_three_signal_compilations_ns": "32111321"
+        },
+        {
+          "warmed_inspect_ns": "23391373",
+          "warmed_three_signal_compilations_ns": "32208850"
+        },
+        {
+          "warmed_inspect_ns": "23194090",
+          "warmed_three_signal_compilations_ns": "32573958"
+        }
+      ],
+      "repetition": "0"
+    },
+    {
+      "cache_condition": "warm",
+      "cached_receipt_reads": "15",
+      "cached_route_ns": "387831278",
+      "checkpoint_steps": "45",
+      "child_cpu_ticks": "624",
+      "closed_synthetic_trades": "10166",
+      "eviction_syscall_succeeded": false,
+      "format": "block256",
+      "fresh_child_peak_rss_bytes": "18276352",
+      "full_tick_receipts_hash": "00e38fca5cd154bcc7cdfa63bdbb6cf17d31559374c043d08f4a90ca38feaadc",
+      "lease_acquisitions": "45",
+      "maximum_decoded_quote_block_events": "256",
+      "new_completed_experiments": "15",
+      "new_pipeline_ns": "5686652969",
+      "new_pipeline_storage_read_bytes": "0",
+      "physical_cold_verified": false,
+      "post_pipeline_warm_stage_diagnostics": [
+        {
+          "warmed_inspect_ns": "23201324",
+          "warmed_three_signal_compilations_ns": "32161981"
+        },
+        {
+          "warmed_inspect_ns": "23107081",
+          "warmed_three_signal_compilations_ns": "32261933"
+        },
+        {
+          "warmed_inspect_ns": "23093580",
+          "warmed_three_signal_compilations_ns": "32477471"
+        },
+        {
+          "warmed_inspect_ns": "22616893",
+          "warmed_three_signal_compilations_ns": "31063222"
+        },
+        {
+          "warmed_inspect_ns": "22614870",
+          "warmed_three_signal_compilations_ns": "31026496"
+        }
+      ],
+      "repetition": "0"
+    },
+    {
+      "cache_condition": "advisory_eviction_requested",
+      "cached_receipt_reads": "15",
+      "cached_route_ns": "425431451",
+      "checkpoint_steps": "45",
+      "child_cpu_ticks": "583",
+      "closed_synthetic_trades": "10166",
+      "eviction_syscall_succeeded": true,
+      "format": "block8192",
+      "fresh_child_peak_rss_bytes": "18399232",
+      "full_tick_receipts_hash": "00e38fca5cd154bcc7cdfa63bdbb6cf17d31559374c043d08f4a90ca38feaadc",
+      "lease_acquisitions": "45",
+      "maximum_decoded_quote_block_events": "8192",
+      "new_completed_experiments": "15",
+      "new_pipeline_ns": "5228030721",
+      "new_pipeline_storage_read_bytes": "3256320",
+      "physical_cold_verified": false,
+      "post_pipeline_warm_stage_diagnostics": [
+        {
+          "warmed_inspect_ns": "24033442",
+          "warmed_three_signal_compilations_ns": "32001056"
+        },
+        {
+          "warmed_inspect_ns": "24163539",
+          "warmed_three_signal_compilations_ns": "31560869"
+        },
+        {
+          "warmed_inspect_ns": "23882202",
+          "warmed_three_signal_compilations_ns": "30740763"
+        },
+        {
+          "warmed_inspect_ns": "23934181",
+          "warmed_three_signal_compilations_ns": "34533992"
+        },
+        {
+          "warmed_inspect_ns": "24112412",
+          "warmed_three_signal_compilations_ns": "31463360"
+        }
+      ],
+      "repetition": "0"
+    },
+    {
+      "cache_condition": "warm",
+      "cached_receipt_reads": "15",
+      "cached_route_ns": "395627610",
+      "checkpoint_steps": "45",
+      "child_cpu_ticks": "587",
+      "closed_synthetic_trades": "10166",
+      "eviction_syscall_succeeded": false,
+      "format": "block8192",
+      "fresh_child_peak_rss_bytes": "18337792",
+      "full_tick_receipts_hash": "00e38fca5cd154bcc7cdfa63bdbb6cf17d31559374c043d08f4a90ca38feaadc",
+      "lease_acquisitions": "45",
+      "maximum_decoded_quote_block_events": "8192",
+      "new_completed_experiments": "15",
+      "new_pipeline_ns": "5307584092",
+      "new_pipeline_storage_read_bytes": "0",
+      "physical_cold_verified": false,
+      "post_pipeline_warm_stage_diagnostics": [
+        {
+          "warmed_inspect_ns": "29594950",
+          "warmed_three_signal_compilations_ns": "31614106"
+        },
+        {
+          "warmed_inspect_ns": "22877444",
+          "warmed_three_signal_compilations_ns": "31950700"
+        },
+        {
+          "warmed_inspect_ns": "22303167",
+          "warmed_three_signal_compilations_ns": "31114344"
+        },
+        {
+          "warmed_inspect_ns": "23002425",
+          "warmed_three_signal_compilations_ns": "32910725"
+        },
+        {
+          "warmed_inspect_ns": "23197131",
+          "warmed_three_signal_compilations_ns": "31185132"
+        }
+      ],
+      "repetition": "0"
+    },
+    {
+      "cache_condition": "advisory_eviction_requested",
+      "cached_receipt_reads": "15",
+      "cached_route_ns": "386382866",
+      "checkpoint_steps": "45",
+      "child_cpu_ticks": "595",
+      "closed_synthetic_trades": "10166",
+      "eviction_syscall_succeeded": true,
+      "format": "block256",
+      "fresh_child_peak_rss_bytes": "18374656",
+      "full_tick_receipts_hash": "00e38fca5cd154bcc7cdfa63bdbb6cf17d31559374c043d08f4a90ca38feaadc",
+      "lease_acquisitions": "45",
+      "maximum_decoded_quote_block_events": "256",
+      "new_completed_experiments": "15",
+      "new_pipeline_ns": "5386810518",
+      "new_pipeline_storage_read_bytes": "3256320",
+      "physical_cold_verified": false,
+      "post_pipeline_warm_stage_diagnostics": [
+        {
+          "warmed_inspect_ns": "23498882",
+          "warmed_three_signal_compilations_ns": "36031031"
+        },
+        {
+          "warmed_inspect_ns": "23228319",
+          "warmed_three_signal_compilations_ns": "35567955"
+        },
+        {
+          "warmed_inspect_ns": "24305852",
+          "warmed_three_signal_compilations_ns": "35729151"
+        },
+        {
+          "warmed_inspect_ns": "23454423",
+          "warmed_three_signal_compilations_ns": "35638863"
+        },
+        {
+          "warmed_inspect_ns": "23238585",
+          "warmed_three_signal_compilations_ns": "36062278"
+        }
+      ],
+      "repetition": "1"
+    },
+    {
+      "cache_condition": "warm",
+      "cached_receipt_reads": "15",
+      "cached_route_ns": "382029661",
+      "checkpoint_steps": "45",
+      "child_cpu_ticks": "586",
+      "closed_synthetic_trades": "10166",
+      "eviction_syscall_succeeded": false,
+      "format": "block256",
+      "fresh_child_peak_rss_bytes": "18296832",
+      "full_tick_receipts_hash": "00e38fca5cd154bcc7cdfa63bdbb6cf17d31559374c043d08f4a90ca38feaadc",
+      "lease_acquisitions": "45",
+      "maximum_decoded_quote_block_events": "256",
+      "new_completed_experiments": "15",
+      "new_pipeline_ns": "5314513683",
+      "new_pipeline_storage_read_bytes": "0",
+      "physical_cold_verified": false,
+      "post_pipeline_warm_stage_diagnostics": [
+        {
+          "warmed_inspect_ns": "23151314",
+          "warmed_three_signal_compilations_ns": "31379069"
+        },
+        {
+          "warmed_inspect_ns": "22628006",
+          "warmed_three_signal_compilations_ns": "31076188"
+        },
+        {
+          "warmed_inspect_ns": "22940652",
+          "warmed_three_signal_compilations_ns": "31989660"
+        },
+        {
+          "warmed_inspect_ns": "23037369",
+          "warmed_three_signal_compilations_ns": "31933965"
+        },
+        {
+          "warmed_inspect_ns": "23073384",
+          "warmed_three_signal_compilations_ns": "30909464"
+        }
+      ],
+      "repetition": "1"
+    },
+    {
+      "cache_condition": "advisory_eviction_requested",
+      "cached_receipt_reads": "15",
+      "cached_route_ns": "390782904",
+      "checkpoint_steps": "45",
+      "child_cpu_ticks": "576",
+      "closed_synthetic_trades": "10166",
+      "eviction_syscall_succeeded": true,
+      "format": "block8192",
+      "fresh_child_peak_rss_bytes": "18472960",
+      "full_tick_receipts_hash": "00e38fca5cd154bcc7cdfa63bdbb6cf17d31559374c043d08f4a90ca38feaadc",
+      "lease_acquisitions": "45",
+      "maximum_decoded_quote_block_events": "8192",
+      "new_completed_experiments": "15",
+      "new_pipeline_ns": "5204674387",
+      "new_pipeline_storage_read_bytes": "3256320",
+      "physical_cold_verified": false,
+      "post_pipeline_warm_stage_diagnostics": [
+        {
+          "warmed_inspect_ns": "22219885",
+          "warmed_three_signal_compilations_ns": "30695303"
+        },
+        {
+          "warmed_inspect_ns": "22607749",
+          "warmed_three_signal_compilations_ns": "30849015"
+        },
+        {
+          "warmed_inspect_ns": "22743135",
+          "warmed_three_signal_compilations_ns": "30990981"
+        },
+        {
+          "warmed_inspect_ns": "22632678",
+          "warmed_three_signal_compilations_ns": "30985641"
+        },
+        {
+          "warmed_inspect_ns": "22907133",
+          "warmed_three_signal_compilations_ns": "31679970"
+        }
+      ],
+      "repetition": "1"
+    },
+    {
+      "cache_condition": "warm",
+      "cached_receipt_reads": "15",
+      "cached_route_ns": "378735884",
+      "checkpoint_steps": "45",
+      "child_cpu_ticks": "574",
+      "closed_synthetic_trades": "10166",
+      "eviction_syscall_succeeded": false,
+      "format": "block8192",
+      "fresh_child_peak_rss_bytes": "18497536",
+      "full_tick_receipts_hash": "00e38fca5cd154bcc7cdfa63bdbb6cf17d31559374c043d08f4a90ca38feaadc",
+      "lease_acquisitions": "45",
+      "maximum_decoded_quote_block_events": "8192",
+      "new_completed_experiments": "15",
+      "new_pipeline_ns": "5192576677",
+      "new_pipeline_storage_read_bytes": "0",
+      "physical_cold_verified": false,
+      "post_pipeline_warm_stage_diagnostics": [
+        {
+          "warmed_inspect_ns": "22666282",
+          "warmed_three_signal_compilations_ns": "30858476"
+        },
+        {
+          "warmed_inspect_ns": "22883873",
+          "warmed_three_signal_compilations_ns": "31081235"
+        },
+        {
+          "warmed_inspect_ns": "23249050",
+          "warmed_three_signal_compilations_ns": "30961703"
+        },
+        {
+          "warmed_inspect_ns": "22685701",
+          "warmed_three_signal_compilations_ns": "30666253"
+        },
+        {
+          "warmed_inspect_ns": "22720375",
+          "warmed_three_signal_compilations_ns": "30390994"
+        }
+      ],
+      "repetition": "1"
+    },
+    {
+      "cache_condition": "advisory_eviction_requested",
+      "cached_receipt_reads": "15",
+      "cached_route_ns": "294907842",
+      "checkpoint_steps": "45",
+      "child_cpu_ticks": "398",
+      "closed_synthetic_trades": "10166",
+      "eviction_syscall_succeeded": true,
+      "format": "native",
+      "fresh_child_peak_rss_bytes": "18345984",
+      "full_tick_receipts_hash": "00e38fca5cd154bcc7cdfa63bdbb6cf17d31559374c043d08f4a90ca38feaadc",
+      "lease_acquisitions": "45",
+      "maximum_decoded_quote_block_events": "8192",
+      "new_completed_experiments": "15",
+      "new_pipeline_ns": "3631599053",
+      "new_pipeline_storage_read_bytes": "3256320",
+      "physical_cold_verified": false,
+      "post_pipeline_warm_stage_diagnostics": [
+        {
+          "warmed_inspect_ns": "17367157",
+          "warmed_three_signal_compilations_ns": "14244945"
+        },
+        {
+          "warmed_inspect_ns": "17586490",
+          "warmed_three_signal_compilations_ns": "13986623"
+        },
+        {
+          "warmed_inspect_ns": "17503204",
+          "warmed_three_signal_compilations_ns": "14285177"
+        },
+        {
+          "warmed_inspect_ns": "17142124",
+          "warmed_three_signal_compilations_ns": "14027895"
+        },
+        {
+          "warmed_inspect_ns": "17333175",
+          "warmed_three_signal_compilations_ns": "13949166"
+        }
+      ],
+      "repetition": "1"
+    },
+    {
+      "cache_condition": "warm",
+      "cached_receipt_reads": "15",
+      "cached_route_ns": "296336977",
+      "checkpoint_steps": "45",
+      "child_cpu_ticks": "401",
+      "closed_synthetic_trades": "10166",
+      "eviction_syscall_succeeded": false,
+      "format": "native",
+      "fresh_child_peak_rss_bytes": "18288640",
+      "full_tick_receipts_hash": "00e38fca5cd154bcc7cdfa63bdbb6cf17d31559374c043d08f4a90ca38feaadc",
+      "lease_acquisitions": "45",
+      "maximum_decoded_quote_block_events": "8192",
+      "new_completed_experiments": "15",
+      "new_pipeline_ns": "3643576563",
+      "new_pipeline_storage_read_bytes": "0",
+      "physical_cold_verified": false,
+      "post_pipeline_warm_stage_diagnostics": [
+        {
+          "warmed_inspect_ns": "18481481",
+          "warmed_three_signal_compilations_ns": "14217704"
+        },
+        {
+          "warmed_inspect_ns": "18652051",
+          "warmed_three_signal_compilations_ns": "14567636"
+        },
+        {
+          "warmed_inspect_ns": "20576670",
+          "warmed_three_signal_compilations_ns": "14528308"
+        },
+        {
+          "warmed_inspect_ns": "18524737",
+          "warmed_three_signal_compilations_ns": "14289564"
+        },
+        {
+          "warmed_inspect_ns": "18367909",
+          "warmed_three_signal_compilations_ns": "14327422"
+        }
+      ],
+      "repetition": "1"
+    },
+    {
+      "cache_condition": "advisory_eviction_requested",
+      "cached_receipt_reads": "15",
+      "cached_route_ns": "376615622",
+      "checkpoint_steps": "45",
+      "child_cpu_ticks": "569",
+      "closed_synthetic_trades": "10166",
+      "eviction_syscall_succeeded": true,
+      "format": "block8192",
+      "fresh_child_peak_rss_bytes": "18280448",
+      "full_tick_receipts_hash": "00e38fca5cd154bcc7cdfa63bdbb6cf17d31559374c043d08f4a90ca38feaadc",
+      "lease_acquisitions": "45",
+      "maximum_decoded_quote_block_events": "8192",
+      "new_completed_experiments": "15",
+      "new_pipeline_ns": "5130517575",
+      "new_pipeline_storage_read_bytes": "3256320",
+      "physical_cold_verified": false,
+      "post_pipeline_warm_stage_diagnostics": [
+        {
+          "warmed_inspect_ns": "22639950",
+          "warmed_three_signal_compilations_ns": "30906792"
+        },
+        {
+          "warmed_inspect_ns": "22580179",
+          "warmed_three_signal_compilations_ns": "31194560"
+        },
+        {
+          "warmed_inspect_ns": "22644156",
+          "warmed_three_signal_compilations_ns": "30987204"
+        },
+        {
+          "warmed_inspect_ns": "22728155",
+          "warmed_three_signal_compilations_ns": "36973748"
+        },
+        {
+          "warmed_inspect_ns": "35069603",
+          "warmed_three_signal_compilations_ns": "33927696"
+        }
+      ],
+      "repetition": "2"
+    },
+    {
+      "cache_condition": "warm",
+      "cached_receipt_reads": "15",
+      "cached_route_ns": "377099035",
+      "checkpoint_steps": "45",
+      "child_cpu_ticks": "571",
+      "closed_synthetic_trades": "10166",
+      "eviction_syscall_succeeded": false,
+      "format": "block8192",
+      "fresh_child_peak_rss_bytes": "18382848",
+      "full_tick_receipts_hash": "00e38fca5cd154bcc7cdfa63bdbb6cf17d31559374c043d08f4a90ca38feaadc",
+      "lease_acquisitions": "45",
+      "maximum_decoded_quote_block_events": "8192",
+      "new_completed_experiments": "15",
+      "new_pipeline_ns": "5153696876",
+      "new_pipeline_storage_read_bytes": "0",
+      "physical_cold_verified": false,
+      "post_pipeline_warm_stage_diagnostics": [
+        {
+          "warmed_inspect_ns": "22773638",
+          "warmed_three_signal_compilations_ns": "34228915"
+        },
+        {
+          "warmed_inspect_ns": "22760237",
+          "warmed_three_signal_compilations_ns": "34298220"
+        },
+        {
+          "warmed_inspect_ns": "22764973",
+          "warmed_three_signal_compilations_ns": "34380010"
+        },
+        {
+          "warmed_inspect_ns": "22750415",
+          "warmed_three_signal_compilations_ns": "34121918"
+        },
+        {
+          "warmed_inspect_ns": "22636241",
+          "warmed_three_signal_compilations_ns": "34274940"
+        }
+      ],
+      "repetition": "2"
+    },
+    {
+      "cache_condition": "advisory_eviction_requested",
+      "cached_receipt_reads": "15",
+      "cached_route_ns": "294967617",
+      "checkpoint_steps": "45",
+      "child_cpu_ticks": "397",
+      "closed_synthetic_trades": "10166",
+      "eviction_syscall_succeeded": true,
+      "format": "native",
+      "fresh_child_peak_rss_bytes": "18284544",
+      "full_tick_receipts_hash": "00e38fca5cd154bcc7cdfa63bdbb6cf17d31559374c043d08f4a90ca38feaadc",
+      "lease_acquisitions": "45",
+      "maximum_decoded_quote_block_events": "8192",
+      "new_completed_experiments": "15",
+      "new_pipeline_ns": "3621877962",
+      "new_pipeline_storage_read_bytes": "3256320",
+      "physical_cold_verified": false,
+      "post_pipeline_warm_stage_diagnostics": [
+        {
+          "warmed_inspect_ns": "17315966",
+          "warmed_three_signal_compilations_ns": "13978964"
+        },
+        {
+          "warmed_inspect_ns": "17296486",
+          "warmed_three_signal_compilations_ns": "13964122"
+        },
+        {
+          "warmed_inspect_ns": "17230265",
+          "warmed_three_signal_compilations_ns": "14011383"
+        },
+        {
+          "warmed_inspect_ns": "17215743",
+          "warmed_three_signal_compilations_ns": "13909689"
+        },
+        {
+          "warmed_inspect_ns": "17170685",
+          "warmed_three_signal_compilations_ns": "13910610"
+        }
+      ],
+      "repetition": "2"
+    },
+    {
+      "cache_condition": "warm",
+      "cached_receipt_reads": "15",
+      "cached_route_ns": "296033579",
+      "checkpoint_steps": "45",
+      "child_cpu_ticks": "402",
+      "closed_synthetic_trades": "10166",
+      "eviction_syscall_succeeded": false,
+      "format": "native",
+      "fresh_child_peak_rss_bytes": "18341888",
+      "full_tick_receipts_hash": "00e38fca5cd154bcc7cdfa63bdbb6cf17d31559374c043d08f4a90ca38feaadc",
+      "lease_acquisitions": "45",
+      "maximum_decoded_quote_block_events": "8192",
+      "new_completed_experiments": "15",
+      "new_pipeline_ns": "3646273435",
+      "new_pipeline_storage_read_bytes": "0",
+      "physical_cold_verified": false,
+      "post_pipeline_warm_stage_diagnostics": [
+        {
+          "warmed_inspect_ns": "17397336",
+          "warmed_three_signal_compilations_ns": "14076784"
+        },
+        {
+          "warmed_inspect_ns": "17231173",
+          "warmed_three_signal_compilations_ns": "14049913"
+        },
+        {
+          "warmed_inspect_ns": "17272266",
+          "warmed_three_signal_compilations_ns": "14023413"
+        },
+        {
+          "warmed_inspect_ns": "17251754",
+          "warmed_three_signal_compilations_ns": "14077495"
+        },
+        {
+          "warmed_inspect_ns": "17343274",
+          "warmed_three_signal_compilations_ns": "14132078"
+        }
+      ],
+      "repetition": "2"
+    },
+    {
+      "cache_condition": "advisory_eviction_requested",
+      "cached_receipt_reads": "15",
+      "cached_route_ns": "394002220",
+      "checkpoint_steps": "45",
+      "child_cpu_ticks": "585",
+      "closed_synthetic_trades": "10166",
+      "eviction_syscall_succeeded": true,
+      "format": "block256",
+      "fresh_child_peak_rss_bytes": "18366464",
+      "full_tick_receipts_hash": "00e38fca5cd154bcc7cdfa63bdbb6cf17d31559374c043d08f4a90ca38feaadc",
+      "lease_acquisitions": "45",
+      "maximum_decoded_quote_block_events": "256",
+      "new_completed_experiments": "15",
+      "new_pipeline_ns": "5280556036",
+      "new_pipeline_storage_read_bytes": "3256320",
+      "physical_cold_verified": false,
+      "post_pipeline_warm_stage_diagnostics": [
+        {
+          "warmed_inspect_ns": "23687277",
+          "warmed_three_signal_compilations_ns": "32489428"
+        },
+        {
+          "warmed_inspect_ns": "23575358",
+          "warmed_three_signal_compilations_ns": "32375595"
+        },
+        {
+          "warmed_inspect_ns": "23299161",
+          "warmed_three_signal_compilations_ns": "32509378"
+        },
+        {
+          "warmed_inspect_ns": "23240703",
+          "warmed_three_signal_compilations_ns": "32133841"
+        },
+        {
+          "warmed_inspect_ns": "23381185",
+          "warmed_three_signal_compilations_ns": "32715159"
+        }
+      ],
+      "repetition": "2"
+    },
+    {
+      "cache_condition": "warm",
+      "cached_receipt_reads": "15",
+      "cached_route_ns": "384461235",
+      "checkpoint_steps": "45",
+      "child_cpu_ticks": "592",
+      "closed_synthetic_trades": "10166",
+      "eviction_syscall_succeeded": false,
+      "format": "block256",
+      "fresh_child_peak_rss_bytes": "18272256",
+      "full_tick_receipts_hash": "00e38fca5cd154bcc7cdfa63bdbb6cf17d31559374c043d08f4a90ca38feaadc",
+      "lease_acquisitions": "45",
+      "maximum_decoded_quote_block_events": "256",
+      "new_completed_experiments": "15",
+      "new_pipeline_ns": "5329533056",
+      "new_pipeline_storage_read_bytes": "4096",
+      "physical_cold_verified": false,
+      "post_pipeline_warm_stage_diagnostics": [
+        {
+          "warmed_inspect_ns": "23290135",
+          "warmed_three_signal_compilations_ns": "35855733"
+        },
+        {
+          "warmed_inspect_ns": "23212827",
+          "warmed_three_signal_compilations_ns": "35473173"
+        },
+        {
+          "warmed_inspect_ns": "22943938",
+          "warmed_three_signal_compilations_ns": "35963297"
+        },
+        {
+          "warmed_inspect_ns": "23164604",
+          "warmed_three_signal_compilations_ns": "35771315"
+        },
+        {
+          "warmed_inspect_ns": "23164293",
+          "warmed_three_signal_compilations_ns": "35411740"
+        }
+      ],
+      "repetition": "2"
+    }
+  ],
+  "repetitions": 3,
+  "source_artifact_rows": 8192,
+  "symbols": [
+    "EURUSD",
+    "GBPUSD",
+    "AUDUSD",
+    "NZDUSD",
+    "XAUUSD"
+  ]
+}

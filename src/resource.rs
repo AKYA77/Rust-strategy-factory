@@ -280,3 +280,8 @@ impl ProcessObservation {
         )
     }
 }
+
+/// Kernel high-water RSS for the current process; not an aggregate or an enforced limit.
+pub fn observe_peak_rss() -> Result<u64> {
+    kilobytes(&bounded_read("/proc/self/status")?, "VmHWM:")
+}
