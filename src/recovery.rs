@@ -603,6 +603,7 @@ pub fn restore_expected(
         "research_runs",
         "corpus_searches",
         "corpus_fleets",
+        "corpus_campaign_runs",
     ] {
         let n=tx.execute(&format!("UPDATE {table} SET token=NULL,expires_ms=NULL{} WHERE (token IS NOT NULL OR expires_ms IS NOT NULL){}",if table=="experiments"{",state=CASE WHEN state='running' THEN 'queued' ELSE state END"}else{""},if table=="experiments"{" AND state IN ('queued','running')"}else{""}),[]).map_err(|e|e.to_string())?;
         revoked += n;

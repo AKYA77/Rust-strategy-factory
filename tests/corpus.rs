@@ -3904,7 +3904,7 @@ fn frozen_campaign_cli_binds_complete_trial_scope_preserves_holds_and_rejects_re
     let id = first["campaign_id"].as_str().unwrap();
     assert_eq!(first["seed"], u64::MAX.to_string());
     assert_eq!(first["declared_slots"], "6");
-    assert_eq!(first["execution_supported"], false);
+    assert_eq!(first["execution_supported"], true);
     assert_eq!(first["inputs_freshly_verified"], false);
     assert_eq!(
         first,
@@ -3983,4 +3983,130 @@ fn frozen_campaign_cli_binds_complete_trial_scope_preserves_holds_and_rejects_re
     assert!(!invalid_db.exists());
     assert!(corpus_campaign::register_file(&config, &invalid_db, 17).is_err());
     assert!(!invalid_db.exists());
+}
+
+#[test]
+fn campaign_foreground_cli_replenishes_frozen_regions_preserves_holds_and_restarts() {
+    use rust_strategy_factory::{
+        corpus_campaign, corpus_search, operator_config, research, storage::Registry, tick_engine,
+    };
+    let f = Fixture::new("campaign-execution-cli", "EURUSD", 7);
+    let config = corpus_search_fixture(&f);
+    let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&config).unwrap()).unwrap();
+    value["start_index"] = 12.into();
+    value["maximum_candidates"] = 1.into();
+    value["queue_width"] = 1.into();
+    fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+    let db = f.root.join("campaign.sqlite");
+    let id = corpus_campaign::register_file(&config, &db, 3).unwrap();
+    let call = |rounds: &str| {
+        let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+            .args(["corpus-campaign-run", db.to_str().unwrap(), &id, rounds])
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()
+    };
+    value["resource_guard"] =
+        serde_json::json!({"maximum_process_rss_bytes":1,"minimum_host_available_memory_bytes":0});
+    fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+    assert_eq!(call("100")["stop_reason"], "pressure");
+    let mut registry = Registry::open(&db).unwrap();
+    let before = corpus_campaign::status(&registry, &id).unwrap();
+    assert_eq!(before["execution"]["attempt"], "0");
+    assert!(corpus_search::list(&registry).unwrap().is_empty());
+    value.as_object_mut().unwrap().remove("resource_guard");
+    fs::write(&config, serde_json::to_vec(&value).unwrap()).unwrap();
+    call("1");
+    corpus_campaign::control(&mut registry, &id, "paused").unwrap();
+    let paused = corpus_campaign::status(&registry, &id).unwrap();
+    let attempts = registry.counts().unwrap().attempts;
+    assert_eq!(call("100")["stop_reason"], "held");
+    assert_eq!(corpus_campaign::status(&registry, &id).unwrap(), paused);
+    assert_eq!(registry.counts().unwrap().attempts, attempts);
+    corpus_campaign::control(&mut registry, &id, "running").unwrap();
+    let current = corpus_campaign::status(&registry, &id).unwrap()["execution"]["next_region"]
+        .as_str()
+        .unwrap()
+        .parse::<usize>()
+        .unwrap();
+    let loaded = operator_config::load_search(&config).unwrap();
+    let mut run = loaded.run();
+    run.start_index = 12 + current as u64;
+    let policy = rust_strategy_factory::retry_policy::Policy {
+        backoff_ms: 1,
+        maximum_slots: 1,
+    };
+    let search_id = corpus_search::prepare_supervision(&db, &run, &policy).unwrap();
+    corpus_search::control(&mut registry, &search_id, "paused").unwrap();
+    let child_held = corpus_search::status(&registry, &search_id).unwrap();
+    assert_eq!(call("100")["stop_reason"], "held");
+    assert_eq!(
+        corpus_search::status(&registry, &search_id).unwrap(),
+        child_held
+    );
+    corpus_search::control(&mut registry, &search_id, "running").unwrap();
+    drop(registry);
+    assert_eq!(call("100")["stop_reason"], "exhausted");
+    let mut registry = Registry::open(&db).unwrap();
+    let final_status = corpus_campaign::status(&registry, &id).unwrap();
+    assert_eq!(final_status["execution"]["state"], "exhausted");
+    assert_eq!(final_status["execution"]["next_region"], "3");
+    assert_eq!(
+        final_status["execution"]["completed_regions"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    assert_eq!(final_status["execution"]["lease_active"], false);
+    assert!(
+        !serde_json::to_string(&final_status)
+            .unwrap()
+            .contains("token")
+    );
+    for index in 12..15 {
+        let strategy = research::candidate_at(index, 42).unwrap().1;
+        let key = tick_engine::corpus_key(
+            &loaded.base,
+            &loaded.specification,
+            &strategy,
+            &loaded.costs,
+            loaded.file.budget,
+        )
+        .unwrap();
+        let receipt = registry.result(&key.identity().unwrap()).unwrap().unwrap();
+        assert_eq!(
+            receipt.result["tick_replay"],
+            serde_json::to_value(
+                tick_engine::replay_corpus(
+                    &loaded.base,
+                    &loaded.specification,
+                    &strategy,
+                    &loaded.costs,
+                    loaded.file.budget
+                )
+                .unwrap()
+            )
+            .unwrap()
+        );
+    }
+    let attempts = registry.counts().unwrap().attempts;
+    assert_eq!(call("100")["stop_reason"], "exhausted");
+    assert_eq!(attempts, registry.counts().unwrap().attempts);
+    assert_eq!(
+        corpus_campaign::status(&registry, &id).unwrap(),
+        final_status
+    );
+    assert!(corpus_campaign::control(&mut registry, &id, "running").is_err());
+    registry.integrity().unwrap();
+    registry
+        .backup(&f.root.join("completed-copy.sqlite"))
+        .unwrap();
+    let copied = Registry::open(&f.root.join("completed-copy.sqlite")).unwrap();
+    assert_eq!(corpus_campaign::status(&copied, &id).unwrap(), final_status);
 }

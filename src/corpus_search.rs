@@ -724,8 +724,13 @@ pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
         .connection
         .unchecked_transaction()
         .map_err(|e| e.to_string())?;
-    let (config, cursor, state, attempt, expiry, jobs) = read(&tx, id)?;
-    let history = requeue_history(&tx, id, cursor)?;
+    let value = status_connection(&tx, id)?;
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(value)
+}
+pub(crate) fn status_connection(connection: &Connection, id: &str) -> Result<serde_json::Value> {
+    let (config, cursor, state, attempt, expiry, jobs) = read(connection, id)?;
+    let history = requeue_history(connection, id, cursor)?;
     let retry_counts: std::collections::BTreeMap<usize, usize> =
         history.iter().map(|(r, _)| (r.slot, r.sequence)).collect();
     let retry_eligible = jobs
@@ -745,10 +750,9 @@ pub fn status(registry: &Registry, id: &str) -> Result<serde_json::Value> {
         *counts.entry(job.state.clone()).or_default() += 1;
     }
     let recent:Vec<_>=jobs.iter().rev().take(32).map(|j|serde_json::json!({"candidate_index":(config.start_index + j.definition.slot as u64).to_string(),"slot":j.definition.slot.to_string(),"family":j.definition.family,"experiment_id":j.definition.key.identity().ok(),"state":j.state,"error":j.error,"error_kind":j.error_kind,"retry_candidate":j.error_kind.is_some_and(|k|k.retry_candidate())})).collect();
-    let control = crate::search_control::status(&tx, id)?;
-    let retry_decisions = crate::retry_audit::status(&tx, id)?;
-    let retry_policy=crate::retry_policy::read(&tx,id)?.map(|(p,hash)|serde_json::json!({"hash":hash,"backoff_ms":p.backoff_ms.to_string(),"maximum_slots":p.maximum_slots.to_string()}));
-    tx.commit().map_err(|e| e.to_string())?;
+    let control = crate::search_control::status(connection, id)?;
+    let retry_decisions = crate::retry_audit::status(connection, id)?;
+    let retry_policy=crate::retry_policy::read(connection,id)?.map(|(p,hash)|serde_json::json!({"hash":hash,"backoff_ms":p.backoff_ms.to_string(),"maximum_slots":p.maximum_slots.to_string()}));
     Ok(
         serde_json::json!({"control":control,"search_id":id,"state":state,"generated_slots":cursor.to_string(),"start_index":config.start_index.to_string(),"maximum_candidates":config.maximum_candidates.to_string(),"attempt":attempt.to_string(),"lease_active":expiry.is_some_and(|t|t>chrono::Utc::now().timestamp_millis()),"slot_states":counts,"recent_slots":recent,"requeue_records":history.len().to_string(),"retry_eligible_slots":retry_eligible.to_string(),"retry_capacity":retry_capacity.to_string(),"maximum_requeues_per_slot":3,"recent_requeues":recent_requeues,"retry_decisions":retry_decisions,"retry_policy":retry_policy,"automatic_retry_enabled":false,"automatic_retry_scope":"dashboard/background","foreground_retry_supported":true,"qualification_granted":false,"limitations":"Generated slots are not new tick simulations; canonical duplicates can share immutable experiment receipts. Synthetic USD training search only."}),
     )

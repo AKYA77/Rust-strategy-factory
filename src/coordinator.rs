@@ -5,12 +5,14 @@ use rusqlite::{Connection, TransactionBehavior, params};
 pub(crate) enum Kind {
     Search,
     Fleet,
+    Campaign,
 }
 impl Kind {
     fn table(self) -> &'static str {
         match self {
             Self::Search => "corpus_searches",
             Self::Fleet => "corpus_fleets",
+            Self::Campaign => "corpus_campaign_runs",
         }
     }
 }
@@ -56,6 +58,7 @@ pub(crate) fn claim(
     let epoch = match kind {
         Kind::Search => Some(crate::search_control::read(&tx, id)?.epoch),
         Kind::Fleet => Some(crate::fleet_control::read(&tx, id)?.epoch),
+        Kind::Campaign => Some(crate::corpus_campaign::epoch(&tx, id)?),
     };
     let token: String = tx
         .query_row("SELECT lower(hex(randomblob(32)))", [], |r| r.get(0))
@@ -81,6 +84,7 @@ pub(crate) fn fence(connection: &Connection, lease: &Lease, now: i64) -> Result<
         || lease.epoch.is_some_and(|epoch| match lease.kind {
             Kind::Search => crate::search_control::read(connection, &lease.id)
                 .map_or(true, |h| h.epoch != epoch),
+            Kind::Campaign => crate::corpus_campaign::epoch(connection, &lease.id) != Ok(epoch),
             Kind::Fleet => {
                 crate::fleet_control::read(connection, &lease.id).map_or(true, |h| h.epoch != epoch)
             }

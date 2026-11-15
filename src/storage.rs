@@ -98,7 +98,7 @@ pub struct Counts {
     pub running: i64,
     pub attempts: i64,
 }
-pub const SCHEMA_VERSION: u32 = 19;
+pub const SCHEMA_VERSION: u32 = 20;
 pub struct Registry {
     pub(crate) connection: Connection,
 }
@@ -278,7 +278,7 @@ impl Registry {
         crate::owned_history::initialize(&mut connection, version < 16)?;
         crate::corpus_fleet::initialize_owned(&mut connection, version < 17)?;
         crate::fleet_control::initialize(&mut connection, version < 18)?;
-        crate::corpus_campaign::initialize(&mut connection, version < 19)?;
+        crate::corpus_campaign::initialize(&mut connection, version)?;
         Ok(Self { connection })
     }
     /// Atomically reserve OOS time across dataset aliases before any competing registration.
