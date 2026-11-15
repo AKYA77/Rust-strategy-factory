@@ -1055,6 +1055,89 @@ async fn generated_search_status(
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct SessionStopRequest {}
+async fn supervision_sessions(State(app): State<Arc<App>>) -> Response {
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match crate::supervision_session::list(&registry) {
+        Ok(rows) => Json(serde_json::json!({"rows":rows,"maximum_retained":"128"})).into_response(),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "verified session inventory unavailable",
+        ),
+    }
+}
+fn session_exists(registry: &Registry, id: &str) -> crate::Result<bool> {
+    registry
+        .connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM corpus_supervision_sessions WHERE id=?1)",
+            [id],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())
+}
+async fn supervision_status(State(app): State<Arc<App>>, Param(id): Param<String>) -> Response {
+    if !catalog_id(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid session identity");
+    }
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match session_exists(&registry, &id) {
+        Ok(true) => {}
+        Ok(false) => return api_error(StatusCode::NOT_FOUND, "session not found"),
+        Err(_) => {
+            return api_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "session inventory unavailable",
+            );
+        }
+    }
+    match crate::supervision_session::status(&registry, &id) {
+        Ok(value) => Json(value).into_response(),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "verified session status unavailable",
+        ),
+    }
+}
+async fn supervision_stop(
+    State(app): State<Arc<App>>,
+    Param(id): Param<String>,
+    Json(_body): Json<SessionStopRequest>,
+) -> Response {
+    if !catalog_id(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid session identity");
+    }
+    let Ok(mut registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match session_exists(&registry, &id) {
+        Ok(true) => {}
+        Ok(false) => return api_error(StatusCode::NOT_FOUND, "session not found"),
+        Err(_) => {
+            return api_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "session inventory unavailable",
+            );
+        }
+    }
+    match crate::supervision_session::request_stop(
+        &mut registry,
+        &id,
+        chrono::Utc::now().timestamp_millis(),
+    ) {
+        Ok(requested) => {
+            Json(serde_json::json!({"session_id":id,"requested":requested,"workers_started":0}))
+                .into_response()
+        }
+        Err(_) => api_error(StatusCode::CONFLICT, "verified session stop unavailable"),
+    }
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct RequeueRequest {
     maximum_slots: usize,
 }
@@ -1550,6 +1633,12 @@ pub async fn serve_with_reviews(
         .route(
             "/api/corpus-fleets/{id}/control",
             post(corpus_fleet_control),
+        )
+        .route("/api/supervision-sessions", get(supervision_sessions))
+        .route("/api/supervision-sessions/{id}", get(supervision_status))
+        .route(
+            "/api/supervision-sessions/{id}/stop",
+            post(supervision_stop),
         )
         .route("/api/corpus-searches", get(generated_searches))
         .route(
