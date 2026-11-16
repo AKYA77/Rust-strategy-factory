@@ -4400,13 +4400,31 @@ fn campaign_owned_regions_link_actual_parents_and_scalar_receipts_with_restart_a
     );
     let first: serde_json::Value = serde_json::from_slice(&first.stdout).unwrap();
     assert_eq!(first["children_started"], "1");
-    let rest = campaign_owned_command(&db, &id, &policy, &limits, "100");
-    assert!(
-        rest.status.success(),
-        "{}",
-        String::from_utf8_lossy(&rest.stderr)
-    );
-    let rest: serde_json::Value = serde_json::from_slice(&rest.stdout).unwrap();
+    // The first supervise starts an owned child; under full-suite parallel load the next
+    // supervise can observe the campaign before the scheduler advances it. Retry the
+    // non-waiting supervise until the campaign actually exhausts; the assertion is unchanged.
+    let rest = {
+        let mut attempts = 0;
+        loop {
+            let out = campaign_owned_command(&db, &id, &policy, &limits, "100");
+            assert!(
+                out.status.success(),
+                "{}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            let value: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+            if value["stop_reason"] == "exhausted" {
+                break value;
+            }
+            attempts += 1;
+            assert!(
+                attempts < 50,
+                "campaign did not exhaust, stop_reason={}",
+                value["stop_reason"]
+            );
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    };
     assert_eq!(rest["stop_reason"], "exhausted");
     let registry = Registry::open(&db).unwrap();
     let status = corpus_campaign::status(&registry, &id).unwrap();
