@@ -107,6 +107,27 @@ New permanent tests: 16 in `historical_migration` (including Codex's two reprodu
 failed before the fix and pass after), plus corpus-admission, timestamp-tie and
 distinct-month tests. Real-corpus integration passes on the VPS with 100,000-event chunks.
 
+### Independent adversarial review outcome
+
+A fresh-context adversarial reviewer ran 13 probes against the fixed code and found **no
+bypass** of the two required attack classes (requested-scope binding; source-prefix
+equivalence), and confirmed the row/string bounds and corpus-admission behaviour. It raised
+four secondary findings; three were acted on in `6fbfd0a`:
+
+1. String budget was enforced only after full-group decode → columns are now read in
+   8,192-row windows with the budget enforced after each window (peak ≤ budget + one window).
+2. `refuses_oversized_row_group` was not a true regression test (fake manifest failed for the
+   wrong reason) → it now builds a correct manifest with a cap-bypassing test-only scan and
+   asserts the `decoded-row budget` error.
+3. Reuse bound only a subset of manifest identity → it now also binds fidelity,
+   `source_precision`, provenance and `import_evidence`.
+4. Low/defense-in-depth (accepted, documented): reusing a completed receipt does not re-read
+   chunk contents against the source; doing so requires forging `manifest.json`, the trust
+   anchor. `historical-verify <dir> <source>` remains the explicit full-equivalence check.
+
+The module now has 17 tests; `cargo clippy --locked --all-targets -- -D warnings` is clean and
+the real-corpus integration test passes with the windowed reader.
+
 ## Remaining work
 
 1. ~~Run `scripts/check.sh`~~ — fmt and Clippy pass; lib tests pass; full suite has two
