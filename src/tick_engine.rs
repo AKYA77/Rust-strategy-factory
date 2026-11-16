@@ -1612,13 +1612,54 @@ pub fn execute_corpus_batch(
 ) -> Result<CorpusBatchReport> {
     CorpusBatchSession::default().round(database, runs, limits)
 }
+// Prefer one still-owned checkpoint per worker. Duplicate stale slots are
+// possible after a jobless round; only the furthest private cursor gets priority.
+fn preferred_checkpoint_jobs(
+    workers: &[WorkerPreparation],
+    inputs: &[(String, String)],
+) -> Vec<Option<usize>> {
+    let mut owners = std::collections::BTreeMap::<usize, (usize, usize)>::new();
+    for (worker, slot) in workers.iter().enumerate() {
+        if let Some(checkpoint) = &slot.resume.checkpoint
+            && let Some(job) = inputs
+                .iter()
+                .position(|(_, id)| id == &checkpoint.experiment_id)
+            && owners
+                .get(&job)
+                .is_none_or(|(_, cursor)| checkpoint.cursor > *cursor)
+        {
+            owners.insert(job, (worker, checkpoint.cursor));
+        }
+    }
+    let mut preferred = vec![None; workers.len()];
+    for (job, (worker, _)) in owners {
+        preferred[worker] = Some(job);
+    }
+    preferred
+}
+fn next_batch_job(
+    next: &std::sync::atomic::AtomicUsize,
+    claimed: &[std::sync::atomic::AtomicBool],
+) -> Option<usize> {
+    use std::sync::atomic::Ordering;
+    loop {
+        let index = next.fetch_add(1, Ordering::Relaxed);
+        let claim = claimed.get(index)?;
+        if claim
+            .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
+            .is_ok()
+        {
+            return Some(index);
+        }
+    }
+}
 fn execute_corpus_batch_session(
     database: &std::path::Path,
     runs: &[CorpusRun<'_>],
     limits: CorpusBatchLimits,
     session: &mut CorpusBatchSession,
 ) -> Result<CorpusBatchReport> {
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     if runs.is_empty()
         || runs.len() > 256
         || !(1..=16).contains(&limits.workers)
@@ -1687,7 +1728,7 @@ fn execute_corpus_batch_session(
             .get(&binding)
             .ok_or("missing preflight source report")?;
         let key = corpus_key_from_facts(run.spec, run.strategy, run.costs, run.budget, observed)?;
-        let identity = crate::data::hash(&key)?;
+        let identity = key.identity()?;
         invocation_inputs.push((binding, identity.clone()));
         if !identities.insert(identity) {
             return Err("duplicate frozen corpus job in batch".into());
@@ -1698,7 +1739,7 @@ fn execute_corpus_batch_session(
             .map_err(|e| e.to_string())?
             .join(database),
         limits,
-        invocation_inputs,
+        &invocation_inputs,
     ))?;
     if session.binding.as_ref() != Some(&binding) {
         session.release();
@@ -1723,6 +1764,13 @@ fn execute_corpus_batch_session(
     slots.resize_with(workers, WorkerPreparation::default);
     slots.truncate(workers);
     let mut restored: Vec<_> = (0..workers).map(|_| WorkerPreparation::default()).collect();
+    let preferred = preferred_checkpoint_jobs(&slots, &invocation_inputs);
+    let claimed: Vec<_> = (0..runs.len())
+        .map(|job| AtomicBool::new(preferred.contains(&Some(job))))
+        .collect();
+    // Reserve preferred jobs before any worker can steal. On spawn failure the
+    // reservation is cancelled BEFORE opening this gate, so no job is lost.
+    let gate = (std::sync::Mutex::new(false), std::sync::Condvar::new());
     let next = AtomicUsize::new(0);
     let mut results: Vec<Option<Result<CorpusProgress>>> = (0..runs.len()).map(|_| None).collect();
     let mut worker_failures = 0;
@@ -1734,6 +1782,9 @@ fn execute_corpus_batch_session(
             connections.into_iter().enumerate().zip(slots)
         {
             let next = &next;
+            let claimed = &claimed;
+            let gate = &gate;
+            let preferred_job = preferred[i];
             let inventories = &sources;
             worker_preparation.stats = CorpusPreparationStats {
                 peak_retained_candles_per_worker: worker_preparation
@@ -1745,13 +1796,21 @@ fn execute_corpus_batch_session(
             match std::thread::Builder::new()
                 .name(format!("corpus-{i}"))
                 .spawn_scoped(scope, move || {
+                    drop(
+                        gate.1
+                            .wait_while(gate.0.lock().unwrap_or_else(|p| p.into_inner()), |ready| {
+                                !*ready
+                            })
+                            .unwrap_or_else(|p| p.into_inner()),
+                    );
                     let mut completed = Vec::new();
                     let mut preparation = worker_preparation;
-                    loop {
-                        let index = next.fetch_add(1, Ordering::Relaxed);
-                        let Some(run) = runs.get(index) else {
-                            break;
-                        };
+                    let mut preferred_job = preferred_job;
+                    while let Some(index) = preferred_job
+                        .take()
+                        .or_else(|| next_batch_job(next, claimed))
+                    {
+                        let run = &runs[index];
                         let binding = match corpus_source_binding(run) {
                             Ok(binding) => binding,
                             Err(error) => {
@@ -1784,9 +1843,16 @@ fn execute_corpus_batch_session(
                     workers_started += 1;
                     handles.push((i, handle));
                 }
-                Err(_) => worker_failures += 1,
+                Err(_) => {
+                    if let Some(job) = preferred[i] {
+                        claimed[job].store(false, Ordering::Relaxed);
+                    }
+                    worker_failures += 1;
+                }
             }
         }
+        *gate.0.lock().unwrap_or_else(|p| p.into_inner()) = true;
+        gate.1.notify_all();
         for (index, handle) in handles {
             match handle.join() {
                 Ok((completed, worker_preparation)) => {
@@ -1879,6 +1945,178 @@ mod worker_preparation_tests {
             max_receipts: 10000,
         }
     }
+    fn affinity_source(name: &str) -> Source {
+        let mut source = Source::new(name);
+        let data = data::synthetic_fixture("EURUSD").unwrap();
+        let mut paths = Vec::new();
+        for (i, ticks) in data.ticks.chunks(250).enumerate() {
+            let part = data::dataset(
+                data.profile.clone(),
+                ticks.to_vec(),
+                &data.manifest.source,
+                data.manifest.archive_hash.clone(),
+                true,
+            )
+            .unwrap();
+            let path = source.root.join(format!("affinity-{i}.rsf"));
+            native::write(&path, &part).unwrap();
+            paths.push(path);
+        }
+        source.spec = corpus::describe(&paths, 100000).unwrap();
+        assert!(source.spec.chunks.len() > 2);
+        source
+    }
+    #[test]
+    fn affinity_reuses_every_available_worker_checkpoint_with_parallel_receipt_parity() {
+        let source = affinity_source("affinity-parity");
+        let costs = Costs::default();
+        let budget = budget();
+        let mut strategies = [strategy(), strategy(), strategy()];
+        strategies[1].entry = Some(crate::strategies::EntryPlan::Limit {
+            offset_ticks: 2,
+            ttl_ms: 120000,
+            cancel_on_signal_false: true,
+        });
+        strategies[2].entry = Some(crate::strategies::EntryPlan::StopMarket {
+            offset_ticks: 2,
+            ttl_ms: 120000,
+            cancel_on_signal_false: true,
+        });
+        let runs: Vec<_> = strategies
+            .iter()
+            .map(|s| CorpusRun {
+                base: &source.root,
+                spec: &source.spec,
+                strategy: s,
+                costs: &costs,
+                budget,
+            })
+            .collect();
+        let limits = CorpusBatchLimits {
+            workers: 2,
+            max_parallel_candles: 20000,
+            max_parallel_feature_cells: 200000,
+            max_parallel_receipts: 20000,
+            max_new_chunks: 1,
+            lease_ms: 60000,
+        };
+        let db = source.root.join("affinity.sqlite");
+        let mut session = CorpusBatchSession::default();
+        let first = session.round(&db, &runs, limits).unwrap();
+        assert_eq!(first.worker_failures, 0);
+        assert!(first.jobs.iter().all(Result::is_ok));
+        let mut available = std::collections::BTreeMap::new();
+        for w in &session.workers {
+            if let Some(c) = &w.resume.checkpoint {
+                available.insert(c.experiment_id.clone(), c.events);
+            }
+        }
+        let expected: u64 = available.values().sum();
+        assert!(expected > 0);
+        let second = session.round(&db, &runs, limits).unwrap();
+        assert_eq!(second.worker_failures, 0);
+        assert_eq!(second.preparation.trusted_prefix_events_skipped, expected);
+        assert_eq!(second.preparation.source_events_decoded, 1500 - expected);
+        assert!(
+            second
+                .jobs
+                .iter()
+                .all(|r| matches!(r, Ok(CorpusProgress::Pending { cursor: 2, .. })))
+        );
+        let mut completed = vec![None; 3];
+        for _ in 2..source.spec.chunks.len() {
+            let r = session.round(&db, &runs, limits).unwrap();
+            assert_eq!(r.worker_failures, 0);
+            for (i, result) in r.jobs.into_iter().enumerate() {
+                match result.unwrap() {
+                    CorpusProgress::Pending { .. } => {}
+                    CorpusProgress::Completed { result, .. } => completed[i] = Some(result),
+                    other => panic!("{other:?}"),
+                }
+            }
+        }
+        for (i, strategy) in strategies.iter().enumerate() {
+            let reference =
+                replay_corpus(&source.root, &source.spec, strategy, &costs, budget).unwrap();
+            assert!(!reference.trades.is_empty());
+            assert_eq!(
+                completed[i].as_ref().unwrap().result["tick_replay"],
+                serde_json::to_value(reference).unwrap()
+            );
+        }
+        crate::storage::Registry::open(&db)
+            .unwrap()
+            .integrity()
+            .unwrap();
+    }
+    #[test]
+    fn affinity_prefers_latest_private_cursor_when_idle_slots_contain_stale_duplicates() {
+        let source = affinity_source("affinity-duplicates");
+        let costs = Costs::default();
+        let budget = budget();
+        let strategy = strategy();
+        let run = || CorpusRun {
+            base: &source.root,
+            spec: &source.spec,
+            strategy: &strategy,
+            costs: &costs,
+            budget,
+        };
+        let mut registry =
+            crate::storage::Registry::open(&source.root.join("duplicates.sqlite")).unwrap();
+        let mut old = WorkerPreparation::default();
+        let mut latest = WorkerPreparation::default();
+        let first =
+            execute_corpus_step_prepared(&mut registry, run(), 1, 60000, &mut || 1000, &mut old)
+                .unwrap();
+        let CorpusProgress::Pending { experiment_id, .. } = first else {
+            panic!()
+        };
+        execute_corpus_step_prepared(&mut registry, run(), 1, 60000, &mut || 1001, &mut latest)
+            .unwrap();
+        assert_eq!(old.resume.checkpoint.as_ref().unwrap().cursor, 1);
+        assert_eq!(latest.resume.checkpoint.as_ref().unwrap().cursor, 2);
+        assert_eq!(
+            preferred_checkpoint_jobs(&[old, latest], &[("source".into(), experiment_id)]),
+            vec![None, Some(0)]
+        );
+    }
+    #[test]
+    fn cancelled_startup_reservations_and_concurrent_stealing_execute_each_job_exactly_once() {
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+        for reserved in [0, 3, 17, 99] {
+            let claimed: Vec<_> = (0..100)
+                .map(|j| AtomicBool::new(j == reserved || j == 7))
+                .collect();
+            // Failed worker's reservation is cancelled before the start gate opens.
+            if reserved != 7 {
+                claimed[7].store(false, Ordering::Relaxed);
+            }
+            let next = AtomicUsize::new(0);
+            let mut jobs = std::thread::scope(|scope| {
+                let a = scope.spawn(|| {
+                    let mut v = vec![reserved];
+                    while let Some(j) = next_batch_job(&next, &claimed) {
+                        v.push(j);
+                    }
+                    v
+                });
+                let b = scope.spawn(|| {
+                    let mut v = Vec::new();
+                    while let Some(j) = next_batch_job(&next, &claimed) {
+                        v.push(j);
+                    }
+                    v
+                });
+                let mut all = a.join().unwrap();
+                all.extend(b.join().unwrap());
+                all
+            });
+            jobs.sort_unstable();
+            assert_eq!(jobs, (0..100).collect::<Vec<_>>());
+        }
+    }
+
     #[test]
     fn combined_warm_checkpoint_still_refuses_consumed_source_mutation_after_key_admission() {
         for blocked in [false, true] {
