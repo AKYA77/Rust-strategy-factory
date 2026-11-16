@@ -6173,3 +6173,287 @@ fn source_facts_match_full_inspection_all_symbols_native_blocked_and_exact_cli_k
         fs::write(path, bytes).unwrap();
     }
 }
+
+#[test]
+fn trusted_session_accounts_skip_only_worker_produced_prefix_and_preserve_complete_receipts() {
+    use rust_strategy_factory::{
+        storage::Registry,
+        strategies::{EntryPlan, Strategy},
+        tick_engine::{
+            self, CorpusBatchLimits, CorpusBatchSession, CorpusBudget, CorpusProgress, CorpusRun,
+            Costs,
+        },
+    };
+    let f = Fixture::new("trusted-session-account", "EURUSD", 37);
+    let data = data::synthetic_fixture("EURUSD").unwrap();
+    let mut paths = Vec::new();
+    for (i, ticks) in data.ticks.chunks(250).enumerate() {
+        let part = data::dataset(
+            data.profile.clone(),
+            ticks.to_vec(),
+            &data.manifest.source,
+            data.manifest.archive_hash.clone(),
+            true,
+        )
+        .unwrap();
+        let path = f.root.join(format!("trusted-{i}.rsf"));
+        native::write(&path, &part).unwrap();
+        paths.push(path);
+    }
+    let spec = corpus::describe(&paths, 10000).unwrap();
+    assert!(spec.chunks.len() > 3);
+    let costs = Costs::default();
+    let budget = CorpusBudget {
+        max_candles: 10000,
+        feature_cells: 100000,
+        max_receipts: 10000,
+    };
+    let limits = CorpusBatchLimits {
+        workers: 1,
+        max_parallel_candles: 10000,
+        max_parallel_feature_cells: 100000,
+        max_parallel_receipts: 10000,
+        max_new_chunks: 1,
+        lease_ms: 60000,
+    };
+    for (index, entry) in [
+        None,
+        Some(EntryPlan::StopMarket {
+            offset_ticks: 2,
+            ttl_ms: 120000,
+            cancel_on_signal_false: true,
+        }),
+        Some(EntryPlan::Limit {
+            offset_ticks: 2,
+            ttl_ms: 120000,
+            cancel_on_signal_false: true,
+        }),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+        strategy.entry = entry;
+        let runs = [CorpusRun {
+            base: &f.root,
+            spec: &spec,
+            strategy: &strategy,
+            costs: &costs,
+            budget,
+        }];
+        let reference =
+            tick_engine::replay_corpus(&f.root, &spec, &strategy, &costs, budget).unwrap();
+        assert!(!reference.trades.is_empty());
+        let db = f.root.join(format!("trusted-{index}.sqlite"));
+        let mut session = CorpusBatchSession::default();
+        let mut replayed = 0;
+        let mut skipped = 0;
+        let mut result = None;
+        for round in 0..spec.chunks.len() {
+            let report = session.round(&db, &runs, limits).unwrap();
+            assert_eq!(report.worker_failures, 0);
+            replayed += report.preparation.account_events_replayed;
+            skipped += report.preparation.trusted_prefix_events_skipped;
+            if round == 0 {
+                assert_eq!(report.preparation.trusted_prefix_events_skipped, 0);
+            } else {
+                assert!(report.preparation.trusted_prefix_events_skipped > 0);
+            }
+            match report.jobs.into_iter().next().unwrap().unwrap() {
+                CorpusProgress::Completed { result: r, .. } => result = Some(r),
+                CorpusProgress::Pending { .. } => {}
+                other => panic!("{other:?}"),
+            }
+        }
+        assert_eq!(replayed, data.ticks.len() as u64);
+        assert!(skipped > data.ticks.len() as u64);
+        assert_eq!(
+            result.unwrap().result["tick_replay"],
+            serde_json::to_value(reference).unwrap()
+        );
+        Registry::open(&db).unwrap().integrity().unwrap();
+        // Dropping invocation-local authority keeps a saved checkpoint untrusted.
+        let cold = f.root.join(format!("cold-{index}.sqlite"));
+        session.release();
+        session.round(&cold, &runs, limits).unwrap();
+        session.release();
+        let resumed = session.round(&cold, &runs, limits).unwrap();
+        assert_eq!(resumed.preparation.trusted_prefix_events_skipped, 0);
+        assert_eq!(resumed.preparation.account_events_replayed, 500);
+    }
+}
+
+#[test]
+fn trusted_session_rejects_same_cursor_rehashed_forgery_and_changed_old_source_bytes() {
+    use rust_strategy_factory::{
+        storage::Registry,
+        strategies::Strategy,
+        tick_engine::{
+            self, CorpusBatchLimits, CorpusBatchSession, CorpusBudget, CorpusRun, Costs,
+        },
+    };
+    for corrupt_source in [false, true] {
+        let f = Fixture::new(
+            if corrupt_source {
+                "trusted-old-source"
+            } else {
+                "trusted-same-cursor"
+            },
+            "EURUSD",
+            7,
+        );
+        let strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+        let costs = Costs::default();
+        let budget = CorpusBudget {
+            max_candles: 100,
+            feature_cells: 10000,
+            max_receipts: 1000,
+        };
+        let runs = [CorpusRun {
+            base: &f.root,
+            spec: &f.spec,
+            strategy: &strategy,
+            costs: &costs,
+            budget,
+        }];
+        let limits = CorpusBatchLimits {
+            workers: 1,
+            max_parallel_candles: 100,
+            max_parallel_feature_cells: 10000,
+            max_parallel_receipts: 1000,
+            max_new_chunks: 1,
+            lease_ms: 60000,
+        };
+        let db = f.root.join("state.sqlite");
+        let mut session = CorpusBatchSession::default();
+        session.round(&db, &runs, limits).unwrap();
+        let id = tick_engine::corpus_key(&f.root, &f.spec, &strategy, &costs, budget)
+            .unwrap()
+            .identity()
+            .unwrap();
+        let registry = Registry::open(&db).unwrap();
+        let (mut record, prior_hash) = registry.replay_checkpoint(&id).unwrap().unwrap();
+        assert_eq!(record.cursor, 1);
+        if corrupt_source {
+            let path = f.root.join(&f.spec.chunks[0].path);
+            let mut bytes = fs::read(&path).unwrap();
+            let n = bytes.len();
+            bytes[n - 1] ^= 1;
+            fs::write(&path, bytes).unwrap();
+        } else {
+            record.state["account"]["balance"] = 999999999.into();
+            let hash = data::hash(&record).unwrap();
+            assert_ne!(hash, prior_hash);
+            let c = rusqlite::Connection::open(&db).unwrap();
+            c.execute_batch("DROP TRIGGER replay_checkpoint_no_update")
+                .unwrap();
+            c.execute(
+                "UPDATE replay_checkpoints SET body=?1,hash=?2 WHERE experiment_id=?3",
+                rusqlite::params![serde_json::to_vec(&record).unwrap(), hash, id],
+            )
+            .unwrap();
+            registry.integrity().unwrap(); // Mechanical hashes alone cannot establish account correctness.
+        }
+        let preserved = registry.replay_checkpoint(&id).unwrap().unwrap().1;
+        match session.round(&db, &runs, limits) {
+            Err(error) => {
+                assert!(corrupt_source);
+                assert!(error.contains("checksum"));
+            }
+            Ok(report) => {
+                assert!(!corrupt_source);
+                assert!(
+                    report.jobs[0]
+                        .as_ref()
+                        .unwrap_err()
+                        .contains("account state differs")
+                );
+            }
+        }
+        assert_eq!(session.retained_candles(), 0);
+        assert_eq!(
+            registry.replay_checkpoint(&id).unwrap().unwrap().1,
+            preserved
+        );
+        assert!(registry.result(&id).unwrap().is_none());
+    }
+}
+
+#[test]
+fn trusted_session_external_valid_progress_and_operator_hold_discard_warm_authority() {
+    use rust_strategy_factory::{
+        storage::Registry,
+        strategies::Strategy,
+        tick_engine::{
+            self, CorpusBatchLimits, CorpusBatchSession, CorpusBudget, CorpusProgress, CorpusRun,
+            Costs,
+        },
+    };
+    let f = Fixture::new("trusted-external-progress", "EURUSD", 7);
+    let strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+    let costs = Costs::default();
+    let budget = CorpusBudget {
+        max_candles: 100,
+        feature_cells: 10000,
+        max_receipts: 1000,
+    };
+    let run = || CorpusRun {
+        base: &f.root,
+        spec: &f.spec,
+        strategy: &strategy,
+        costs: &costs,
+        budget,
+    };
+    let limits = CorpusBatchLimits {
+        workers: 1,
+        max_parallel_candles: 100,
+        max_parallel_feature_cells: 10000,
+        max_parallel_receipts: 1000,
+        max_new_chunks: 1,
+        lease_ms: 60000,
+    };
+    let db = f.root.join("state.sqlite");
+    let mut session = CorpusBatchSession::default();
+    session.round(&db, &[run()], limits).unwrap();
+    let mut registry = Registry::open(&db).unwrap();
+    let id = tick_engine::corpus_key(&f.root, &f.spec, &strategy, &costs, budget)
+        .unwrap()
+        .identity()
+        .unwrap();
+    tick_engine::execute_corpus_step(&mut registry, run(), 1, 60000, || {
+        chrono::Utc::now().timestamp_millis()
+    })
+    .unwrap();
+    let report = session.round(&db, &[run()], limits).unwrap();
+    assert!(report.jobs[0].is_ok());
+    assert_eq!(report.preparation.trusted_prefix_events_skipped, 0);
+    assert_eq!(report.preparation.account_events_replayed, 21);
+    registry.set_corpus_control(&id, "paused", 1).unwrap();
+    let held = session.round(&db, &[run()], limits).unwrap();
+    assert!(matches!(&held.jobs[0], Ok(CorpusProgress::Held { .. })));
+    assert_eq!(held.preparation.account_events_replayed, 0);
+    registry.set_corpus_control(&id, "running", 2).unwrap();
+    let resumed = session.round(&db, &[run()], limits).unwrap();
+    assert!(resumed.jobs[0].is_ok());
+    assert_eq!(resumed.preparation.trusted_prefix_events_skipped, 0);
+    assert_eq!(resumed.preparation.account_events_replayed, 28);
+    loop {
+        let r = session.round(&db, &[run()], limits).unwrap();
+        match r.jobs.into_iter().next().unwrap().unwrap() {
+            CorpusProgress::Completed { result, .. } => {
+                assert_eq!(
+                    result.result["tick_replay"],
+                    serde_json::to_value(
+                        tick_engine::replay_corpus(&f.root, &f.spec, &strategy, &costs, budget)
+                            .unwrap()
+                    )
+                    .unwrap()
+                );
+                break;
+            }
+            CorpusProgress::Pending { .. } => {}
+            other => panic!("{other:?}"),
+        }
+    }
+    registry.integrity().unwrap();
+}

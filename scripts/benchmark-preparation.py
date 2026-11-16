@@ -25,7 +25,7 @@ if len(sys.argv)>1 and sys.argv[1]=='--worker':
     elapsed=time.perf_counter_ns()-start
     cpu=resource.getrusage(resource.RUSAGE_CHILDREN)
     values=receipts(report)
-    assert len(values)==3,(role,report)
+    assert len(values)==len(json.loads(Path(config).read_text())['strategies']),(role,report)
     trades=sum(len(v['trades']) for v in values)
     assert trades>0
     cached=command(binary,'corpus-batch',config,database,'100')
@@ -38,6 +38,7 @@ parser=argparse.ArgumentParser()
 parser.add_argument('before',type=Path);parser.add_argument('after',type=Path);parser.add_argument('output',type=Path)
 parser.add_argument('--new-chunks',type=int,default=64)
 parser.add_argument('--workers',type=int,default=1)
+parser.add_argument('--strategies',type=int,choices=[1,3],default=3)
 parser.add_argument('--repetitions',type=int,default=3);parser.add_argument('--quotes',type=int,default=20000)
 a=parser.parse_args()
 assert 1<=a.repetitions<=10 and 1000<=a.quotes<=100000 and 1<=a.workers<=3 and 1<=a.new_chunks<=64
@@ -58,7 +59,7 @@ with tempfile.TemporaryDirectory(prefix='preparation-benchmark-') as tmp:
         command(after,'pack-native',dataset,native)
     command(after,'corpus-create',base/'corpus.json',base/'0.rsf',base/'1.rsf')
     strategies=[]
-    for entry in [None,{'StopMarket':{'offset_ticks':2,'ttl_ms':120000,'cancel_on_signal_false':True}},{'Limit':{'offset_ticks':2,'ttl_ms':120000,'cancel_on_signal_false':True}}]:
+    for entry in [None,{'StopMarket':{'offset_ticks':2,'ttl_ms':120000,'cancel_on_signal_false':True}},{'Limit':{'offset_ticks':2,'ttl_ms':120000,'cancel_on_signal_false':True}}][:a.strategies]:
         strategies.append({'timeframe':'M1','side':'Long','stop_ticks':100,'entry':entry,'rule':{'UtcSession':{'start_hour':0,'end_hour':23,'weekdays':127}}})
     config=base/'config.json';config.write_text(json.dumps({'specification':'corpus.json','strategies':strategies,'budget':{'max_candles':100000,'feature_cells':1000000,'max_receipts':10000},'limits':{'workers':a.workers,'max_parallel_candles':100000*a.workers,'max_parallel_feature_cells':1000000*a.workers,'max_parallel_receipts':10000*a.workers,'max_new_chunks':a.new_chunks,'lease_ms':600000}}))
     records=[]
@@ -69,6 +70,6 @@ with tempfile.TemporaryDirectory(prefix='preparation-benchmark-') as tmp:
             row=json.loads(result.read_text());row['repetition']=repetition;records.append(row)
     assert len({r['financial_receipt_sha256'] for r in records})==1
     summaries={role:{'median_elapsed_ms':statistics.median(r['elapsed_ms'] for r in records if r['role']==role),'median_peak_pipeline_child_rss_kib':statistics.median(r['peak_pipeline_child_rss_kib'] for r in records if r['role']==role)} for role in ['before','after']}
-    evidence={'class':'SYNTHETIC_DEVELOPMENT_PIPELINE_ONLY','host':{'platform':platform.platform(),'available_parallelism':len(os.sched_getaffinity(0))},'quotes':a.quotes,'max_new_chunks_per_round':a.new_chunks,'workers':a.workers,'strategies':3,'repetitions':a.repetitions,'cache_scope':'Fresh worker processes and registries; OS cache uncontrolled, no physical-cold claim. Cached route checked separately and excluded from measured first-route timing/CPU/RSS.','measurement_scope':'Each timed pipeline includes actual corpus-batch CLI and registry integrity CLI. CPU and RSS are child-resource observations in a fresh worker, not total host/service memory.','versions':{role:{'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'version':command(binary,'version')} for role,binary in [('before',before),('after',after)]},'records':records,'summaries':summaries,'limitations':'Small one-symbol synthetic workload; declared worker count is recorded, not an equal CPU-share claim. Repetitions are repeated measurement of three strategies, not independent trials. No genuine data, source approval, qualification, production default or universal throughput/RSS gain is established.'}
+    evidence={'class':'SYNTHETIC_DEVELOPMENT_PIPELINE_ONLY','host':{'platform':platform.platform(),'available_parallelism':len(os.sched_getaffinity(0))},'quotes':a.quotes,'max_new_chunks_per_round':a.new_chunks,'workers':a.workers,'strategies':a.strategies,'repetitions':a.repetitions,'cache_scope':'Fresh worker processes and registries; OS cache uncontrolled, no physical-cold claim. Cached route checked separately and excluded from measured first-route timing/CPU/RSS.','measurement_scope':'Each timed pipeline includes actual corpus-batch CLI and registry integrity CLI. CPU and RSS are child-resource observations in a fresh worker, not total host/service memory.','versions':{role:{'binary_sha256':hashlib.sha256(binary.read_bytes()).hexdigest(),'version':command(binary,'version')} for role,binary in [('before',before),('after',after)]},'records':records,'summaries':summaries,'limitations':'Small one-symbol synthetic workload; declared worker count is recorded, not an equal CPU-share claim. Repetitions are repeated measurements of the selected fixed strategies, not independent trials. No genuine data, source approval, qualification, production default or universal throughput/RSS gain is established.'}
     a.output.parent.mkdir(parents=True,exist_ok=True);a.output.write_text(json.dumps(evidence,indent=2)+'\n')
     print(json.dumps(summaries))
