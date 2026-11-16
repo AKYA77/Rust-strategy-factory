@@ -26,6 +26,10 @@ use std::{
     fs::{self, File, OpenOptions},
     io::{Read, Write},
     path::{Path, PathBuf},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 /// Parser identity recorded in every migrated chunk manifest.
@@ -837,6 +841,43 @@ fn publish_json(path: &Path, value: &impl Serialize) -> Result<()> {
     result.and(cleanup).map_err(err)
 }
 
+/// Atomically replace a derived status artifact. Unlike [`publish_json`], this permits an
+/// existing file to be superseded, which is correct for a recomputable batch report.
+fn publish_json_replace(path: &Path, value: &impl Serialize) -> Result<()> {
+    let bytes = serde_json::to_vec_pretty(value).map_err(err)?;
+    let parent = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let name = path
+        .file_name()
+        .ok_or("artifact filename missing")?
+        .to_string_lossy()
+        .to_string();
+    let mut nonce = [0u8; 16];
+    getrandom::fill(&mut nonce).map_err(err)?;
+    let temporary = parent.join(format!(
+        ".{name}.{:032x}.tmp",
+        nonce
+            .iter()
+            .fold(0u128, |acc, b| (acc << 8) | u128::from(*b))
+    ));
+    let result = (|| -> std::io::Result<()> {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)?;
+        file.write_all(&bytes)?;
+        file.sync_all()?;
+        fs::rename(&temporary, path)?;
+        File::open(parent)?.sync_all()
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result.map_err(err)
+}
+
 /// Convert one legacy canonical partition into a restart-safe directory of native chunks.
 ///
 /// Re-running a completed conversion verifies and returns the existing receipt. Re-running a
@@ -1165,6 +1206,303 @@ fn source_description_from_receipt(receipt: &Receipt) -> String {
         "historical-parquet-migration-v1:{}:{}",
         receipt.source.dataset_hash, receipt.source.source_sha256
     )
+}
+
+/// One canonical instrument-month partition selected for migration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Partition {
+    pub instrument: String,
+    pub year: u32,
+    pub month: u32,
+    pub dataset_hash: String,
+    pub parquet_path: String,
+    pub manifest_path: String,
+    pub import_receipt_path: Option<String>,
+    pub rows: u64,
+    pub price_scale: i64,
+    pub source_sha256: String,
+    pub quote_stream_sha256: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PartitionReport {
+    pub instrument: String,
+    pub year: u32,
+    pub month: u32,
+    pub dataset_hash: String,
+    pub status: String,
+    pub events: u64,
+    pub chunks: u64,
+    pub output_hash: String,
+    pub output_dir: String,
+    pub error: Option<String>,
+    pub wall_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BatchReport {
+    pub version: String,
+    pub root: String,
+    pub output_root: String,
+    pub workers: usize,
+    pub chunk_events: usize,
+    pub planned: usize,
+    pub converted: usize,
+    pub already_complete: usize,
+    pub failed: usize,
+    pub events: u64,
+    pub partitions: Vec<PartitionReport>,
+    pub limitations: String,
+}
+
+const BATCH_VERSION: &str = "historical-parquet-migration-batch-v1";
+const CANONICAL_QUALITY: &str = "STRUCTURAL_PASS_CALENDAR_REVIEW_REQUIRED";
+
+/// Select the canonical instrument-month partitions from the retired factory's catalog.
+///
+/// Only exact 24-field `data/v2` manifests with the canonical quality status are accepted.
+/// The instrument/year/month tuple comes from joining `source_sha256` to the archive
+/// manifest. Duplicate tuples resolve to the lexicographically smallest `dataset_hash`.
+pub fn plan(root: &Path) -> Result<Vec<Partition>> {
+    let archives = root.join("archives");
+    let catalog = root.join("catalog");
+    let mut archive_meta: std::collections::HashMap<String, (String, u32, u32)> =
+        std::collections::HashMap::new();
+    for entry in fs::read_dir(&archives).map_err(err)? {
+        let entry = entry.map_err(err)?;
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !name.ends_with("-ticks.manifest.json") {
+            continue;
+        }
+        let value: serde_json::Value =
+            serde_json::from_reader(File::open(entry.path()).map_err(err)?).map_err(err)?;
+        let (Some(sha), Some(instrument), Some(year), Some(month)) = (
+            value.get("sha256").and_then(|v| v.as_str()),
+            value.get("instrument").and_then(|v| v.as_str()),
+            value.get("year").and_then(|v| v.as_u64()),
+            value.get("month").and_then(|v| v.as_u64()),
+        ) else {
+            continue;
+        };
+        archive_meta.insert(
+            sha.to_string(),
+            (instrument.to_string(), year as u32, month as u32),
+        );
+    }
+    let mut receipt_by_source: std::collections::HashMap<String, PathBuf> =
+        std::collections::HashMap::new();
+    let receipts = catalog.join("import-receipts");
+    if receipts.is_dir() {
+        for entry in fs::read_dir(&receipts).map_err(err)? {
+            let entry = entry.map_err(err)?;
+            let value: serde_json::Value =
+                serde_json::from_reader(File::open(entry.path()).map_err(err)?).map_err(err)?;
+            let source = value.get("source");
+            if let Some(sha) = source
+                .and_then(|s| s.get("sha256"))
+                .and_then(|v| v.as_str())
+            {
+                receipt_by_source.insert(sha.to_string(), entry.path());
+            }
+        }
+    }
+    let mut groups: std::collections::HashMap<(String, u32, u32), Partition> =
+        std::collections::HashMap::new();
+    for entry in fs::read_dir(&catalog).map_err(err)? {
+        let entry = entry.map_err(err)?;
+        if !entry.path().is_dir() {
+            continue;
+        }
+        let manifest_path = entry.path().join("manifest.json");
+        if !manifest_path.is_file() {
+            continue;
+        }
+        let Ok(manifest) =
+            serde_json::from_reader::<_, LegacyManifest>(File::open(&manifest_path).map_err(err)?)
+        else {
+            continue;
+        };
+        if manifest.quality_status != CANONICAL_QUALITY {
+            continue;
+        }
+        let Some((instrument, year, month)) = archive_meta.get(&manifest.source_sha256) else {
+            continue;
+        };
+        let parquet_path = entry.path().join("quotes.parquet");
+        if !parquet_path.is_file() {
+            continue;
+        }
+        let candidate = Partition {
+            instrument: instrument.clone(),
+            year: *year,
+            month: *month,
+            dataset_hash: manifest.dataset_hash.clone(),
+            parquet_path: parquet_path.to_string_lossy().to_string(),
+            manifest_path: manifest_path.to_string_lossy().to_string(),
+            import_receipt_path: receipt_by_source
+                .get(&manifest.source_sha256)
+                .map(|p| p.to_string_lossy().to_string()),
+            rows: manifest.rows,
+            price_scale: manifest.price_scale,
+            source_sha256: manifest.source_sha256.clone(),
+            quote_stream_sha256: manifest.quote_stream_sha256.clone(),
+        };
+        groups
+            .entry((instrument.clone(), *year, *month))
+            .and_modify(|existing| {
+                if candidate.dataset_hash < existing.dataset_hash {
+                    *existing = candidate.clone();
+                }
+            })
+            .or_insert(candidate);
+    }
+    let mut partitions: Vec<Partition> = groups.into_values().collect();
+    partitions.sort_by(|a, b| {
+        (a.instrument.as_str(), a.year, a.month).cmp(&(b.instrument.as_str(), b.year, b.month))
+    });
+    Ok(partitions)
+}
+
+fn convert_partition(
+    partition: &Partition,
+    output_root: &Path,
+    profiles_dir: &Path,
+    chunk_events: usize,
+) -> PartitionReport {
+    let start = std::time::Instant::now();
+    let output_dir = output_root.join(format!(
+        "{}-{year:04}{month:02}",
+        partition.instrument,
+        year = partition.year,
+        month = partition.month
+    ));
+    let mut report = PartitionReport {
+        instrument: partition.instrument.clone(),
+        year: partition.year,
+        month: partition.month,
+        dataset_hash: partition.dataset_hash.clone(),
+        status: "failed".into(),
+        events: 0,
+        chunks: 0,
+        output_hash: String::new(),
+        output_dir: output_dir.to_string_lossy().to_string(),
+        error: None,
+        wall_ms: 0,
+    };
+    let already_complete = output_dir.join("manifest.json").is_file();
+    let result = (|| -> Result<Receipt> {
+        let profile: Profile = serde_json::from_reader(
+            File::open(profiles_dir.join(format!("{}.json", partition.instrument))).map_err(err)?,
+        )
+        .map_err(err)?;
+        let parquet = Path::new(&partition.parquet_path);
+        let mut config = Config::new(parquet, &output_dir, profile)?
+            .with_manifest(Path::new(&partition.manifest_path))?
+            .with_chunk_events(chunk_events)?;
+        if let Some(receipt) = &partition.import_receipt_path {
+            config = config.with_import_receipt(Path::new(receipt))?;
+        }
+        convert(&config)
+    })();
+    report.wall_ms = start.elapsed().as_millis() as u64;
+    match result {
+        Ok(receipt) => {
+            report.status = if already_complete {
+                "already_complete".to_string()
+            } else {
+                "converted".to_string()
+            };
+            report.events = receipt.events;
+            report.chunks = receipt.chunks.len() as u64;
+            report.output_hash = receipt.output_hash;
+        }
+        Err(error) => report.error = Some(error),
+    }
+    report
+}
+
+/// Convert a planned batch with a bounded worker pool. Completed partitions are re-verified
+/// and skipped, so the batch is safe to restart.
+pub fn run_batch(
+    root: &Path,
+    output_root: &Path,
+    profiles_dir: &Path,
+    workers: usize,
+    chunk_events: usize,
+    limit: Option<usize>,
+) -> Result<BatchReport> {
+    if workers == 0 || workers > 16 {
+        return Err("worker count must be 1..=16".into());
+    }
+    let mut partitions = plan(root)?;
+    if let Some(limit) = limit {
+        partitions.truncate(limit);
+    }
+    if partitions.is_empty() {
+        return Err("no canonical partitions found".into());
+    }
+    fs::create_dir_all(output_root).map_err(err)?;
+    let next = Arc::new(AtomicUsize::new(0));
+    let results: Arc<Mutex<Vec<Option<PartitionReport>>>> =
+        Arc::new(Mutex::new((0..partitions.len()).map(|_| None).collect()));
+    let shared = Arc::new(partitions.clone());
+    let mut handles = Vec::new();
+    for _ in 0..workers {
+        let next = Arc::clone(&next);
+        let results = Arc::clone(&results);
+        let shared = Arc::clone(&shared);
+        let output_root = output_root.to_path_buf();
+        let profiles_dir = profiles_dir.to_path_buf();
+        handles.push(std::thread::spawn(move || {
+            loop {
+                let index = next.fetch_add(1, Ordering::SeqCst);
+                if index >= shared.len() {
+                    break;
+                }
+                let report =
+                    convert_partition(&shared[index], &output_root, &profiles_dir, chunk_events);
+                if let Ok(mut slot) = results.lock() {
+                    slot[index] = Some(report);
+                }
+            }
+        }));
+    }
+    for handle in handles {
+        handle.join().map_err(|_| "migration worker panicked")?;
+    }
+    let partitions_report = results
+        .lock()
+        .map_err(|_| "migration result lock poisoned")?
+        .iter()
+        .filter_map(|value| value.clone())
+        .collect::<Vec<_>>();
+    let mut report = BatchReport {
+        version: BATCH_VERSION.into(),
+        root: root.to_string_lossy().to_string(),
+        output_root: output_root.to_string_lossy().to_string(),
+        workers,
+        chunk_events,
+        planned: partitions.len(),
+        converted: 0,
+        already_complete: 0,
+        failed: 0,
+        events: 0,
+        partitions: partitions_report,
+        limitations: "Format conversion only. Completion means each selected canonical partition was converted and verified; it does not establish calendar completeness, profile approval, source licensing or research eligibility.".into(),
+    };
+    for partition in &report.partitions {
+        match partition.status.as_str() {
+            "converted" => report.converted += 1,
+            "already_complete" => report.already_complete += 1,
+            _ => report.failed += 1,
+        }
+        report.events += partition.events;
+    }
+    publish_json_replace(&output_root.join("batch-report.json"), &report)?;
+    Ok(report)
 }
 
 #[cfg(test)]

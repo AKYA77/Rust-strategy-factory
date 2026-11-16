@@ -459,6 +459,49 @@ fn run(args: &[String]) -> Result<()> {
                 None,
             )?)
         }
+        ["historical-plan", root, output] => {
+            let partitions = rust_strategy_factory::historical_migration::plan(Path::new(root))?;
+            let rows = partitions.iter().map(|p| p.rows).sum::<u64>();
+            save(output, &partitions)?;
+            print(&serde_json::json!({"planned": partitions.len(), "rows": rows}))
+        }
+        [
+            "historical-batch",
+            root,
+            output_root,
+            profiles,
+            workers,
+            chunk_events,
+            limit,
+        ] => {
+            let report = rust_strategy_factory::historical_migration::run_batch(
+                Path::new(root),
+                Path::new(output_root),
+                Path::new(profiles),
+                workers.parse().map_err(|_| "invalid worker count")?,
+                chunk_events.parse().map_err(|_| "invalid chunk events")?,
+                Some(limit.parse().map_err(|_| "invalid limit")?),
+            )?;
+            print(&report)
+        }
+        [
+            "historical-batch",
+            root,
+            output_root,
+            profiles,
+            workers,
+            chunk_events,
+        ] => {
+            let report = rust_strategy_factory::historical_migration::run_batch(
+                Path::new(root),
+                Path::new(output_root),
+                Path::new(profiles),
+                workers.parse().map_err(|_| "invalid worker count")?,
+                chunk_events.parse().map_err(|_| "invalid chunk events")?,
+                None,
+            )?;
+            print(&report)
+        }
         ["pack-parquet", input, output] => {
             rust_strategy_factory::parquet_store::write(Path::new(output), &read_dataset(input)?)
         }
