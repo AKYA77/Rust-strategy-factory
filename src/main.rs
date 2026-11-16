@@ -557,6 +557,43 @@ fn run(args: &[String]) -> Result<()> {
             }))
         }
         [
+            "historical-corpus-study",
+            root,
+            output_root,
+            instrument,
+            strategy,
+            max_candles,
+            feature_cells,
+            report,
+        ] => {
+            let spec = rust_strategy_factory::historical_corpus::register(
+                Path::new(root),
+                Path::new(output_root),
+                instrument,
+                rust_strategy_factory::historical_corpus::EXPECTED_MONTHS,
+            )?;
+            let strategy: rust_strategy_factory::strategies::Strategy = read_json(strategy)?;
+            let max_candles: usize = max_candles.parse().map_err(|_| "invalid candle budget")?;
+            let feature_cells: usize = feature_cells
+                .parse()
+                .map_err(|_| "invalid feature budget")?;
+            let study = rust_strategy_factory::historical_corpus::study(
+                &spec,
+                &strategy,
+                max_candles,
+                feature_cells,
+            )?;
+            save_replace(report, &study)?;
+            print(&serde_json::json!({
+                "identity": study.identity,
+                "instrument": study.instrument,
+                "months": study.months.len(),
+                "events": study.events,
+                "candles": study.candles,
+                "signals": study.signals,
+            }))
+        }
+        [
             "historical-corpus-audit",
             root,
             output_root,

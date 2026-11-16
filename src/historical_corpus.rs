@@ -431,6 +431,85 @@ pub fn audit(spec: &HistoricalCorpus) -> Result<AuditReport> {
     })
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MonthStudy {
+    pub year: u32,
+    pub month: u32,
+    pub corpus_identity: String,
+    pub events: u64,
+    pub candles: usize,
+    pub signals: usize,
+    pub first_ms: i64,
+    pub last_ms: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StudyReport {
+    pub instrument: String,
+    pub identity: String,
+    pub strategy_identity: String,
+    pub months: Vec<MonthStudy>,
+    pub events: u64,
+    pub candles: usize,
+    pub signals: usize,
+    pub limitations: String,
+}
+
+/// Bounded structural study of one instrument's real historical corpus: per month, build the
+/// native corpus specification, verify it, and compute observed facts, closed candles and
+/// causal signals. No account replay and no eligibility grant.
+pub fn study(
+    spec: &HistoricalCorpus,
+    strategy: &crate::strategies::Strategy,
+    max_candles: usize,
+    feature_cells: usize,
+) -> Result<StudyReport> {
+    let mut months = Vec::with_capacity(spec.months.len());
+    let mut events = 0u64;
+    let mut candles = 0usize;
+    let mut signals = 0usize;
+    for month in &spec.months {
+        let dir = Path::new(&month.output_dir);
+        let chunks: Vec<std::path::PathBuf> = month
+            .chunk_files
+            .iter()
+            .map(|file| dir.join(file))
+            .collect();
+        let corpus_spec =
+            crate::corpus::describe(&chunks, crate::historical_migration::MAX_CHUNK_EVENTS)?;
+        crate::corpus::inspect(dir, &corpus_spec)?;
+        let facts = crate::corpus::source_facts(dir, &corpus_spec)?;
+        let candles_vec =
+            crate::corpus::candle_context(dir, &corpus_spec, strategy.timeframe, max_candles)?;
+        let mask = crate::corpus::signals(dir, &corpus_spec, strategy, max_candles, feature_cells)?;
+        events += facts.events();
+        candles += candles_vec.len();
+        signals += mask.count();
+        months.push(MonthStudy {
+            year: month.year,
+            month: month.month,
+            corpus_identity: corpus_spec.identity()?,
+            events: facts.events(),
+            candles: candles_vec.len(),
+            signals: mask.count(),
+            first_ms: facts.first().timestamp_ms,
+            last_ms: facts.latest().timestamp_ms,
+        });
+    }
+    Ok(StudyReport {
+        instrument: spec.instrument.clone(),
+        identity: spec.identity.clone(),
+        strategy_identity: strategy.identity()?,
+        months,
+        events,
+        candles,
+        signals,
+        limitations: LIMITATIONS.into(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

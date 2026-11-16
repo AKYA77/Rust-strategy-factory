@@ -8,6 +8,7 @@
 use rust_strategy_factory::candles::Timeframe;
 use rust_strategy_factory::contracts::Side;
 use rust_strategy_factory::corpus::{self};
+use rust_strategy_factory::historical_corpus::{self, EXPECTED_MONTHS};
 use rust_strategy_factory::strategies::{Rule, Strategy};
 use std::path::{Path, PathBuf};
 
@@ -61,4 +62,37 @@ fn real_historical_structural_pipeline() {
         total_signals += mask.count();
     }
     assert!(total_events > 0 && total_candles > 0 && total_signals > 0);
+}
+
+#[test]
+fn real_historical_study_report() {
+    let catalog_root = Path::new("/var/lib/hermes-factory");
+    let output = Path::new("/root/workspace/historical-migration-output/full-100k");
+    if !catalog_root.join("catalog").is_dir() || !output.is_dir() {
+        eprintln!("skipping real historical study: data absent");
+        return;
+    }
+    let spec =
+        historical_corpus::register(catalog_root, output, "EURUSD", EXPECTED_MONTHS).unwrap();
+    let strategy = Strategy {
+        timeframe: Timeframe::M1,
+        side: Side::Long,
+        stop_ticks: 100,
+        rule: Rule::AboveMean { window: 2 },
+        entry: None,
+        stop_policy: None,
+    };
+    let study = historical_corpus::study(&spec, &strategy, 1_000_000, 1_000_000).unwrap();
+    assert_eq!(study.months.len(), EXPECTED_MONTHS);
+    assert_eq!(
+        study.events,
+        spec.months.iter().map(|month| month.rows).sum::<u64>()
+    );
+    assert!(study.candles > 0 && study.signals > 0);
+    let again = historical_corpus::study(&spec, &strategy, 1_000_000, 1_000_000).unwrap();
+    assert_eq!(
+        serde_json::to_string(&study).unwrap(),
+        serde_json::to_string(&again).unwrap(),
+        "study report must be deterministic"
+    );
 }
