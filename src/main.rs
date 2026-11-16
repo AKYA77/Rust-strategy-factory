@@ -545,6 +545,32 @@ fn run(args: &[String]) -> Result<()> {
                 "rows": corpus.months.iter().map(|m| m.rows).sum::<u64>(),
             }))
         }
+        [
+            "historical-corpus-audit",
+            root,
+            output_root,
+            instrument,
+            report,
+        ] => {
+            let spec = rust_strategy_factory::historical_corpus::register(
+                Path::new(root),
+                Path::new(output_root),
+                instrument,
+                rust_strategy_factory::historical_corpus::EXPECTED_MONTHS,
+            )?;
+            let audit = rust_strategy_factory::historical_corpus::audit(&spec)?;
+            save_replace(report, &audit)?;
+            print(&serde_json::json!({
+                "identity": audit.identity,
+                "instrument": audit.instrument,
+                "months": audit.months,
+                "chunks": audit.chunks,
+                "rows": audit.rows,
+                "candles": audit.candles,
+                "first_ms": audit.first_ms,
+                "last_ms": audit.last_ms,
+            }))
+        }
         ["historical-catalog-scan", root, output_root, report] => {
             let catalog = rust_strategy_factory::historical_catalog::scan_catalog(
                 Path::new(root),

@@ -272,6 +272,111 @@ pub fn visit_months<F: FnMut(usize, &data::Dataset) -> Result<()>>(
     Ok(())
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MonthAudit {
+    pub year: u32,
+    pub month: u32,
+    pub chunks: usize,
+    pub rows: u64,
+    pub candles: u64,
+    pub first_ms: i64,
+    pub last_ms: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AuditReport {
+    pub instrument: String,
+    pub identity: String,
+    pub months: usize,
+    pub chunks: usize,
+    pub rows: u64,
+    pub candles: u64,
+    pub first_ms: i64,
+    pub last_ms: i64,
+    pub per_month: Vec<MonthAudit>,
+    pub limitations: String,
+}
+
+/// Stream the whole corpus with bounded memory, verifying source attribution, per-month
+/// sequence continuity, cross-month ordering and causal candle generation.
+pub fn audit(spec: &HistoricalCorpus) -> Result<AuditReport> {
+    verify(spec)?;
+    let mut per_month = Vec::with_capacity(spec.months.len());
+    let mut rows = 0u64;
+    let mut candles = 0u64;
+    let mut chunks = 0usize;
+    let mut previous_last: Option<i64> = None;
+    for month in &spec.months {
+        let mut expected_sequence = 0u64;
+        let mut month_rows = 0u64;
+        let mut month_candles = 0u64;
+        let mut month_chunks = 0usize;
+        let mut month_first: Option<i64> = None;
+        let mut month_last: Option<i64> = None;
+        let dir = Path::new(&month.output_dir);
+        for (file, hash) in month.chunk_files.iter().zip(&month.chunk_hashes) {
+            let dataset = native::read(&dir.join(file))?;
+            if data::hash(&dataset)? != *hash || dataset.profile != spec.profile {
+                return Err("historical corpus chunk mismatch during audit".into());
+            }
+            if !dataset.manifest.source.contains(&month.dataset_hash) {
+                return Err("historical corpus source attribution mismatch during audit".into());
+            }
+            if dataset.ticks[0].sequence != expected_sequence {
+                return Err("historical corpus sequence continuity mismatch during audit".into());
+            }
+            expected_sequence += dataset.ticks.len() as u64;
+            if let Some(previous) = previous_last
+                && dataset.ticks[0].timestamp_ms < previous
+            {
+                return Err("historical corpus cross-month timestamp order invalid".into());
+            }
+            let first_ms = dataset.ticks[0].timestamp_ms;
+            let last_ms = dataset.ticks[dataset.ticks.len() - 1].timestamp_ms;
+            month_first = Some(month_first.map_or(first_ms, |v| v.min(first_ms)));
+            month_last = Some(month_last.map_or(last_ms, |v| v.max(last_ms)));
+            previous_last = Some(last_ms);
+            let built = crate::candles::build(&dataset, crate::candles::Timeframe::M1)?;
+            month_candles += built.len() as u64;
+            month_rows += dataset.ticks.len() as u64;
+            month_chunks += 1;
+        }
+        if month_rows != month.rows {
+            return Err("historical corpus month row count mismatch during audit".into());
+        }
+        rows += month_rows;
+        candles += month_candles;
+        chunks += month_chunks;
+        per_month.push(MonthAudit {
+            year: month.year,
+            month: month.month,
+            chunks: month_chunks,
+            rows: month_rows,
+            candles: month_candles,
+            first_ms: month_first.unwrap_or(0),
+            last_ms: month_last.unwrap_or(0),
+        });
+    }
+    let expected_rows: u64 = spec.months.iter().map(|m| m.rows).sum();
+    if rows != expected_rows {
+        return Err("historical corpus total row count mismatch during audit".into());
+    }
+    Ok(AuditReport {
+        instrument: spec.instrument.clone(),
+        identity: spec.identity.clone(),
+        months: spec.months.len(),
+        chunks,
+        rows,
+        candles,
+        first_ms: per_month.first().map(|m| m.first_ms).unwrap_or(0),
+        last_ms: per_month.last().map(|m| m.last_ms).unwrap_or(0),
+        per_month,
+        limitations: LIMITATIONS.into(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

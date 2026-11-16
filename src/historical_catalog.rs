@@ -12,7 +12,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-pub const VERSION: &str = "historical-corpus-catalog-v1";
+pub const VERSION: &str = "historical-corpus-catalog-v2";
 const LIMITATIONS: &str = "Catalog status only. Structural validity is not calendar completeness, broker/profile approval, licensing, scientific eligibility or research readiness. A rejected or pending gate blocks research eligibility; an accepted assertion is a reviewer-supplied claim bound to evidence, not an independent qualification.";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -52,31 +52,113 @@ pub enum Gate {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Gates {
+pub struct GateDetail {
+    pub state: Gate,
+    pub required_evidence: Vec<String>,
+    pub evidence: Vec<String>,
+    pub dataset_identity: Option<String>,
+    pub receipt: Option<String>,
+    pub explanation: String,
+}
+
+impl GateDetail {
+    pub fn pending(required: &[&str], explanation: &str) -> Self {
+        Self {
+            state: Gate::Pending,
+            required_evidence: required.iter().map(|s| (*s).to_string()).collect(),
+            evidence: Vec::new(),
+            dataset_identity: None,
+            receipt: None,
+            explanation: explanation.into(),
+        }
+    }
+    pub fn accept(&mut self, dataset_identity: &str, receipt: &str, evidence: Vec<String>) {
+        self.state = Gate::Accepted;
+        self.dataset_identity = Some(dataset_identity.into());
+        self.receipt = Some(receipt.into());
+        self.evidence.extend(evidence);
+        self.explanation = format!(
+            "Accepted for dataset {dataset_identity} via receipt {receipt}; a reviewer-supplied claim bound to evidence, not independent verification."
+        );
+    }
+    pub fn reject(&mut self, explanation: &str) {
+        self.state = Gate::Rejected;
+        self.explanation = explanation.into();
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct GateDecisions {
     pub calendar: Gate,
     pub profile: Gate,
     pub legal: Gate,
     pub scientific: Gate,
-    pub evidence: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Gates {
+    pub calendar: GateDetail,
+    pub profile: GateDetail,
+    pub legal: GateDetail,
+    pub scientific: GateDetail,
 }
 
 impl Gates {
     pub fn pending() -> Self {
         Self {
-            calendar: Gate::Pending,
-            profile: Gate::Pending,
-            legal: Gate::Pending,
-            scientific: Gate::Pending,
-            evidence: Vec::new(),
+            calendar: GateDetail::pending(
+                &[
+                    "broker/session definition (open/close, holidays, DST)",
+                    "per-instrument coverage and timestamp-continuity report",
+                ],
+                "Pending: no broker-confirmed session calendar or coverage acceptance is recorded.",
+            ),
+            profile: GateDetail::pending(
+                &[
+                    "broker instrument specification (contract size, tick/pip, rollover)",
+                    "instrument/profile review record",
+                ],
+                "Pending: no broker instrument specification or profile review is recorded.",
+            ),
+            legal: GateDetail::pending(
+                &[
+                    "provider license terms for source_id (e.g. HistData.com)",
+                    "redistribution and research-use review record",
+                ],
+                "Pending: provider licensing and redistribution rights are not established.",
+            ),
+            scientific: GateDetail::pending(
+                &["research protocol approval", "data-quality review record"],
+                "Pending: no scientific protocol or data-quality approval is recorded.",
+            ),
         }
     }
     pub fn accepted_all(&self) -> bool {
-        [self.calendar, self.profile, self.legal, self.scientific]
-            .iter()
-            .all(|g| *g == Gate::Accepted)
+        [
+            self.calendar.state,
+            self.profile.state,
+            self.legal.state,
+            self.scientific.state,
+        ]
+        .iter()
+        .all(|g| *g == Gate::Accepted)
     }
     pub fn any_rejected(&self) -> bool {
-        [self.calendar, self.profile, self.legal, self.scientific].contains(&Gate::Rejected)
+        [
+            self.calendar.state,
+            self.profile.state,
+            self.legal.state,
+            self.scientific.state,
+        ]
+        .contains(&Gate::Rejected)
+    }
+    pub fn evidence(&self) -> Vec<String> {
+        let mut all = Vec::new();
+        for gate in [&self.calendar, &self.profile, &self.legal, &self.scientific] {
+            all.extend(gate.evidence.iter().cloned());
+        }
+        all
     }
 }
 
@@ -89,6 +171,7 @@ pub struct InstrumentStatus {
     pub coverage: String,
     pub structural_valid: bool,
     pub gates: Gates,
+    pub structural_evidence: Vec<String>,
     pub review_state: Option<ReviewState>,
     pub eligible_for_research: bool,
 }
@@ -243,10 +326,10 @@ pub fn scan_instrument(
     let complete =
         verified == expected && months.iter().all(|m| m.state == PartitionState::Verified);
     let structural_valid = complete && months.iter().all(|m| m.load_error.is_none());
-    let mut gates = Gates::pending();
-    gates.evidence.push(format!(
+    let gates = Gates::pending();
+    let structural_evidence = vec![format!(
         "{instrument}: {verified}/{expected} monthly partitions structurally verified"
-    ));
+    )];
     Ok(InstrumentStatus {
         instrument: instrument.into(),
         months,
@@ -258,6 +341,7 @@ pub fn scan_instrument(
         },
         structural_valid,
         gates,
+        structural_evidence,
         review_state: None,
         eligible_for_research: false,
     })
@@ -367,18 +451,24 @@ impl Catalog {
     /// required for eligibility; a pending or rejected gate blocks it.
     pub fn bind_assertions(
         &mut self,
-        calendar: Gate,
-        profile: Gate,
-        legal: Gate,
-        scientific: Gate,
+        dataset_identity: &str,
+        receipt: &str,
+        decisions: GateDecisions,
         evidence: Vec<String>,
     ) {
         for instrument in &mut self.instruments {
-            instrument.gates.calendar = calendar;
-            instrument.gates.profile = profile;
-            instrument.gates.legal = legal;
-            instrument.gates.scientific = scientific;
-            instrument.gates.evidence.extend(evidence.iter().cloned());
+            for (gate, state) in [
+                (&mut instrument.gates.calendar, decisions.calendar),
+                (&mut instrument.gates.profile, decisions.profile),
+                (&mut instrument.gates.legal, decisions.legal),
+                (&mut instrument.gates.scientific, decisions.scientific),
+            ] {
+                match state {
+                    Gate::Accepted => gate.accept(dataset_identity, receipt, evidence.clone()),
+                    Gate::Rejected => gate.reject("Rejected by explicit assertion."),
+                    Gate::Pending => gate.state = Gate::Pending,
+                }
+            }
             instrument.eligible_for_research =
                 instrument.structural_valid && instrument.gates.accepted_all();
         }
@@ -390,29 +480,39 @@ impl Catalog {
         if report.record.request.catalog_identity != self.identity {
             return Err("review catalog identity does not match this catalog".into());
         }
+        let catalog_identity = self.identity.clone();
+        let receipt = report.hash.clone();
         for instrument in &mut self.instruments {
             let mut changed = false;
-            for assessment in &report.record.request.assessments {
+            for (index, assessment) in report.record.request.assessments.iter().enumerate() {
+                let evidence = format!(
+                    "{:?} evidence {}",
+                    assessment.area,
+                    report
+                        .record
+                        .evidence_hashes
+                        .get(index)
+                        .map_or("", String::as_str)
+                );
                 let gate = match assessment.area {
                     Area::Calendar => Some(&mut instrument.gates.calendar),
                     Area::Profile => Some(&mut instrument.gates.profile),
                     _ => None,
                 };
                 if let Some(gate) = gate {
-                    *gate = match assessment.decision {
-                        Decision::AcceptedAssertion => Gate::Accepted,
-                        Decision::Rejected => Gate::Rejected,
-                        Decision::Pending => Gate::Pending,
-                    };
+                    match assessment.decision {
+                        Decision::AcceptedAssertion => {
+                            gate.accept(&catalog_identity, &receipt, vec![evidence])
+                        }
+                        Decision::Rejected => gate.reject(&format!(
+                            "{:?} rejected by review receipt {receipt}",
+                            assessment.area
+                        )),
+                        Decision::Pending => gate.state = Gate::Pending,
+                    }
                     changed = true;
                 } else {
-                    instrument.gates.evidence.push(format!(
-                        "{:?}: {:?} evidence {}",
-                        assessment.area,
-                        assessment.decision,
-                        report.record.evidence_hashes
-                            [assessment_index(&report.record.request.assessments, assessment.area)]
-                    ));
+                    instrument.structural_evidence.push(evidence);
                 }
             }
             if changed {
@@ -425,24 +525,22 @@ impl Catalog {
     }
 }
 
-fn assessment_index(assessments: &[data_review::Assessment], area: Area) -> usize {
-    assessments
-        .iter()
-        .position(|a| a.area == area)
-        .unwrap_or_default()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn gate(state: Gate) -> GateDetail {
+        let mut gate = GateDetail::pending(&[], "test");
+        gate.state = state;
+        gate
+    }
+
     fn gates(calendar: Gate, profile: Gate, legal: Gate, scientific: Gate) -> Gates {
         Gates {
-            calendar,
-            profile,
-            legal,
-            scientific,
-            evidence: vec!["e".into()],
+            calendar: gate(calendar),
+            profile: gate(profile),
+            legal: gate(legal),
+            scientific: gate(scientific),
         }
     }
 
@@ -530,6 +628,7 @@ mod tests {
                 coverage: "complete".into(),
                 structural_valid: true,
                 gates: Gates::pending(),
+                structural_evidence: vec!["structural".into()],
                 review_state: None,
                 eligible_for_research: false,
             }],
@@ -537,19 +636,39 @@ mod tests {
             limitations: LIMITATIONS.into(),
         };
         catalog.bind_assertions(
-            Gate::Accepted,
-            Gate::Accepted,
-            Gate::Accepted,
-            Gate::Accepted,
+            "dataset-1",
+            "receipt-1",
+            GateDecisions {
+                calendar: Gate::Accepted,
+                profile: Gate::Accepted,
+                legal: Gate::Accepted,
+                scientific: Gate::Accepted,
+            },
             vec!["legal+scientific evidence".into()],
         );
         assert!(catalog.instruments[0].eligible_for_research);
-        assert_eq!(catalog.instruments[0].gates.evidence.len(), 1);
+        assert_eq!(
+            catalog.instruments[0]
+                .gates
+                .legal
+                .dataset_identity
+                .as_deref(),
+            Some("dataset-1")
+        );
+        assert_eq!(
+            catalog.instruments[0].gates.legal.receipt.as_deref(),
+            Some("receipt-1")
+        );
+        assert_eq!(catalog.instruments[0].gates.legal.evidence.len(), 1);
         catalog.bind_assertions(
-            Gate::Accepted,
-            Gate::Accepted,
-            Gate::Pending,
-            Gate::Accepted,
+            "dataset-1",
+            "receipt-1",
+            GateDecisions {
+                calendar: Gate::Accepted,
+                profile: Gate::Accepted,
+                legal: Gate::Pending,
+                scientific: Gate::Accepted,
+            },
             vec![],
         );
         assert!(!catalog.instruments[0].eligible_for_research);
@@ -583,6 +702,7 @@ mod tests {
                 coverage: "complete".into(),
                 structural_valid: true,
                 gates: Gates::pending(),
+                structural_evidence: vec!["structural".into()],
                 review_state: None,
                 eligible_for_research: false,
             }],
@@ -609,16 +729,28 @@ mod tests {
         })
         .unwrap();
         catalog.bind_review(&report).unwrap();
-        assert_eq!(catalog.instruments[0].gates.calendar, Gate::Accepted);
-        assert_eq!(catalog.instruments[0].gates.profile, Gate::Accepted);
-        assert_eq!(catalog.instruments[0].gates.legal, Gate::Pending);
-        assert_eq!(catalog.instruments[0].gates.scientific, Gate::Pending);
+        assert_eq!(catalog.instruments[0].gates.calendar.state, Gate::Accepted);
+        assert_eq!(catalog.instruments[0].gates.profile.state, Gate::Accepted);
+        assert_eq!(catalog.instruments[0].gates.legal.state, Gate::Pending);
+        assert_eq!(catalog.instruments[0].gates.scientific.state, Gate::Pending);
         assert!(!catalog.instruments[0].eligible_for_research);
         assert_eq!(
             catalog.instruments[0].review_state,
             Some(data_review::State::AssertionsRecorded)
         );
-        assert!(catalog.instruments[0].gates.evidence.len() >= 3);
+        assert_eq!(
+            catalog.instruments[0]
+                .gates
+                .calendar
+                .dataset_identity
+                .as_deref(),
+            Some("0000000000000000000000000000000000000000000000000000000000000000")
+        );
+        assert_eq!(
+            catalog.instruments[0].gates.calendar.receipt.as_deref(),
+            Some(report.hash.as_str())
+        );
+        assert!(catalog.instruments[0].structural_evidence.len() >= 3);
     }
 
     #[test]
