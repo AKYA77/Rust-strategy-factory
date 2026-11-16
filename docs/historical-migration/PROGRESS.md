@@ -7,34 +7,38 @@ are not counted as integrated into `main`.
 
 | Criterion | Weight | Implementation | Verified end-to-end | Note |
 |---|---|---|---|---|
-| Core Rust implementation | 20 | ~85% | ~70% | Engine, corpus, campaign/fleet, checkpoint modules exist and are tested; Codex stack #8–#13 unmerged. |
-| Data ingestion and provenance | 15 | ~85% | ~75% | Legacy Parquet → native conversion with source binding, receipt identity, restart safety. |
-| Multi-instrument historical integration | 15 | ~80% | ~60% | 8/8 instruments converted (176 partitions, 421,078,937 events) and registered; downstream research integration pending. |
-| Engine correctness and verification | 20 | ~80% | ~65% | CI green, adversarial/spec reviews, regression tests; full unmerged stack not jointly accepted. |
-| Operational usability and recovery | 10 | ~65% | ~50% | Migration/corpus/catalog/audit CLIs; dashboard integration and recovery runbooks incomplete. |
-| Performance | 5 | ~75% | ~65% | Measured bounded conversion, windowed decode, receipt-only catalog scan. |
-| Scientific/data eligibility and acceptance | 10 | ~25% | ~5% | Four gates implemented, all pending; 0 instruments eligible. |
-| Integration and deployment readiness | 5 | ~45% | ~30% | PR #6 open and green; not merged; VPS-only data path. |
+| Core Rust implementation | 20 | ~87% | ~72% | Engine, corpus, campaign/fleet, checkpoint modules exist and are tested; Codex stack #8–#13 unmerged. |
+| Data ingestion and provenance | 15 | ~90% | ~80% | Legacy Parquet → native conversion with source binding, receipt identity, restart safety; corpus/catalog/audit CLIs. |
+| Multi-instrument historical integration | 15 | ~88% | ~70% | 8/8 instruments converted and registered; real corpus → source facts → candles → causal signals verified on genuine data. Replay/execution remains synthetic literal-USD scoped. |
+| Engine correctness and verification | 20 | ~82% | ~68% | CI green, adversarial review, regression tests; full unmerged stack not jointly accepted. |
+| Operational usability and recovery | 10 | ~70% | ~55% | Migration/corpus/catalog/audit CLIs and real-data tests; dashboard historical views and live VPS recovery incomplete. |
+| Performance | 5 | ~78% | ~68% | Measured bounded conversion, windowed decode, receipt-only catalog scan, 12-min full-corpus audit. |
+| Scientific/data eligibility and acceptance | 10 | ~28% | ~8% | Four gates implemented, all pending; 0 instruments eligible; declarations and machine evidence only. |
+| Integration and deployment readiness | 5 | ~50% | ~35% | PR #6 open and green; not merged; VPS-only data path; no systemd/reboot acceptance. |
 
 ## Accounting
 
-- **Overall project completion: ~72%** (implementation-weighted; range 70–74%).
-- **Verified end-to-end readiness: ~55–60%** (requires real-data acceptance, merged stack and
-  operational runbooks; tracked separately).
-- **Progress added this session: ~2–3 percentage points.** The multi-month corpus,
-  historical catalog with review gates, bounded streaming audit, review-binding workflow and
-  fresh-context reviews were added and verified on real VPS data. The gain is real but modest
-  because the large remaining items (scientific eligibility, merged-stack integration,
-  operational runbooks) did not move.
-- **Remaining: ~28%.**
+- **Software implementation completeness (Metric A): ~76%.**
+- **Verified end-to-end completion (Metric B): ~62%.**
+- **Progress added this milestone: +2 points.** A genuine VPS-data structural pipeline
+  (corpus → observed source facts → closed M1 candles → causal signals) now runs for all
+  eight instruments (47 s, all nonzero), and the whole-project gap assessment is recorded.
+  The gain is bounded because the execution/replay path for real FX data, the merged Codex
+  stack, live VPS acceptance and the external approvals did not move.
+- **Remaining: ~38% software, ~38% verified. Target gap to 95%: 19 points software, 33 points
+  verified.**
+- Baseline used: external provisional estimates (software 74%, verified 60%). The rubric and
+  weights are unchanged.
 
 ## Main blockers
 
 1. All four review gates (calendar/profile/legal/scientific) remain pending; no instrument is
    research-eligible. External owner determinations are required and must not be invented.
 2. Codex PRs #8–#13 are unmerged; the full stack is not jointly accepted.
-3. Downstream research-system integration and operational/recovery runbooks are incomplete.
-4. VPS disk pressure (93% used) limits further full-corpus workloads.
+3. Real/FX execution and full-history qualification are unfinished; corpus replay is
+   deliberately scoped to synthetic literal-USD inputs.
+4. Live systemd/reboot VPS acceptance and operational runbooks are incomplete.
+5. VPS disk pressure (95% used, ~5 GiB free) limits further full-corpus allocations.
 
 ## Consistency rule
 
