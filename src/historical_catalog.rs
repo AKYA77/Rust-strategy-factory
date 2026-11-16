@@ -556,6 +556,72 @@ mod tests {
     }
 
     #[test]
+    fn bind_review_updates_gates_and_keeps_legal_pending() {
+        use crate::data_review::{self, Area, Assessment, Decision, Request};
+        let mut catalog = Catalog {
+            version: VERSION.into(),
+            instruments: vec![InstrumentStatus {
+                instrument: "EURUSD".into(),
+                months: vec![PartitionStatus {
+                    instrument: "EURUSD".into(),
+                    year: 2025,
+                    month: 1,
+                    state: PartitionState::Verified,
+                    dataset_hash: Some("d".into()),
+                    source_sha256: Some("a".repeat(64)),
+                    parquet_sha256: Some("b".repeat(64)),
+                    rows: 1,
+                    first_ms: Some(0),
+                    last_ms: Some(1),
+                    timestamp_ties: 0,
+                    gaps_over_hour: 0,
+                    correction_records: 0,
+                    quarantine_records: 0,
+                    load_error: None,
+                }],
+                expected_months: 1,
+                coverage: "complete".into(),
+                structural_valid: true,
+                gates: Gates::pending(),
+                review_state: None,
+                eligible_for_research: false,
+            }],
+            identity: "0".repeat(64),
+            limitations: LIMITATIONS.into(),
+        };
+        let assessment = |area: Area| Assessment {
+            area,
+            decision: Decision::AcceptedAssertion,
+            explanation: "accepted".into(),
+            evidence_text: "evidence".into(),
+        };
+        let report = data_review::Report::create(Request {
+            catalog_identity: "0".repeat(64),
+            catalog_hash: "0".repeat(64),
+            reviewer: "reviewer".into(),
+            assessments: [
+                assessment(Area::Source),
+                assessment(Area::Profile),
+                assessment(Area::Calendar),
+                assessment(Area::Quality),
+                assessment(Area::Coverage),
+            ],
+        })
+        .unwrap();
+        catalog.bind_review(&report).unwrap();
+        assert_eq!(catalog.instruments[0].gates.calendar, Gate::Accepted);
+        assert_eq!(catalog.instruments[0].gates.profile, Gate::Accepted);
+        assert_eq!(catalog.instruments[0].gates.legal, Gate::Pending);
+        assert_eq!(catalog.instruments[0].gates.scientific, Gate::Pending);
+        assert!(!catalog.instruments[0].eligible_for_research);
+        assert_eq!(
+            catalog.instruments[0].review_state,
+            Some(data_review::State::AssertionsRecorded)
+        );
+        assert!(catalog.instruments[0].gates.evidence.len() >= 3);
+    }
+
+    #[test]
     fn evidence_counts_match_legacy_shape() {
         let correction = serde_json::json!({
             "rows_reordered": 126,
