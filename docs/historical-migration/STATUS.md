@@ -175,6 +175,24 @@ the windowed fix.
   equivalence, scans the catalog, checks cross-month ordering, and assembles causal M1 candles
   while asserting per-month sequence restart and per-month source identity.
 
+## Bounded audit and v2 review gates
+
+- `historical_corpus::audit` / CLI `historical-corpus-audit` streams every chunk of one
+  instrument with bounded memory and verifies source attribution, per-month sequence
+  continuity from zero, cross-month timestamp ordering, month and total row counts, and
+  causal M1 candle generation. Full-corpus result: 8 instruments, **421,078,937 rows**,
+  **4,299 chunks**, **5,413,197 M1 candles**, all exit 0; ~12 min total wall, chunk-by-chunk.
+- Catalog **v2** gives each gate explicit `required_evidence`, an operator-visible
+  `explanation`, and — on acceptance — a `dataset_identity` and review `receipt` binding.
+  `bind_review` refuses a report whose catalog identity does not match; `bind_assertions`
+  records explicit calendar/profile/legal/scientific decisions with evidence. A pending or
+  rejected gate blocks eligibility; 0 instruments are eligible.
+- `docs/historical-migration/DATA_READINESS.md` records verified facts (coverage, source
+  metadata `HistData.com`/millisecond/scale 1e6, Saturday-absent Sunday-open session
+  observation, corrections and quarantine) and the unknowns that require owner/external
+  determination (exact session/holiday calendar, licence, broker specification, scientific
+  approval). `docs/historical-migration/PROGRESS.md` records the completion rubric.
+
 ## Remaining work
 
 1. ~~Run `scripts/check.sh`~~ — fmt and Clippy pass; lib tests pass; full suite has two
