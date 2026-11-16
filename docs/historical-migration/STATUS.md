@@ -147,6 +147,12 @@ The module now has 20 tests. Known accepted residual: reuse of a completed recei
 re-read chunk contents against the source (requires forging the receipt trust anchor);
 `historical-verify <dir> <source>` is the explicit full-equivalence check.
 
+Measured memory bound for the windowed decode: a malicious 65,536-row group with 5,000-byte
+`source_id` strings (358 KB compressed Parquet) is refused with
+`legacy column 5 exceeds the decoded string byte budget` at **~300 MiB peak RSS**
+(budget 256 MiB + one 8,192-row window). The same class of input peaked at ~1.24 GiB before
+the windowed fix.
+
 ## Remaining work
 
 1. ~~Run `scripts/check.sh`~~ — fmt and Clippy pass; lib tests pass; full suite has two
