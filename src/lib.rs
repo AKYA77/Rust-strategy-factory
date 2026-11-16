@@ -50,6 +50,8 @@ pub mod compressed;
 
 pub mod parquet_store;
 
+pub mod historical_migration;
+
 pub mod coverage;
 
 pub mod import_job;

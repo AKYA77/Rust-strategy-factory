@@ -382,6 +382,83 @@ fn run(args: &[String]) -> Result<()> {
         ["import-status", directory] => print(&rust_strategy_factory::import_job::status(
             Path::new(directory),
         )?),
+        [
+            "historical-convert",
+            source,
+            output,
+            profile,
+            manifest,
+            import_receipt,
+            chunk_events,
+        ] => {
+            let profile: Profile = read_json(profile)?;
+            let config = rust_strategy_factory::historical_migration::Config::new(
+                Path::new(source),
+                Path::new(output),
+                profile,
+            )?
+            .with_manifest(Path::new(manifest))?
+            .with_import_receipt(Path::new(import_receipt))?
+            .with_chunk_events(chunk_events.parse().map_err(|_| "invalid chunk events")?)?;
+            print(&rust_strategy_factory::historical_migration::convert(
+                &config,
+            )?)
+        }
+        [
+            "historical-convert",
+            source,
+            output,
+            profile,
+            manifest,
+            import_receipt,
+        ] => {
+            let profile: Profile = read_json(profile)?;
+            let config = rust_strategy_factory::historical_migration::Config::new(
+                Path::new(source),
+                Path::new(output),
+                profile,
+            )?
+            .with_manifest(Path::new(manifest))?
+            .with_import_receipt(Path::new(import_receipt))?;
+            print(&rust_strategy_factory::historical_migration::convert(
+                &config,
+            )?)
+        }
+        ["historical-convert", source, output, profile, manifest] => {
+            let profile: Profile = read_json(profile)?;
+            let config = rust_strategy_factory::historical_migration::Config::new(
+                Path::new(source),
+                Path::new(output),
+                profile,
+            )?
+            .with_manifest(Path::new(manifest))?;
+            print(&rust_strategy_factory::historical_migration::convert(
+                &config,
+            )?)
+        }
+        ["historical-convert", source, output, profile] => {
+            let profile: Profile = read_json(profile)?;
+            let config = rust_strategy_factory::historical_migration::Config::new(
+                Path::new(source),
+                Path::new(output),
+                profile,
+            )?;
+            print(&rust_strategy_factory::historical_migration::convert(
+                &config,
+            )?)
+        }
+        ["historical-verify", directory, source] => {
+            print(&rust_strategy_factory::historical_migration::verify_output(
+                Path::new(directory),
+                Some(Path::new(source)),
+            )?)
+        }
+        ["historical-verify", directory] => {
+            print(&rust_strategy_factory::historical_migration::verify_output(
+                Path::new(directory),
+                None,
+            )?)
+        }
         ["pack-parquet", input, output] => {
             rust_strategy_factory::parquet_store::write(Path::new(output), &read_dataset(input)?)
         }
