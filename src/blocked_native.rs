@@ -16,6 +16,9 @@ const MAX_META: usize = 1024 * 1024;
 const MAX_EVENTS: usize = 2_000_000;
 const MAX_BLOCKS: usize = 4096;
 const ENTRY: usize = 64;
+/// Format ceiling for bounded whole-file verification of already decoded artifacts.
+pub(crate) const MAX_BYTES: u64 =
+    (HEADER + MAX_META + MAX_BLOCKS * ENTRY + 32) as u64 + MAX_EVENTS as u64 * 32;
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Metadata {

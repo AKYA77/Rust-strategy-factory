@@ -180,6 +180,8 @@ pub struct SourceFacts {
     latest: crate::coverage::Event,
     max_resident_quote_events: usize,
     limitations: &'static str,
+    #[serde(skip)]
+    max_artifact_events: usize,
 }
 const FACTS_LIMITATIONS: &str = "Observed source identity/profile/declared class and exact ordered events only. No candle, complete coverage, independent approval, execution or scientific eligibility is established. Reuse must verify actual current artifacts; metadata is additional to bounded quote residency.";
 impl SourceFacts {
@@ -211,14 +213,58 @@ impl SourceFacts {
         self.max_resident_quote_events
     }
     pub fn verify_current(&self, base: &Path, spec: &Specification) -> Result<()> {
-        verify_current_identity(base, spec, &self.corpus_identity)
+        verify_current_identity(base, spec, &self.corpus_identity, self.max_artifact_events)
     }
 }
-fn verify_current_identity(base: &Path, spec: &Specification, identity: &str) -> Result<()> {
+fn verify_current_identity(
+    base: &Path,
+    spec: &Specification,
+    identity: &str,
+    max_artifact_events: usize,
+) -> Result<()> {
     if identity != spec.identity()? {
         return Err("verified source identity differs".into());
     }
-    visit_blocks(base, spec, |_| Ok(()))
+    if max_artifact_events == 0 || max_artifact_events > spec.max_chunk_events {
+        return Err("verified source exceeds current artifact event budget".into());
+    }
+    // Only private, fully decoded snapshots reach this path. Equal complete
+    // file hashes plus the same ordered specification preserve the validated
+    // profile/class/quotes/order/root. Read every current byte on one descriptor;
+    // neither metadata nor the expected hash alone establishes current identity.
+    let mut buffer = [0u8; 65536];
+    for chunk in &spec.chunks {
+        let file = File::open(base.join(&chunk.path)).map_err(|e| e.to_string())?;
+        let length = file.metadata().map_err(|e| e.to_string())?.len();
+        let cap = if chunk.block_root.is_some() {
+            crate::blocked_native::MAX_BYTES
+        } else {
+            native::MAX_BYTES
+        };
+        if length == 0 || length > cap {
+            return Err("current corpus artifact byte budget exceeded".into());
+        }
+        let mut reader = file.take(cap + 1);
+        let mut hash = blake3::Hasher::new();
+        let mut bytes = 0u64;
+        loop {
+            let n = reader.read(&mut buffer).map_err(|e| e.to_string())?;
+            if n == 0 {
+                break;
+            }
+            bytes = bytes
+                .checked_add(n as u64)
+                .ok_or("artifact byte count overflow")?;
+            if bytes > cap {
+                return Err("current corpus artifact grew beyond byte budget".into());
+            }
+            hash.update(&buffer[..n]);
+        }
+        if bytes != length || hash.finalize().to_hex().as_str() != chunk.file_hash {
+            return Err("corpus artifact revision/fingerprint checksum mismatch".into());
+        }
+    }
+    Ok(())
 }
 /// Compute only source facts needed for a frozen execution key, without candles.
 pub fn source_facts(base: &Path, spec: &Specification) -> Result<SourceFacts> {
@@ -230,7 +276,16 @@ pub fn source_facts(base: &Path, spec: &Specification) -> Result<SourceFacts> {
     let mut latest = None;
     let mut peak = 0;
     let mut events = SequenceHash::new();
+    let mut artifact_events = 0usize;
+    let mut max_artifact_events = 0usize;
     visit_blocks(base, spec, |block| {
+        artifact_events = artifact_events
+            .checked_add(block.ticks.len())
+            .ok_or("artifact event count overflow")?;
+        if block.last_in_chunk {
+            max_artifact_events = max_artifact_events.max(artifact_events);
+            artifact_events = 0;
+        }
         if profile.is_none() {
             profile = Some(block.profile.clone());
             source = Some(block.manifest.source.clone());
@@ -258,6 +313,7 @@ pub fn source_facts(base: &Path, spec: &Specification) -> Result<SourceFacts> {
         latest: crate::coverage::Event::from(&latest.ok_or("empty source facts")?),
         max_resident_quote_events: peak,
         limitations: FACTS_LIMITATIONS,
+        max_artifact_events,
     })
 }
 /// Verified immutable candle contexts built alongside inspection in one source pass.
@@ -265,6 +321,7 @@ pub fn source_facts(base: &Path, spec: &Specification) -> Result<SourceFacts> {
 pub struct Prepared {
     report: Report,
     frames: std::collections::BTreeMap<Timeframe, Vec<candles::Candle>>,
+    max_artifact_events: usize,
 }
 impl Prepared {
     pub(crate) fn source_facts(&self) -> SourceFacts {
@@ -280,6 +337,7 @@ impl Prepared {
             latest: self.report.latest.clone(),
             max_resident_quote_events: self.report.max_resident_quote_events,
             limitations: FACTS_LIMITATIONS,
+            max_artifact_events: self.max_artifact_events,
         }
     }
     pub fn report(&self) -> &Report {
@@ -297,7 +355,12 @@ impl Prepared {
     /// Recheck every actual artifact before reusing this immutable context.
     /// Identity alone never establishes that the currently resolved bytes match.
     pub fn verify_current(&self, base: &Path, spec: &Specification) -> Result<()> {
-        verify_current_identity(base, spec, &self.report.corpus_identity)
+        verify_current_identity(
+            base,
+            spec,
+            &self.report.corpus_identity,
+            self.max_artifact_events,
+        )
     }
     pub fn signals(
         &self,
@@ -369,7 +432,16 @@ fn inspect_prepared(
     let mut repeats = 0;
     let mut gaps = 0;
     let mut peak = 0;
+    let mut artifact_events = 0usize;
+    let mut max_artifact_events = 0usize;
     visit_blocks(base, spec, |d| {
+        artifact_events = artifact_events
+            .checked_add(d.ticks.len())
+            .ok_or("artifact event count overflow")?;
+        if d.last_in_chunk {
+            max_artifact_events = max_artifact_events.max(artifact_events);
+            artifact_events = 0;
+        }
         if profile.is_none() {
             for tf in Timeframe::ALL {
                 streams.push(candles::Stream::new(d.profile.clone(), tf)?);
@@ -447,6 +519,7 @@ fn inspect_prepared(
             limitations: "Observed ordered native chunks and closed UTC candle fingerprints only. One bounded quote chunk plus seven candle states is retained; metadata and per-chunk validation allocations are additional. No empty/final unfinished candles, missing quotes, source completeness, approved class, acquisition/resume or scientific eligibility is established. Synthetic USD replay is a separate explicitly gated consumer. Source archives/provenance remain separate immutable artifacts; profiles/source/class cannot be mixed.",
         },
         frames,
+        max_artifact_events,
     })
 }
 
