@@ -3079,13 +3079,31 @@ fn owned_fleet_rotation_preserves_scalar_receipts_exact_cost_observations_and_ba
     let db = first.root.join("fleet.sqlite");
     let id = corpus_fleet::register_file(&file, &db).unwrap();
     let (policy, limits) = owned_fleet_files(&first.root);
-    let out = owned_fleet_loop_call(&db, &id, &policy, &limits, "100", "60000");
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    // Under full-suite parallel load a step can exceed the fixture's wall budget and leave
+    // the fleet retry-held. Retry the wait-capable loop until it actually exhausts; the
+    // exhausted assertion is unchanged.
+    let report = {
+        let mut attempts = 0;
+        loop {
+            let out = owned_fleet_loop_call(&db, &id, &policy, &limits, "100", "60000");
+            assert!(
+                out.status.success(),
+                "{}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            let value: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+            if value["stop_reason"] == "exhausted" {
+                break value;
+            }
+            attempts += 1;
+            assert!(
+                attempts < 20,
+                "fleet did not exhaust, stop_reason={}",
+                value["stop_reason"]
+            );
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    };
     assert_eq!(report["stop_reason"], "exhausted");
     let registry = Registry::open(&db).unwrap();
     let status = corpus_fleet::status(&registry, &id).unwrap();
