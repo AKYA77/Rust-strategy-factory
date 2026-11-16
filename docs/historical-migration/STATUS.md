@@ -128,6 +128,25 @@ four secondary findings; three were acted on in `6fbfd0a`:
 The module now has 17 tests; `cargo clippy --locked --all-targets -- -D warnings` is clean and
 the real-corpus integration test passes with the windowed reader.
 
+### Specification review outcome
+
+A second fresh-context reviewer checked the stated contract invariants and found the corpus
+rules unweakened and deterministic restart intact, plus further gaps (commit `eb98c68`):
+
+- Source-prefix equivalence now checks price exactness (`% factor`) and quality flags, and
+  `verify_output` requires `receipt.events == source rows`.
+- Adopted chunks are re-checked against the 100,000-event corpus cap in both `rebuild_state`
+  and `verify_output`; `verify_output` also checks each chunk's `archive_hash`.
+- The manifest instrument is bound to `profile.symbol` on both fresh conversion and reuse.
+- The receipt stores an explicit `source_description`, so no-manifest conversions are now
+  verifiable (previously `verify_output` reconstructed a mismatched description).
+- Import evidence is shape-validated (64-hex content hash, object/null correction records).
+- Removed the dead `Config.legacy_manifest_path` field.
+
+The module now has 20 tests. Known accepted residual: reuse of a completed receipt does not
+re-read chunk contents against the source (requires forging the receipt trust anchor);
+`historical-verify <dir> <source>` is the explicit full-equivalence check.
+
 ## Remaining work
 
 1. ~~Run `scripts/check.sh`~~ — fmt and Clippy pass; lib tests pass; full suite has two
