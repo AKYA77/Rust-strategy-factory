@@ -62,6 +62,9 @@ pub fn validate_months(months: &[MonthlySource], expected: usize) -> Result<()> 
     }
     let mut previous: Option<&MonthlySource> = None;
     for month in months {
+        if !(2000..=2200).contains(&month.year) || !(1..=12).contains(&month.month) {
+            return Err("invalid calendar month".into());
+        }
         if month.rows == 0
             || month.first_ms > month.last_ms
             || month.chunk_files.is_empty()
@@ -429,6 +432,17 @@ mod tests {
         duplicate[7].month = duplicate[6].month;
         assert!(validate_months(&duplicate, 22).is_err());
         assert!(validate_months(&contiguous(), 21).is_err());
+    }
+
+    #[test]
+    fn validate_months_rejects_out_of_range_calendar() {
+        let mut alias = contiguous();
+        alias.truncate(2);
+        alias[0].year = 2025;
+        alias[0].month = 12;
+        alias[1].year = 2025;
+        alias[1].month = 13; // month_index aliases as 2026-01
+        assert!(validate_months(&alias, 2).is_err());
     }
 
     #[test]

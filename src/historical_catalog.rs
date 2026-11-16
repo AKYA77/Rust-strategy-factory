@@ -477,6 +477,10 @@ impl Catalog {
     /// Bind a receipt-bound review report to this catalog identity and update the gates it
     /// covers. Legal and scientific gates remain pending unless separately recorded.
     pub fn bind_review(&mut self, report: &data_review::Report) -> Result<()> {
+        // Refuse forged or corrupted reports before trusting any decision: the record hash,
+        // version and evidence hashes must verify.
+        let verified = data_review::Report::verified(report.record.clone(), report.hash.clone())?;
+        let report = &verified;
         if report.record.request.catalog_identity != self.identity {
             return Err("review catalog identity does not match this catalog".into());
         }
@@ -751,6 +755,78 @@ mod tests {
             Some(report.hash.as_str())
         );
         assert!(catalog.instruments[0].structural_evidence.len() >= 3);
+    }
+
+    fn one_instrument_catalog(identity: &str) -> Catalog {
+        Catalog {
+            version: VERSION.into(),
+            instruments: vec![InstrumentStatus {
+                instrument: "EURUSD".into(),
+                months: vec![PartitionStatus {
+                    instrument: "EURUSD".into(),
+                    year: 2025,
+                    month: 1,
+                    state: PartitionState::Verified,
+                    dataset_hash: Some("d".into()),
+                    source_sha256: Some("a".repeat(64)),
+                    parquet_sha256: Some("b".repeat(64)),
+                    rows: 1,
+                    first_ms: Some(0),
+                    last_ms: Some(1),
+                    timestamp_ties: 0,
+                    gaps_over_hour: 0,
+                    correction_records: 0,
+                    quarantine_records: 0,
+                    load_error: None,
+                }],
+                expected_months: 1,
+                coverage: "complete".into(),
+                structural_valid: true,
+                gates: Gates::pending(),
+                structural_evidence: vec!["structural".into()],
+                review_state: None,
+                eligible_for_research: false,
+            }],
+            identity: identity.into(),
+            limitations: LIMITATIONS.into(),
+        }
+    }
+
+    #[test]
+    fn bind_review_refuses_forged_or_tampered_report() {
+        use crate::data_review::{self, Area, Assessment, Decision, Request};
+        let mut catalog = one_instrument_catalog(&"0".repeat(64));
+        let assessment = |area: Area| Assessment {
+            area,
+            decision: Decision::AcceptedAssertion,
+            explanation: "accepted".into(),
+            evidence_text: "evidence".into(),
+        };
+        let make = || {
+            data_review::Report::create(Request {
+                catalog_identity: "0".repeat(64),
+                catalog_hash: "0".repeat(64),
+                reviewer: "reviewer".into(),
+                assessments: [
+                    assessment(Area::Source),
+                    assessment(Area::Profile),
+                    assessment(Area::Calendar),
+                    assessment(Area::Quality),
+                    assessment(Area::Coverage),
+                ],
+            })
+            .unwrap()
+        };
+        let mut bad_hash = make();
+        bad_hash.hash = "0".repeat(64);
+        assert!(catalog.bind_review(&bad_hash).is_err());
+        let mut bad_evidence = make();
+        bad_evidence.record.evidence_hashes[0] = "0".repeat(64);
+        assert!(catalog.bind_review(&bad_evidence).is_err());
+        let mut wrong_identity = make();
+        wrong_identity.record.request.catalog_identity = "1".repeat(64);
+        wrong_identity.hash = crate::data::hash(&wrong_identity.record).unwrap();
+        assert!(catalog.bind_review(&wrong_identity).is_err());
     }
 
     #[test]
