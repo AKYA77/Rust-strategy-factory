@@ -1,0 +1,36 @@
+diff --git a/src/historical_migration.rs b/src/historical_migration.rs
+index 8246232..670976c 100644
+--- a/src/historical_migration.rs
++++ b/src/historical_migration.rs
+@@ -1538,4 +1538,31 @@ mod tests {
+         assert_eq!(dataset.ticks[0].bid, 57_308);
+         assert_eq!(dataset.ticks[0].ask, 57_310);
+     }
++    #[test]
++    fn codex_review_completed_conversion_must_bind_requested_profile_and_source() {
++        let (dir, parquet, output, _) = fixture(migration_profile("NZDUSD"), 7);
++        let config = Config::new(&parquet, &output, migration_profile("NZDUSD")).unwrap().with_chunk_events(7).unwrap().with_manifest(&dir.join("manifest.json")).unwrap();
++        convert(&config).unwrap();
++        let changed = Config::new(&dir.join("missing-different-source.parquet"), &output, migration_profile("EURUSD")).unwrap();
++        assert!(convert(&changed).is_err(), "completed conversion accepted a different requested profile and missing source");
++        fs::remove_dir_all(dir).unwrap();
++    }
++    #[test]
++    fn codex_review_partial_resume_must_reject_self_hashed_different_prices() {
++        let (dir, parquet, output, _) = fixture(migration_profile("NZDUSD"), 7);
++        let config = Config::new(&parquet, &output, migration_profile("NZDUSD")).unwrap().with_chunk_events(7).unwrap().with_manifest(&dir.join("manifest.json")).unwrap();
++        let initial = convert(&config).unwrap();
++        fs::remove_file(output.join("manifest.json")).unwrap();
++        let path = output.join(&initial.chunks[0].file);
++        let original = native::read(&path).unwrap();
++        let mut ticks = original.ticks.clone();
++        for tick in &mut ticks { tick.bid += original.profile.tick; tick.ask += original.profile.tick; }
++        let mut changed = data::dataset(original.profile.clone(), ticks, &original.manifest.source, original.manifest.archive_hash.clone(), false).unwrap();
++        changed.manifest.parser_version = original.manifest.parser_version.clone();
++        changed.manifest.imported_at = original.manifest.imported_at.clone();
++        fs::remove_file(&path).unwrap(); native::write(&path, &changed).unwrap();
++        assert!(convert(&config).is_err(), "resume accepted different native prices bound only by self-computed hashes");
++        fs::remove_dir_all(dir).unwrap();
++    }
++
+ }
