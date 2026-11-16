@@ -75,6 +75,8 @@ impl GateDetail {
     pub fn accept(&mut self, dataset_identity: &str, receipt: &str, evidence: Vec<String>) {
         if evidence.iter().all(|e| e.trim().is_empty()) {
             self.state = Gate::Pending;
+            self.dataset_identity = None;
+            self.receipt = None;
             self.explanation =
                 "Pending: acceptance requires retained evidence; missing evidence is not accepted."
                     .into();
@@ -83,14 +85,21 @@ impl GateDetail {
         self.state = Gate::Accepted;
         self.dataset_identity = Some(dataset_identity.into());
         self.receipt = Some(receipt.into());
-        self.evidence.extend(evidence);
+        self.evidence = evidence;
         self.explanation = format!(
             "Accepted for dataset {dataset_identity} via receipt {receipt}; a reviewer-supplied claim bound to evidence, not independent verification."
         );
     }
     pub fn reject(&mut self, explanation: &str) {
         self.state = Gate::Rejected;
+        self.dataset_identity = None;
+        self.receipt = None;
         self.explanation = explanation.into();
+    }
+    pub fn set_pending(&mut self) {
+        self.state = Gate::Pending;
+        self.dataset_identity = None;
+        self.receipt = None;
     }
 }
 
@@ -163,7 +172,9 @@ impl Gates {
     pub fn evidence(&self) -> Vec<String> {
         let mut all = Vec::new();
         for gate in [&self.calendar, &self.profile, &self.legal, &self.scientific] {
-            all.extend(gate.evidence.iter().cloned());
+            if gate.state == Gate::Accepted {
+                all.extend(gate.evidence.iter().cloned());
+            }
         }
         all
     }
@@ -181,6 +192,16 @@ pub struct InstrumentStatus {
     pub structural_evidence: Vec<String>,
     pub review_state: Option<ReviewState>,
     pub eligible_for_research: bool,
+}
+
+impl InstrumentStatus {
+    /// Eligibility requires structural validity, all four gates accepted, and no rejected
+    /// review. A reviewer-supplied acceptance flag is a claim, not independent verification.
+    fn compute_eligible(&self) -> bool {
+        self.structural_valid
+            && self.gates.accepted_all()
+            && self.review_state != Some(ReviewState::Rejected)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -207,8 +228,8 @@ fn field(value: &serde_json::Value, key: &str) -> u64 {
 /// Rows reordered or dropped by the retired importer's source-order correction.
 fn correction_records(value: &serde_json::Value) -> u64 {
     field(value, "rows_reordered")
-        + array_len(value, "duplicate_blocks_removed")
-        + array_len(value, "uncorrectable")
+        .saturating_add(array_len(value, "duplicate_blocks_removed"))
+        .saturating_add(array_len(value, "uncorrectable"))
 }
 
 /// Quotes removed by the retired importer's quality quarantine.
@@ -249,10 +270,10 @@ fn scan_partition(
         quarantine_records: 0,
         load_error: None,
     };
-    if canonical.is_none() {
+    let Some(canonical) = canonical else {
         status.state = PartitionState::Noncanonical;
         return status;
-    }
+    };
     match historical_migration::verify_receipt_only(&month_dir(
         output_root,
         instrument,
@@ -264,6 +285,19 @@ fn scan_partition(
             status.load_error = Some(error);
         }
         Ok(receipt) => {
+            // A foreign or self-consistent receipt must never be reported as a verified
+            // canonical partition: bind it to the canonical plan identity.
+            if receipt.source.dataset_hash != canonical.dataset_hash
+                || receipt.source.source_sha256 != canonical.source_sha256
+                || receipt.source.rows != canonical.rows
+                || receipt.source.instrument != canonical.instrument
+                || receipt.source.parquet_path != canonical.parquet_path
+            {
+                status.state = PartitionState::LoadFailure;
+                status.load_error =
+                    Some("monthly receipt does not match the canonical partition".into());
+                return status;
+            }
             status.state = PartitionState::Verified;
             status.dataset_hash = Some(receipt.source.dataset_hash);
             status.source_sha256 = Some(receipt.source.source_sha256);
@@ -310,6 +344,27 @@ fn extra_partitions(output_root: &Path, instrument: &str, plan: &[Partition]) ->
     extras
 }
 
+fn validate_plan_months(plan: &[Partition]) -> Result<()> {
+    let mut previous: Option<(u32, u32)> = None;
+    for partition in plan {
+        if partition.year == 0 || partition.year > 4000 || !(1..=12).contains(&partition.month) {
+            return Err("canonical plan contains an invalid calendar month".into());
+        }
+        if let Some((year, month)) = previous {
+            let current = partition.year as u64 * 12 + partition.month as u64;
+            let previous_index = year as u64 * 12 + month as u64;
+            if current == previous_index {
+                return Err("canonical plan contains a duplicate month".into());
+            }
+            if current != previous_index + 1 {
+                return Err("canonical plan months are not contiguous".into());
+            }
+        }
+        previous = Some((partition.year, partition.month));
+    }
+    Ok(())
+}
+
 /// Structural status for one instrument. Never asserts calendar or research eligibility.
 pub fn scan_instrument(
     root: &Path,
@@ -318,6 +373,13 @@ pub fn scan_instrument(
     expected: usize,
 ) -> Result<InstrumentStatus> {
     let plan = historical_corpus::plan_instrument(root, instrument)?;
+    validate_plan_months(&plan)?;
+    if plan.len() != expected {
+        return Err(format!(
+            "canonical plan has {} partitions for {instrument}, expected {expected}",
+            plan.len()
+        ));
+    }
     let mut months: Vec<PartitionStatus> = plan
         .iter()
         .map(|p| scan_partition(instrument, p.year, p.month, Some(p), output_root))
@@ -354,19 +416,10 @@ pub fn scan_instrument(
     })
 }
 
-pub fn scan_catalog(
-    root: &Path,
-    output_root: &Path,
-    instruments: &[&str],
-    expected: usize,
-) -> Result<Catalog> {
-    let mut statuses = Vec::new();
-    for instrument in instruments {
-        statuses.push(scan_instrument(root, output_root, instrument, expected)?);
-    }
-    let identity = data::hash(&(
+fn catalog_identity(instruments: &[InstrumentStatus]) -> Result<String> {
+    data::hash(&(
         VERSION,
-        statuses
+        instruments
             .iter()
             .map(|s| {
                 (
@@ -390,7 +443,20 @@ pub fn scan_catalog(
                 )
             })
             .collect::<Vec<_>>(),
-    ))?;
+    ))
+}
+
+pub fn scan_catalog(
+    root: &Path,
+    output_root: &Path,
+    instruments: &[&str],
+    expected: usize,
+) -> Result<Catalog> {
+    let mut statuses = Vec::new();
+    for instrument in instruments {
+        statuses.push(scan_instrument(root, output_root, instrument, expected)?);
+    }
+    let identity = catalog_identity(&statuses)?;
     Ok(Catalog {
         version: VERSION.into(),
         instruments: statuses,
@@ -404,39 +470,29 @@ impl Catalog {
         if self.version != VERSION || self.limitations != LIMITATIONS {
             return Err("invalid historical catalog".into());
         }
-        let expected = data::hash(&(
-            VERSION,
-            self.instruments
-                .iter()
-                .map(|s| {
-                    (
-                        &s.instrument,
-                        s.expected_months,
-                        &s.coverage,
-                        s.structural_valid,
-                        s.months
-                            .iter()
-                            .map(|m| {
-                                (
-                                    m.year,
-                                    m.month,
-                                    m.state,
-                                    &m.dataset_hash,
-                                    &m.source_sha256,
-                                    m.rows,
-                                )
-                            })
-                            .collect::<Vec<_>>(),
-                    )
-                })
-                .collect::<Vec<_>>(),
-        ))?;
-        if expected != self.identity {
+        if catalog_identity(&self.instruments)? != self.identity {
             return Err("historical catalog identity mismatch".into());
         }
         for instrument in &self.instruments {
             if instrument.months.len() != instrument.expected_months {
                 return Err("historical catalog month count mismatch".into());
+            }
+            let mut previous: Option<(u32, u32)> = None;
+            for month in &instrument.months {
+                if month.instrument != instrument.instrument {
+                    return Err("historical catalog month instrument mismatch".into());
+                }
+                if month.state == PartitionState::Verified && month.load_error.is_some() {
+                    return Err("historical catalog verified month has a load error".into());
+                }
+                if let Some((year, previous_month)) = previous {
+                    let current = month.year as u64 * 12 + month.month as u64;
+                    let previous_index = year as u64 * 12 + previous_month as u64;
+                    if current <= previous_index {
+                        return Err("historical catalog months are not strictly increasing".into());
+                    }
+                }
+                previous = Some((month.year, month.month));
             }
             let structural_valid = instrument.coverage == "complete"
                 && instrument
@@ -446,8 +502,7 @@ impl Catalog {
             if structural_valid != instrument.structural_valid {
                 return Err("historical catalog structural flag mismatch".into());
             }
-            let eligible = structural_valid && instrument.gates.accepted_all();
-            if eligible != instrument.eligible_for_research {
+            if instrument.compute_eligible() != instrument.eligible_for_research {
                 return Err("historical catalog eligibility mismatch".into());
             }
         }
@@ -462,7 +517,10 @@ impl Catalog {
         receipt: &str,
         decisions: GateDecisions,
         evidence: Vec<String>,
-    ) {
+    ) -> Result<()> {
+        if dataset_identity != self.identity {
+            return Err("assertion dataset identity does not match this catalog".into());
+        }
         for instrument in &mut self.instruments {
             for (gate, state) in [
                 (&mut instrument.gates.calendar, decisions.calendar),
@@ -473,12 +531,12 @@ impl Catalog {
                 match state {
                     Gate::Accepted => gate.accept(dataset_identity, receipt, evidence.clone()),
                     Gate::Rejected => gate.reject("Rejected by explicit assertion."),
-                    Gate::Pending => gate.state = Gate::Pending,
+                    Gate::Pending => gate.set_pending(),
                 }
             }
-            instrument.eligible_for_research =
-                instrument.structural_valid && instrument.gates.accepted_all();
+            instrument.eligible_for_research = instrument.compute_eligible();
         }
+        Ok(())
     }
 
     /// Bind a receipt-bound review report to this catalog identity and update the gates it
@@ -491,6 +549,11 @@ impl Catalog {
         if report.record.request.catalog_identity != self.identity {
             return Err("review catalog identity does not match this catalog".into());
         }
+        if report.record.request.catalog_hash != data::hash(&self.instruments)? {
+            return Err("review catalog hash does not match this catalog".into());
+        }
+        // Refuse to bind into a catalog whose own identity or flags are inconsistent.
+        self.verify()?;
         let catalog_identity = self.identity.clone();
         let receipt = report.hash.clone();
         for instrument in &mut self.instruments {
@@ -519,7 +582,7 @@ impl Catalog {
                             "{:?} rejected by review receipt {receipt}",
                             assessment.area
                         )),
-                        Decision::Pending => gate.state = Gate::Pending,
+                        Decision::Pending => gate.set_pending(),
                     }
                     changed = true;
                 } else {
@@ -528,8 +591,7 @@ impl Catalog {
             }
             if changed {
                 instrument.review_state = Some(report.state);
-                instrument.eligible_for_research =
-                    instrument.structural_valid && instrument.gates.accepted_all();
+                instrument.eligible_for_research = instrument.compute_eligible();
             }
         }
         Ok(())
@@ -614,49 +676,21 @@ mod tests {
 
     #[test]
     fn explicit_gates_control_eligibility() {
-        let mut catalog = Catalog {
-            version: VERSION.into(),
-            instruments: vec![InstrumentStatus {
-                instrument: "EURUSD".into(),
-                months: vec![PartitionStatus {
-                    instrument: "EURUSD".into(),
-                    year: 2025,
-                    month: 1,
-                    state: PartitionState::Verified,
-                    dataset_hash: Some("d".into()),
-                    source_sha256: Some("a".repeat(64)),
-                    parquet_sha256: Some("b".repeat(64)),
-                    rows: 1,
-                    first_ms: Some(0),
-                    last_ms: Some(1),
-                    timestamp_ties: 0,
-                    gaps_over_hour: 0,
-                    correction_records: 0,
-                    quarantine_records: 0,
-                    load_error: None,
-                }],
-                expected_months: 1,
-                coverage: "complete".into(),
-                structural_valid: true,
-                gates: Gates::pending(),
-                structural_evidence: vec!["structural".into()],
-                review_state: None,
-                eligible_for_research: false,
-            }],
-            identity: "0".repeat(64),
-            limitations: LIMITATIONS.into(),
-        };
-        catalog.bind_assertions(
-            "dataset-1",
-            "receipt-1",
-            GateDecisions {
-                calendar: Gate::Accepted,
-                profile: Gate::Accepted,
-                legal: Gate::Accepted,
-                scientific: Gate::Accepted,
-            },
-            vec!["legal+scientific evidence".into()],
-        );
+        let mut catalog = one_instrument_catalog();
+        let identity = catalog.identity.clone();
+        catalog
+            .bind_assertions(
+                &identity,
+                "receipt-1",
+                GateDecisions {
+                    calendar: Gate::Accepted,
+                    profile: Gate::Accepted,
+                    legal: Gate::Accepted,
+                    scientific: Gate::Accepted,
+                },
+                vec!["legal+scientific evidence".into()],
+            )
+            .unwrap();
         assert!(catalog.instruments[0].eligible_for_research);
         assert_eq!(
             catalog.instruments[0]
@@ -664,62 +698,51 @@ mod tests {
                 .legal
                 .dataset_identity
                 .as_deref(),
-            Some("dataset-1")
+            Some(identity.as_str())
         );
         assert_eq!(
             catalog.instruments[0].gates.legal.receipt.as_deref(),
             Some("receipt-1")
         );
         assert_eq!(catalog.instruments[0].gates.legal.evidence.len(), 1);
-        catalog.bind_assertions(
-            "dataset-1",
-            "receipt-1",
-            GateDecisions {
-                calendar: Gate::Accepted,
-                profile: Gate::Accepted,
-                legal: Gate::Pending,
-                scientific: Gate::Accepted,
-            },
-            vec![],
-        );
+        catalog
+            .bind_assertions(
+                &identity,
+                "receipt-1",
+                GateDecisions {
+                    calendar: Gate::Accepted,
+                    profile: Gate::Accepted,
+                    legal: Gate::Pending,
+                    scientific: Gate::Accepted,
+                },
+                vec![],
+            )
+            .unwrap();
         assert!(!catalog.instruments[0].eligible_for_research);
+        // A mismatched dataset identity is refused.
+        assert!(
+            catalog
+                .bind_assertions(
+                    &"b".repeat(64),
+                    "receipt-1",
+                    GateDecisions {
+                        calendar: Gate::Accepted,
+                        profile: Gate::Accepted,
+                        legal: Gate::Accepted,
+                        scientific: Gate::Accepted,
+                    },
+                    vec!["evidence".into()],
+                )
+                .is_err()
+        );
     }
 
     #[test]
     fn bind_review_updates_gates_and_keeps_legal_pending() {
         use crate::data_review::{self, Area, Assessment, Decision, Request};
-        let mut catalog = Catalog {
-            version: VERSION.into(),
-            instruments: vec![InstrumentStatus {
-                instrument: "EURUSD".into(),
-                months: vec![PartitionStatus {
-                    instrument: "EURUSD".into(),
-                    year: 2025,
-                    month: 1,
-                    state: PartitionState::Verified,
-                    dataset_hash: Some("d".into()),
-                    source_sha256: Some("a".repeat(64)),
-                    parquet_sha256: Some("b".repeat(64)),
-                    rows: 1,
-                    first_ms: Some(0),
-                    last_ms: Some(1),
-                    timestamp_ties: 0,
-                    gaps_over_hour: 0,
-                    correction_records: 0,
-                    quarantine_records: 0,
-                    load_error: None,
-                }],
-                expected_months: 1,
-                coverage: "complete".into(),
-                structural_valid: true,
-                gates: Gates::pending(),
-                structural_evidence: vec!["structural".into()],
-                review_state: None,
-                eligible_for_research: false,
-            }],
-            identity: "0".repeat(64),
-            limitations: LIMITATIONS.into(),
-        };
+        let mut catalog = one_instrument_catalog();
+        let identity = catalog.identity.clone();
+        let catalog_hash = crate::data::hash(&catalog.instruments).unwrap();
         let assessment = |area: Area| Assessment {
             area,
             decision: Decision::AcceptedAssertion,
@@ -727,8 +750,8 @@ mod tests {
             evidence_text: "evidence".into(),
         };
         let report = data_review::Report::create(Request {
-            catalog_identity: "0".repeat(64),
-            catalog_hash: "0".repeat(64),
+            catalog_identity: identity.clone(),
+            catalog_hash,
             reviewer: "reviewer".into(),
             assessments: [
                 assessment(Area::Source),
@@ -755,7 +778,7 @@ mod tests {
                 .calendar
                 .dataset_identity
                 .as_deref(),
-            Some("0000000000000000000000000000000000000000000000000000000000000000")
+            Some(identity.as_str())
         );
         assert_eq!(
             catalog.instruments[0].gates.calendar.receipt.as_deref(),
@@ -764,8 +787,8 @@ mod tests {
         assert!(catalog.instruments[0].structural_evidence.len() >= 3);
     }
 
-    fn one_instrument_catalog(identity: &str) -> Catalog {
-        Catalog {
+    fn one_instrument_catalog() -> Catalog {
+        let mut catalog = Catalog {
             version: VERSION.into(),
             instruments: vec![InstrumentStatus {
                 instrument: "EURUSD".into(),
@@ -794,9 +817,11 @@ mod tests {
                 review_state: None,
                 eligible_for_research: false,
             }],
-            identity: identity.into(),
+            identity: String::new(),
             limitations: LIMITATIONS.into(),
-        }
+        };
+        catalog.identity = catalog_identity(&catalog.instruments).unwrap();
+        catalog
     }
 
     #[test]
@@ -813,7 +838,9 @@ mod tests {
     #[test]
     fn bind_review_refuses_forged_or_tampered_report() {
         use crate::data_review::{self, Area, Assessment, Decision, Request};
-        let mut catalog = one_instrument_catalog(&"0".repeat(64));
+        let mut catalog = one_instrument_catalog();
+        let identity = catalog.identity.clone();
+        let catalog_hash = crate::data::hash(&catalog.instruments).unwrap();
         let assessment = |area: Area| Assessment {
             area,
             decision: Decision::AcceptedAssertion,
@@ -822,8 +849,8 @@ mod tests {
         };
         let make = || {
             data_review::Report::create(Request {
-                catalog_identity: "0".repeat(64),
-                catalog_hash: "0".repeat(64),
+                catalog_identity: identity.clone(),
+                catalog_hash: catalog_hash.clone(),
                 reviewer: "reviewer".into(),
                 assessments: [
                     assessment(Area::Source),
@@ -845,6 +872,65 @@ mod tests {
         wrong_identity.record.request.catalog_identity = "1".repeat(64);
         wrong_identity.hash = crate::data::hash(&wrong_identity.record).unwrap();
         assert!(catalog.bind_review(&wrong_identity).is_err());
+        let mut wrong_catalog_hash = make();
+        wrong_catalog_hash.record.request.catalog_hash = "f".repeat(64);
+        wrong_catalog_hash.hash = crate::data::hash(&wrong_catalog_hash.record).unwrap();
+        assert!(catalog.bind_review(&wrong_catalog_hash).is_err());
+    }
+
+    #[test]
+    fn rejected_review_blocks_eligibility() {
+        use crate::data_review::{self, Area, Assessment, Decision, Request};
+        let mut catalog = one_instrument_catalog();
+        let identity = catalog.identity.clone();
+        let catalog_hash = crate::data::hash(&catalog.instruments).unwrap();
+        let accepted = |area: Area| Assessment {
+            area,
+            decision: Decision::AcceptedAssertion,
+            explanation: "accepted".into(),
+            evidence_text: "evidence".into(),
+        };
+        let rejected = |area: Area| Assessment {
+            area,
+            decision: Decision::Rejected,
+            explanation: "rejected".into(),
+            evidence_text: "evidence".into(),
+        };
+        let report = data_review::Report::create(Request {
+            catalog_identity: identity.clone(),
+            catalog_hash,
+            reviewer: "reviewer".into(),
+            assessments: [
+                accepted(Area::Source),
+                accepted(Area::Profile),
+                accepted(Area::Calendar),
+                rejected(Area::Quality),
+                accepted(Area::Coverage),
+            ],
+        })
+        .unwrap();
+        assert_eq!(report.state, data_review::State::Rejected);
+        catalog.bind_review(&report).unwrap();
+        catalog
+            .bind_assertions(
+                &identity,
+                "receipt",
+                GateDecisions {
+                    calendar: Gate::Accepted,
+                    profile: Gate::Accepted,
+                    legal: Gate::Accepted,
+                    scientific: Gate::Accepted,
+                },
+                vec!["evidence".into()],
+            )
+            .unwrap();
+        assert!(catalog.instruments[0].gates.accepted_all());
+        assert_eq!(
+            catalog.instruments[0].review_state,
+            Some(data_review::State::Rejected)
+        );
+        assert!(!catalog.instruments[0].eligible_for_research);
+        catalog.verify().unwrap();
     }
 
     #[test]

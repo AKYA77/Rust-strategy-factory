@@ -78,4 +78,44 @@ fn real_corpus_end_to_end() {
     let again =
         historical_corpus::register(catalog_root, output, "EURUSD", EXPECTED_MONTHS).unwrap();
     assert_eq!(again.identity, spec.identity);
+
+    // A truncated chunk inventory must be refused even if the identity is recomputed.
+    let mut truncated = spec.clone();
+    truncated.months[0].chunk_files.pop();
+    truncated.months[0].chunk_hashes.pop();
+    truncated.identity =
+        historical_corpus::identity(&truncated.instrument, &truncated.profile, &truncated.months)
+            .unwrap();
+    assert!(historical_corpus::verify(&truncated).is_err());
+}
+
+#[test]
+fn catalog_refuses_foreign_receipt() {
+    let catalog_root = Path::new("/var/lib/hermes-factory");
+    let output = Path::new("/root/workspace/historical-migration-output/full-100k");
+    if !catalog_root.join("catalog").is_dir() || !output.is_dir() {
+        eprintln!("skipping real catalog foreign-receipt check: data absent");
+        return;
+    }
+    let tmp = std::env::temp_dir().join(format!("rsf-catalog-foreign-{}", std::process::id()));
+    let dir = tmp.join("EURUSD-202501");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::copy(
+        output.join("AUDUSD-202501/manifest.json"),
+        dir.join("manifest.json"),
+    )
+    .unwrap();
+    let status =
+        historical_catalog::scan_instrument(catalog_root, &tmp, "EURUSD", EXPECTED_MONTHS).unwrap();
+    let january = status
+        .months
+        .iter()
+        .find(|m| m.year == 2025 && m.month == 1)
+        .unwrap();
+    assert_eq!(
+        january.state,
+        rust_strategy_factory::historical_catalog::PartitionState::LoadFailure
+    );
+    assert!(!status.structural_valid);
+    let _ = std::fs::remove_dir_all(&tmp);
 }

@@ -15,7 +15,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-pub const VERSION: &str = "historical-monthly-corpus-v1";
+pub const VERSION: &str = "historical-monthly-corpus-v2";
 /// 2025-01 through 2026-10 for the eight canonical instruments.
 pub const EXPECTED_MONTHS: usize = 22;
 const LIMITATIONS: &str = "Aggregate multi-month corpus over independently verified monthly native sources. Aggregate identity is not source approval: no calendar completeness, broker/profile approval, licensing or scientific eligibility is established. Month boundaries are explicit; per-month source identities and provenance remain distinct. Sequence numbers restart at each month and are not globally increasing across months.";
@@ -33,6 +33,7 @@ pub struct MonthlySource {
     pub first_ms: i64,
     pub last_ms: i64,
     pub output_dir: String,
+    pub parquet_path: String,
     pub chunk_files: Vec<String>,
     pub chunk_hashes: Vec<String>,
 }
@@ -50,6 +51,12 @@ pub struct HistoricalCorpus {
 
 fn month_index(year: u32, month: u32) -> u64 {
     year as u64 * 12 + month as u64
+}
+
+/// Exact source binding: the chunk's source description must contain the month's dataset
+/// hash as a whole field, not as a substring of a longer value.
+fn source_binds(description: &str, dataset_hash: &str) -> bool {
+    description.split(':').any(|part| part == dataset_hash)
 }
 
 /// Refuse missing, overlapping, ambiguous or non-contiguous months.
@@ -106,6 +113,7 @@ pub fn identity(instrument: &str, profile: &Profile, months: &[MonthlySource]) -
             .iter()
             .map(|m| {
                 (
+                    &m.instrument,
                     m.year,
                     m.month,
                     &m.dataset_hash,
@@ -114,6 +122,9 @@ pub fn identity(instrument: &str, profile: &Profile, months: &[MonthlySource]) -
                     m.rows,
                     m.first_ms,
                     m.last_ms,
+                    &m.parquet_path,
+                    &m.output_dir,
+                    &m.chunk_files,
                     &m.chunk_hashes,
                 )
             })
@@ -150,6 +161,7 @@ pub fn register(
             || receipt.source.source_sha256 != partition.source_sha256
             || receipt.source.rows != partition.rows
             || receipt.source.instrument != instrument
+            || receipt.source.parquet_path != partition.parquet_path
             || receipt.profile.symbol != instrument
         {
             return Err("monthly migration receipt does not match the canonical plan".into());
@@ -169,6 +181,7 @@ pub fn register(
             first_ms: receipt.first_ms,
             last_ms: receipt.last_ms,
             output_dir: dir.to_string_lossy().to_string(),
+            parquet_path: partition.parquet_path.clone(),
             chunk_files: receipt.chunks.iter().map(|c| c.file.clone()).collect(),
             chunk_hashes: receipt
                 .chunks
@@ -200,12 +213,17 @@ pub fn verify(spec: &HistoricalCorpus) -> Result<()> {
     {
         return Err("invalid historical corpus specification".into());
     }
-    validate_months(&spec.months, spec.months.len())?;
+    validate_months(&spec.months, EXPECTED_MONTHS)?;
     for month in &spec.months {
+        if month.instrument != spec.instrument {
+            return Err("historical corpus month instrument mismatch".into());
+        }
         let dir = Path::new(&month.output_dir);
         let receipt = historical_migration::verify_output(dir, None)?;
         if receipt.source.dataset_hash != month.dataset_hash
             || receipt.source.source_sha256 != month.source_sha256
+            || receipt.source.parquet_sha256 != month.parquet_sha256
+            || receipt.source.parquet_path != month.parquet_path
             || receipt.source.rows != month.rows
             || receipt.first_ms != month.first_ms
             || receipt.last_ms != month.last_ms
@@ -213,11 +231,41 @@ pub fn verify(spec: &HistoricalCorpus) -> Result<()> {
         {
             return Err("historical corpus month receipt mismatch".into());
         }
+        if receipt.chunks.len() != month.chunk_files.len()
+            || receipt
+                .chunks
+                .iter()
+                .map(|c| &c.file)
+                .ne(month.chunk_files.iter())
+            || receipt
+                .chunks
+                .iter()
+                .map(|c| &c.dataset_hash)
+                .ne(month.chunk_hashes.iter())
+        {
+            return Err("historical corpus chunk inventory mismatch".into());
+        }
         for (file, hash) in month.chunk_files.iter().zip(&month.chunk_hashes) {
             let dataset = native::read(&dir.join(file))?;
             if data::hash(&dataset)? != *hash {
                 return Err("historical corpus chunk hash mismatch".into());
             }
+        }
+    }
+    Ok(())
+}
+
+/// Source-bound verification: every monthly chunk must equal the canonical legacy Parquet
+/// prefix, not just its own receipt. Expensive; use for acceptance, not repeated scans.
+pub fn verify_bound(spec: &HistoricalCorpus) -> Result<()> {
+    verify(spec)?;
+    for month in &spec.months {
+        let receipt = historical_migration::verify_output(
+            Path::new(&month.output_dir),
+            Some(Path::new(&month.parquet_path)),
+        )?;
+        if receipt.source.dataset_hash != month.dataset_hash || receipt.source.rows != month.rows {
+            return Err("historical corpus source-bound receipt mismatch".into());
         }
     }
     Ok(())
@@ -233,6 +281,9 @@ pub fn visit_month<F: FnMut(&data::Dataset) -> Result<()>>(
         .months
         .get(index)
         .ok_or("historical corpus month index out of range")?;
+    if month.chunk_files.len() != month.chunk_hashes.len() {
+        return Err("historical corpus chunk inventory mismatch".into());
+    }
     let dir = Path::new(&month.output_dir);
     for (file, hash) in month.chunk_files.iter().zip(&month.chunk_hashes) {
         let dataset = native::read(&dir.join(file))?;
@@ -324,7 +375,7 @@ pub fn audit(spec: &HistoricalCorpus) -> Result<AuditReport> {
             if data::hash(&dataset)? != *hash || dataset.profile != spec.profile {
                 return Err("historical corpus chunk mismatch during audit".into());
             }
-            if !dataset.manifest.source.contains(&month.dataset_hash) {
+            if !source_binds(&dataset.manifest.source, &month.dataset_hash) {
                 return Err("historical corpus source attribution mismatch during audit".into());
             }
             if dataset.ticks[0].sequence != expected_sequence {
@@ -396,6 +447,7 @@ mod tests {
             first_ms: first,
             last_ms: last,
             output_dir: format!("/tmp/EURUSD-{year:04}{month:02}"),
+            parquet_path: format!("/tmp/EURUSD-{year:04}{month:02}.parquet"),
             chunk_files: vec!["chunk-000000.rsf".into()],
             chunk_hashes: vec!["c".repeat(64)],
         }

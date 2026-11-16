@@ -545,6 +545,17 @@ fn run(args: &[String]) -> Result<()> {
                 "rows": corpus.months.iter().map(|m| m.rows).sum::<u64>(),
             }))
         }
+        ["historical-corpus-verify-bound", spec] => {
+            let corpus: rust_strategy_factory::historical_corpus::HistoricalCorpus =
+                read_json(spec)?;
+            rust_strategy_factory::historical_corpus::verify_bound(&corpus)?;
+            print(&serde_json::json!({
+                "identity": corpus.identity,
+                "instrument": corpus.instrument,
+                "months": corpus.months.len(),
+                "source_bound": true,
+            }))
+        }
         [
             "historical-corpus-audit",
             root,

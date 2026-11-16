@@ -1306,6 +1306,10 @@ pub fn verify_receipt_only(dir: &Path) -> Result<Receipt> {
     if !path.is_file() {
         return Err("migration receipt missing; output is partial".into());
     }
+    const MAX_RECEIPT_BYTES: u64 = 1 << 20;
+    if fs::metadata(&path).map_err(err)?.len() > MAX_RECEIPT_BYTES {
+        return Err("migration receipt exceeds size bound".into());
+    }
     let bytes = fs::read(&path).map_err(err)?;
     let receipt: Receipt = serde_json::from_slice(&bytes).map_err(err)?;
     if receipt.version != RECEIPT_VERSION {
@@ -1512,6 +1516,9 @@ pub fn plan(root: &Path) -> Result<Vec<Partition>> {
         ) else {
             continue;
         };
+        if !(1..=4000).contains(&year) || !(1..=12).contains(&month) {
+            continue;
+        }
         archive_meta.insert(
             sha.to_string(),
             (instrument.to_string(), year as u32, month as u32),
