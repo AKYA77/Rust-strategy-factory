@@ -136,16 +136,19 @@ completeness, profile approval, source licensing or research eligibility.
 ## Integrity guarantees
 
 - **Requested-scope binding.** Reusing a completed directory re-verifies the exact requested
-  source bytes (SHA-256), the trusted manifest identity, the profile and the receipt version
-  before returning it. A self-consistent existing receipt is never accepted for a different
-  requested source or profile.
+  source bytes (SHA-256), the trusted manifest identity (including fidelity, source precision
+  and provenance), the import evidence, the profile and the receipt version before returning
+  it. A self-consistent existing receipt is never accepted for a different requested source or
+  profile.
 - **Source-prefix equivalence.** On resume, every adopted chunk is compared tick-by-tick with
   the legacy source rows it claims to represent (timestamp, sequence, bid, ask). A chunk whose
   prices were changed and consistently rehashed is refused. `historical-verify <dir> <source>`
   performs the same full equivalence check.
 - **Bounded decoded memory.** Each untrusted Parquet row group is preflighted against an
-  explicit decoded-row cap (65,536) and a decoded string-byte budget (256 MiB) before any
-  allocation; a compressed-file ceiling alone is not treated as a memory bound.
+  explicit decoded-row cap (65,536). Columns are decoded in bounded 8,192-row windows and the
+  decoded string-byte budget (256 MiB) is enforced after every window, so peak decoded string
+  allocation is bounded by the budget plus one window rather than by the untrusted group size.
+  A compressed-file ceiling alone is not treated as a memory bound.
 - **Corpus admission.** Chunks are capped at 100,000 events so each monthly partition is
   admissible to `ordered-native-corpus-v1`. Each month remains a distinct single-source
   corpus: per-partition source descriptions differ, so the corpus loader refuses to merge

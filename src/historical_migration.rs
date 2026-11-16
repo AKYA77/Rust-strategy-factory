@@ -48,6 +48,9 @@ const GAP_MS: i64 = 3_600_000;
 /// file-size ceiling does not bound decoded allocation, so these are enforced explicitly.
 const MAX_ROW_GROUP_ROWS: usize = 65_536;
 const MAX_GROUP_STRING_BYTES: u64 = 256 * 1024 * 1024;
+/// Read columns in bounded windows so decoded allocation is capped before the string-byte
+/// budget is exceeded, rather than materializing an entire untrusted group first.
+const MAX_WINDOW_ROWS: usize = 8_192;
 
 /// Trusted legacy catalog manifest. The 24-field shape is the canonical `data/v2` shape;
 /// alternate or incomplete legacy manifests are refused rather than guessed at.
@@ -81,7 +84,7 @@ pub struct LegacyManifest {
 }
 
 /// Quarantine and correction evidence extracted from a legacy import receipt.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ImportEvidence {
     pub corrected_content_sha256: String,
@@ -339,24 +342,30 @@ fn verify_schema(meta: &FileMetaData) -> Result<()> {
 }
 
 fn read_int64_column(group: &dyn RowGroupReader, index: usize, rows: usize) -> Result<Vec<i64>> {
-    let mut def = Vec::with_capacity(rows);
+    let mut column = match group.get_column_reader(index).map_err(err)? {
+        ColumnReader::Int64ColumnReader(column) => column,
+        _ => return Err(format!("legacy column {index} physical type mismatch")),
+    };
     let mut values = Vec::with_capacity(rows);
-    if let ColumnReader::Int64ColumnReader(mut column) =
-        group.get_column_reader(index).map_err(err)?
-    {
+    while values.len() < rows {
+        let window = (rows - values.len()).min(MAX_WINDOW_ROWS);
+        let mut def = Vec::new();
+        let mut chunk = Vec::new();
         let (_, values_read, levels) = column
-            .read_records(rows, Some(&mut def), None, &mut values)
+            .read_records(window, Some(&mut def), None, &mut chunk)
             .map_err(err)?;
-        if levels != rows || values_read != rows || def.len() != rows || def.iter().any(|d| *d != 1)
+        if levels != window
+            || values_read != window
+            || def.len() != window
+            || def.iter().any(|d| *d != 1)
         {
             return Err(format!(
                 "legacy column {index} level/value count or null mismatch"
             ));
         }
-        Ok(values)
-    } else {
-        Err(format!("legacy column {index} physical type mismatch"))
+        values.extend_from_slice(&chunk);
     }
+    Ok(values)
 }
 
 fn read_string_column(
@@ -365,34 +374,42 @@ fn read_string_column(
     rows: usize,
     budget: &mut u64,
 ) -> Result<Vec<String>> {
-    let mut def = Vec::with_capacity(rows);
+    let mut column = match group.get_column_reader(index).map_err(err)? {
+        ColumnReader::ByteArrayColumnReader(column) => column,
+        _ => return Err(format!("legacy column {index} physical type mismatch")),
+    };
     let mut values = Vec::with_capacity(rows);
-    if let ColumnReader::ByteArrayColumnReader(mut column) =
-        group.get_column_reader(index).map_err(err)?
-    {
+    while values.len() < rows {
+        let window = (rows - values.len()).min(MAX_WINDOW_ROWS);
+        let mut def = Vec::new();
+        let mut chunk = Vec::new();
         let (_, values_read, levels) = column
-            .read_records(rows, Some(&mut def), None, &mut values)
+            .read_records(window, Some(&mut def), None, &mut chunk)
             .map_err(err)?;
-        if levels != rows || values_read != rows || def.len() != rows || def.iter().any(|d| *d != 1)
+        if levels != window
+            || values_read != window
+            || def.len() != window
+            || def.iter().any(|d| *d != 1)
         {
             return Err(format!(
                 "legacy column {index} level/value count or null mismatch"
             ));
         }
-        let bytes = values.iter().map(|value| value.len() as u64).sum::<u64>();
+        let bytes = chunk.iter().map(|value| value.len() as u64).sum::<u64>();
         if bytes > *budget {
             return Err(format!(
                 "legacy column {index} exceeds the decoded string byte budget"
             ));
         }
         *budget -= bytes;
-        values
-            .iter()
-            .map(|value| value.as_utf8().map(str::to_string).map_err(err))
-            .collect()
-    } else {
-        Err(format!("legacy column {index} physical type mismatch"))
+        values.extend(
+            chunk
+                .iter()
+                .map(|value| value.as_utf8().map(str::to_string).map_err(err))
+                .collect::<Result<Vec<_>>>()?,
+        );
     }
+    Ok(values)
 }
 
 fn read_group(group: &dyn RowGroupReader) -> Result<GroupColumns> {
@@ -733,6 +750,9 @@ fn verify_reuse_scope(config: &Config, receipt: &Receipt) -> Result<()> {
             || receipt.source.source_id != manifest.source_id
             || receipt.source.ingest_batch_id != manifest.ingest_batch_id
             || receipt.source.quality_status != manifest.quality_status
+            || receipt.source.fidelity != manifest.fidelity
+            || receipt.source.source_precision != manifest.source_precision
+            || receipt.source.provenance != manifest.provenance
             || receipt.quote_stream_sha256 != manifest.quote_stream_sha256
             || receipt.source.first_ns != manifest.first_ns
             || receipt.source.latest_verified_ns != manifest.latest_verified_ns)
@@ -740,6 +760,9 @@ fn verify_reuse_scope(config: &Config, receipt: &Receipt) -> Result<()> {
         return Err(
             "requested legacy manifest identity does not match the completed migration".into(),
         );
+    }
+    if receipt.source.import_evidence != config.import_evidence {
+        return Err("requested import evidence does not match the completed migration".into());
     }
     Ok(())
 }
@@ -1815,6 +1838,81 @@ mod tests {
         }
     }
 
+    /// Test-only quote scan that reads columns directly, bypassing the row-group cap so a
+    /// correct manifest can be built for an oversized-group refusal test.
+    fn scan_quote_stream_unchecked(path: &Path) -> Result<QuoteScan> {
+        let reader = open_reader(path)?;
+        verify_schema(reader.metadata().file_metadata())?;
+        let mut hasher = Sha256::new();
+        let mut meta: Option<Meta> = None;
+        let mut rows = 0u64;
+        let mut first_ns = 0i64;
+        let mut last_ns = 0i64;
+        for index in 0..reader.metadata().num_row_groups() {
+            let group = reader.get_row_group(index).map_err(err)?;
+            let n = group.metadata().num_rows() as usize;
+            let mut budget = u64::MAX;
+            let instrument = read_string_column(group.as_ref(), 0, n, &mut budget)?;
+            let ts = read_int64_column(group.as_ref(), 1, n)?;
+            let bid = read_int64_column(group.as_ref(), 2, n)?;
+            let ask = read_int64_column(group.as_ref(), 3, n)?;
+            let scale = read_int64_column(group.as_ref(), 4, n)?;
+            let source = read_string_column(group.as_ref(), 5, n, &mut budget)?;
+            let batch = read_string_column(group.as_ref(), 6, n, &mut budget)?;
+            let order = read_int64_column(group.as_ref(), 7, n)?;
+            let precision = read_string_column(group.as_ref(), 8, n, &mut budget)?;
+            let _quality = read_string_column(group.as_ref(), 9, n, &mut budget)?;
+            for i in 0..n {
+                if let Some(current) = &meta {
+                    let row = Meta {
+                        instrument: instrument[i].clone(),
+                        scale: scale[i],
+                        source: source[i].clone(),
+                        batch: batch[i].clone(),
+                        precision: precision[i].clone(),
+                    };
+                    if !current.same(&row) {
+                        return Err("legacy Parquet mixes source/instrument units".into());
+                    }
+                } else {
+                    let row = Meta {
+                        instrument: instrument[i].clone(),
+                        scale: scale[i],
+                        source: source[i].clone(),
+                        batch: batch[i].clone(),
+                        precision: precision[i].clone(),
+                    };
+                    hasher.update(
+                        serde_json::to_vec(&StreamMetadata {
+                            batch: &row.batch,
+                            instrument: &row.instrument,
+                            precision: &row.precision,
+                            scale: row.scale,
+                            source: &row.source,
+                        })
+                        .map_err(err)?,
+                    );
+                    meta = Some(row);
+                    first_ns = ts[i];
+                }
+                hasher.update(ts[i].to_be_bytes());
+                hasher.update(bid[i].to_be_bytes());
+                hasher.update(ask[i].to_be_bytes());
+                hasher.update(order[i].to_be_bytes());
+                last_ns = ts[i];
+                rows += 1;
+            }
+        }
+        let meta = meta.ok_or("empty legacy Parquet")?;
+        Ok(QuoteScan {
+            hash: hex(&hasher.finalize()),
+            rows,
+            first_ns,
+            last_ns,
+            meta,
+        })
+    }
+
     fn write_manifest(path: &Path, scan: &QuoteScan, parquet_sha256: &str) -> Result<()> {
         write_manifest_identity(
             path,
@@ -2202,19 +2300,9 @@ mod tests {
         let parquet = dir.join("legacy.parquet");
         let count = MAX_ROW_GROUP_ROWS + 1;
         write_legacy(&parquet, &rows(count), count).unwrap();
-        let scan = QuoteScan {
-            hash: "0".repeat(64),
-            rows: count as u64,
-            first_ns: 0,
-            last_ns: 0,
-            meta: Meta {
-                instrument: "NZDUSD".into(),
-                scale: 1_000_000,
-                source: "HistData.com".into(),
-                batch: "test-batch".into(),
-                precision: "millisecond".into(),
-            },
-        };
+        // Build a correct manifest without the row-group cap so the refusal is specifically
+        // the decoded-row preflight, not a later quote-stream mismatch.
+        let scan = scan_quote_stream_unchecked(&parquet).unwrap();
         let manifest = dir.join("manifest.json");
         write_manifest(&manifest, &scan, &sha256_file(&parquet).unwrap()).unwrap();
         let output = dir.join("output");
@@ -2222,9 +2310,35 @@ mod tests {
             .unwrap()
             .with_manifest(&manifest)
             .unwrap();
+        let error = convert(&config).unwrap_err();
         assert!(
-            convert(&config).is_err(),
-            "oversized untrusted row group was not refused"
+            error.contains("decoded-row budget"),
+            "oversized untrusted row group was not refused by the row budget: {error}"
+        );
+    }
+
+    #[test]
+    fn refuses_string_column_beyond_decoded_byte_budget() {
+        let dir = temp_dir("bigstrings");
+        let parquet = dir.join("legacy.parquet");
+        let mut rows = rows(MAX_ROW_GROUP_ROWS);
+        let big: &'static str = Box::leak("x".repeat(5_000).into_boxed_str());
+        for row in &mut rows {
+            row.source = big;
+        }
+        write_legacy(&parquet, &rows, MAX_ROW_GROUP_ROWS).unwrap();
+        let scan = scan_quote_stream_unchecked(&parquet).unwrap();
+        let manifest = dir.join("manifest.json");
+        write_manifest(&manifest, &scan, &sha256_file(&parquet).unwrap()).unwrap();
+        let output = dir.join("output");
+        let config = Config::new(&parquet, &output, migration_profile("NZDUSD"))
+            .unwrap()
+            .with_manifest(&manifest)
+            .unwrap();
+        let error = convert(&config).unwrap_err();
+        assert!(
+            error.contains("decoded string byte budget"),
+            "oversized decoded string column was not refused: {error}"
         );
     }
 
