@@ -1,0 +1,384 @@
+{
+  "class": "SYNTHETIC_DEVELOPMENT_PIPELINE_ONLY",
+  "host": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "available_parallelism": 3
+  },
+  "quotes": 100000,
+  "max_new_chunks_per_round": 1,
+  "workers": 1,
+  "strategies": 1,
+  "repetitions": 5,
+  "cache_scope": "Fresh worker processes and registries; OS cache uncontrolled, no physical-cold claim. Cached route checked separately and excluded from measured first-route timing/CPU/RSS.",
+  "measurement_scope": "Each timed pipeline includes actual corpus-batch CLI and registry integrity CLI. CPU and RSS are child-resource observations in a fresh worker, not total host/service memory.",
+  "versions": {
+    "before": {
+      "binary_sha256": "29efcad9d63e4d7cf27436df5708d1feba8118f03889c60e68756ca9dba57a4c",
+      "version": {
+        "compute_revision": "compute-blake3:fd5799006a21d67644aa3abe0c54ab5e462d259dce7c144413104cd4f8a7c6ae",
+        "engine": "ordered-l1-v6-frozen-atr-stops",
+        "indicators": "causal-primitives-v4-outward-atr",
+        "package": "0.1.0",
+        "signals": "closed-publication-next-event-v3-scoped-features",
+        "software_status": "SOFTWARE_INCOMPLETE"
+      }
+    },
+    "after": {
+      "binary_sha256": "aa1997837afa7f63bbb1a717c03962aa7d97954aec67fb140e99048cb1716faf",
+      "version": {
+        "compute_revision": "compute-blake3:9784c2390b3156f13347af08f94a17243d24a92f41871389c6a1cb16f91df240",
+        "engine": "ordered-l1-v6-frozen-atr-stops",
+        "indicators": "causal-primitives-v4-outward-atr",
+        "package": "0.1.0",
+        "signals": "closed-publication-next-event-v3-scoped-features",
+        "software_status": "SOFTWARE_INCOMPLETE"
+      }
+    }
+  },
+  "records": [
+    {
+      "role": "before",
+      "elapsed_ms": 367.738113,
+      "child_user_seconds": 0.320775,
+      "child_system_seconds": 0.020697,
+      "peak_pipeline_child_rss_kib": 27252,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1
+      },
+      "cached_preparation": {
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 0
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 347.651063,
+      "child_user_seconds": 0.29003799999999996,
+      "child_system_seconds": 0.031359,
+      "peak_pipeline_child_rss_kib": 26940,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "account_events_replayed": 50000,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "trusted_prefix_events_skipped": 50000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 0
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 382.751284,
+      "child_user_seconds": 0.274593,
+      "child_system_seconds": 0.072471,
+      "peak_pipeline_child_rss_kib": 26868,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "account_events_replayed": 50000,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "trusted_prefix_events_skipped": 50000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 1
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 357.571801,
+      "child_user_seconds": 0.30555899999999997,
+      "child_system_seconds": 0.027663,
+      "peak_pipeline_child_rss_kib": 27252,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1
+      },
+      "cached_preparation": {
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 1
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 367.910765,
+      "child_user_seconds": 0.288977,
+      "child_system_seconds": 0.040974,
+      "peak_pipeline_child_rss_kib": 27140,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1
+      },
+      "cached_preparation": {
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 2
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 334.567065,
+      "child_user_seconds": 0.282762,
+      "child_system_seconds": 0.023705,
+      "peak_pipeline_child_rss_kib": 27128,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "account_events_replayed": 50000,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "trusted_prefix_events_skipped": 50000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 2
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 351.079271,
+      "child_user_seconds": 0.291192,
+      "child_system_seconds": 0.034504,
+      "peak_pipeline_child_rss_kib": 26968,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "account_events_replayed": 50000,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "trusted_prefix_events_skipped": 50000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 3
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 350.072184,
+      "child_user_seconds": 0.308569,
+      "child_system_seconds": 0.020103,
+      "peak_pipeline_child_rss_kib": 27268,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1
+      },
+      "cached_preparation": {
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 3
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 357.733573,
+      "child_user_seconds": 0.304428,
+      "child_system_seconds": 0.027842,
+      "peak_pipeline_child_rss_kib": 27204,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1
+      },
+      "cached_preparation": {
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 4
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 335.135358,
+      "child_user_seconds": 0.28249199999999997,
+      "child_system_seconds": 0.027437999999999997,
+      "peak_pipeline_child_rss_kib": 27020,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "account_events_replayed": 50000,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "trusted_prefix_events_skipped": 50000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 4
+    }
+  ],
+  "summaries": {
+    "before": {
+      "median_elapsed_ms": 357.733573,
+      "median_peak_pipeline_child_rss_kib": 27252
+    },
+    "after": {
+      "median_elapsed_ms": 347.651063,
+      "median_peak_pipeline_child_rss_kib": 26968
+    }
+  },
+  "limitations": "Small one-symbol synthetic workload; declared worker count is recorded, not an equal CPU-share claim. Repetitions are repeated measurements of the selected fixed strategies, not independent trials. No genuine data, source approval, qualification, production default or universal throughput/RSS gain is established.",
+  "source_baseline": "e16063713bd4c9f7891169bba11cf3df4eb78b3d",
+  "source_candidate": "codex/trusted-session-checkpoints; source manifests and binary/compute fingerprints retained in versions",
+  "interpretation": "Exact account work reduction is proven separately. This small synthetic one-job measurement has a slightly lower median but remains insufficient for a general throughput/RSS claim; full source IO verification is unchanged."
+}

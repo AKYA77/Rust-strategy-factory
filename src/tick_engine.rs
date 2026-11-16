@@ -895,6 +895,23 @@ pub struct CorpusRun<'a> {
     pub costs: &'a Costs,
     pub budget: CorpusBudget,
 }
+// Private process-local authority: never constructed from stored JSON. One slot per worker.
+struct TrustedCheckpoint {
+    experiment_id: String,
+    source_binding: String,
+    cursor: usize,
+    checkpoint_hash: String,
+    state: AccountState,
+    previous: Option<i64>,
+    events: u64,
+    conversions: crate::corpus::SequenceHash,
+}
+#[derive(Default)]
+struct CheckpointReuse {
+    checkpoint: Option<TrustedCheckpoint>,
+    advanced_events: u64,
+    skipped_events: u64,
+}
 struct ResumeControl<'a> {
     registry: &'a mut crate::storage::Registry,
     lease: &'a crate::storage::Lease,
@@ -927,6 +944,7 @@ pub fn advance_corpus(
             clock: &mut clock,
         }),
         None,
+        None,
     )
 }
 pub fn replay_corpus(
@@ -946,6 +964,7 @@ pub fn replay_corpus(
         },
         None,
         None,
+        None,
     )?
     .ok_or_else(|| "unexpected incomplete corpus replay".into())
 }
@@ -953,7 +972,13 @@ fn replay_corpus_internal(
     run: CorpusRun<'_>,
     mut control: Option<ResumeControl<'_>>,
     prepared: Option<&crate::corpus::Prepared>,
+    mut reuse: Option<&mut CheckpointReuse>,
 ) -> Result<Option<Replay>> {
+    let source_binding = if reuse.is_some() {
+        Some(corpus_source_binding(&run)?)
+    } else {
+        None
+    };
     let CorpusRun {
         base,
         spec,
@@ -1021,14 +1046,39 @@ fn replay_corpus_internal(
             .saturating_add(c.max_new_chunks)
             .min(spec.chunks.len())
     });
-    let mut events = 0u64;
-    let mut boundary = 0usize;
-    let mut state = AccountState::initial();
-    let mut previous = None;
-    let mut conversions = crate::corpus::SequenceHash::new();
+    let trusted = reuse
+        .as_mut()
+        .and_then(|r| r.checkpoint.take())
+        .filter(|t| {
+            saved.as_ref().is_some_and(|(record, hash)| {
+                t.cursor == old_cursor as usize
+                    && &t.checkpoint_hash == hash
+                    && t.experiment_id == record.experiment_id
+                    && source_binding.as_ref() == Some(&t.source_binding)
+            })
+        });
+    let resumed = trusted.is_some();
+    let (mut events, mut boundary, mut state, mut previous, mut conversions) = match trusted {
+        Some(t) => {
+            if let Some(r) = &mut reuse {
+                r.skipped_events = r
+                    .skipped_events
+                    .checked_add(t.events)
+                    .ok_or("checkpoint reuse counter overflow")?;
+            }
+            (t.events, t.cursor, t.state, t.previous, t.conversions)
+        }
+        None => (
+            0,
+            0,
+            AccountState::initial(),
+            None,
+            crate::corpus::SequenceHash::new(),
+        ),
+    };
     crate::corpus::visit_blocks(base, spec, |dataset| {
         let index = dataset.chunk_index;
-        if index >= stop {
+        if index >= stop || (resumed && index < old_cursor as usize) {
             return Ok(());
         }
         for tick in dataset.ticks {
@@ -1043,7 +1093,13 @@ fn replay_corpus_internal(
             {
                 return Err("corpus replay receipt budget exceeded".into());
             }
-            events += 1;
+            events = events.checked_add(1).ok_or("corpus event count overflow")?;
+            if let Some(r) = &mut reuse {
+                r.advanced_events = r
+                    .advanced_events
+                    .checked_add(1)
+                    .ok_or("checkpoint replay counter overflow")?;
+            }
             conversions.push(&fx)?;
             previous = Some(tick.timestamp_ms);
         }
@@ -1060,17 +1116,30 @@ fn replay_corpus_internal(
         Ok(())
     })?;
     if let Some(c) = &mut control {
+        let mut committed_hash = saved.as_ref().map(|(_, hash)| hash.clone());
         if boundary > old_cursor as usize {
             let payload = serde_json::json!({"version":"corpus-account-state-v1","corpus":spec.identity()?,"account":state,"previous_ms":previous,"events":events});
-            c.registry.save_replay_checkpoint(
+            committed_hash = Some(c.registry.save_replay_checkpoint(
                 c.lease,
                 (c.clock)(),
                 old_cursor,
                 boundary as i64,
                 payload,
-            )?;
+            )?);
         }
         if boundary < spec.chunks.len() {
+            if let Some(r) = &mut reuse {
+                r.checkpoint = Some(TrustedCheckpoint {
+                    experiment_id: c.lease.experiment_id.clone(),
+                    source_binding: source_binding.ok_or("missing checkpoint source binding")?,
+                    cursor: boundary,
+                    checkpoint_hash: committed_hash.ok_or("missing committed checkpoint hash")?,
+                    state,
+                    previous,
+                    events,
+                    conversions,
+                });
+            }
             return Ok(None);
         }
     }
@@ -1133,6 +1202,10 @@ pub struct CorpusPreparationStats {
     pub current_byte_checks: usize,
     /// Verification attempts using a cold no-frame inventory.
     pub inventory_byte_checks: usize,
+    /// Account transitions actually evaluated, including cold semantic prefix checks.
+    pub account_events_replayed: u64,
+    /// Prefix account transitions omitted using private worker-produced committed state.
+    pub trusted_prefix_events_skipped: u64,
     /// Candle objects, not bytes/RSS or OS-enforced memory.
     pub peak_retained_candles_per_worker: usize,
 }
@@ -1141,6 +1214,7 @@ struct WorkerPreparation {
     key_inventory: Option<(String, crate::corpus::SourceFacts)>,
     slot: Option<(String, crate::corpus::Prepared)>,
     stats: CorpusPreparationStats,
+    resume: CheckpointReuse,
 }
 impl WorkerPreparation {
     fn binding(run: &CorpusRun<'_>) -> Result<String> {
@@ -1237,8 +1311,16 @@ fn execute_corpus_step_prepared(
     if !(1..=64).contains(&max_new_chunks) || !(1..=86_400_000).contains(&lease_ms) {
         return Err("invalid corpus step/lease budget".into());
     }
+    let mut resume = std::mem::take(&mut preparation.resume);
     let key = preparation.key(&run)?;
     let id = registry.register(&key)?;
+    if resume
+        .checkpoint
+        .as_ref()
+        .is_some_and(|c| c.experiment_id != id)
+    {
+        resume.checkpoint = None;
+    }
     let control = registry.corpus_control(&id)?;
     if control != "running" {
         return Ok(CorpusProgress::Held {
@@ -1290,6 +1372,7 @@ fn execute_corpus_step_prepared(
             clock,
         }),
         Some(prepared),
+        Some(&mut resume),
     )? {
         None => {
             let cursor = registry
@@ -1298,12 +1381,19 @@ fn execute_corpus_step_prepared(
                 .0
                 .cursor;
             registry.yield_lease(&lease, clock())?;
+            preparation.stats.account_events_replayed += resume.advanced_events;
+            preparation.stats.trusted_prefix_events_skipped += resume.skipped_events;
+            resume.advanced_events = 0;
+            resume.skipped_events = 0;
+            preparation.resume = resume;
             Ok(CorpusProgress::Pending {
                 experiment_id: id,
                 cursor,
             })
         }
         Some(replay) => {
+            preparation.stats.account_events_replayed += resume.advanced_events;
+            preparation.stats.trusted_prefix_events_skipped += resume.skipped_events;
             let control = registry.corpus_control(&id)?;
             if control != "running" {
                 registry.yield_lease(&lease, clock())?;
@@ -1447,6 +1537,7 @@ pub struct CorpusBatchReport {
     pub failure_kinds: Vec<Option<crate::corpus_failure::Kind>>,
 }
 /// Invocation-local ownership of at most one immutable context per worker.
+/// Retains at most one private committed account per worker, within receipt reservations.
 /// No leases, threads, connections or eligibility survive a round through this object.
 #[derive(Default)]
 pub struct CorpusBatchSession {
@@ -1548,6 +1639,16 @@ fn execute_corpus_batch_session(
             .max()
             .ok_or("empty corpus batch")?,
         limits.max_parallel_candles,
+    );
+    // Retained account receipt vectors require the same worst-case reservation
+    // under cross-round reassignment as retained candle contexts.
+    session.constrain_retention(
+        workers,
+        runs.iter()
+            .map(|r| r.budget.max_receipts)
+            .max()
+            .ok_or("empty corpus batch")?,
+        limits.max_parallel_receipts,
     );
     let mut identities = std::collections::BTreeSet::new();
     let mut sources = std::collections::BTreeMap::new();
@@ -1673,6 +1774,9 @@ fn execute_corpus_batch_session(
                     preparation.reuses += stats.reuses;
                     preparation.current_byte_checks += stats.current_byte_checks;
                     preparation.inventory_byte_checks += stats.inventory_byte_checks;
+                    preparation.account_events_replayed += stats.account_events_replayed;
+                    preparation.trusted_prefix_events_skipped +=
+                        stats.trusted_prefix_events_skipped;
                     preparation.peak_retained_candles_per_worker = preparation
                         .peak_retained_candles_per_worker
                         .max(stats.peak_retained_candles_per_worker);
@@ -1752,6 +1856,99 @@ mod worker_preparation_tests {
             max_receipts: 10000,
         }
     }
+    #[test]
+    fn combined_warm_checkpoint_still_refuses_consumed_source_mutation_after_key_admission() {
+        for blocked in [false, true] {
+            let mut source = Source::new(if blocked {
+                "combined-admission-block"
+            } else {
+                "combined-admission-native"
+            });
+            let data = data::synthetic_fixture("EURUSD").unwrap();
+            let mut paths = Vec::new();
+            for (i, ticks) in data.ticks.chunks(data.ticks.len().div_ceil(2)).enumerate() {
+                let part = data::dataset(
+                    data.profile.clone(),
+                    ticks.to_vec(),
+                    &data.manifest.source,
+                    data.manifest.archive_hash.clone(),
+                    true,
+                )
+                .unwrap();
+                let path = source
+                    .root
+                    .join(format!("part-{i}.{}", if blocked { "rsfb" } else { "rsf" }));
+                if blocked {
+                    crate::blocked_native::write(&path, &part, 64).unwrap();
+                } else {
+                    native::write(&path, &part).unwrap();
+                }
+                paths.push(path);
+            }
+            source.spec = corpus::describe(&paths, 100000).unwrap();
+            let strategy = strategy();
+            let costs = Costs::default();
+            let budget = budget();
+            let run = || CorpusRun {
+                base: &source.root,
+                spec: &source.spec,
+                strategy: &strategy,
+                costs: &costs,
+                budget,
+            };
+            let mut registry =
+                crate::storage::Registry::open(&source.root.join("state.sqlite")).unwrap();
+            let mut cache = WorkerPreparation::default();
+            let first = execute_corpus_step_prepared(
+                &mut registry,
+                run(),
+                1,
+                60000,
+                &mut || 1000,
+                &mut cache,
+            )
+            .unwrap();
+            let CorpusProgress::Pending { experiment_id, .. } = first else {
+                panic!()
+            };
+            assert!(cache.resume.checkpoint.is_some());
+            let prior = registry
+                .replay_checkpoint(&experiment_id)
+                .unwrap()
+                .unwrap()
+                .1;
+            let mut calls = 0;
+            let error = execute_corpus_step_prepared(
+                &mut registry,
+                run(),
+                1,
+                60000,
+                &mut || {
+                    calls += 1;
+                    if calls == 2 {
+                        let mut bytes = fs::read(&paths[0]).unwrap();
+                        let last = bytes.len() - 1;
+                        bytes[last] ^= 1;
+                        fs::write(&paths[0], bytes).unwrap();
+                    }
+                    1001
+                },
+                &mut cache,
+            )
+            .unwrap_err();
+            assert!(error.contains("checksum"), "{error}");
+            assert_eq!(
+                registry
+                    .replay_checkpoint(&experiment_id)
+                    .unwrap()
+                    .unwrap()
+                    .1,
+                prior
+            );
+            assert!(registry.result(&experiment_id).unwrap().is_none());
+        }
+    }
+
     #[test]
     fn cold_inventory_never_grants_real_or_non_usd_execution_authority() {
         for (symbol, synthetic) in [("USDJPY", true), ("EURUSD", false)] {

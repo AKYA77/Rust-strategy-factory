@@ -1,0 +1,364 @@
+{
+  "class": "SYNTHETIC_DEVELOPMENT_PIPELINE_ONLY",
+  "host": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "available_parallelism": 3
+  },
+  "quotes": 100000,
+  "max_new_chunks_per_round": 1,
+  "workers": 2,
+  "strategies": 3,
+  "repetitions": 5,
+  "cache_scope": "Fresh worker processes and registries; OS cache uncontrolled, no physical-cold claim. Cached route checked separately and excluded from measured first-route timing/CPU/RSS.",
+  "measurement_scope": "Each timed pipeline includes actual corpus-batch CLI and registry integrity CLI. CPU and RSS are child-resource observations in a fresh worker, not total host/service memory.",
+  "versions": {
+    "before": {
+      "binary_sha256": "29efcad9d63e4d7cf27436df5708d1feba8118f03889c60e68756ca9dba57a4c",
+      "version": {
+        "compute_revision": "compute-blake3:fd5799006a21d67644aa3abe0c54ab5e462d259dce7c144413104cd4f8a7c6ae",
+        "engine": "ordered-l1-v6-frozen-atr-stops",
+        "indicators": "causal-primitives-v4-outward-atr",
+        "package": "0.1.0",
+        "signals": "closed-publication-next-event-v3-scoped-features",
+        "software_status": "SOFTWARE_INCOMPLETE"
+      }
+    },
+    "after": {
+      "binary_sha256": "cf302879b61d8f1e629a8c27529dbda78784b83c2220a0a2d75fb278351680e4",
+      "version": {
+        "compute_revision": "compute-blake3:83caa6d48e03c4f0ebc9cc9086a0d49412bdb8ec225d1d4c66b4b6827f4d0691",
+        "engine": "ordered-l1-v6-frozen-atr-stops",
+        "indicators": "causal-primitives-v4-outward-atr",
+        "package": "0.1.0",
+        "signals": "closed-publication-next-event-v3-scoped-features",
+        "software_status": "SOFTWARE_INCOMPLETE"
+      }
+    }
+  },
+  "records": [
+    {
+      "role": "before",
+      "elapsed_ms": 950.950711,
+      "child_user_seconds": 0.916118,
+      "child_system_seconds": 0.320492,
+      "peak_pipeline_child_rss_kib": 83924,
+      "financial_receipt_sha256": "ae28660be2f57b9d874eea07622a65f9c6c2af6d2fd00fe97456d79660e7ff95",
+      "resolved_trades": 2485,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 6
+      },
+      "preparation": {
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 3
+      },
+      "cached_preparation": {
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 0
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 621.808106,
+      "child_user_seconds": 0.731161,
+      "child_system_seconds": 0.092039,
+      "peak_pipeline_child_rss_kib": 84752,
+      "financial_receipt_sha256": "ae28660be2f57b9d874eea07622a65f9c6c2af6d2fd00fe97456d79660e7ff95",
+      "resolved_trades": 2485,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 6
+      },
+      "preparation": {
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 3
+      },
+      "cached_preparation": {
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 0
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 680.993143,
+      "child_user_seconds": 0.8174779999999999,
+      "child_system_seconds": 0.14093899999999998,
+      "peak_pipeline_child_rss_kib": 86228,
+      "financial_receipt_sha256": "ae28660be2f57b9d874eea07622a65f9c6c2af6d2fd00fe97456d79660e7ff95",
+      "resolved_trades": 2485,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 6
+      },
+      "preparation": {
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 3
+      },
+      "cached_preparation": {
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 1
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 688.095359,
+      "child_user_seconds": 0.875709,
+      "child_system_seconds": 0.076069,
+      "peak_pipeline_child_rss_kib": 85476,
+      "financial_receipt_sha256": "ae28660be2f57b9d874eea07622a65f9c6c2af6d2fd00fe97456d79660e7ff95",
+      "resolved_trades": 2485,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 6
+      },
+      "preparation": {
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 3
+      },
+      "cached_preparation": {
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 1
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 816.789496,
+      "child_user_seconds": 1.123041,
+      "child_system_seconds": 0.131862,
+      "peak_pipeline_child_rss_kib": 84168,
+      "financial_receipt_sha256": "ae28660be2f57b9d874eea07622a65f9c6c2af6d2fd00fe97456d79660e7ff95",
+      "resolved_trades": 2485,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 6
+      },
+      "preparation": {
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 3
+      },
+      "cached_preparation": {
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 2
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 573.614103,
+      "child_user_seconds": 0.720614,
+      "child_system_seconds": 0.066648,
+      "peak_pipeline_child_rss_kib": 84092,
+      "financial_receipt_sha256": "ae28660be2f57b9d874eea07622a65f9c6c2af6d2fd00fe97456d79660e7ff95",
+      "resolved_trades": 2485,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 6
+      },
+      "preparation": {
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 3
+      },
+      "cached_preparation": {
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 2
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 764.273254,
+      "child_user_seconds": 0.86449,
+      "child_system_seconds": 0.10472999999999999,
+      "peak_pipeline_child_rss_kib": 84024,
+      "financial_receipt_sha256": "ae28660be2f57b9d874eea07622a65f9c6c2af6d2fd00fe97456d79660e7ff95",
+      "resolved_trades": 2485,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 6
+      },
+      "preparation": {
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 3
+      },
+      "cached_preparation": {
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 3
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 623.108439,
+      "child_user_seconds": 0.788507,
+      "child_system_seconds": 0.087755,
+      "peak_pipeline_child_rss_kib": 85600,
+      "financial_receipt_sha256": "ae28660be2f57b9d874eea07622a65f9c6c2af6d2fd00fe97456d79660e7ff95",
+      "resolved_trades": 2485,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 6
+      },
+      "preparation": {
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 3
+      },
+      "cached_preparation": {
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 3
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 652.257577,
+      "child_user_seconds": 0.8330179999999999,
+      "child_system_seconds": 0.052597,
+      "peak_pipeline_child_rss_kib": 85596,
+      "financial_receipt_sha256": "ae28660be2f57b9d874eea07622a65f9c6c2af6d2fd00fe97456d79660e7ff95",
+      "resolved_trades": 2485,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 6
+      },
+      "preparation": {
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 3
+      },
+      "cached_preparation": {
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 4
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 587.652445,
+      "child_user_seconds": 0.736929,
+      "child_system_seconds": 0.058186999999999996,
+      "peak_pipeline_child_rss_kib": 84828,
+      "financial_receipt_sha256": "ae28660be2f57b9d874eea07622a65f9c6c2af6d2fd00fe97456d79660e7ff95",
+      "resolved_trades": 2485,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 6
+      },
+      "preparation": {
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 3
+      },
+      "cached_preparation": {
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 4
+    }
+  ],
+  "summaries": {
+    "before": {
+      "median_elapsed_ms": 688.095359,
+      "median_peak_pipeline_child_rss_kib": 85476
+    },
+    "after": {
+      "median_elapsed_ms": 621.808106,
+      "median_peak_pipeline_child_rss_kib": 84752
+    }
+  },
+  "limitations": "Small one-symbol synthetic workload; declared worker count is recorded, not an equal CPU-share claim. Repetitions are repeated measurement of three strategies, not independent trials. No genuine data, source approval, qualification, production default or universal throughput/RSS gain is established.",
+  "source_baseline": "e16063713bd4c9f7891169bba11cf3df4eb78b3d",
+  "source_candidate": "codex/verified-source-rehash; binary and compute fingerprints in versions",
+  "interpretation": "Five rotated complete synthetic market/stop/limit pipeline pairs preserve complete receipts. One paired regression; median observations do not establish universal speed/RSS gains, real-data readiness or policy/scientific promotion. Current source bytes are still fully read; only repeated quote decoding is removed."
+}
