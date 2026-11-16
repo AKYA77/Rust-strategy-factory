@@ -1,0 +1,11 @@
+# Complete checkpoint publication lease fencing
+
+Branch: `codex/checkpoint-attempt-fence`, independently based on main `e16063713bd4`. All remote heads/open PRs were checked before task selection: only Codex PRs #1 and #2 were published. Neither is modified or required by this branch. Hermes retains ingestion, routine integration, dashboard and VPS ownership. Shared central state ledgers remain untouched.
+
+The new regression fails against main: a lease object carrying the current valid nonce but attempt0 can publish a checkpoint. `save_replay_checkpoint` previously checked state, nonce and stored expiry but omitted the attempt comparison present in validation, finish and yield. Publication now reads and compares the stored attempt inside its existing immediate transaction, before checkpoint history or immutable evidence writes. No schema or receipt encoding changes.
+
+Two adversarial tests cover zero/negative/future/maximal attempts, a previous attempt combined with the current nonce after reclaim, stale nonce refusal, no checkpoint/attempt mutation on refusal, preservation of valid current authority, valid continuation and backup/reopen integrity. A synchronized two-connection race accepts only the legitimate actor's checkpoint. Existing expiry, control, semantic-prefix, source, immutable history and result guards remain mandatory.
+
+Local validation:452 Rust tests, formatting, Clippy and2 compile-fail checks pass. All27 storage tests pass, as do optimized release, the actual corpus-recovery/generated-search Chromium suites and artifact-aware install/update/rollback/backup/restore operations. Hosted CI is checked on the exact published SHA. A failing-before-fix reproduction is retained locally in work/checkpoint-attempt-before.log. It is not a production data artifact or scientific result.
+
+Next independent task: reconcile the scoped1000-checkpoint ceiling with the already bounded10000-row global journal and10000-artifact specification. Preserve per-record/global byte limits, complete immutable-chain verification, no-write quota refusal, old-corruption refusal and backup/restart. This is separate from authenticated persistent seek and from Hermes's data ingestion.
