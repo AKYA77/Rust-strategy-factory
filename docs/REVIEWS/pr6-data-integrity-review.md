@@ -37,3 +37,5 @@ Hermes owns the conversion implementation and source ingestion. Codex's independ
 ## Latest-head applicability
 
 Hermes subsequently pushed `4ebb54baf7d8f741f53bf752572d5a484ec832a2` (canonical planner/batch runner). Exact function-body comparison confirms `rebuild_state`, `convert` and `verify_output` are unchanged from the reproduced86c172c source. The two confirmed findings therefore still apply to that head; the new batch implementation itself has not received a complete review here.
+
+The subsequently fetched `13e0b450a0432911f946277d6a1c737962c9aa8a` records full-corpus results and changes only two documentation files. Migration implementation is unchanged from4ebb54b, so the reproduced findings remain applicable. This review does not assert that fresh converted corpus prices are wrong; it demonstrates missing requested-scope and adopted-prefix equivalence checks.
