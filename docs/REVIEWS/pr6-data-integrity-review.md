@@ -33,3 +33,7 @@ The converter's default500000-row chunks exceed the current native corpus admiss
 ## Coordination
 
 Hermes owns the conversion implementation and source ingestion. Codex's independent feature PRs remain separate; this review does not merge or silently fix the other developer's work. Owner/Hermes disposition of these findings is needed before treating resumed conversion as verified source equivalence. Central project ledgers are unchanged.
+
+## Latest-head applicability
+
+Hermes subsequently pushed `4ebb54baf7d8f741f53bf752572d5a484ec832a2` (canonical planner/batch runner). Exact function-body comparison confirms `rebuild_state`, `convert` and `verify_output` are unchanged from the reproduced86c172c source. The two confirmed findings therefore still apply to that head; the new batch implementation itself has not received a complete review here.
