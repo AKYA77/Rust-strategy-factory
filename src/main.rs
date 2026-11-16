@@ -583,6 +583,29 @@ fn run(args: &[String]) -> Result<()> {
                     .count(),
             }))
         }
+        [
+            "historical-catalog-review",
+            catalog_path,
+            review_path,
+            output,
+        ] => {
+            let mut catalog: rust_strategy_factory::historical_catalog::Catalog =
+                read_json(catalog_path)?;
+            let report: rust_strategy_factory::data_review::Report = read_json(review_path)?;
+            catalog.bind_review(&report)?;
+            catalog.verify()?;
+            save_replace(output, &catalog)?;
+            print(&serde_json::json!({
+                "identity": catalog.identity,
+                "instruments": catalog.instruments.len(),
+                "eligible": catalog
+                    .instruments
+                    .iter()
+                    .filter(|i| i.eligible_for_research)
+                    .count(),
+                "review_state": report.state,
+            }))
+        }
         ["historical-plan", root, output] => {
             let partitions = rust_strategy_factory::historical_migration::plan(Path::new(root))?;
             let rows = partitions.iter().map(|p| p.rows).sum::<u64>();

@@ -363,6 +363,27 @@ impl Catalog {
         Ok(())
     }
 
+    /// Record explicit gate decisions with retained evidence. Structural validity is still
+    /// required for eligibility; a pending or rejected gate blocks it.
+    pub fn bind_assertions(
+        &mut self,
+        calendar: Gate,
+        profile: Gate,
+        legal: Gate,
+        scientific: Gate,
+        evidence: Vec<String>,
+    ) {
+        for instrument in &mut self.instruments {
+            instrument.gates.calendar = calendar;
+            instrument.gates.profile = profile;
+            instrument.gates.legal = legal;
+            instrument.gates.scientific = scientific;
+            instrument.gates.evidence.extend(evidence.iter().cloned());
+            instrument.eligible_for_research =
+                instrument.structural_valid && instrument.gates.accepted_all();
+        }
+    }
+
     /// Bind a receipt-bound review report to this catalog identity and update the gates it
     /// covers. Legal and scientific gates remain pending unless separately recorded.
     pub fn bind_review(&mut self, report: &data_review::Report) -> Result<()> {
@@ -480,6 +501,58 @@ mod tests {
         let missing = scan_partition("EURUSD", 2025, 1, Some(&canonical), output);
         assert_eq!(missing.state, PartitionState::LoadFailure);
         assert!(missing.load_error.is_some());
+    }
+
+    #[test]
+    fn explicit_gates_control_eligibility() {
+        let mut catalog = Catalog {
+            version: VERSION.into(),
+            instruments: vec![InstrumentStatus {
+                instrument: "EURUSD".into(),
+                months: vec![PartitionStatus {
+                    instrument: "EURUSD".into(),
+                    year: 2025,
+                    month: 1,
+                    state: PartitionState::Verified,
+                    dataset_hash: Some("d".into()),
+                    source_sha256: Some("a".repeat(64)),
+                    parquet_sha256: Some("b".repeat(64)),
+                    rows: 1,
+                    first_ms: Some(0),
+                    last_ms: Some(1),
+                    timestamp_ties: 0,
+                    gaps_over_hour: 0,
+                    correction_records: 0,
+                    quarantine_records: 0,
+                    load_error: None,
+                }],
+                expected_months: 1,
+                coverage: "complete".into(),
+                structural_valid: true,
+                gates: Gates::pending(),
+                review_state: None,
+                eligible_for_research: false,
+            }],
+            identity: "0".repeat(64),
+            limitations: LIMITATIONS.into(),
+        };
+        catalog.bind_assertions(
+            Gate::Accepted,
+            Gate::Accepted,
+            Gate::Accepted,
+            Gate::Accepted,
+            vec!["legal+scientific evidence".into()],
+        );
+        assert!(catalog.instruments[0].eligible_for_research);
+        assert_eq!(catalog.instruments[0].gates.evidence.len(), 1);
+        catalog.bind_assertions(
+            Gate::Accepted,
+            Gate::Accepted,
+            Gate::Pending,
+            Gate::Accepted,
+            vec![],
+        );
+        assert!(!catalog.instruments[0].eligible_for_research);
     }
 
     #[test]

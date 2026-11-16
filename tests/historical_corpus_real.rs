@@ -53,9 +53,16 @@ fn real_corpus_end_to_end() {
     let mut visited = 0u64;
     let mut candles_total = 0usize;
     for index in [0, spec.months.len() - 1] {
+        let mut expected_sequence = 0u64;
         historical_corpus::visit_month(&spec, index, |dataset| {
-            assert_eq!(dataset.ticks[0].sequence, 0);
-            assert_eq!(dataset.manifest.source, spec.months[index].dataset_hash);
+            assert_eq!(dataset.ticks[0].sequence, expected_sequence);
+            expected_sequence += dataset.ticks.len() as u64;
+            assert!(
+                dataset
+                    .manifest
+                    .source
+                    .contains(&spec.months[index].dataset_hash)
+            );
             let candles = candles::build(dataset, Timeframe::M1)?;
             candles_total += candles.len();
             visited += dataset.ticks.len() as u64;
