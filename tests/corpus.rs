@@ -3079,9 +3079,16 @@ fn owned_fleet_rotation_preserves_scalar_receipts_exact_cost_observations_and_ba
     let db = first.root.join("fleet.sqlite");
     let id = corpus_fleet::register_file(&file, &db).unwrap();
     let (policy, limits) = owned_fleet_files(&first.root);
-    // Under full-suite parallel load a step can exceed the fixture's wall budget and leave
-    // the fleet retry-held. Retry the wait-capable loop until it actually exhausts; the
-    // exhausted assertion is unchanged.
+    // The fixture's default 10 s wall budget is too tight under full-suite parallel load and
+    // leaves the fleet permanently retry-held; give it room to actually exhaust.
+    fs::write(
+        &limits,
+        r#"{"maximum_wall_ms":40000,"shutdown_grace_ms":100,"maximum_output_bytes":1048576}"#,
+    )
+    .unwrap();
+    // Under full-suite parallel load a step can exceed the wall budget and leave the fleet
+    // retry-held. Retry the wait-capable loop until it actually exhausts; the exhausted
+    // assertion is unchanged.
     let report = {
         let mut attempts = 0;
         loop {
