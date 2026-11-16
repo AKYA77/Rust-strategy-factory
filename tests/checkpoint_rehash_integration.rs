@@ -116,12 +116,14 @@ fn combined_private_checkpoints_and_current_source_proofs_preserve_complete_orde
             let db = f.root.join(format!("{index}.sqlite"));
             let mut session = CorpusBatchSession::default();
             let mut replayed = 0;
+            let mut decoded = 0;
             let mut skipped = 0;
             let mut completed = None;
             for round in 0..f.spec.chunks.len() {
                 let r = session.round(&db, &[f.run(&strategy)], f.limits()).unwrap();
                 assert_eq!(r.worker_failures, 0);
                 replayed += r.preparation.account_events_replayed;
+                decoded += r.preparation.source_events_decoded;
                 skipped += r.preparation.trusted_prefix_events_skipped;
                 if round > 0 {
                     assert_eq!(r.preparation.current_byte_checks, 1);
@@ -136,6 +138,10 @@ fn combined_private_checkpoints_and_current_source_proofs_preserve_complete_orde
             assert_eq!(
                 replayed,
                 corpus::source_facts(&f.root, &f.spec).unwrap().events()
+            );
+            assert_eq!(
+                decoded, replayed,
+                "warm traversal must decode each quote only once"
             );
             assert!(skipped > 0);
             assert_eq!(
@@ -202,6 +208,41 @@ fn combined_reuse_never_authenticates_rehashed_checkpoint_json_or_changed_consum
             assert_eq!(session.retained_candles(), 0);
             assert_eq!(registry.replay_checkpoint(&id).unwrap().unwrap().1, head);
             assert!(registry.result(&id).unwrap().is_none());
+        }
+    }
+}
+
+#[test]
+fn cold_range_continuation_recomputes_account_prefix_but_does_not_decode_future_artifacts() {
+    for format in 0..3 {
+        let f = Fixture::new(format);
+        let strategy = strategy(None);
+        let db = f.root.join("cold.sqlite");
+        let mut session = CorpusBatchSession::default();
+        let first = session.round(&db, &[f.run(&strategy)], f.limits()).unwrap();
+        assert!(first.jobs[0].is_ok());
+        assert_eq!(first.preparation.source_events_decoded, 250);
+        session.release();
+        let second = session.round(&db, &[f.run(&strategy)], f.limits()).unwrap();
+        assert!(second.jobs[0].is_ok());
+        assert_eq!(second.preparation.trusted_prefix_events_skipped, 0);
+        assert_eq!(second.preparation.account_events_replayed, 500);
+        assert_eq!(second.preparation.source_events_decoded, 500);
+        let expected = serde_json::to_value(
+            tick_engine::replay_corpus(&f.root, &f.spec, &strategy, &f.costs, f.budget).unwrap(),
+        )
+        .unwrap();
+        loop {
+            session.release();
+            let r = session.round(&db, &[f.run(&strategy)], f.limits()).unwrap();
+            match r.jobs.into_iter().next().unwrap().unwrap() {
+                CorpusProgress::Pending { .. } => {}
+                CorpusProgress::Completed { result, .. } => {
+                    assert_eq!(result.result["tick_replay"], expected);
+                    break;
+                }
+                other => panic!("{other:?}"),
+            }
         }
     }
 }

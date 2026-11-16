@@ -1,0 +1,416 @@
+{
+  "class": "SYNTHETIC_DEVELOPMENT_PIPELINE_ONLY",
+  "host": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "available_parallelism": 3
+  },
+  "quotes": 100000,
+  "artifacts": 2,
+  "artifact_format": "native",
+  "max_new_chunks_per_round": 1,
+  "workers": 1,
+  "strategies": 1,
+  "repetitions": 5,
+  "cache_scope": "Fresh worker processes and registries; OS cache uncontrolled, no physical-cold claim. Cached route checked separately and excluded from measured first-route timing/CPU/RSS.",
+  "measurement_scope": "Each timed pipeline includes actual corpus-batch CLI and registry integrity CLI. CPU and RSS are child-resource observations in a fresh worker, not total host/service memory.",
+  "versions": {
+    "before": {
+      "binary_sha256": "e61de4c73ce7b260ae8ee965861b1392385909ac47f90c52f4af538e8d0bcbcd",
+      "version": {
+        "compute_revision": "compute-blake3:e9606365a15cd7f4e86ffc39e3b9ad3359042899186e677cd2040a35a1780baa",
+        "engine": "ordered-l1-v6-frozen-atr-stops",
+        "indicators": "causal-primitives-v4-outward-atr",
+        "package": "0.1.0",
+        "signals": "closed-publication-next-event-v3-scoped-features",
+        "software_status": "SOFTWARE_INCOMPLETE"
+      }
+    },
+    "after": {
+      "binary_sha256": "ced7fb43204c10ab099b3920769d5201fdb3f48f22d37945d6a43f83bb85c34f",
+      "version": {
+        "compute_revision": "compute-blake3:54a445477b3e6d2f3aa53d9d3f234cc1ee62eebac5456c9cd7870a2362749f9e",
+        "engine": "ordered-l1-v6-frozen-atr-stops",
+        "indicators": "causal-primitives-v4-outward-atr",
+        "package": "0.1.0",
+        "signals": "closed-publication-next-event-v3-scoped-features",
+        "software_status": "SOFTWARE_INCOMPLETE"
+      }
+    }
+  },
+  "records": [
+    {
+      "role": "before",
+      "elapsed_ms": 335.839872,
+      "child_user_seconds": 0.274412,
+      "child_system_seconds": 0.032158,
+      "peak_pipeline_child_rss_kib": 26852,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "account_events_replayed": 50000,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "trusted_prefix_events_skipped": 50000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 0
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 306.514341,
+      "child_user_seconds": 0.25149699999999997,
+      "child_system_seconds": 0.030841999999999998,
+      "peak_pipeline_child_rss_kib": 26392,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "account_events_replayed": 50000,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "source_events_decoded": 50000,
+        "trusted_prefix_events_skipped": 50000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 0
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 315.698511,
+      "child_user_seconds": 0.27827199999999996,
+      "child_system_seconds": 0.012558999999999999,
+      "peak_pipeline_child_rss_kib": 26596,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "account_events_replayed": 50000,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "source_events_decoded": 50000,
+        "trusted_prefix_events_skipped": 50000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 1
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 446.623451,
+      "child_user_seconds": 0.295448,
+      "child_system_seconds": 0.11285999999999999,
+      "peak_pipeline_child_rss_kib": 26804,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "account_events_replayed": 50000,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "trusted_prefix_events_skipped": 50000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 1
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 316.945056,
+      "child_user_seconds": 0.279107,
+      "child_system_seconds": 0.011767999999999999,
+      "peak_pipeline_child_rss_kib": 26752,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "account_events_replayed": 50000,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "trusted_prefix_events_skipped": 50000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 2
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 375.877006,
+      "child_user_seconds": 0.246077,
+      "child_system_seconds": 0.039028,
+      "peak_pipeline_child_rss_kib": 26636,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "account_events_replayed": 50000,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "source_events_decoded": 50000,
+        "trusted_prefix_events_skipped": 50000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 2
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 304.264267,
+      "child_user_seconds": 0.24714699999999998,
+      "child_system_seconds": 0.033166,
+      "peak_pipeline_child_rss_kib": 26584,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "account_events_replayed": 50000,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "source_events_decoded": 50000,
+        "trusted_prefix_events_skipped": 50000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 3
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 456.742024,
+      "child_user_seconds": 0.36907,
+      "child_system_seconds": 0.056757999999999996,
+      "peak_pipeline_child_rss_kib": 26712,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "account_events_replayed": 50000,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "trusted_prefix_events_skipped": 50000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 3
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 322.03966,
+      "child_user_seconds": 0.277445,
+      "child_system_seconds": 0.020128999999999998,
+      "peak_pipeline_child_rss_kib": 26628,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "account_events_replayed": 50000,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "trusted_prefix_events_skipped": 50000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 4
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 313.94832,
+      "child_user_seconds": 0.253983,
+      "child_system_seconds": 0.032947,
+      "peak_pipeline_child_rss_kib": 26392,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 2
+      },
+      "preparation": {
+        "account_events_replayed": 50000,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "source_events_decoded": 50000,
+        "trusted_prefix_events_skipped": 50000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 4
+    }
+  ],
+  "summaries": {
+    "before": {
+      "median_elapsed_ms": 335.839872,
+      "median_peak_pipeline_child_rss_kib": 26752
+    },
+    "after": {
+      "median_elapsed_ms": 313.94832,
+      "median_peak_pipeline_child_rss_kib": 26584
+    }
+  },
+  "limitations": "Small one-symbol synthetic workload; declared worker count is recorded, not an equal CPU-share claim. Repetitions are repeated measurements of the selected fixed strategies, not independent trials. No genuine data, source approval, qualification, production default or universal throughput/RSS gain is established.",
+  "source_baseline": "106851726605b0e8568de9bd92421891e4ba978f",
+  "candidate_stage": "final native two-artifact candidate",
+  "interpretation": "Synthetic full CLI+integrity pipeline only; complete receipt parity. Initial native run was inconclusive/slower, final paired medians are scoped observations. Blocked RSS increases; no universal speed/memory, physical-cold, real-data or scientific claim."
+}

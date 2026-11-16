@@ -1,0 +1,416 @@
+{
+  "class": "SYNTHETIC_DEVELOPMENT_PIPELINE_ONLY",
+  "host": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "available_parallelism": 3
+  },
+  "quotes": 100000,
+  "artifacts": 8,
+  "artifact_format": "blocked",
+  "max_new_chunks_per_round": 1,
+  "workers": 1,
+  "strategies": 1,
+  "repetitions": 5,
+  "cache_scope": "Fresh worker processes and registries; OS cache uncontrolled, no physical-cold claim. Cached route checked separately and excluded from measured first-route timing/CPU/RSS.",
+  "measurement_scope": "Each timed pipeline includes actual corpus-batch CLI and registry integrity CLI. CPU and RSS are child-resource observations in a fresh worker, not total host/service memory.",
+  "versions": {
+    "before": {
+      "binary_sha256": "e61de4c73ce7b260ae8ee965861b1392385909ac47f90c52f4af538e8d0bcbcd",
+      "version": {
+        "compute_revision": "compute-blake3:e9606365a15cd7f4e86ffc39e3b9ad3359042899186e677cd2040a35a1780baa",
+        "engine": "ordered-l1-v6-frozen-atr-stops",
+        "indicators": "causal-primitives-v4-outward-atr",
+        "package": "0.1.0",
+        "signals": "closed-publication-next-event-v3-scoped-features",
+        "software_status": "SOFTWARE_INCOMPLETE"
+      }
+    },
+    "after": {
+      "binary_sha256": "ced7fb43204c10ab099b3920769d5201fdb3f48f22d37945d6a43f83bb85c34f",
+      "version": {
+        "compute_revision": "compute-blake3:54a445477b3e6d2f3aa53d9d3f234cc1ee62eebac5456c9cd7870a2362749f9e",
+        "engine": "ordered-l1-v6-frozen-atr-stops",
+        "indicators": "causal-primitives-v4-outward-atr",
+        "package": "0.1.0",
+        "signals": "closed-publication-next-event-v3-scoped-features",
+        "software_status": "SOFTWARE_INCOMPLETE"
+      }
+    }
+  },
+  "records": [
+    {
+      "role": "before",
+      "elapsed_ms": 1603.254418,
+      "child_user_seconds": 1.414603,
+      "child_system_seconds": 0.114629,
+      "peak_pipeline_child_rss_kib": 28644,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 8
+      },
+      "preparation": {
+        "account_events_replayed": 12500,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "trusted_prefix_events_skipped": 87500
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 0
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 1341.802159,
+      "child_user_seconds": 1.114793,
+      "child_system_seconds": 0.17902099999999999,
+      "peak_pipeline_child_rss_kib": 29920,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 8
+      },
+      "preparation": {
+        "account_events_replayed": 12500,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "source_events_decoded": 12500,
+        "trusted_prefix_events_skipped": 87500
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 0
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 1242.191696,
+      "child_user_seconds": 1.062281,
+      "child_system_seconds": 0.135897,
+      "peak_pipeline_child_rss_kib": 30152,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 8
+      },
+      "preparation": {
+        "account_events_replayed": 12500,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "source_events_decoded": 12500,
+        "trusted_prefix_events_skipped": 87500
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 1
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 1493.75205,
+      "child_user_seconds": 1.387296,
+      "child_system_seconds": 0.067852,
+      "peak_pipeline_child_rss_kib": 28520,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 8
+      },
+      "preparation": {
+        "account_events_replayed": 12500,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "trusted_prefix_events_skipped": 87500
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 1
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 1482.48087,
+      "child_user_seconds": 1.382883,
+      "child_system_seconds": 0.057894999999999995,
+      "peak_pipeline_child_rss_kib": 28692,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 8
+      },
+      "preparation": {
+        "account_events_replayed": 12500,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "trusted_prefix_events_skipped": 87500
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 2
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 1294.405193,
+      "child_user_seconds": 1.072134,
+      "child_system_seconds": 0.165851,
+      "peak_pipeline_child_rss_kib": 29960,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 8
+      },
+      "preparation": {
+        "account_events_replayed": 12500,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "source_events_decoded": 12500,
+        "trusted_prefix_events_skipped": 87500
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 2
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 1296.30295,
+      "child_user_seconds": 1.112705,
+      "child_system_seconds": 0.13919399999999998,
+      "peak_pipeline_child_rss_kib": 30184,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 8
+      },
+      "preparation": {
+        "account_events_replayed": 12500,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "source_events_decoded": 12500,
+        "trusted_prefix_events_skipped": 87500
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 3
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 1542.230958,
+      "child_user_seconds": 1.404633,
+      "child_system_seconds": 0.095777,
+      "peak_pipeline_child_rss_kib": 28452,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 8
+      },
+      "preparation": {
+        "account_events_replayed": 12500,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "trusted_prefix_events_skipped": 87500
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 3
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 1510.156935,
+      "child_user_seconds": 1.404908,
+      "child_system_seconds": 0.061152,
+      "peak_pipeline_child_rss_kib": 28656,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 8
+      },
+      "preparation": {
+        "account_events_replayed": 12500,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "trusted_prefix_events_skipped": 87500
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 4
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 1300.971389,
+      "child_user_seconds": 1.07889,
+      "child_system_seconds": 0.172231,
+      "peak_pipeline_child_rss_kib": 29960,
+      "financial_receipt_sha256": "b082db8aad00c597ad60e7353b2e752f2729b9c789bced81d3be7ed130d5f623",
+      "resolved_trades": 1606,
+      "counts": {
+        "registered": 1,
+        "completed": 1,
+        "running": 0,
+        "attempts": 8
+      },
+      "preparation": {
+        "account_events_replayed": 12500,
+        "builds": 0,
+        "current_byte_checks": 1,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2199,
+        "reuses": 1,
+        "source_events_decoded": 12500,
+        "trusted_prefix_events_skipped": 87500
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 1,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 4
+    }
+  ],
+  "summaries": {
+    "before": {
+      "median_elapsed_ms": 1510.156935,
+      "median_peak_pipeline_child_rss_kib": 28644
+    },
+    "after": {
+      "median_elapsed_ms": 1296.30295,
+      "median_peak_pipeline_child_rss_kib": 29960
+    }
+  },
+  "limitations": "Small one-symbol synthetic workload; declared worker count is recorded, not an equal CPU-share claim. Repetitions are repeated measurements of the selected fixed strategies, not independent trials. No genuine data, source approval, qualification, production default or universal throughput/RSS gain is established.",
+  "source_baseline": "106851726605b0e8568de9bd92421891e4ba978f",
+  "candidate_stage": "final blocked eight-artifact candidate",
+  "interpretation": "Synthetic full CLI+integrity pipeline only; complete receipt parity. Initial native run was inconclusive/slower, final paired medians are scoped observations. Blocked RSS increases; no universal speed/memory, physical-cold, real-data or scientific claim."
+}

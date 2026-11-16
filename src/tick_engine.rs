@@ -911,6 +911,7 @@ struct CheckpointReuse {
     checkpoint: Option<TrustedCheckpoint>,
     advanced_events: u64,
     skipped_events: u64,
+    decoded_events: u64,
 }
 struct ResumeControl<'a> {
     registry: &'a mut crate::storage::Registry,
@@ -1076,8 +1077,14 @@ fn replay_corpus_internal(
             crate::corpus::SequenceHash::new(),
         ),
     };
-    crate::corpus::visit_blocks(base, spec, |dataset| {
+    let mut visit = |dataset: crate::corpus::QuoteBlock<'_>| {
         let index = dataset.chunk_index;
+        if let Some(r) = &mut reuse {
+            r.decoded_events = r
+                .decoded_events
+                .checked_add(dataset.ticks.len() as u64)
+                .ok_or("decoded event counter overflow")?;
+        }
         if index >= stop || (resumed && index < old_cursor as usize) {
             return Ok(());
         }
@@ -1114,7 +1121,17 @@ fn replay_corpus_internal(
             }
         }
         Ok(())
-    })?;
+    };
+    // Only an exact private checkpoint match can omit account-prefix replay.
+    // Cold/unmatched stored state still recomputes from artifact zero.
+    let start = if resumed { old_cursor as usize } else { 0 };
+    if control.is_some() && (start > 0 || stop < spec.chunks.len()) {
+        prepared.visit_replay_range(base, spec, start..stop, &mut visit)?;
+    } else {
+        // Full-span and independent scalar traversal already decode/verify every
+        // artifact. With nothing omitted, retain that existing sequential path.
+        crate::corpus::visit_blocks(base, spec, &mut visit)?;
+    }
     if let Some(c) = &mut control {
         let mut committed_hash = saved.as_ref().map(|(_, hash)| hash.clone());
         if boundary > old_cursor as usize {
@@ -1206,6 +1223,8 @@ pub struct CorpusPreparationStats {
     pub account_events_replayed: u64,
     /// Prefix account transitions omitted using private worker-produced committed state.
     pub trusted_prefix_events_skipped: u64,
+    /// Quotes decoded by replay traversal; excludes inventory/preparation and raw-byte scans.
+    pub source_events_decoded: u64,
     /// Candle objects, not bytes/RSS or OS-enforced memory.
     pub peak_retained_candles_per_worker: usize,
 }
@@ -1383,8 +1402,10 @@ fn execute_corpus_step_prepared(
             registry.yield_lease(&lease, clock())?;
             preparation.stats.account_events_replayed += resume.advanced_events;
             preparation.stats.trusted_prefix_events_skipped += resume.skipped_events;
+            preparation.stats.source_events_decoded += resume.decoded_events;
             resume.advanced_events = 0;
             resume.skipped_events = 0;
+            resume.decoded_events = 0;
             preparation.resume = resume;
             Ok(CorpusProgress::Pending {
                 experiment_id: id,
@@ -1394,6 +1415,7 @@ fn execute_corpus_step_prepared(
         Some(replay) => {
             preparation.stats.account_events_replayed += resume.advanced_events;
             preparation.stats.trusted_prefix_events_skipped += resume.skipped_events;
+            preparation.stats.source_events_decoded += resume.decoded_events;
             let control = registry.corpus_control(&id)?;
             if control != "running" {
                 registry.yield_lease(&lease, clock())?;
@@ -1777,6 +1799,7 @@ fn execute_corpus_batch_session(
                     preparation.account_events_replayed += stats.account_events_replayed;
                     preparation.trusted_prefix_events_skipped +=
                         stats.trusted_prefix_events_skipped;
+                    preparation.source_events_decoded += stats.source_events_decoded;
                     preparation.peak_retained_candles_per_worker = preparation
                         .peak_retained_candles_per_worker
                         .max(stats.peak_retained_candles_per_worker);
