@@ -68,6 +68,21 @@ A full canonical batch completed on the VPS (4 workers, `--chunk-events 500000`,
   XAUUSD 2026-09, AUDUSD 2025-01, EURUSD 2026-10).
 - Output: `/root/workspace/historical-migration-output/full` with `batch-report.json`.
 
+### Corpus-admissible re-run (100,000-event chunks)
+
+After aligning the chunk cap, the full corpus was re-converted into
+`/root/workspace/historical-migration-output/full-100k`:
+
+- 176/176 partitions converted, 0 failed; 421,078,937 events; 4,299 chunks; max chunk
+  100,000 events; 13 GiB.
+- Sampled `historical-verify <dir> <legacy.parquet>` (full tick equivalence) passed for
+  NZDUSD 2025-12, USDCAD 2026-07 and XAUUSD 2026-09.
+- `corpus-create-bounded` + `corpus-inspect` on NZDUSD 2025-12 produced a loadable
+  `ordered-native-corpus-v1` specification (9 chunks), confirming genuine native corpus
+  admission.
+- The earlier 500,000-event output under `full/` is superseded and inadmissible; it is retained
+  until an independent rollback copy is verified.
+
 ## Integrity-fix milestone (Codex review response)
 
 Codex's `codex/review-pr6-data-integrity` review found two reproduced P1 defects; both are
