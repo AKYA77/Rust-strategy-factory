@@ -1030,15 +1030,22 @@ impl Registry {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(db_err)?;
-        let (status, token, expiry, key_json): (String, Option<String>, Option<i64>, String) = tx
+        let (status, token, expiry, key_json, attempt): (
+            String,
+            Option<String>,
+            Option<i64>,
+            String,
+            i64,
+        ) = tx
             .query_row(
-                "SELECT state,token,expires_ms,key_json FROM experiments WHERE id=?1",
+                "SELECT state,token,expires_ms,key_json,attempt FROM experiments WHERE id=?1",
                 [&lease.experiment_id],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
             )
             .map_err(db_err)?;
         if status != "running"
             || token.as_deref() != Some(&lease.token)
+            || attempt != lease.attempt
             || expiry.is_none_or(|e| e <= now_ms)
         {
             return Err("checkpoint lease stale, expired or terminal".into());
