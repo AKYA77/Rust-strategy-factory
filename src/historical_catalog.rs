@@ -73,6 +73,13 @@ impl GateDetail {
         }
     }
     pub fn accept(&mut self, dataset_identity: &str, receipt: &str, evidence: Vec<String>) {
+        if evidence.iter().all(|e| e.trim().is_empty()) {
+            self.state = Gate::Pending;
+            self.explanation =
+                "Pending: acceptance requires retained evidence; missing evidence is not accepted."
+                    .into();
+            return;
+        }
         self.state = Gate::Accepted;
         self.dataset_identity = Some(dataset_identity.into());
         self.receipt = Some(receipt.into());
@@ -790,6 +797,17 @@ mod tests {
             identity: identity.into(),
             limitations: LIMITATIONS.into(),
         }
+    }
+
+    #[test]
+    fn acceptance_requires_retained_evidence() {
+        let mut gate = GateDetail::pending(&["e"], "pending");
+        gate.accept("dataset-1", "receipt-1", vec![]);
+        assert_eq!(gate.state, Gate::Pending);
+        gate.accept("dataset-1", "receipt-1", vec!["".into(), "  ".into()]);
+        assert_eq!(gate.state, Gate::Pending);
+        gate.accept("dataset-1", "receipt-1", vec!["evidence".into()]);
+        assert_eq!(gate.state, Gate::Accepted);
     }
 
     #[test]
