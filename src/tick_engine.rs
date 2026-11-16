@@ -1357,63 +1357,72 @@ fn execute_corpus_step_prepared(
         }
         crate::storage::Claim::Acquired(lease) => lease,
     };
-    let corpus_id = run.spec.identity()?;
-    registry.validate_lease(&lease, clock())?;
-    if registry.experiment_key(&id)?.as_ref() != Some(&key) {
-        return Err("registered corpus inputs or build differ".into());
-    }
-    let prepared = preparation.prepare(&run)?;
-    match replay_corpus_internal(
-        run,
-        Some(ResumeControl {
-            registry,
-            lease: &lease,
-            max_new_chunks,
-            clock,
-        }),
-        Some(prepared),
-        Some(&mut resume),
-    )? {
-        None => {
-            let cursor = registry
-                .replay_checkpoint(&id)?
-                .ok_or("missing committed corpus checkpoint")?
-                .0
-                .cursor;
-            registry.yield_lease(&lease, clock())?;
-            preparation.stats.account_events_replayed += resume.advanced_events;
-            preparation.stats.trusted_prefix_events_skipped += resume.skipped_events;
-            resume.advanced_events = 0;
-            resume.skipped_events = 0;
-            preparation.resume = resume;
-            Ok(CorpusProgress::Pending {
-                experiment_id: id,
-                cursor,
-            })
+    let result = (|| {
+        let corpus_id = run.spec.identity()?;
+        registry.validate_lease(&lease, clock())?;
+        if registry.experiment_key(&id)?.as_ref() != Some(&key) {
+            return Err("registered corpus inputs or build differ".into());
         }
-        Some(replay) => {
-            preparation.stats.account_events_replayed += resume.advanced_events;
-            preparation.stats.trusted_prefix_events_skipped += resume.skipped_events;
-            let control = registry.corpus_control(&id)?;
-            if control != "running" {
+        let prepared = preparation.prepare(&run)?;
+        match replay_corpus_internal(
+            run,
+            Some(ResumeControl {
+                registry,
+                lease: &lease,
+                max_new_chunks,
+                clock,
+            }),
+            Some(prepared),
+            Some(&mut resume),
+        )? {
+            None => {
+                let cursor = registry
+                    .replay_checkpoint(&id)?
+                    .ok_or("missing committed corpus checkpoint")?
+                    .0
+                    .cursor;
                 registry.yield_lease(&lease, clock())?;
-                return Ok(CorpusProgress::Held {
+                preparation.stats.account_events_replayed += resume.advanced_events;
+                preparation.stats.trusted_prefix_events_skipped += resume.skipped_events;
+                resume.advanced_events = 0;
+                resume.skipped_events = 0;
+                preparation.resume = resume;
+                Ok(CorpusProgress::Pending {
                     experiment_id: id,
-                    state: control,
-                });
+                    cursor,
+                })
             }
-            let result = serde_json::json!({"kind":"synthetic-corpus-replay-v1","corpus_identity":corpus_id,"tick_replay":replay});
-            registry.finish(&lease, clock(), crate::storage::Outcome::Completed, &result)?;
-            let result = registry
-                .result(&id)?
-                .ok_or("completed corpus receipt missing")?;
-            Ok(CorpusProgress::Completed {
-                experiment_id: id,
-                cached: false,
-                result,
-            })
+            Some(replay) => {
+                preparation.stats.account_events_replayed += resume.advanced_events;
+                preparation.stats.trusted_prefix_events_skipped += resume.skipped_events;
+                let control = registry.corpus_control(&id)?;
+                if control != "running" {
+                    registry.yield_lease(&lease, clock())?;
+                    return Ok(CorpusProgress::Held {
+                        experiment_id: id,
+                        state: control,
+                    });
+                }
+                let result = serde_json::json!({"kind":"synthetic-corpus-replay-v1","corpus_identity":corpus_id,"tick_replay":replay});
+                registry.finish(&lease, clock(), crate::storage::Outcome::Completed, &result)?;
+                let result = registry
+                    .result(&id)?
+                    .ok_or("completed corpus receipt missing")?;
+                Ok(CorpusProgress::Completed {
+                    experiment_id: id,
+                    cached: false,
+                    result,
+                })
+            }
         }
+    })();
+    if result.is_err() {
+        // One best-effort cleanup attempt. Its transactional nonce/attempt/expiry
+        // fence cannot yield a replacement actor or demote a terminal result.
+        // Preserve the original execution error if cleanup itself is refused.
+        let _ = registry.yield_lease(&lease, clock());
     }
+    result
 }
 
 #[cfg(test)]
