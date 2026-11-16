@@ -57,16 +57,28 @@ conversion is deterministic across build profiles. Debug-build USDCAD took ~30 s
 work, so release timings are the realistic planning numbers. Peak RSS is dominated by the
 bounded chunk buffer plus Parquet row-group decode, not by the month size.
 
+## Full corpus milestone
+
+A full canonical batch completed on the VPS (4 workers, `--chunk-events 500000`, release):
+
+- 176/176 partitions converted, 0 failed; 421,078,937 events; 928 chunks; 13 GiB output.
+- Elapsed ~5.5 minutes wall; ~1,181 s aggregate CPU; peak worker RSS ~356 MiB.
+- Re-run verified all 176 as already complete with identical `output_hash` values.
+- `historical-verify` with the legacy source passed for sampled partitions (USDCAD 2026-07,
+  XAUUSD 2026-09, AUDUSD 2025-01, EURUSD 2026-10).
+- Output: `/root/workspace/historical-migration-output/full` with `batch-report.json`.
+
 ## Remaining work
 
-1. Run `scripts/check.sh` (fmt, Clippy, full test suite) and record the result.
-2. Commit the verified milestone on `hermes/real-data-migration`, push, open a pull request
-   and verify CI for the exact commit.
-3. Add the real-data integration test path (`tests/historical_migration_real.rs`) if not yet
-   present; it must skip cleanly when `/var/lib/hermes-factory` is absent.
-4. Full-corpus preparation: enumerate the 176 canonical partitions, convert with bounded
-   workers, record per-partition receipts, quality/coverage reports and resource usage.
+1. ~~Run `scripts/check.sh`~~ — fmt and Clippy pass; lib tests pass; full suite has two
+   load-dependent `tests/corpus` timing flakes that pass in isolation.
+2. ~~Commit, push, open a pull request~~ — PR #6, CI green for `86c172c`.
+3. ~~Add the real-data integration test~~ — `tests/historical_migration_real.rs` skips cleanly
+   without the legacy catalog.
+4. ~~Full-corpus preparation~~ — 176/176 converted and verified; batch report published.
 5. Continue non-overlapping Rust-factory work from `docs/NEXT_ACTION.md`.
+6. Optional: independent scientific/qualification review of the migrated corpus (Codex), and
+   explicit calendar/profile/licensing acceptance before any research use.
 
 ## Safety notes
 

@@ -111,3 +111,23 @@ e95a94ae9192019ac61c49c4a8276bc656ac0ab621ca57dbcc19dc770b057477`.
 
 These results demonstrate real-data import correctness only. They do not establish calendar
 completeness, profile approval, source licensing or research eligibility.
+
+## Full canonical corpus
+
+`historical-plan` selects the canonical partitions and `historical-batch` converts them with a
+bounded worker pool. A full run on the VPS (4 workers, `--chunk-events 500000`, release build)
+produced:
+
+- 176/176 partitions converted, 0 failed; 421,078,937 events; 928 native chunks; 13 GiB.
+- Per instrument: 22 partitions each for AUDUSD, EURUSD, GBPUSD, NZDUSD, USDCAD, USDCHF,
+  USDJPY and XAUUSD.
+- Elapsed ~5.5 minutes wall; ~1,181 s aggregate CPU; peak worker RSS ~356 MiB.
+- Re-running the batch verified all 176 partitions as already complete with identical
+  `output_hash` values, confirming deterministic restart.
+- Independent `historical-verify <dir> <legacy.parquet>` checks (which recompute the logical
+  quote stream from the legacy file) passed for sampled partitions including USDCAD 2026-07,
+  XAUUSD 2026-09, AUDUSD 2025-01 and EURUSD 2026-10.
+
+Every partition's `quote_stream_sha256` was recomputed during conversion and matched its
+trusted manifest. Conversion remains a format operation: it does not establish calendar
+completeness, profile approval, source licensing or research eligibility.
