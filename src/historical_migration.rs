@@ -1301,7 +1301,7 @@ pub fn convert(config: &Config) -> Result<Receipt> {
 
 /// Verify a published migration directory. Partial output (no receipt) is refused.
 /// When `source_parquet` is supplied the logical quote stream is independently recomputed.
-pub fn verify_output(dir: &Path, source_parquet: Option<&Path>) -> Result<Receipt> {
+pub fn verify_receipt_only(dir: &Path) -> Result<Receipt> {
     let path = dir.join("manifest.json");
     if !path.is_file() {
         return Err("migration receipt missing; output is partial".into());
@@ -1321,6 +1321,11 @@ pub fn verify_output(dir: &Path, source_parquet: Option<&Path>) -> Result<Receip
     if receipt.chunks.is_empty() || receipt.chunks.len() > MAX_CHUNKS {
         return Err("migration receipt chunk budget invalid".into());
     }
+    Ok(receipt)
+}
+
+pub fn verify_output(dir: &Path, source_parquet: Option<&Path>) -> Result<Receipt> {
+    let receipt = verify_receipt_only(dir)?;
     let source_desc = source_description_from_receipt(&receipt);
     let mut rows = 0u64;
     let mut last_tick: Option<Tick> = None;

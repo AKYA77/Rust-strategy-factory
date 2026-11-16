@@ -72,6 +72,35 @@ fn save<T: serde::Serialize>(path: &str, value: &T) -> Result<()> {
     let cleanup = fs::remove_file(&temp);
     publication.and(cleanup).map_err(|e| e.to_string())
 }
+fn save_replace<T: serde::Serialize>(path: &str, value: &T) -> Result<()> {
+    // Derived report/specification: atomically replace an existing artifact.
+    let bytes = serde_json::to_vec_pretty(value).map_err(|e| e.to_string())?;
+    let destination = Path::new(path);
+    let parent = destination
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let name = destination
+        .file_name()
+        .ok_or("artifact filename missing")?
+        .to_string_lossy();
+    let temp = parent.join(format!(".{name}.{}.tmp", std::process::id()));
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&temp)
+        .map_err(|e| e.to_string())?;
+    let publication = (|| -> std::io::Result<()> {
+        file.write_all(&bytes)?;
+        file.sync_all()?;
+        fs::rename(&temp, destination)?;
+        fs::File::open(parent)?.sync_all()
+    })();
+    drop(file);
+    let _ = fs::remove_file(&temp);
+    publication.map_err(|e| e.to_string())
+}
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ResearchFile {
@@ -476,7 +505,7 @@ fn run(args: &[String]) -> Result<()> {
                 instrument,
                 expected,
             )?;
-            save(spec, &corpus)?;
+            save_replace(spec, &corpus)?;
             print(&serde_json::json!({
                 "identity": corpus.identity,
                 "instrument": corpus.instrument,
@@ -497,7 +526,7 @@ fn run(args: &[String]) -> Result<()> {
                 instrument,
                 rust_strategy_factory::historical_corpus::EXPECTED_MONTHS,
             )?;
-            save(spec, &corpus)?;
+            save_replace(spec, &corpus)?;
             print(&serde_json::json!({
                 "identity": corpus.identity,
                 "instrument": corpus.instrument,
@@ -514,6 +543,44 @@ fn run(args: &[String]) -> Result<()> {
                 "instrument": corpus.instrument,
                 "months": corpus.months.len(),
                 "rows": corpus.months.iter().map(|m| m.rows).sum::<u64>(),
+            }))
+        }
+        ["historical-catalog-scan", root, output_root, report] => {
+            let catalog = rust_strategy_factory::historical_catalog::scan_catalog(
+                Path::new(root),
+                Path::new(output_root),
+                &[
+                    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD", "XAUUSD",
+                ],
+                rust_strategy_factory::historical_corpus::EXPECTED_MONTHS,
+            )?;
+            save_replace(report, &catalog)?;
+            print(&serde_json::json!({
+                "identity": catalog.identity,
+                "instruments": catalog.instruments.len(),
+                "eligible": catalog
+                    .instruments
+                    .iter()
+                    .filter(|i| i.eligible_for_research)
+                    .count(),
+                "structural_valid": catalog
+                    .instruments
+                    .iter()
+                    .filter(|i| i.structural_valid)
+                    .count(),
+            }))
+        }
+        ["historical-catalog-verify", report] => {
+            let catalog: rust_strategy_factory::historical_catalog::Catalog = read_json(report)?;
+            catalog.verify()?;
+            print(&serde_json::json!({
+                "identity": catalog.identity,
+                "instruments": catalog.instruments.len(),
+                "eligible": catalog
+                    .instruments
+                    .iter()
+                    .filter(|i| i.eligible_for_research)
+                    .count(),
             }))
         }
         ["historical-plan", root, output] => {

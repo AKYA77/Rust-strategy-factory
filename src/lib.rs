@@ -54,6 +54,8 @@ pub mod historical_migration;
 
 pub mod historical_corpus;
 
+pub mod historical_catalog;
+
 pub mod coverage;
 
 pub mod import_job;

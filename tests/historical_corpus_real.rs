@@ -1,5 +1,6 @@
 //! Real-corpus multi-month integration check. Skips cleanly when the VPS data is absent.
 
+use rust_strategy_factory::historical_catalog::{self};
 use rust_strategy_factory::historical_corpus::{self, EXPECTED_MONTHS};
 use std::path::Path;
 
@@ -24,4 +25,24 @@ fn real_corpus_registers_verifies_and_traverses() {
     .unwrap();
     assert_eq!(visited, spec.months[0].rows);
     assert!(expected_rows > 0);
+
+    let catalog = historical_catalog::scan_catalog(
+        catalog,
+        output,
+        &[
+            "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD", "XAUUSD",
+        ],
+        EXPECTED_MONTHS,
+    )
+    .unwrap();
+    catalog.verify().unwrap();
+    assert_eq!(catalog.instruments.len(), 8);
+    assert!(catalog.instruments.iter().all(|i| i.structural_valid));
+    assert!(catalog.instruments.iter().all(|i| !i.eligible_for_research));
+    let usdcad = catalog
+        .instruments
+        .iter()
+        .find(|i| i.instrument == "USDCAD")
+        .unwrap();
+    assert!(usdcad.months.iter().any(|m| m.quarantine_records == 353));
 }
