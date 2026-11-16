@@ -1376,66 +1376,75 @@ fn execute_corpus_step_prepared(
         }
         crate::storage::Claim::Acquired(lease) => lease,
     };
-    let corpus_id = run.spec.identity()?;
-    registry.validate_lease(&lease, clock())?;
-    if registry.experiment_key(&id)?.as_ref() != Some(&key) {
-        return Err("registered corpus inputs or build differ".into());
-    }
-    let prepared = preparation.prepare(&run)?;
-    match replay_corpus_internal(
-        run,
-        Some(ResumeControl {
-            registry,
-            lease: &lease,
-            max_new_chunks,
-            clock,
-        }),
-        Some(prepared),
-        Some(&mut resume),
-    )? {
-        None => {
-            let cursor = registry
-                .replay_checkpoint(&id)?
-                .ok_or("missing committed corpus checkpoint")?
-                .0
-                .cursor;
-            registry.yield_lease(&lease, clock())?;
-            preparation.stats.account_events_replayed += resume.advanced_events;
-            preparation.stats.trusted_prefix_events_skipped += resume.skipped_events;
-            preparation.stats.source_events_decoded += resume.decoded_events;
-            resume.advanced_events = 0;
-            resume.skipped_events = 0;
-            resume.decoded_events = 0;
-            preparation.resume = resume;
-            Ok(CorpusProgress::Pending {
-                experiment_id: id,
-                cursor,
-            })
+    let result = (|| {
+        let corpus_id = run.spec.identity()?;
+        registry.validate_lease(&lease, clock())?;
+        if registry.experiment_key(&id)?.as_ref() != Some(&key) {
+            return Err("registered corpus inputs or build differ".into());
         }
-        Some(replay) => {
-            preparation.stats.account_events_replayed += resume.advanced_events;
-            preparation.stats.trusted_prefix_events_skipped += resume.skipped_events;
-            preparation.stats.source_events_decoded += resume.decoded_events;
-            let control = registry.corpus_control(&id)?;
-            if control != "running" {
+        let prepared = preparation.prepare(&run)?;
+        match replay_corpus_internal(
+            run,
+            Some(ResumeControl {
+                registry,
+                lease: &lease,
+                max_new_chunks,
+                clock,
+            }),
+            Some(prepared),
+            Some(&mut resume),
+        )? {
+            None => {
+                let cursor = registry
+                    .replay_checkpoint(&id)?
+                    .ok_or("missing committed corpus checkpoint")?
+                    .0
+                    .cursor;
                 registry.yield_lease(&lease, clock())?;
-                return Ok(CorpusProgress::Held {
+                preparation.stats.account_events_replayed += resume.advanced_events;
+                preparation.stats.trusted_prefix_events_skipped += resume.skipped_events;
+                preparation.stats.source_events_decoded += resume.decoded_events;
+                resume.advanced_events = 0;
+                resume.skipped_events = 0;
+                resume.decoded_events = 0;
+                preparation.resume = resume;
+                Ok(CorpusProgress::Pending {
                     experiment_id: id,
-                    state: control,
-                });
+                    cursor,
+                })
             }
-            let result = serde_json::json!({"kind":"synthetic-corpus-replay-v1","corpus_identity":corpus_id,"tick_replay":replay});
-            registry.finish(&lease, clock(), crate::storage::Outcome::Completed, &result)?;
-            let result = registry
-                .result(&id)?
-                .ok_or("completed corpus receipt missing")?;
-            Ok(CorpusProgress::Completed {
-                experiment_id: id,
-                cached: false,
-                result,
-            })
+            Some(replay) => {
+                preparation.stats.account_events_replayed += resume.advanced_events;
+                preparation.stats.trusted_prefix_events_skipped += resume.skipped_events;
+                preparation.stats.source_events_decoded += resume.decoded_events;
+                let control = registry.corpus_control(&id)?;
+                if control != "running" {
+                    registry.yield_lease(&lease, clock())?;
+                    return Ok(CorpusProgress::Held {
+                        experiment_id: id,
+                        state: control,
+                    });
+                }
+                let result = serde_json::json!({"kind":"synthetic-corpus-replay-v1","corpus_identity":corpus_id,"tick_replay":replay});
+                registry.finish(&lease, clock(), crate::storage::Outcome::Completed, &result)?;
+                let result = registry
+                    .result(&id)?
+                    .ok_or("completed corpus receipt missing")?;
+                Ok(CorpusProgress::Completed {
+                    experiment_id: id,
+                    cached: false,
+                    result,
+                })
+            }
         }
+    })();
+    if result.is_err() {
+        // One best-effort cleanup attempt. Its transactional nonce/attempt/expiry
+        // fence cannot yield a replacement actor or demote a terminal result.
+        // Preserve the original execution error if cleanup itself is refused.
+        let _ = registry.yield_lease(&lease, clock());
     }
+    result
 }
 
 #[cfg(test)]
@@ -2119,95 +2128,147 @@ mod worker_preparation_tests {
 
     #[test]
     fn combined_warm_checkpoint_still_refuses_consumed_source_mutation_after_key_admission() {
-        for blocked in [false, true] {
-            let mut source = Source::new(if blocked {
-                "combined-admission-block"
-            } else {
-                "combined-admission-native"
-            });
-            let data = data::synthetic_fixture("EURUSD").unwrap();
-            let mut paths = Vec::new();
-            for (i, ticks) in data.ticks.chunks(data.ticks.len().div_ceil(2)).enumerate() {
-                let part = data::dataset(
-                    data.profile.clone(),
-                    ticks.to_vec(),
-                    &data.manifest.source,
-                    data.manifest.archive_hash.clone(),
-                    true,
-                )
-                .unwrap();
-                let path = source
-                    .root
-                    .join(format!("part-{i}.{}", if blocked { "rsfb" } else { "rsf" }));
-                if blocked {
-                    crate::blocked_native::write(&path, &part, 64).unwrap();
-                } else {
-                    native::write(&path, &part).unwrap();
-                }
-                paths.push(path);
-            }
-            source.spec = corpus::describe(&paths, 100000).unwrap();
-            let strategy = strategy();
-            let costs = Costs::default();
-            let budget = budget();
-            let run = || CorpusRun {
-                base: &source.root,
-                spec: &source.spec,
-                strategy: &strategy,
-                costs: &costs,
-                budget,
-            };
-            let mut registry =
-                crate::storage::Registry::open(&source.root.join("state.sqlite")).unwrap();
-            let mut cache = WorkerPreparation::default();
-            let first = execute_corpus_step_prepared(
-                &mut registry,
-                run(),
-                1,
-                60000,
-                &mut || 1000,
-                &mut cache,
-            )
-            .unwrap();
-            let CorpusProgress::Pending { experiment_id, .. } = first else {
-                panic!()
-            };
-            assert!(cache.resume.checkpoint.is_some());
-            let prior = registry
-                .replay_checkpoint(&experiment_id)
-                .unwrap()
-                .unwrap()
-                .1;
-            let mut calls = 0;
-            let error = execute_corpus_step_prepared(
-                &mut registry,
-                run(),
-                1,
-                60000,
-                &mut || {
-                    calls += 1;
-                    if calls == 2 {
-                        let mut bytes = fs::read(&paths[0]).unwrap();
-                        let last = bytes.len() - 1;
-                        bytes[last] ^= 1;
-                        fs::write(&paths[0], bytes).unwrap();
+        std::thread::scope(|scope| {
+            for blocked in [false, true] {
+                scope.spawn(move || {
+                    let mut source = Source::new(if blocked {
+                        "combined-admission-block"
+                    } else {
+                        "combined-admission-native"
+                    });
+                    let data = data::synthetic_fixture("EURUSD").unwrap();
+                    let mut paths = Vec::new();
+                    for (i, ticks) in data.ticks.chunks(data.ticks.len().div_ceil(2)).enumerate() {
+                        let part = data::dataset(
+                            data.profile.clone(),
+                            ticks.to_vec(),
+                            &data.manifest.source,
+                            data.manifest.archive_hash.clone(),
+                            true,
+                        )
+                        .unwrap();
+                        let path = source
+                            .root
+                            .join(format!("part-{i}.{}", if blocked { "rsfb" } else { "rsf" }));
+                        if blocked {
+                            crate::blocked_native::write(&path, &part, 64).unwrap();
+                        } else {
+                            native::write(&path, &part).unwrap();
+                        }
+                        paths.push(path);
                     }
-                    1001
-                },
-                &mut cache,
-            )
-            .unwrap_err();
-            assert!(error.contains("checksum"), "{error}");
-            assert_eq!(
-                registry
-                    .replay_checkpoint(&experiment_id)
-                    .unwrap()
-                    .unwrap()
-                    .1,
-                prior
-            );
-            assert!(registry.result(&experiment_id).unwrap().is_none());
-        }
+                    source.spec = corpus::describe(&paths, 100000).unwrap();
+                    let strategy = strategy();
+                    let costs = Costs::default();
+                    let budget = budget();
+                    let run = || CorpusRun {
+                        base: &source.root,
+                        spec: &source.spec,
+                        strategy: &strategy,
+                        costs: &costs,
+                        budget,
+                    };
+                    let mut registry =
+                        crate::storage::Registry::open(&source.root.join("state.sqlite")).unwrap();
+                    let mut cache = WorkerPreparation::default();
+                    let first = execute_corpus_step_prepared(
+                        &mut registry,
+                        run(),
+                        1,
+                        60000,
+                        &mut || 1000,
+                        &mut cache,
+                    )
+                    .unwrap();
+                    let CorpusProgress::Pending { experiment_id, .. } = first else {
+                        panic!()
+                    };
+                    assert!(cache.resume.checkpoint.is_some());
+                    let prior = registry
+                        .replay_checkpoint(&experiment_id)
+                        .unwrap()
+                        .unwrap()
+                        .1;
+                    let original = fs::read(&paths[0]).unwrap();
+                    let mut calls = 0;
+                    let error = execute_corpus_step_prepared(
+                        &mut registry,
+                        run(),
+                        1,
+                        60000,
+                        &mut || {
+                            calls += 1;
+                            if calls == 2 {
+                                let mut bytes = fs::read(&paths[0]).unwrap();
+                                let last = bytes.len() - 1;
+                                bytes[last] ^= 1;
+                                fs::write(&paths[0], bytes).unwrap();
+                            }
+                            1001
+                        },
+                        &mut cache,
+                    )
+                    .unwrap_err();
+                    assert!(error.contains("checksum"), "{error}");
+                    assert_eq!(
+                        registry
+                            .replay_checkpoint(&experiment_id)
+                            .unwrap()
+                            .unwrap()
+                            .1,
+                        prior
+                    );
+                    assert!(registry.result(&experiment_id).unwrap().is_none());
+                    assert!(cache.resume.checkpoint.is_none());
+                    let sql = rusqlite::Connection::open(source.root.join("state.sqlite")).unwrap();
+                    let (state, token): (String, Option<String>) = sql
+                        .query_row(
+                            "SELECT state,token FROM experiments WHERE id=?1",
+                            [&experiment_id],
+                            |r| Ok((r.get(0)?, r.get(1)?)),
+                        )
+                        .unwrap();
+                    assert_eq!(state, "queued");
+                    assert!(token.is_none());
+                    assert_eq!(registry.counts().unwrap().attempts, 2);
+                    fs::write(&paths[0], original).unwrap();
+                    let before = cache.stats.account_events_replayed;
+                    let progress = execute_corpus_step_prepared(
+                        &mut registry,
+                        run(),
+                        1,
+                        60000,
+                        &mut || 1002,
+                        &mut cache,
+                    )
+                    .unwrap();
+                    let CorpusProgress::Completed {
+                        result,
+                        cached: false,
+                        ..
+                    } = progress
+                    else {
+                        panic!("{progress:?}")
+                    };
+                    // Error consumes private authority. Immediate retry must reconstruct
+                    // the exact complete account prefix rather than reuse failed state.
+                    assert_eq!(
+                        cache.stats.account_events_replayed - before,
+                        data.ticks.len() as u64
+                    );
+                    let reference =
+                        replay_corpus(&source.root, &source.spec, &strategy, &costs, budget)
+                            .unwrap();
+                    assert!(!reference.trades.is_empty());
+                    assert_eq!(
+                        result.result["tick_replay"],
+                        serde_json::to_value(reference).unwrap()
+                    );
+                    assert_eq!(registry.counts().unwrap().attempts, 3);
+                    registry.integrity().unwrap();
+                });
+            }
+        });
     }
 
     #[test]
