@@ -101,7 +101,6 @@ pub struct Config {
     pub output_dir: PathBuf,
     pub profile: Profile,
     pub legacy_manifest: Option<LegacyManifest>,
-    pub legacy_manifest_path: Option<PathBuf>,
     pub import_evidence: Option<ImportEvidence>,
     pub chunk_events: usize,
 }
@@ -117,7 +116,6 @@ impl Config {
             output_dir: output_dir.to_path_buf(),
             profile,
             legacy_manifest: None,
-            legacy_manifest_path: None,
             import_evidence: None,
             chunk_events,
         })
@@ -140,7 +138,6 @@ impl Config {
             return Err("unsupported legacy schema version".into());
         }
         self.legacy_manifest = Some(manifest);
-        self.legacy_manifest_path = Some(path.to_path_buf());
         Ok(self)
     }
     pub fn with_import_receipt(mut self, path: &Path) -> Result<Self> {
@@ -166,6 +163,26 @@ impl Config {
                 .cloned()
                 .unwrap_or(serde_json::Value::Null),
         };
+        let hex64 = |value: &str| value.len() == 64 && value.bytes().all(|b| b.is_ascii_hexdigit());
+        if !evidence.corrected_content_sha256.is_empty()
+            && !hex64(&evidence.corrected_content_sha256)
+        {
+            return Err(
+                "import evidence corrected_content_sha256 must be 64 hexadecimal characters or empty"
+                    .into(),
+            );
+        }
+        for (name, value) in [
+            ("source_order_correction", &evidence.source_order_correction),
+            (
+                "source_quality_quarantine",
+                &evidence.source_quality_quarantine,
+            ),
+        ] {
+            if !value.is_object() && !value.is_null() {
+                return Err(format!("import evidence {name} must be an object or null"));
+            }
+        }
         self.import_evidence = Some(evidence);
         Ok(self)
     }
@@ -202,6 +219,8 @@ pub struct SourceReceipt {
     pub quality_status: String,
     pub fidelity: String,
     pub provenance: serde_json::Value,
+    #[serde(default)]
+    pub source_description: String,
     pub import_evidence: Option<ImportEvidence>,
     pub limitations: Vec<String>,
 }
@@ -225,6 +244,7 @@ pub struct Receipt {
     pub limitations: String,
 }
 
+#[derive(Debug)]
 struct State {
     chunks: Vec<ChunkReceipt>,
     rows_done: u64,
@@ -583,6 +603,9 @@ fn rebuild_state(config: &Config, source_desc: &str, archive: &str) -> Result<St
         if events == 0 {
             return Err("empty migrated chunk".into());
         }
+        if events as usize > MAX_CHUNK_EVENTS {
+            return Err("adopted migrated chunk exceeds the native corpus admission cap".into());
+        }
         if dataset.profile != config.profile
             || dataset.manifest.parser_version != CHUNK_PARSER_VERSION
             || dataset.manifest.source != source_desc
@@ -733,7 +756,7 @@ fn verify_reuse_scope(config: &Config, receipt: &Receipt) -> Result<()> {
     if receipt.class != DataClass::RealStructurallyValid {
         return Err("completed migration receipt is not structurally valid".into());
     }
-    if receipt.profile != config.profile {
+    if receipt.profile != config.profile || receipt.source.instrument != config.profile.symbol {
         return Err("requested profile does not match the completed migration".into());
     }
     let source_hash = sha256_file(&config.source_parquet)?;
@@ -808,14 +831,26 @@ fn verify_chunks_against_source(
             let dataset = current.as_ref().ok_or("adopted native chunk missing")?;
             let adopted = dataset.ticks[tick_index];
             let ts_ns = cols.ts[i];
-            if ts_ns < 0 || ts_ns % NS_PER_MS != 0 || cols.scale[i] != expected_scale {
+            if ts_ns < 0
+                || ts_ns % NS_PER_MS != 0
+                || cols.scale[i] != expected_scale
+                || !cols.quality[i].is_empty()
+            {
                 return Err("legacy source row is inconsistent during equivalence check".into());
+            }
+            let bid_int = cols.bid[i];
+            let ask_int = cols.ask[i];
+            if bid_int <= 0 || ask_int < bid_int || bid_int % factor != 0 || ask_int % factor != 0 {
+                return Err(
+                    "legacy source row is not exact in profile units during equivalence check"
+                        .into(),
+                );
             }
             let expected = Tick {
                 timestamp_ms: ts_ns / NS_PER_MS,
                 sequence: seen,
-                bid: cols.bid[i] / factor,
-                ask: cols.ask[i] / factor,
+                bid: bid_int / factor,
+                ask: ask_int / factor,
             };
             if adopted != expected {
                 return Err(
@@ -1057,7 +1092,14 @@ pub fn convert(config: &Config) -> Result<Receipt> {
         return Err("legacy Parquet row count mismatch".into());
     }
     let factor = match &config.legacy_manifest {
-        Some(manifest) => convert_scale(config, manifest.price_scale)?,
+        Some(manifest) => {
+            if manifest.instrument != config.profile.symbol {
+                return Err(
+                    "legacy manifest instrument does not match the requested profile".into(),
+                );
+            }
+            convert_scale(config, manifest.price_scale)?
+        }
         None => {
             let first = reader.get_row_group(0).map_err(err)?;
             let cols = read_group(first.as_ref())?;
@@ -1232,6 +1274,7 @@ pub fn convert(config: &Config) -> Result<Receipt> {
             .as_ref()
             .map(|m| m.provenance.clone())
             .unwrap_or(serde_json::Value::Null),
+        source_description: source_desc.clone(),
         import_evidence: config.import_evidence.clone(),
         limitations: limitations.clone(),
     };
@@ -1289,9 +1332,16 @@ pub fn verify_output(dir: &Path, source_parquet: Option<&Path>) -> Result<Receip
         let path = dir.join(&chunk.file);
         let dataset = native::read(&path)?;
         let events = dataset.ticks.len() as u64;
+        if events == 0 {
+            return Err("empty migrated chunk".into());
+        }
+        if events > MAX_CHUNK_EVENTS as u64 {
+            return Err("migrated chunk exceeds the native corpus admission cap".into());
+        }
         if dataset.profile != receipt.profile
             || dataset.manifest.parser_version != CHUNK_PARSER_VERSION
             || dataset.manifest.source != source_desc
+            || dataset.manifest.archive_hash != receipt.source.source_sha256
             || dataset.manifest.class != DataClass::RealStructurallyValid
             || dataset.manifest.events as u64 != events
             || chunk.events != events
@@ -1346,6 +1396,7 @@ pub fn verify_output(dir: &Path, source_parquet: Option<&Path>) -> Result<Receip
         let scan = scan_quote_stream(source)?;
         if scan.hash != receipt.quote_stream_sha256
             || scan.rows != receipt.source.rows
+            || scan.rows != receipt.events
             || scan.first_ns != receipt.source.first_ns
             || scan.last_ns != receipt.source.latest_verified_ns
             || scan.meta.instrument != receipt.source.instrument
@@ -1368,6 +1419,9 @@ pub fn verify_output(dir: &Path, source_parquet: Option<&Path>) -> Result<Receip
 }
 
 fn source_description_from_receipt(receipt: &Receipt) -> String {
+    if !receipt.source.source_description.is_empty() {
+        return receipt.source.source_description.clone();
+    }
     format!(
         "historical-parquet-migration-v1:{}:{}",
         receipt.source.dataset_hash, receipt.source.source_sha256
@@ -2339,6 +2393,70 @@ mod tests {
         assert!(
             error.contains("decoded string byte budget"),
             "oversized decoded string column was not refused: {error}"
+        );
+    }
+
+    #[test]
+    fn no_manifest_conversion_is_verifiable() {
+        let dir = temp_dir("nomanifest");
+        let parquet = dir.join("legacy.parquet");
+        write_legacy(&parquet, &rows(20), 2).unwrap();
+        let output = dir.join("output");
+        let config = Config::new(&parquet, &output, migration_profile("NZDUSD")).unwrap();
+        let receipt = convert(&config).unwrap();
+        assert!(
+            receipt
+                .source
+                .source_description
+                .starts_with("historical-parquet-migration-v1:unverified:")
+        );
+        verify_output(&output, None).unwrap();
+        verify_output(&output, Some(&parquet)).unwrap();
+    }
+
+    #[test]
+    fn instrument_profile_mismatch_is_refused() {
+        let (dir, parquet, output, _) = fixture(migration_profile("NZDUSD"), 7);
+        let config = Config::new(&parquet, &output, migration_profile("EURUSD"))
+            .unwrap()
+            .with_chunk_events(7)
+            .unwrap()
+            .with_manifest(&dir.join("manifest.json"))
+            .unwrap();
+        assert!(
+            convert(&config).is_err(),
+            "manifest instrument was not bound to the requested profile"
+        );
+    }
+
+    #[test]
+    fn adopted_chunk_above_corpus_cap_is_refused() {
+        let dir = temp_dir("bigchunk");
+        let output = dir.join("output");
+        fs::create_dir_all(&output).unwrap();
+        let profile = migration_profile("NZDUSD");
+        let ticks: Vec<Tick> = (0..100_001)
+            .map(|i| Tick {
+                timestamp_ms: 1_000 + i,
+                sequence: i as u64,
+                bid: 573_080,
+                ask: 573_100,
+            })
+            .collect();
+        let dataset = data::dataset(
+            profile.clone(),
+            ticks,
+            "source-desc",
+            "archive".into(),
+            false,
+        )
+        .unwrap();
+        native::write(&output.join("chunk-000000.rsf"), &dataset).unwrap();
+        let config = Config::new(&dir.join("missing.parquet"), &output, profile).unwrap();
+        let error = rebuild_state(&config, "source-desc", "archive").unwrap_err();
+        assert!(
+            error.contains("admission cap"),
+            "oversized adopted chunk was not refused: {error}"
         );
     }
 
