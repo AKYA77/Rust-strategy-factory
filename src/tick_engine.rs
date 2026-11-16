@@ -1213,6 +1213,13 @@ fn corpus_source_binding(run: &CorpusRun<'_>) -> Result<String> {
 }
 #[derive(Default, Debug, Clone, Copy, Serialize)]
 pub struct CorpusPreparationStats {
+    /// Distinct source inventories built by full batch preflight traversal.
+    pub preflight_inventory_builds: usize,
+    /// Existing private inventories reused after fresh verification of every artifact byte.
+    pub preflight_inventory_reuses: usize,
+    /// Logical quote events decoded by full preflight inventory construction.
+    /// Excludes candle preparation, replay, raw byte scans and validation iterations.
+    pub preflight_source_events_decoded: u64,
     pub builds: usize,
     pub reuses: usize,
     /// Verification attempts for warm retained candle contexts.
@@ -1725,13 +1732,36 @@ fn execute_corpus_batch_session(
     let mut identities = std::collections::BTreeSet::new();
     let mut sources = std::collections::BTreeMap::new();
     let mut invocation_inputs = Vec::with_capacity(runs.len());
+    let mut preparation = CorpusPreparationStats::default();
     for run in runs {
         let binding = corpus_source_binding(run)?;
         if !sources.contains_key(&binding) {
-            sources.insert(
-                binding.clone(),
-                crate::corpus::source_facts(run.base, run.spec)?,
-            );
+            // Reuse only already-retained private source proof, independently of
+            // account/session authority. Every current byte and operational cap
+            // is rechecked before the frozen key or registry can be touched.
+            let retained = session.workers.iter().find_map(|worker| {
+                worker
+                    .key_inventory
+                    .as_ref()
+                    .filter(|(stored, _)| stored == &binding)
+            });
+            let inventory = match retained {
+                Some((_, inventory)) => {
+                    inventory.verify_current(run.base, run.spec)?;
+                    preparation.preflight_inventory_reuses += 1;
+                    inventory.clone()
+                }
+                None => {
+                    let inventory = crate::corpus::source_facts(run.base, run.spec)?;
+                    preparation.preflight_inventory_builds += 1;
+                    preparation.preflight_source_events_decoded = preparation
+                        .preflight_source_events_decoded
+                        .checked_add(inventory.events())
+                        .ok_or("preflight decode counter overflow")?;
+                    inventory
+                }
+            };
+            sources.insert(binding.clone(), inventory);
         }
         let observed = sources
             .get(&binding)
@@ -1762,7 +1792,7 @@ fn execute_corpus_batch_session(
                 return Ok(CorpusBatchReport {
                     workers_started: 0,
                     worker_failures: 1,
-                    preparation: CorpusPreparationStats::default(),
+                    preparation,
                     jobs: runs.iter().map(|_| Err(error.message.clone())).collect(),
                     failure_kinds: vec![Some(error.kind); runs.len()],
                 });
@@ -1784,7 +1814,6 @@ fn execute_corpus_batch_session(
     let mut results: Vec<Option<Result<CorpusProgress>>> = (0..runs.len()).map(|_| None).collect();
     let mut worker_failures = 0;
     let mut workers_started = 0;
-    let mut preparation = CorpusPreparationStats::default();
     std::thread::scope(|scope| {
         let mut handles = Vec::new();
         for ((i, mut registry), mut worker_preparation) in

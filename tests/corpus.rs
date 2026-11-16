@@ -2273,6 +2273,12 @@ fn actual_sqlite_writer_contention_has_typed_admission_failures_and_no_child_cla
     };
     let blocked = tick_engine::execute_corpus_batch(&db, &runs, limits).unwrap();
     assert_eq!(blocked.workers_started, 0);
+    assert_eq!(blocked.preparation.preflight_inventory_builds, 1);
+    assert_eq!(blocked.preparation.preflight_inventory_reuses, 0);
+    assert_eq!(
+        blocked.preparation.preflight_source_events_decoded,
+        corpus::source_facts(&f.root, &f.spec).unwrap().events()
+    );
     assert_eq!(
         blocked.failure_kinds,
         vec![Some(Kind::RegistryAdmissionBusy)]
