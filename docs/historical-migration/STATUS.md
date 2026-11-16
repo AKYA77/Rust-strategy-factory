@@ -198,6 +198,30 @@ the windowed fix.
   permanent regression tests. The `tests/corpus` campaign-owned supervision test was hardened
   against scheduler-idle timing with an unchanged `exhausted` assertion.
 
+## Adversarial review of the corpus/catalog (this session)
+
+A fresh-context adversarial review (empirical, throwaway harness against the real corpus)
+found and we fixed:
+
+- **High:** catalog scan marked a foreign/self-consistent receipt as `Verified`; it now binds
+  each receipt to the canonical partition identity (dataset/source/parquet path/rows/
+  instrument) and reports a mismatch as a load failure. The catalog path also validates plan
+  month ranges, duplicates and contiguity.
+- **High:** `register`/`verify` did not bind monthly output to the canonical source bytes.
+  `verify` now binds month instrument, parquet hash and parquet path and refuses a chunk
+  inventory that differs from the receipt; `verify_bound` (CLI `historical-corpus-verify-bound`)
+  performs full source-byte equivalence per month.
+- **Medium/low:** eligibility also requires no rejected review; `bind_assertions` binds the
+  catalog identity; `bind_review` verifies the catalog and the report `catalog_hash`; gate
+  transitions clear stale binding metadata; receipt reads are size-capped; correction counts
+  saturate; source attribution is exact field binding; traversal and catalog verification were
+  tightened. Regression tests cover the foreign-receipt, truncated-inventory, forged-report,
+  wrong-identity, wrong-catalog-hash and rejected-review cases.
+
+Residual accepted: `register`/`verify`/`audit` trust the per-month receipt as the trust
+anchor; `verify_bound` and `historical-verify <dir> <source>` are the explicit source-byte
+equivalence checks. `audit` does not re-read the Parquet.
+
 ## Remaining work
 
 1. ~~Run `scripts/check.sh`~~ — fmt and Clippy pass; lib tests pass; full suite has two
