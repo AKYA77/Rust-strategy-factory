@@ -459,6 +459,63 @@ fn run(args: &[String]) -> Result<()> {
                 None,
             )?)
         }
+        [
+            "historical-corpus-register",
+            root,
+            output_root,
+            instrument,
+            spec,
+            expected,
+        ] => {
+            let expected: usize = expected
+                .parse()
+                .map_err(|_| "invalid expected month count")?;
+            let corpus = rust_strategy_factory::historical_corpus::register(
+                Path::new(root),
+                Path::new(output_root),
+                instrument,
+                expected,
+            )?;
+            save(spec, &corpus)?;
+            print(&serde_json::json!({
+                "identity": corpus.identity,
+                "instrument": corpus.instrument,
+                "months": corpus.months.len(),
+                "rows": corpus.months.iter().map(|m| m.rows).sum::<u64>(),
+            }))
+        }
+        [
+            "historical-corpus-register",
+            root,
+            output_root,
+            instrument,
+            spec,
+        ] => {
+            let corpus = rust_strategy_factory::historical_corpus::register(
+                Path::new(root),
+                Path::new(output_root),
+                instrument,
+                rust_strategy_factory::historical_corpus::EXPECTED_MONTHS,
+            )?;
+            save(spec, &corpus)?;
+            print(&serde_json::json!({
+                "identity": corpus.identity,
+                "instrument": corpus.instrument,
+                "months": corpus.months.len(),
+                "rows": corpus.months.iter().map(|m| m.rows).sum::<u64>(),
+            }))
+        }
+        ["historical-corpus-verify", spec] => {
+            let corpus: rust_strategy_factory::historical_corpus::HistoricalCorpus =
+                read_json(spec)?;
+            rust_strategy_factory::historical_corpus::verify(&corpus)?;
+            print(&serde_json::json!({
+                "identity": corpus.identity,
+                "instrument": corpus.instrument,
+                "months": corpus.months.len(),
+                "rows": corpus.months.iter().map(|m| m.rows).sum::<u64>(),
+            }))
+        }
         ["historical-plan", root, output] => {
             let partitions = rust_strategy_factory::historical_migration::plan(Path::new(root))?;
             let rows = partitions.iter().map(|p| p.rows).sum::<u64>();

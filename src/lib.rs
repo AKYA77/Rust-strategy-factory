@@ -52,6 +52,8 @@ pub mod parquet_store;
 
 pub mod historical_migration;
 
+pub mod historical_corpus;
+
 pub mod coverage;
 
 pub mod import_job;
