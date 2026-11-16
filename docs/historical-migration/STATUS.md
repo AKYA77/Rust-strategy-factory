@@ -192,6 +192,11 @@ the windowed fix.
   observation, corrections and quarantine) and the unknowns that require owner/external
   determination (exact session/holiday calendar, licence, broker specification, scientific
   approval). `docs/historical-migration/PROGRESS.md` records the completion rubric.
+- Fresh-context review fixes: `bind_review` now verifies the review report (`Report::verified`:
+  record hash, version, evidence hashes) before trusting any decision, and `validate_months`
+  rejects out-of-range calendar months that could alias into the next year. Both have
+  permanent regression tests. The `tests/corpus` campaign-owned supervision test was hardened
+  against scheduler-idle timing with an unchanged `exhausted` assertion.
 
 ## Remaining work
 
