@@ -19,12 +19,14 @@ are not counted as integrated into `main`.
 ## Accounting
 
 - **Software implementation completeness (Metric A): ~76%.**
-- **Verified end-to-end completion (Metric B): ~62%.**
-- **Progress added this milestone: +2 points.** A genuine VPS-data structural pipeline
-  (corpus → observed source facts → closed M1 candles → causal signals) now runs for all
-  eight instruments (47 s, all nonzero), and the whole-project gap assessment is recorded.
-  The gain is bounded because the execution/replay path for real FX data, the merged Codex
-  stack, live VPS acceptance and the external approvals did not move.
+- **Verified end-to-end completion (Metric B): ~63%.**
+- **Progress added this milestone: +3 points.** A genuine VPS-data structural pipeline
+  (corpus → observed source facts → closed M1 candles → causal signals) runs for all eight
+  instruments; a deterministic per-instrument **study report** is now produced; and
+  `historical-corpus-verify-bound` confirmed full source-byte equivalence for **all 421,078,937
+  events** across all eight instruments. The whole-project gap assessment, storage report and
+  Codex compatibility notes are recorded. The gain is bounded because real/FX execution, the
+  merged Codex stack, live VPS acceptance and external approvals did not move.
 - **Remaining: ~38% software, ~38% verified. Target gap to 95%: 19 points software, 33 points
   verified.**
 - Baseline used: external provisional estimates (software 74%, verified 60%). The rubric and

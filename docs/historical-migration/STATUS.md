@@ -198,6 +198,15 @@ the windowed fix.
   permanent regression tests. The `tests/corpus` campaign-owned supervision test was hardened
   against scheduler-idle timing with an unchanged `exhausted` assertion.
 
+## Full source-bound verification (all eight instruments)
+
+`historical-corpus-verify-bound` was run for every instrument: each month's native chunks
+are compared tick-for-tick against the canonical legacy Parquet prefix, not just their own
+receipt. All 8/8 passed (`bound=0`): EURUSD 137 s, GBPUSD 135 s, USDJPY 190 s, USDCHF 100 s,
+USDCAD 124 s, AUDUSD 101 s, NZDUSD 79 s, XAUUSD 461 s (~22 min total, 421,078,937 events).
+Combined with the bounded audit and the real-data structural pipeline, the converted corpus
+is verified for source equivalence, ordering, row counts, candles and causal signals.
+
 ## Adversarial review of the corpus/catalog (this session)
 
 A fresh-context adversarial review (empirical, throwaway harness against the real corpus)
