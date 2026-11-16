@@ -3047,6 +3047,29 @@ fn owned_fleet_call(
         .output()
         .unwrap()
 }
+/// Wait-capable fleet driver: scheduler-idle retry backoffs are waited out instead of
+/// being treated as a terminal stop, so the bounded visit budget can actually be reached.
+fn owned_fleet_loop_call(
+    db: &std::path::Path,
+    id: &str,
+    policy: &std::path::Path,
+    limits: &std::path::Path,
+    maximum: &str,
+    wait_ms: &str,
+) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-fleet-loop",
+            db.to_str().unwrap(),
+            id,
+            policy.to_str().unwrap(),
+            limits.to_str().unwrap(),
+            maximum,
+            wait_ms,
+        ])
+        .output()
+        .unwrap()
+}
 #[test]
 fn owned_fleet_rotation_preserves_scalar_receipts_exact_cost_observations_and_backup() {
     use rust_strategy_factory::{corpus_fleet, operator_config, storage::Registry, tick_engine};
@@ -3056,7 +3079,7 @@ fn owned_fleet_rotation_preserves_scalar_receipts_exact_cost_observations_and_ba
     let db = first.root.join("fleet.sqlite");
     let id = corpus_fleet::register_file(&file, &db).unwrap();
     let (policy, limits) = owned_fleet_files(&first.root);
-    let out = owned_fleet_call(&db, &id, &policy, &limits, "100");
+    let out = owned_fleet_loop_call(&db, &id, &policy, &limits, "100", "60000");
     assert!(
         out.status.success(),
         "{}",
@@ -4724,6 +4747,29 @@ fn rotation_command(
         .output()
         .unwrap()
 }
+/// Wait-capable rotation driver for the final recovery: it waits out scheduler-idle
+/// retry backoffs so the restored source can be exhausted within the visit budget.
+fn rotation_loop_command(
+    db: &std::path::Path,
+    id: &str,
+    policy: &std::path::Path,
+    limits: &std::path::Path,
+    maximum: &str,
+    wait_ms: &str,
+) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "campaign-rotation-loop",
+            db.to_str().unwrap(),
+            id,
+            policy.to_str().unwrap(),
+            limits.to_str().unwrap(),
+            maximum,
+            wait_ms,
+        ])
+        .output()
+        .unwrap()
+}
 #[test]
 fn campaign_rotation_isolates_unavailable_input_preserves_fair_cursor_then_recovers_with_exact_costs()
  {
@@ -4780,7 +4826,7 @@ fn campaign_rotation_isolates_unavailable_input_preserves_fair_cursor_then_recov
         "0"
     );
     campaign_rotation::control(&mut registry, &id, "running").unwrap();
-    let out = rotation_command(&db, &id, &policy, &limits, "100");
+    let out = rotation_loop_command(&db, &id, &policy, &limits, "100", "60000");
     assert!(
         out.status.success(),
         "{}",

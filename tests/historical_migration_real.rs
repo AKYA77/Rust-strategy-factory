@@ -62,7 +62,7 @@ fn real_samples_convert_and_verify() {
             .unwrap()
             .with_manifest(&manifest)
             .unwrap()
-            .with_chunk_events(500_000)
+            .with_chunk_events(100_000)
             .unwrap();
         let receipt_path = PathBuf::from(receipt);
         if receipt_path.is_file() {

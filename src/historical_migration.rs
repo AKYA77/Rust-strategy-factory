@@ -37,12 +37,17 @@ pub const CHUNK_PARSER_VERSION: &str = "historical-parquet-migration-chunk-v1";
 /// Receipt identity for a completed migration directory.
 pub const RECEIPT_VERSION: &str = "historical-parquet-migration-receipt-v1";
 const LEGACY_SCHEMA: &str = "message schema { optional binary instrument_id (String); optional int64 event_ts_utc_ns; optional int64 bid_int; optional int64 ask_int; optional int64 price_scale; optional binary source_id (String); optional binary ingest_batch_id (String); optional int64 original_record_order; optional binary source_precision (String); optional binary quality_flags (String); }";
-const DEFAULT_CHUNK_EVENTS: usize = 500_000;
-const MAX_CHUNK_EVENTS: usize = 1_000_000;
+/// Aligned with the native corpus admission cap (`ordered-native-corpus-v1` = 100,000).
+const DEFAULT_CHUNK_EVENTS: usize = 100_000;
+const MAX_CHUNK_EVENTS: usize = 100_000;
 const MAX_PARQUET_FILE: u64 = 512 * 1024 * 1024;
 const MAX_CHUNKS: usize = 8_192;
 const NS_PER_MS: i64 = 1_000_000;
 const GAP_MS: i64 = 3_600_000;
+/// Decoded-row and string-byte preflight for one untrusted Parquet row group. A compressed
+/// file-size ceiling does not bound decoded allocation, so these are enforced explicitly.
+const MAX_ROW_GROUP_ROWS: usize = 65_536;
+const MAX_GROUP_STRING_BYTES: u64 = 256 * 1024 * 1024;
 
 /// Trusted legacy catalog manifest. The 24-field shape is the canonical `data/v2` shape;
 /// alternate or incomplete legacy manifests are refused rather than guessed at.
@@ -116,7 +121,7 @@ impl Config {
     }
     pub fn with_chunk_events(mut self, chunk_events: usize) -> Result<Self> {
         if chunk_events == 0 || chunk_events > MAX_CHUNK_EVENTS {
-            return Err("chunk budget must be 1..=1000000".into());
+            return Err("chunk budget must be 1..=100000".into());
         }
         self.chunk_events = chunk_events;
         Ok(self)
@@ -358,6 +363,7 @@ fn read_string_column(
     group: &dyn RowGroupReader,
     index: usize,
     rows: usize,
+    budget: &mut u64,
 ) -> Result<Vec<String>> {
     let mut def = Vec::with_capacity(rows);
     let mut values = Vec::with_capacity(rows);
@@ -373,6 +379,13 @@ fn read_string_column(
                 "legacy column {index} level/value count or null mismatch"
             ));
         }
+        let bytes = values.iter().map(|value| value.len() as u64).sum::<u64>();
+        if bytes > *budget {
+            return Err(format!(
+                "legacy column {index} exceeds the decoded string byte budget"
+            ));
+        }
+        *budget -= bytes;
         values
             .iter()
             .map(|value| value.as_utf8().map(str::to_string).map_err(err))
@@ -387,17 +400,21 @@ fn read_group(group: &dyn RowGroupReader) -> Result<GroupColumns> {
     if rows == 0 {
         return Err("legacy Parquet row group is empty".into());
     }
+    if rows > MAX_ROW_GROUP_ROWS {
+        return Err("legacy Parquet row group exceeds the decoded-row budget".into());
+    }
+    let mut string_budget = MAX_GROUP_STRING_BYTES;
     Ok(GroupColumns {
-        instrument: read_string_column(group, 0, rows)?,
+        instrument: read_string_column(group, 0, rows, &mut string_budget)?,
         ts: read_int64_column(group, 1, rows)?,
         bid: read_int64_column(group, 2, rows)?,
         ask: read_int64_column(group, 3, rows)?,
         scale: read_int64_column(group, 4, rows)?,
-        source: read_string_column(group, 5, rows)?,
-        batch: read_string_column(group, 6, rows)?,
+        source: read_string_column(group, 5, rows, &mut string_budget)?,
+        batch: read_string_column(group, 6, rows, &mut string_budget)?,
         order: read_int64_column(group, 7, rows)?,
-        precision: read_string_column(group, 8, rows)?,
-        quality: read_string_column(group, 9, rows)?,
+        precision: read_string_column(group, 8, rows, &mut string_budget)?,
+        quality: read_string_column(group, 9, rows, &mut string_budget)?,
     })
 }
 
@@ -674,8 +691,8 @@ fn write_chunk(
     Ok(())
 }
 
-fn convert_scale(config: &Config, scale: i64) -> Result<i64> {
-    let profile_scale = config.profile.price_scale;
+fn scale_factor(profile: &Profile, scale: i64) -> Result<i64> {
+    let profile_scale = profile.price_scale;
     if profile_scale <= 0 || scale <= 0 || scale % profile_scale != 0 {
         return Err("legacy price scale is not an exact multiple of the profile scale".into());
     }
@@ -684,6 +701,113 @@ fn convert_scale(config: &Config, scale: i64) -> Result<i64> {
         return Err("legacy price scale conversion factor invalid".into());
     }
     Ok(factor)
+}
+
+fn convert_scale(config: &Config, scale: i64) -> Result<i64> {
+    scale_factor(&config.profile, scale)
+}
+
+/// Bind idempotent reuse to the exact requested source bytes, manifest identity and profile.
+/// A self-consistent existing receipt is not evidence for a different requested conversion.
+fn verify_reuse_scope(config: &Config, receipt: &Receipt) -> Result<()> {
+    if receipt.version != RECEIPT_VERSION {
+        return Err("completed migration receipt version mismatch".into());
+    }
+    if receipt.class != DataClass::RealStructurallyValid {
+        return Err("completed migration receipt is not structurally valid".into());
+    }
+    if receipt.profile != config.profile {
+        return Err("requested profile does not match the completed migration".into());
+    }
+    let source_hash = sha256_file(&config.source_parquet)?;
+    if source_hash != receipt.source.parquet_sha256 {
+        return Err("requested source bytes do not match the completed migration".into());
+    }
+    if let Some(manifest) = &config.legacy_manifest
+        && (receipt.source.dataset_hash != manifest.dataset_hash
+            || receipt.source.source_sha256 != manifest.source_sha256
+            || receipt.source.parquet_sha256 != manifest.parquet_sha256
+            || receipt.source.rows != manifest.rows
+            || receipt.source.instrument != manifest.instrument
+            || receipt.source.price_scale != manifest.price_scale
+            || receipt.source.source_id != manifest.source_id
+            || receipt.source.ingest_batch_id != manifest.ingest_batch_id
+            || receipt.source.quality_status != manifest.quality_status
+            || receipt.quote_stream_sha256 != manifest.quote_stream_sha256
+            || receipt.source.first_ns != manifest.first_ns
+            || receipt.source.latest_verified_ns != manifest.latest_verified_ns)
+    {
+        return Err(
+            "requested legacy manifest identity does not match the completed migration".into(),
+        );
+    }
+    Ok(())
+}
+
+/// Compare published native ticks with the exact legacy source rows they claim to represent.
+/// Self-consistent native checksums and a fresh receipt hash do not establish this equality.
+fn verify_chunks_against_source(
+    output_dir: &Path,
+    chunks: &[ChunkReceipt],
+    rows: u64,
+    profile: &Profile,
+    source_parquet: &Path,
+) -> Result<()> {
+    if rows == 0 {
+        return Ok(());
+    }
+    let reader = open_reader(source_parquet)?;
+    verify_schema(reader.metadata().file_metadata())?;
+    let first = reader.get_row_group(0).map_err(err)?;
+    let first_cols = read_group(first.as_ref())?;
+    let factor = scale_factor(profile, first_cols.scale[0])?;
+    let expected_scale = factor * profile.price_scale;
+    let mut chunk_index = 0usize;
+    let mut tick_index = 0usize;
+    let mut current: Option<crate::data::Dataset> = None;
+    let mut seen = 0u64;
+    'groups: for group_index in 0..reader.metadata().num_row_groups() {
+        let group = reader.get_row_group(group_index).map_err(err)?;
+        let cols = read_group(group.as_ref())?;
+        for i in 0..cols.ts.len() {
+            if seen >= rows {
+                break 'groups;
+            }
+            while current.as_ref().is_none_or(|d| tick_index >= d.ticks.len()) {
+                if chunk_index >= chunks.len() {
+                    return Err("native chunks are shorter than the recorded row count".into());
+                }
+                let path = output_dir.join(&chunks[chunk_index].file);
+                current = Some(native::read(&path)?);
+                tick_index = 0;
+                chunk_index += 1;
+            }
+            let dataset = current.as_ref().ok_or("adopted native chunk missing")?;
+            let adopted = dataset.ticks[tick_index];
+            let ts_ns = cols.ts[i];
+            if ts_ns < 0 || ts_ns % NS_PER_MS != 0 || cols.scale[i] != expected_scale {
+                return Err("legacy source row is inconsistent during equivalence check".into());
+            }
+            let expected = Tick {
+                timestamp_ms: ts_ns / NS_PER_MS,
+                sequence: seen,
+                bid: cols.bid[i] / factor,
+                ask: cols.ask[i] / factor,
+            };
+            if adopted != expected {
+                return Err(
+                    "native output differs from the legacy source rows it claims to represent"
+                        .into(),
+                );
+            }
+            tick_index += 1;
+            seen += 1;
+        }
+    }
+    if seen != rows {
+        return Err("legacy source is shorter than the recorded native output".into());
+    }
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -886,12 +1010,14 @@ fn publish_json_replace(path: &Path, value: &impl Serialize) -> Result<()> {
 pub fn convert(config: &Config) -> Result<Receipt> {
     config.profile.validate()?;
     if config.chunk_events == 0 || config.chunk_events > MAX_CHUNK_EVENTS {
-        return Err("chunk budget must be 1..=1000000".into());
+        return Err("chunk budget must be 1..=100000".into());
     }
     fs::create_dir_all(&config.output_dir).map_err(err)?;
     let receipt_path = config.output_dir.join("manifest.json");
     if receipt_path.is_file() {
-        return verify_output(&config.output_dir, None);
+        let receipt = verify_output(&config.output_dir, None)?;
+        verify_reuse_scope(config, &receipt)?;
+        return Ok(receipt);
     }
     let parquet_sha256 = sha256_file(&config.source_parquet)?;
     if let Some(manifest) = &config.legacy_manifest
@@ -907,14 +1033,28 @@ pub fn convert(config: &Config) -> Result<Receipt> {
     {
         return Err("legacy Parquet row count mismatch".into());
     }
+    let factor = match &config.legacy_manifest {
+        Some(manifest) => convert_scale(config, manifest.price_scale)?,
+        None => {
+            let first = reader.get_row_group(0).map_err(err)?;
+            let cols = read_group(first.as_ref())?;
+            convert_scale(config, cols.scale[0])?
+        }
+    };
     let source_desc = source_description(config, &parquet_sha256);
     let archive = archive_hash(config, &parquet_sha256);
     let mut state = rebuild_state(config, &source_desc, &archive)?;
     if state.rows_done > total_rows {
         return Err("migrated chunks exceed the legacy source row count".into());
     }
+    verify_chunks_against_source(
+        &config.output_dir,
+        &state.chunks,
+        state.rows_done,
+        &config.profile,
+        &config.source_parquet,
+    )?;
     let expected = expected_meta(config)?;
-    let mut factor: Option<i64> = None;
     if state.rows_done < total_rows {
         let mut remaining = state.rows_done;
         let mut group_index = 0usize;
@@ -951,16 +1091,12 @@ pub fn convert(config: &Config) -> Result<Receipt> {
             if start > rows {
                 return Err("resume offset exceeds legacy row group".into());
             }
-            if factor.is_none() {
-                factor = Some(convert_scale(config, cols.scale[start])?);
-            }
-            let current_factor = factor.unwrap_or(1);
             convert_ticks(
                 config,
                 &cols,
                 start,
                 &mut expected_row,
-                current_factor,
+                factor,
                 &mut chunk,
                 state.rows_done,
                 &mut previous,
@@ -1197,6 +1333,13 @@ pub fn verify_output(dir: &Path, source_parquet: Option<&Path>) -> Result<Receip
         {
             return Err("legacy source quote stream mismatch".into());
         }
+        verify_chunks_against_source(
+            dir,
+            &receipt.chunks,
+            receipt.events,
+            &receipt.profile,
+            source,
+        )?;
     }
     Ok(receipt)
 }
@@ -1550,6 +1693,24 @@ mod tests {
             .collect()
     }
 
+    /// Pairs of rows share a timestamp, exercising tie ordering across chunk boundaries.
+    fn rows_with_ties(count: usize) -> Vec<LegacyRow> {
+        (0..count)
+            .map(|i| LegacyRow {
+                instrument: "NZDUSD",
+                ts_ns: 1_764_565_200_184_000_000 + (i as i64 / 2) * 1_000_000,
+                bid: 573_080 + (i as i64 % 5) * 10,
+                ask: 573_080 + (i as i64 % 5) * 10 + 20,
+                scale: 1_000_000,
+                source: "HistData.com",
+                batch: "test-batch",
+                order: i as i64,
+                precision: "millisecond",
+                quality: "",
+            })
+            .collect()
+    }
+
     fn write_legacy(path: &Path, rows: &[LegacyRow], batch_rows: usize) -> Result<()> {
         let schema = Arc::new(parse_message_type(LEGACY_SCHEMA).map_err(err)?);
         let props = Arc::new(
@@ -1655,10 +1816,26 @@ mod tests {
     }
 
     fn write_manifest(path: &Path, scan: &QuoteScan, parquet_sha256: &str) -> Result<()> {
+        write_manifest_identity(
+            path,
+            scan,
+            parquet_sha256,
+            "test-dataset-hash",
+            "test-source-sha256",
+        )
+    }
+
+    fn write_manifest_identity(
+        path: &Path,
+        scan: &QuoteScan,
+        parquet_sha256: &str,
+        dataset_hash: &str,
+        source_sha256: &str,
+    ) -> Result<()> {
         let value = serde_json::json!({
             "schema_version": "data/v2",
-            "dataset_hash": "test-dataset-hash",
-            "source_sha256": "test-source-sha256",
+            "dataset_hash": dataset_hash,
+            "source_sha256": source_sha256,
             "parquet_sha256": parquet_sha256,
             "quote_stream_sha256": scan.hash,
             "rows": scan.rows,
@@ -1875,5 +2052,279 @@ mod tests {
         let dataset = native::read(&output.join(&receipt.chunks[0].file)).unwrap();
         assert_eq!(dataset.ticks[0].bid, 57_308);
         assert_eq!(dataset.ticks[0].ask, 57_310);
+    }
+
+    #[test]
+    fn codex_review_completed_conversion_must_bind_requested_profile_and_source() {
+        let (dir, parquet, output, _) = fixture(migration_profile("NZDUSD"), 7);
+        let config = Config::new(&parquet, &output, migration_profile("NZDUSD"))
+            .unwrap()
+            .with_chunk_events(7)
+            .unwrap()
+            .with_manifest(&dir.join("manifest.json"))
+            .unwrap();
+        convert(&config).unwrap();
+        let changed = Config::new(
+            &dir.join("missing-different-source.parquet"),
+            &output,
+            migration_profile("EURUSD"),
+        )
+        .unwrap();
+        assert!(
+            convert(&changed).is_err(),
+            "completed conversion accepted a different requested profile and missing source"
+        );
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn codex_review_partial_resume_must_reject_self_hashed_different_prices() {
+        let (dir, parquet, output, _) = fixture(migration_profile("NZDUSD"), 7);
+        let config = Config::new(&parquet, &output, migration_profile("NZDUSD"))
+            .unwrap()
+            .with_chunk_events(7)
+            .unwrap()
+            .with_manifest(&dir.join("manifest.json"))
+            .unwrap();
+        let initial = convert(&config).unwrap();
+        fs::remove_file(output.join("manifest.json")).unwrap();
+        let path = output.join(&initial.chunks[0].file);
+        let original = native::read(&path).unwrap();
+        let mut ticks = original.ticks.clone();
+        for tick in &mut ticks {
+            tick.bid += original.profile.tick;
+            tick.ask += original.profile.tick;
+        }
+        let mut changed = data::dataset(
+            original.profile.clone(),
+            ticks,
+            &original.manifest.source,
+            original.manifest.archive_hash.clone(),
+            false,
+        )
+        .unwrap();
+        changed.manifest.parser_version = original.manifest.parser_version.clone();
+        changed.manifest.imported_at = original.manifest.imported_at.clone();
+        fs::remove_file(&path).unwrap();
+        native::write(&path, &changed).unwrap();
+        assert!(
+            convert(&config).is_err(),
+            "resume accepted different native prices bound only by self-computed hashes"
+        );
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn reuse_rejects_different_source_bytes_at_same_output() {
+        let (dir, parquet, output, _) = fixture(migration_profile("NZDUSD"), 7);
+        let config = Config::new(&parquet, &output, migration_profile("NZDUSD"))
+            .unwrap()
+            .with_chunk_events(7)
+            .unwrap()
+            .with_manifest(&dir.join("manifest.json"))
+            .unwrap();
+        convert(&config).unwrap();
+        let other = dir.join("other.parquet");
+        let mut changed = rows(20);
+        for row in &mut changed {
+            row.bid += 10;
+            row.ask += 10;
+        }
+        write_legacy(&other, &changed, 2).unwrap();
+        let reuse = Config::new(&other, &output, migration_profile("NZDUSD")).unwrap();
+        assert!(
+            convert(&reuse).is_err(),
+            "completed output was reused for different source bytes"
+        );
+    }
+
+    #[test]
+    fn reuse_rejects_changed_manifest_identity() {
+        let (dir, parquet, output, _) = fixture(migration_profile("NZDUSD"), 7);
+        let config = Config::new(&parquet, &output, migration_profile("NZDUSD"))
+            .unwrap()
+            .with_chunk_events(7)
+            .unwrap()
+            .with_manifest(&dir.join("manifest.json"))
+            .unwrap();
+        convert(&config).unwrap();
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&fs::read(dir.join("manifest.json")).unwrap()).unwrap();
+        value["dataset_hash"] = serde_json::json!("different-dataset-hash");
+        let manifest = dir.join("manifest-changed.json");
+        fs::write(&manifest, serde_json::to_vec(&value).unwrap()).unwrap();
+        let reuse = Config::new(&parquet, &output, migration_profile("NZDUSD"))
+            .unwrap()
+            .with_manifest(&manifest)
+            .unwrap();
+        assert!(
+            convert(&reuse).is_err(),
+            "completed output was reused for a different manifest identity"
+        );
+    }
+
+    #[test]
+    fn resume_rejects_changed_source_data_with_updated_manifest() {
+        let (dir, parquet, output, _) = fixture(migration_profile("NZDUSD"), 7);
+        let config = Config::new(&parquet, &output, migration_profile("NZDUSD"))
+            .unwrap()
+            .with_chunk_events(7)
+            .unwrap()
+            .with_manifest(&dir.join("manifest.json"))
+            .unwrap();
+        convert(&config).unwrap();
+        fs::remove_file(output.join("manifest.json")).unwrap();
+        let changed_parquet = dir.join("changed.parquet");
+        let mut changed = rows(20);
+        for row in &mut changed {
+            row.bid += 10;
+            row.ask += 10;
+        }
+        write_legacy(&changed_parquet, &changed, 2).unwrap();
+        let scan = scan_quote_stream(&changed_parquet).unwrap();
+        let manifest = dir.join("manifest-changed-source.json");
+        write_manifest(&manifest, &scan, &sha256_file(&changed_parquet).unwrap()).unwrap();
+        let resume = Config::new(&changed_parquet, &output, migration_profile("NZDUSD"))
+            .unwrap()
+            .with_chunk_events(7)
+            .unwrap()
+            .with_manifest(&manifest)
+            .unwrap();
+        assert!(
+            convert(&resume).is_err(),
+            "resume accepted adopted chunks that differ from the changed source"
+        );
+    }
+
+    #[test]
+    fn refuses_oversized_row_group() {
+        let dir = temp_dir("biggroup");
+        let parquet = dir.join("legacy.parquet");
+        let count = MAX_ROW_GROUP_ROWS + 1;
+        write_legacy(&parquet, &rows(count), count).unwrap();
+        let scan = QuoteScan {
+            hash: "0".repeat(64),
+            rows: count as u64,
+            first_ns: 0,
+            last_ns: 0,
+            meta: Meta {
+                instrument: "NZDUSD".into(),
+                scale: 1_000_000,
+                source: "HistData.com".into(),
+                batch: "test-batch".into(),
+                precision: "millisecond".into(),
+            },
+        };
+        let manifest = dir.join("manifest.json");
+        write_manifest(&manifest, &scan, &sha256_file(&parquet).unwrap()).unwrap();
+        let output = dir.join("output");
+        let config = Config::new(&parquet, &output, migration_profile("NZDUSD"))
+            .unwrap()
+            .with_manifest(&manifest)
+            .unwrap();
+        assert!(
+            convert(&config).is_err(),
+            "oversized untrusted row group was not refused"
+        );
+    }
+
+    #[test]
+    fn migrated_chunks_are_admissible_to_native_corpus() {
+        let (dir, parquet, output, _) = fixture(migration_profile("NZDUSD"), 7);
+        let config = Config::new(&parquet, &output, migration_profile("NZDUSD"))
+            .unwrap()
+            .with_chunk_events(7)
+            .unwrap()
+            .with_manifest(&dir.join("manifest.json"))
+            .unwrap();
+        let receipt = convert(&config).unwrap();
+        assert!(receipt.chunks.len() > 1);
+        let paths: Vec<PathBuf> = receipt
+            .chunks
+            .iter()
+            .map(|c| output.join(&c.file))
+            .collect();
+        let spec = crate::corpus::describe(&paths, 100_000).unwrap();
+        assert_eq!(spec.chunks.len(), receipt.chunks.len());
+        let mut visited = 0usize;
+        crate::corpus::visit_chunks(&output, &spec, |_index, dataset| {
+            visited += dataset.ticks.len();
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(visited, 20);
+    }
+
+    #[test]
+    fn converted_timestamp_ties_are_preserved_and_admissible() {
+        let dir = temp_dir("ties");
+        let parquet = dir.join("legacy.parquet");
+        let manifest = dir.join("manifest.json");
+        write_legacy(&parquet, &rows_with_ties(20), 2).unwrap();
+        let scan = scan_quote_stream(&parquet).unwrap();
+        write_manifest(&manifest, &scan, &sha256_file(&parquet).unwrap()).unwrap();
+        let output = dir.join("output");
+        let config = Config::new(&parquet, &output, migration_profile("NZDUSD"))
+            .unwrap()
+            .with_chunk_events(7)
+            .unwrap()
+            .with_manifest(&manifest)
+            .unwrap();
+        let receipt = convert(&config).unwrap();
+        assert_eq!(receipt.timestamp_ties, 10);
+        let paths: Vec<PathBuf> = receipt
+            .chunks
+            .iter()
+            .map(|c| output.join(&c.file))
+            .collect();
+        let spec = crate::corpus::describe(&paths, 100_000).unwrap();
+        crate::corpus::visit_chunks(&output, &spec, |_, _| Ok(())).unwrap();
+    }
+
+    #[test]
+    fn distinct_months_remain_distinct_single_source_corpora() {
+        let dir = temp_dir("months");
+        let mut corpora = Vec::new();
+        for name in ["month-a", "month-b"] {
+            let parquet = dir.join(format!("{name}.parquet"));
+            let manifest = dir.join(format!("{name}-manifest.json"));
+            write_legacy(&parquet, &rows(20), 2).unwrap();
+            let scan = scan_quote_stream(&parquet).unwrap();
+            write_manifest_identity(
+                &manifest,
+                &scan,
+                &sha256_file(&parquet).unwrap(),
+                name,
+                name,
+            )
+            .unwrap();
+            let output = dir.join(name);
+            let config = Config::new(&parquet, &output, migration_profile("NZDUSD"))
+                .unwrap()
+                .with_chunk_events(7)
+                .unwrap()
+                .with_manifest(&manifest)
+                .unwrap();
+            let receipt = convert(&config).unwrap();
+            let paths: Vec<PathBuf> = receipt
+                .chunks
+                .iter()
+                .map(|c| output.join(&c.file))
+                .collect();
+            let spec = crate::corpus::describe(&paths, 100_000).unwrap();
+            corpora.push((output, spec));
+        }
+        for (output, spec) in &corpora {
+            crate::corpus::visit_chunks(output, spec, |_, _| Ok(())).unwrap();
+        }
+        let mut all_paths: Vec<PathBuf> = Vec::new();
+        for (output, spec) in &corpora {
+            all_paths.extend(spec.chunks.iter().map(|c| output.join(&c.path)));
+        }
+        let combined = crate::corpus::describe(&all_paths, 100_000).unwrap();
+        assert!(
+            crate::corpus::visit_chunks(&dir, &combined, |_, _| Ok(())).is_err(),
+            "distinct monthly sources must not be merged into one unverified corpus"
+        );
     }
 }

@@ -68,6 +68,30 @@ A full canonical batch completed on the VPS (4 workers, `--chunk-events 500000`,
   XAUUSD 2026-09, AUDUSD 2025-01, EURUSD 2026-10).
 - Output: `/root/workspace/historical-migration-output/full` with `batch-report.json`.
 
+## Integrity-fix milestone (Codex review response)
+
+Codex's `codex/review-pr6-data-integrity` review found two reproduced P1 defects; both are
+fixed with permanent regressions:
+
+- **Requested-scope binding** — completed-output reuse now re-verifies the requested source
+  bytes, trusted manifest identity, profile and receipt version. A self-consistent receipt is
+  no longer accepted for a different source/profile.
+- **Source-prefix equivalence** — resumed conversions compare every adopted chunk tick-by-tick
+  with the legacy source prefix; changed-but-consistently-rehashed prices are refused.
+  `historical-verify <dir> <source>` performs the same full equivalence check.
+- **Bounded decoded memory** — row groups are preflighted against a 65,536-row cap and a
+  256 MiB decoded string-byte budget before allocation.
+- **Corpus admission** — chunk size aligned to the native `ordered-native-corpus-v1` cap of
+  100,000; each month remains a distinct single-source corpus and the loader refuses to merge
+  distinct monthly sources.
+- **Test stability** — the two campaign/fleet rotation tests now use the wait-capable loop
+  drivers so scheduler-idle retry backoffs are waited out instead of being treated as a
+  terminal stop. Assertions are unchanged.
+
+New permanent tests: 16 in `historical_migration` (including Codex's two reproducers, which
+failed before the fix and pass after), plus corpus-admission, timestamp-tie and
+distinct-month tests. Real-corpus integration passes on the VPS with 100,000-event chunks.
+
 ## Remaining work
 
 1. ~~Run `scripts/check.sh`~~ — fmt and Clippy pass; lib tests pass; full suite has two
@@ -76,9 +100,15 @@ A full canonical batch completed on the VPS (4 workers, `--chunk-events 500000`,
 3. ~~Add the real-data integration test~~ — `tests/historical_migration_real.rs` skips cleanly
    without the legacy catalog.
 4. ~~Full-corpus preparation~~ — 176/176 converted and verified; batch report published.
-5. Continue non-overlapping Rust-factory work from `docs/NEXT_ACTION.md`.
-6. Optional: independent scientific/qualification review of the migrated corpus (Codex), and
-   explicit calendar/profile/licensing acceptance before any research use.
+5. ~~Fix the two confirmed converter integrity defects~~ — regressions added, both pass.
+6. ~~Bounded decoded memory + native corpus admission alignment~~ — implemented and tested.
+7. ~~Investigate the two campaign-rotation test failures~~ — wait-capable drivers; assertions
+   unchanged.
+8. Re-run the full 176-partition migration with the 100,000-event chunk cap into a fresh
+   directory and re-verify; the earlier 500,000-event output is superseded and inadmissible.
+9. Continue non-overlapping Rust-factory work from `docs/NEXT_ACTION.md`.
+10. Optional: independent scientific/qualification review of the migrated corpus (Codex), and
+    explicit calendar/profile/licensing acceptance before any research use.
 
 ## Safety notes
 

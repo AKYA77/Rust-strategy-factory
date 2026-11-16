@@ -89,8 +89,9 @@ cargo run --locked -- historical-convert \
 cargo run --locked -- historical-verify <output-dir> [legacy.parquet]
 ```
 
-`chunk-events` defaults to 500,000 and is capped at 1,000,000. The input file is capped at
-512 MiB and the chunk count at 8,192. Profiles live in
+`chunk-events` defaults to 100,000 and is capped at 100,000, matching the native
+`ordered-native-corpus-v1` admission cap. The input file is capped at 512 MiB and the chunk
+count at 8,192. Profiles live in
 `configs/historical-migration/profiles/`; they use the legacy fixed-point scale 1,000,000,
 `tick` equal to the observed source quantum, and an explicit not-approved provenance string.
 
@@ -131,3 +132,31 @@ produced:
 Every partition's `quote_stream_sha256` was recomputed during conversion and matched its
 trusted manifest. Conversion remains a format operation: it does not establish calendar
 completeness, profile approval, source licensing or research eligibility.
+
+## Integrity guarantees
+
+- **Requested-scope binding.** Reusing a completed directory re-verifies the exact requested
+  source bytes (SHA-256), the trusted manifest identity, the profile and the receipt version
+  before returning it. A self-consistent existing receipt is never accepted for a different
+  requested source or profile.
+- **Source-prefix equivalence.** On resume, every adopted chunk is compared tick-by-tick with
+  the legacy source rows it claims to represent (timestamp, sequence, bid, ask). A chunk whose
+  prices were changed and consistently rehashed is refused. `historical-verify <dir> <source>`
+  performs the same full equivalence check.
+- **Bounded decoded memory.** Each untrusted Parquet row group is preflighted against an
+  explicit decoded-row cap (65,536) and a decoded string-byte budget (256 MiB) before any
+  allocation; a compressed-file ceiling alone is not treated as a memory bound.
+- **Corpus admission.** Chunks are capped at 100,000 events so each monthly partition is
+  admissible to `ordered-native-corpus-v1`. Each month remains a distinct single-source
+  corpus: per-partition source descriptions differ, so the corpus loader refuses to merge
+  months into one unverified source. An aggregate multi-month corpus requires a separate
+  factory extension and is not implied by conversion.
+
+## Regression coverage
+
+The permanent tests cover exact conversion, determinism across output directories,
+restart-from-committed-chunks, corrupted-chunk refusal, crossed/non-millisecond source
+refusal, wrong manifest identity, requested-scope reuse refusal (different source bytes and
+different manifest identity), changed-source resume refusal, oversized row-group refusal,
+native corpus admission, timestamp ties across chunk boundaries, and the requirement that
+distinct months stay distinct single-source corpora.
