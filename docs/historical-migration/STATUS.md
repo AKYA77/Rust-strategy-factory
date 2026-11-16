@@ -153,6 +153,28 @@ Measured memory bound for the windowed decode: a malicious 65,536-row group with
 (budget 256 MiB + one 8,192-row window). The same class of input peaked at ~1.24 GiB before
 the windowed fix.
 
+## Multi-month corpus and catalog milestone
+
+- `src/historical_corpus.rs`: explicit aggregate specification over the 22 independently
+  verified monthly native corpora. It preserves per-month source identities and provenance,
+  refuses missing/overlapping/ambiguous/non-contiguous months, excludes the seven noncanonical
+  partitions via the canonical plan, and traverses months in order with explicit month
+  boundaries and per-month sequence spaces. No chunk data is copied. Deterministic identity;
+  CLI `historical-corpus-register` / `historical-corpus-verify`.
+- `src/historical_catalog.rs`: structural status per instrument and month (verified, missing,
+  noncanonical, load-failure), source identities, coverage, timestamp ties, gaps and legacy
+  correction/quarantine counts. Gates are calendar/profile/legal/scientific, all pending;
+  eligibility requires structural validity plus all gates accepted. CLI
+  `historical-catalog-scan` / `historical-catalog-verify`. Added
+  `historical_migration::verify_receipt_only` so catalog scans do not re-read every chunk.
+- Real VPS results: all eight instruments register 22/22 months; total 421,078,937 rows;
+  catalog identity `c7ca19266439680d28f2a81ba01f1eb8407955dde26839b22f451a05959b1339`;
+  8/8 structurally valid, 0 eligible (all gates pending). Legacy corrections and quarantine
+  are surfaced (e.g. USDCAD 2026-07: 353 quarantined quotes; XAUUSD: 103,621 reordered rows).
+- End-to-end real test `tests/historical_corpus_real.rs`: registers EURUSD, verifies receipt
+  equivalence, scans the catalog, checks cross-month ordering, and assembles causal M1 candles
+  while asserting per-month sequence restart and per-month source identity.
+
 ## Remaining work
 
 1. ~~Run `scripts/check.sh`~~ — fmt and Clippy pass; lib tests pass; full suite has two
@@ -165,10 +187,13 @@ the windowed fix.
 6. ~~Bounded decoded memory + native corpus admission alignment~~ — implemented and tested.
 7. ~~Investigate the two campaign-rotation test failures~~ — wait-capable drivers; assertions
    unchanged.
-8. Re-run the full 176-partition migration with the 100,000-event chunk cap into a fresh
-   directory and re-verify; the earlier 500,000-event output is superseded and inadmissible.
-9. Continue non-overlapping Rust-factory work from `docs/NEXT_ACTION.md`.
-10. Optional: independent scientific/qualification review of the migrated corpus (Codex), and
+8. ~~Re-run the full 176-partition migration with the 100,000-event chunk cap~~ — done in
+   `full-100k`; sampled source-bound verification passed (NZDUSD, USDCAD, USDJPY ×2,
+   XAUUSD ×2).
+9. ~~Multi-month corpus model + catalog/review status~~ — `historical_corpus` and
+   `historical_catalog`; all eight instruments register 22/22 months, 0 eligible.
+10. Continue non-overlapping Rust-factory work from `docs/NEXT_ACTION.md`.
+11. Optional: independent scientific/qualification review of the migrated corpus (Codex), and
     explicit calendar/profile/licensing acceptance before any research use.
 
 ## Safety notes
