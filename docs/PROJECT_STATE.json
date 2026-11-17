@@ -194,8 +194,8 @@
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43649991019,
-    "sha": "84eb7c40fe350b3d317d9a49dbd5de20b2a07dc4",
+    "run_id": 44121648230,
+    "sha": "3d2d6f2994c4a0f1bce709652551962b1b5de5a9",
     "conclusion": "success"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
