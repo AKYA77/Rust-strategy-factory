@@ -231,6 +231,19 @@ Residual accepted: `register`/`verify`/`audit` trust the per-month receipt as th
 anchor; `verify_bound` and `historical-verify <dir> <source>` are the explicit source-byte
 equivalence checks. `audit` does not re-read the Parquet.
 
+## Integration branch `hermes/integration-codex-stack`
+
+- Created from the Codex stack tip `codex/retained-preflight-inventory` @ `74790a4` and merged
+  with `hermes/real-data-migration` (merge commit `cbcfb62`, clean auto-merge, no conflicts).
+- Combined verification: `cargo build`, `cargo fmt --check`, `cargo clippy --all-targets
+  -D warnings`, full `scripts/check.sh` (exit 0, all Rust tests including the real-data
+  pipeline/study), release build, `check-data-compute-identity.py`,
+  `check-operations.py`, `check-full-horizon.py` — all exit 0.
+- File overlap between the two lines was only `tests/corpus.rs`; the Hermes `src/` modules are
+  additive and disjoint from the Codex engine/corpus/campaign/dashboard files.
+- This is the cumulative integration candidate for Codex PRs #8–#13 plus the Hermes
+  historical-data work. Not merged to `main`; hosted CI must pass on the exact pushed SHA.
+
 ## Remaining work
 
 1. ~~Run `scripts/check.sh`~~ — fmt and Clippy pass; lib tests pass; full suite has two
