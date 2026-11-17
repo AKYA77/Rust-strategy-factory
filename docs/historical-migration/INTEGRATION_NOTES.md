@@ -6,10 +6,24 @@ Codex branches were not modified.
 
 ## Dependency chain
 
-Codex PRs #8–#13 form a stacked engine/checkpoint/corpus/campaign series (trusted checkpoint
-reuse, source-byte verification, checkpoint-aware range decoding, parallel worker affinity,
-failed-step lease cleanup, attempt fencing, checkpoint history limits, retained preflight
-inventory). None are merged to `main`; individual green PRs do not prove the combined stack.
+Codex PRs #8–#13 form a stacked engine/checkpoint/corpus/campaign series. The tip
+`codex/retained-preflight-inventory` @ `74790a44d39f` is **11 commits** ahead of `main`:
+
+1. `f3b268e` reuse private worker-produced checkpoint state (trusted checkpoint reuse)
+2. `20db094` fence checkpoint publication by the complete current lease attempt
+3. `2bd84fc` allow bounded checkpoint histories through the global journal ceiling
+4. `63c7e4a` relinquish still-current corpus leases after returned execution errors
+5. `96f7780` rehash every current artifact without redecoding verified snapshots
+6. `1068517` integrate checkpoint-reuse and source-rehash heads + adversarial parity tests
+7. `eaf8bd6` decode checkpoint-aware source ranges with full final-byte verification
+8. `97059bf` preserve private checkpoint ownership before parallel work stealing
+9. `c1f134c` integrate failed-step cleanup with checkpoint-aware worker replay
+10. `10461ef` integrate exact checkpoint authority and long-history safeguards
+11. `74790a4` reuse privately verified source inventories across batch preflight rounds
+
+Earlier branches (`checkpoint-range-seek`, `trusted-session-checkpoints`, …) are the
+individual PR heads; the tip is the accumulated stack. None are merged to `main`;
+individually green PRs do not prove the combined stack.
 
 ## File overlap with this branch
 
