@@ -183,7 +183,7 @@
     "full historical data",
     "target VPS validation"
   ],
-  "next_action": "Merge the verified hermes/integration-codex-stack branch to main, then reconcile PROJECT_STATE.json, IMPLEMENTATION_QUEUE.md and ACCEPTANCE.md against what is actually implemented and close the superseded PRs. Continue with the real historical-data execution path: the converted native corpus is REAL_STRUCTURALLY_VALID only and grants no calendar completeness, profile approval, source licensing or research eligibility. Keep the remaining scientific/operations queue rather than treating integration as software completion.",
+  "next_action": "Real/protected/non-USD execution, approved source acquisition, calendar/profile approval and target-VPS acceptance remain externally pending and are the highest-priority blockers: source access still returns 403, no broker/calendar/conversion facts are approved, and no legitimate real quote window has been obtained. Continue the remaining software queue - full end-to-end acceptance with hardware/resource evidence, writer backpressure, supervised crash/disk-full injection, aggregate audit coverage and the requirement-to-evidence ledger - without weakening financial, provenance, scientific or security safeguards. The converted native corpus is REAL_STRUCTURALLY_VALID only and grants no eligibility.",
   "qualified_strategies": 0,
   "tests_passed": 511,
   "benchmark": "docs/BENCHMARKS/v6-sequential-synthetic.json",
@@ -194,8 +194,8 @@
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 44121648230,
-    "sha": "3d2d6f2994c4a0f1bce709652551962b1b5de5a9",
+    "run_id": 44137568215,
+    "sha": "47e7ccb7947dce284677941f189122b64a38eb64",
     "conclusion": "success"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",

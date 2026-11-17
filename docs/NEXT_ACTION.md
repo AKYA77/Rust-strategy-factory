@@ -22,10 +22,14 @@ aborting a healthy child. Software remains incomplete.
 
 ## Implement next
 
-Continue the real historical-data execution path. The converted native corpus is
-`REAL_STRUCTURALLY_VALID` only — it grants no calendar completeness, profile approval, source
-licensing or research eligibility. Keep the remaining scientific/operations queue rather than
-treating the integration as software completion.
+The highest-priority blockers are external: real/protected/non-USD execution, approved source
+acquisition, broker/calendar/conversion facts and target-VPS acceptance all remain pending (source
+access still returns 403 and no legitimate real quote window has been obtained). Continue the
+remaining software queue — full end-to-end acceptance with hardware/resource evidence, writer
+backpressure, supervised crash/disk-full injection and aggregate audit coverage — without weakening
+financial, provenance, scientific or security safeguards. The converted native corpus is
+`REAL_STRUCTURALLY_VALID` only and grants no calendar completeness, profile approval, source
+licensing, scientific eligibility or qualification.
 
 
 Current streaming boundary: one authoritative AccountState transition serves materialized and synthetic USD corpus replay. Account checkpoints are hash-chained/lease-fenced; saved prefixes and source artifacts are revalidated before advancement. Bounded parallel corpus rounds now serve both supplied batches and a durable generated queue/coordinator. The materialized Driver remains separate. Real/protected/non-USD execution, fast-seek resume and full-history qualification remain refused/unfinished. See DECISIONS/0010-durable-corpus-backlog.md for implemented boundaries and remaining acceptance.
