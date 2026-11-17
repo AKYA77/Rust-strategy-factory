@@ -1,0 +1,109 @@
+{
+  "budget": {
+    "max_candles_per_month": 1000000,
+    "max_events_per_month": 1000000
+  },
+  "corpus_root": "/var/lib/hermes-factory",
+  "eligibility": "REAL_STRUCTURALLY_VALID_ONLY",
+  "instruments": [
+    {
+      "candles": 681141,
+      "events": 39341710,
+      "first_month": "2025-01",
+      "identity": "520e7141cb4abb7adc35caa1d410e2869ccef79e15290fe2e8eb58613840d256",
+      "instrument": "EURUSD",
+      "last_month": "2026-10",
+      "months": 22,
+      "signals": 319438,
+      "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2"
+    },
+    {
+      "candles": 679870,
+      "events": 45183142,
+      "first_month": "2025-01",
+      "identity": "cb645f2f1876c06c2069d48e0dc5e89b41165ef8ce70892a7211fbb70262e2a1",
+      "instrument": "GBPUSD",
+      "last_month": "2026-10",
+      "months": 22,
+      "signals": 320004,
+      "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2"
+    },
+    {
+      "candles": 681115,
+      "events": 55975984,
+      "first_month": "2025-01",
+      "identity": "669a72c6ab5e9dcfb1a87af324c77a059db89fc58f04d50577d1809778cfd901",
+      "instrument": "USDJPY",
+      "last_month": "2026-10",
+      "months": 22,
+      "signals": 327261,
+      "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2"
+    },
+    {
+      "candles": 680362,
+      "events": 31697927,
+      "first_month": "2025-01",
+      "identity": "e763051d077e31332c8b9b0398df5a39e6bdab676ba26cabc95b043621f7bfad",
+      "instrument": "USDCHF",
+      "last_month": "2026-10",
+      "months": 22,
+      "signals": 316598,
+      "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2"
+    },
+    {
+      "candles": 681142,
+      "events": 40194714,
+      "first_month": "2025-01",
+      "identity": "393c6d7ea07d88c2795d3839b58b74309ebefb1932795b7eab6ee3bc17ac8035",
+      "instrument": "USDCAD",
+      "last_month": "2026-10",
+      "months": 22,
+      "signals": 314317,
+      "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2"
+    },
+    {
+      "candles": 679989,
+      "events": 33498834,
+      "first_month": "2025-01",
+      "identity": "056a656401f7b0ebd4895398343f7c6aa6fba2493cd00ef1132bf9f665026775",
+      "instrument": "AUDUSD",
+      "last_month": "2026-10",
+      "months": 22,
+      "signals": 316064,
+      "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2"
+    },
+    {
+      "candles": 680241,
+      "events": 28206376,
+      "first_month": "2025-01",
+      "identity": "a9cf81658571bab392e46b3e18e4ed9a40ad3ff759b54230da5560ecc2a0e959",
+      "instrument": "NZDUSD",
+      "last_month": "2026-10",
+      "months": 22,
+      "signals": 313738,
+      "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2"
+    },
+    {
+      "candles": 649390,
+      "events": 146980250,
+      "first_month": "2025-01",
+      "identity": "1a62a9702eb88d875086ff854c8dc489be5f0440ef76e8815602757c84eeb4b0",
+      "instrument": "XAUUSD",
+      "last_month": "2026-10",
+      "months": 22,
+      "signals": 323907,
+      "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2"
+    }
+  ],
+  "kind": "historical-real-data-study-receipt-v1",
+  "limitations": "Aggregate multi-month corpus over independently verified monthly native sources. Aggregate identity is not source approval: no calendar completeness, broker/profile approval, licensing, scientific eligibility or qualification is granted. Counts are observations from one bounded M1 long/AboveMean(2) study, not performance evidence.",
+  "native_output": "/root/workspace/historical-migration-output/full-100k",
+  "receipt_sha256": "cb20fc483fe8d823fbdb4cf97d7ea9ad46fbac6fa7862da8be37183559014567",
+  "totals": {
+    "candles": 5413250,
+    "events": 421078937,
+    "instrument_months": 176,
+    "instruments": 8,
+    "signals": 2551327
+  }
+}

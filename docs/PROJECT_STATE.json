@@ -194,8 +194,8 @@
   "operations_acceptance": "python3 scripts/check-operations.py passed with real debug/release binaries; populated user units verified; live systemd/VPS/boot/cutover unrun",
   "codec_component_benchmark": "docs/BENCHMARKS/zstd-native-v1.json",
   "hosted_ci": {
-    "run_id": 43649991019,
-    "sha": "84eb7c40fe350b3d317d9a49dbd5de20b2a07dc4",
+    "run_id": 44121648230,
+    "sha": "3d2d6f2994c4a0f1bce709652551962b1b5de5a9",
     "conclusion": "success"
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
@@ -215,6 +215,7 @@
   "import_cost_benchmark": "docs/BENCHMARKS/import-job-v1.json",
   "dependency_archive_inventory": "docs/SOURCE_REVIEW/2026-11-13-linux-lock-check.json",
   "real_data_matrix": "docs/REAL_DATA_MATRIX.json",
+  "historical_real_data_study_receipt": "docs/historical-migration/REAL_DATA_STUDY_RECEIPT.json",
   "corpus_inventory_benchmark": "docs/BENCHMARKS/corpus-v3.json",
   "corpus_inventory_resources": "docs/BENCHMARKS/corpus-v3-resources.json",
   "corpus_batch_transition_tradeoff": "Final five-pair synthetic component median about1.5% overhead vs frozen batch; retained for one checked publication transition. Negative v1/v2 receipts and exact source reconstruction patches retained. No replay/full-history throughput claim.",
