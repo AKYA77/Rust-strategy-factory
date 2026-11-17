@@ -2049,6 +2049,7 @@ fn fleet_duplicate_inputs_and_global_resource_pressure_do_not_start_searches() {
 }
 #[test]
 fn fleet_cli_restarts_at_next_input_and_stops_with_terminal_budget() {
+    let _fleet_timing = fleet_timing_guard();
     let first = Fixture::new("fleet-cli", "EURUSD", 7);
     let second = Fixture::new("fleet-cli", "XAUUSD", 7);
     let file = corpus_fleet_fixture(&first, &second);
@@ -3023,6 +3024,17 @@ fn owned_child_rss_threshold_cancels_and_preserves_actual_resource_observations(
     registry.integrity().unwrap();
 }
 
+/// The fleet/campaign loop tests spawn subprocesses and assert wall-clock retry, pause and
+/// lease behaviour. Running them concurrently with the rest of the 92-test suite starves
+/// those children (CPU and SQLite write locks), producing load-induced failures that are not
+/// correctness defects. Serialize only these timing-sensitive tests; no assertion changes.
+static FLEET_TIMING_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+fn fleet_timing_guard() -> std::sync::MutexGuard<'static, ()> {
+    FLEET_TIMING_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 fn owned_fleet_files(root: &std::path::Path) -> (std::path::PathBuf, std::path::PathBuf) {
     let policy = root.join("owned-policy.json");
     let limits = root.join("owned-limits.json");
@@ -3078,6 +3090,7 @@ fn owned_fleet_loop_call(
 }
 #[test]
 fn owned_fleet_rotation_preserves_scalar_receipts_exact_cost_observations_and_backup() {
+    let _fleet_timing = fleet_timing_guard();
     use rust_strategy_factory::{corpus_fleet, operator_config, storage::Registry, tick_engine};
     let first = Fixture::new("owned-fleet-parity", "EURUSD", 7);
     let second = Fixture::new("owned-fleet-parity", "XAUUSD", 7);
@@ -3109,11 +3122,7 @@ fn owned_fleet_rotation_preserves_scalar_receipts_exact_cost_observations_and_ba
                 break value;
             }
             attempts += 1;
-            assert!(
-                attempts < 20,
-                "fleet did not exhaust, stop_reason={}",
-                value["stop_reason"]
-            );
+            assert!(attempts < 20, "fleet did not exhaust: {}", value);
             std::thread::sleep(std::time::Duration::from_millis(50));
         }
     };
@@ -3295,8 +3304,9 @@ fn owned_fleet_isolates_missing_input_and_never_overrides_operator_source_pause(
     let healthy = invoke();
     assert_eq!(healthy["last"]["visit"]["source_index"], "1");
     assert_eq!(
-        healthy["last"]["status"]["owned_observations"][1]["owned_visits"],
-        "1"
+        healthy["last"]["status"]["owned_observations"][1]["owned_visits"], "1",
+        "healthy report: {}",
+        healthy
     );
     fs::rename(&hidden, artifact).unwrap();
     let recovered = invoke();
@@ -3384,6 +3394,7 @@ fn fleet_loop_command(
 }
 #[test]
 fn fleet_loop_wait_budget_restart_and_pure_polling_preserve_frozen_deadline() {
+    let _fleet_timing = fleet_timing_guard();
     let f = Fixture::new("loop-wait", "EURUSD", 7);
     let (db, policy, limits, id, source) = retryable_fleet_fixture(&f, 86400000);
     let first = fleet_loop_command(&db, &id, &policy, &limits, "100")
@@ -3430,8 +3441,9 @@ fn fleet_loop_wait_budget_restart_and_pure_polling_preserve_frozen_deadline() {
 }
 #[test]
 fn fleet_loop_ready_retry_executes_once_then_preserves_new_permanent_failure_hold() {
+    let _fleet_timing = fleet_timing_guard();
     let f = Fixture::new("loop-ready", "EURUSD", 7);
-    let (db, policy, limits, id, source) = retryable_fleet_fixture(&f, 1000);
+    let (db, policy, limits, id, source) = retryable_fleet_fixture(&f, 6000);
     let out = fleet_loop_command(&db, &id, &policy, &limits, "10000")
         .output()
         .unwrap();
@@ -3442,7 +3454,12 @@ fn fleet_loop_ready_retry_executes_once_then_preserves_new_permanent_failure_hol
     );
     let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(report["stop_reason"], "retry-held");
-    assert_eq!(report["wakeups"], "1");
+    assert!(
+        report["wakeups"] == "1",
+        "wakeups={} full report: {}",
+        report["wakeups"],
+        report
+    );
     let reg = rust_strategy_factory::storage::Registry::open(&db).unwrap();
     let status = rust_strategy_factory::corpus_search::status(&reg, &source).unwrap();
     assert_eq!(status["requeue_records"], "2");
@@ -3471,6 +3488,7 @@ fn fleet_loop_sigterm_interrupts_wait_without_fabricating_progress() {
     fleet_loop_intervention(true);
 }
 fn fleet_loop_intervention(signal: bool) {
+    let _fleet_timing = fleet_timing_guard();
     use std::io::BufRead;
     let f = Fixture::new(
         if signal {
@@ -3539,6 +3557,7 @@ fn fleet_loop_intervention(signal: bool) {
 
 #[test]
 fn fleet_loop_refuses_policy_retuning_and_invalid_wait_before_new_work() {
+    let _fleet_timing = fleet_timing_guard();
     let f = Fixture::new("loop-policy", "EURUSD", 7);
     let (db, policy, limits, id, _) = retryable_fleet_fixture(&f, 86400000);
     let out = fleet_loop_command(&db, &id, &policy, &limits, "0")

@@ -243,6 +243,18 @@ equivalence checks. `audit` does not re-read the Parquet.
   additive and disjoint from the Codex engine/corpus/campaign/dashboard files.
 - This is the cumulative integration candidate for Codex PRs #8–#13 plus the Hermes
   historical-data work. Not merged to `main`; hosted CI must pass on the exact pushed SHA.
+- Independent `codex/long-campaign-ledger` (PR #1) merged cleanly on top (`e69a693`).
+- Test-stability fixes (no assertion weakened):
+  - `tests/corpus.rs`: a process-local lock serializes the wall-clock/subprocess fleet tests,
+    which previously starved each other's children under the 92-test parallel run.
+  - `fleet_loop_ready_retry_...`: the fixture's retry deadline is anchored to the setup run, so
+    the 1000 ms backoff could expire before the first child ran; the backoff is now 6000 ms,
+    comfortably larger than the fixture-to-child gap and inside the loop's 10 s wait budget.
+  - `owned_process`: the parent supervisor's own bookkeeping writes (`start`, `attach`,
+    `observe_resources`, `finish`) retry transient SQLite lock errors. That connection
+    deliberately keeps a 10 ms busy timeout so the sampling loop stays responsive, so without
+    the retry a concurrent writer's brief lock aborted an otherwise healthy child with
+    `database is locked` / `parent-resource-journal-unavailable`.
 
 ## Remaining work
 

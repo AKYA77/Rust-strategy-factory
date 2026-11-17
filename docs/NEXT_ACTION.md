@@ -4,11 +4,28 @@ Status: SOFTWARE_INCOMPLETE. Use the existing checkout. Read AGENTS.md, PROJECT_
 
 ## Latest verified local milestone
 
-450 Rust tests/fmt/Clippy pass. A private-field non-deserializable SourceFacts inventory now supplies frozen corpus keys from fully verified ordered events/profile/class/time facts without candle aggregation. Public standalone and shared batch key paths retain per-consumer current-byte/path/operational checks, explicit specification identity matching, budgets/costs, source/protection gates and semantic account-prefix recomputation. One new all-eight-symbol native/blocked/CLI integration test and the second compiler-forgery check pass; existing mutation and real/non-USD refusal checks remain mandatory. Three rotated100K-quote order pairs preserve full hashes and2485 resolved trades each. The two-year fixture preserves all logical inventory/financial fingerprints; observed registered/cached times are7.624s/0.661s, with no broad performance, policy or scientific promotion. All eleven Chromium suites and release operations pass. Hosted CI follows publication. Software remains incomplete.
+The integration branch `hermes/integration-codex-stack` combines the Codex stack tip
+(`codex/retained-preflight-inventory` @ `74790a4`, PRs #8–#13), the independent
+`codex/long-campaign-ledger` (PR #1) and the Hermes historical Parquet→native migration (PR #6).
+All four lines merged cleanly with no conflicts. The combined branch passes `cargo build`,
+`cargo fmt --all -- --check`, `cargo clippy --all-targets -- -D warnings`, the full
+`scripts/check.sh` (all Rust tests including the real-data pipeline/study), the release build,
+`check-data-compute-identity.py`, `check-operations.py` and `check-full-horizon.py`; hosted CI
+is green on the pushed SHA. Hosted browser acceptance runs in CI (local Playwright is not
+installed). Three load-induced test flakes were diagnosed and fixed without weakening any
+assertion: the fleet/campaign subprocess tests now serialize on a process-local lock, the
+`fleet_loop_ready_retry` fixture backoff (6000 ms) is larger than the fixture-to-child gap, and
+the parent's best-effort resource journal retries transient SQLite lock errors instead of
+aborting a healthy child. Software remains incomplete.
 
 ## Implement next
 
-Native traversal, bounded causal multi-frame contexts, one account transition, registered recovery, bounded pools and generated corpus queues now have synthetic fixture evidence. Next specific task: Extend the per-campaign owned ledger beyond128 retained links using bounded keyset pages and a verified streaming chain/cost rollup, with a safe schema migration and compatible legacy snapshot hashes. Remove artificial long-scope stoppage while preserving source/operator holds, parent/report/advance bindings, exact known/unknown costs, no-child refusal at explicit configured limits and immutable evidence. Verify legitimate long campaign continuation, independent rotation attribution, restart/backup, pagination and corruption refusal. Continue authenticated checkpoint-aware fast-seek without weakening legacy forgery checks, import/coverage activation and scientific/full-period/operations acceptance.
+Merge the verified integration branch to `main`, then reconcile `PROJECT_STATE.json`,
+`IMPLEMENTATION_QUEUE.md` and `ACCEPTANCE.md` against what is actually implemented and close the
+superseded PRs. Continue with the real historical-data execution path: the native corpus is
+`REAL_STRUCTURALLY_VALID` only — it grants no calendar completeness, profile approval, source
+licensing or research eligibility. Keep the remaining scientific/operations queue rather than
+treating the integration as software completion.
 
 
 Current streaming boundary: one authoritative AccountState transition serves materialized and synthetic USD corpus replay. Account checkpoints are hash-chained/lease-fenced; saved prefixes and source artifacts are revalidated before advancement. Bounded parallel corpus rounds now serve both supplied batches and a durable generated queue/coordinator. The materialized Driver remains separate. Real/protected/non-USD execution, fast-seek resume and full-history qualification remain refused/unfinished. See DECISIONS/0010-durable-corpus-backlog.md for implemented boundaries and remaining acceptance.
