@@ -1,0 +1,11 @@
+# Codex campaign-ledger integration checkpoint
+
+Branch: `codex/long-campaign-ledger`, based on `e16063713bd4c9f7891169bba11cf3df4eb78b3d`.
+
+Ownership: Codex finishes this independent high-risk ledger task; Hermes owns canonical historical-quote conversion, ordinary implementation and VPS operations. Remote fetch and open-PR inspection at branch creation found main unchanged and no other published branches or open PRs. This branch does not modify NEXT_ACTION.md, PROJECT_STATE.json, IMPLEMENTATION_QUEUE.md or ACCEPTANCE.md. Reconcile those central ledgers only when the approved PR is merged. Never merge or force-push another developer's work.
+
+Scope: schema23 migration, optional immutable campaign visit budget, bounded recent projections and ascending keyset pages, complete streaming chain/parent/report/advance verification with observed/unknown cost rollups, authenticated read-only dashboard pages and exact exports. Legacy omitted-budget identities and short snapshot encodings are preserved. No financial rule, source gate or scientific acceptance assertion changes.
+
+Local verification:451 Rust tests, formatting and Clippy pass on the final lease-guard implementation;2 compile-fail checks pass. All12 Chromium suites pass, with the long-ledger suite repeated on the final optimized binary. The actual129-visit fixture verifies complete nonzero scalar receipt parity, independent rotation attribution, explicit no-child budget refusal, exact pages/exports, restart/backup and old omitted corruption refusal. Optimized install/update/rollback/artifact-aware backup/restore checks pass. The1,051,200-quote explicitly synthetic UTC-horizon check preserves exact counts and complete scalar/resumed/cached receipts; no economic or real-data acceptance is claimed. Hosted CI is checked on the PR after publication. See DECISIONS/0055-long-campaign-owned-ledgers.md for design and limits.
+
+Integration follow-up: set registry_schema_version to23 and record actual test/browser acceptance in the central ledgers after merge. The remaining implementation queue stays SOFTWARE_INCOMPLETE. Rotation lifetime quotas, campaign inventory scaling, authenticated fast-seek, writer backpressure and scientific/production acceptance are separate work. Codex should take difficult tasks and requested reviews; no continuation of the former autonomous direct-to-main loop.

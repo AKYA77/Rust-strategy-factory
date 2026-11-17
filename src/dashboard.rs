@@ -1087,6 +1087,48 @@ struct CampaignControl {
     state: String,
     expected_epoch: String,
 }
+async fn campaign_owned_page(
+    State(app): State<Arc<App>>,
+    Param(id): Param<String>,
+    Query(query): Query<ProcessHistoryQuery>,
+) -> Response {
+    let limit = query.limit.unwrap_or(32);
+    if !catalog_id(&id)
+        || !(1..=128).contains(&limit)
+        || query.after.as_ref().is_some_and(|a| !catalog_id(a))
+    {
+        return api_error(StatusCode::BAD_REQUEST, "invalid campaign owned page");
+    }
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    match registry.connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM corpus_campaigns WHERE id=?1)",
+        [&id],
+        |r| r.get::<_, bool>(0),
+    ) {
+        Ok(true) => {}
+        Ok(false) => return api_error(StatusCode::NOT_FOUND, "campaign not found"),
+        Err(_) => {
+            return api_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "campaign inventory unavailable",
+            );
+        }
+    }
+    if let Some(after) = &query.after {
+        match registry.connection.query_row("SELECT EXISTS(SELECT 1 FROM corpus_campaign_owned_visits WHERE campaign_id=?1 AND invocation_id=?2)",rusqlite::params![id,after],|r|r.get::<_,bool>(0)) {
+            Ok(true)=>{},Ok(false)=>return api_error(StatusCode::BAD_REQUEST,"unknown campaign owned cursor"),Err(_)=>return api_error(StatusCode::INTERNAL_SERVER_ERROR,"campaign ledger unavailable"),
+        }
+    }
+    match crate::corpus_campaign::owned_visit_page(&registry, &id, query.after.as_deref(), limit) {
+        Ok(value) => Json(value).into_response(),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "verified campaign ledger unavailable",
+        ),
+    }
+}
 async fn campaign_control(
     State(app): State<Arc<App>>,
     Param(id): Param<String>,
@@ -2053,6 +2095,7 @@ pub async fn serve_with_reviews(
         .route("/api/campaigns", get(campaigns))
         .route("/api/campaigns/{id}", get(campaign_status))
         .route("/api/campaigns/{id}/control", post(campaign_control))
+        .route("/api/campaigns/{id}/owned-visits", get(campaign_owned_page))
         .route("/api/corpus-fleets", get(corpus_fleets))
         .route("/api/corpus-fleets/{id}", get(corpus_fleet_status))
         .route(

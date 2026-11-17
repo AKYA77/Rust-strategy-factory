@@ -181,7 +181,7 @@ pub(crate) fn process_history_ids(
     let next = if more { ids.last().cloned() } else { None };
     Ok((ids, next))
 }
-pub const SCHEMA_VERSION: u32 = 22;
+pub const SCHEMA_VERSION: u32 = 23;
 pub struct Registry {
     pub(crate) connection: Connection,
 }
@@ -369,6 +369,7 @@ impl Registry {
         crate::fleet_control::initialize(&mut connection, version < 18)?;
         crate::corpus_campaign::initialize(&mut connection, version)?;
         crate::campaign_rotation::initialize(&mut connection, version)?;
+        crate::corpus_campaign::initialize_long_ledger(&mut connection)?;
         Ok(Self { connection })
     }
     /// Atomically reserve OOS time across dataset aliases before any competing registration.
