@@ -4,25 +4,25 @@ Status: SOFTWARE_INCOMPLETE. Use the existing checkout. Read AGENTS.md, PROJECT_
 
 ## Latest verified local milestone
 
-The integration branch `hermes/integration-codex-stack` combines the Codex stack tip
+The integration branch `hermes/integration-codex-stack` combined the Codex stack tip
 (`codex/retained-preflight-inventory` @ `74790a4`, PRs #8–#13), the independent
-`codex/long-campaign-ledger` (PR #1) and the Hermes historical Parquet→native migration (PR #6).
-All four lines merged cleanly with no conflicts. The combined branch passes `cargo build`,
+`codex/long-campaign-ledger` (PR #1) and the Hermes historical Parquet→native migration (PR #6),
+assembled on top of `main` @ `e160637`. All four lines merged cleanly with no conflicts and every
+PR head commit is an ancestor of the combined branch. The combined branch passed `cargo build`,
 `cargo fmt --all -- --check`, `cargo clippy --all-targets -- -D warnings`, the full
-`scripts/check.sh` (all Rust tests including the real-data pipeline/study), the release build,
-`check-data-compute-identity.py`, `check-operations.py` and `check-full-horizon.py`; hosted CI
-is green on the pushed SHA. Hosted browser acceptance runs in CI (local Playwright is not
-installed). Three load-induced test flakes were diagnosed and fixed without weakening any
-assertion: the fleet/campaign subprocess tests now serialize on a process-local lock, the
+`scripts/check.sh` (511 Rust tests passed, 0 failed, including the real-data pipeline/study
+tests), the release build, `check-data-compute-identity.py`, `check-operations.py` and
+`check-full-horizon.py`; hosted CI was green on the pushed SHA. PR #14 then merged the branch
+into `main` as `3d2d6f2`, and the 13 superseded PRs were closed with their history preserved.
+Three load-induced test flakes were diagnosed and fixed without weakening any assertion: the
+fleet/campaign subprocess tests now serialize on a process-local lock, the
 `fleet_loop_ready_retry` fixture backoff (6000 ms) is larger than the fixture-to-child gap, and
-the parent's best-effort resource journal retries transient SQLite lock errors instead of
+the parent supervisor's own bookkeeping writes retry transient SQLite lock contention instead of
 aborting a healthy child. Software remains incomplete.
 
 ## Implement next
 
-Merge the verified integration branch to `main`, then reconcile `PROJECT_STATE.json`,
-`IMPLEMENTATION_QUEUE.md` and `ACCEPTANCE.md` against what is actually implemented and close the
-superseded PRs. Continue with the real historical-data execution path: the native corpus is
+Continue the real historical-data execution path. The converted native corpus is
 `REAL_STRUCTURALLY_VALID` only — it grants no calendar completeness, profile approval, source
 licensing or research eligibility. Keep the remaining scientific/operations queue rather than
 treating the integration as software completion.

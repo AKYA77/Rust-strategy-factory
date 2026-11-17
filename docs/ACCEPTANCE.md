@@ -663,3 +663,9 @@ rule, scientific safeguard, security control or assertion was weakened.
 
 The converted legacy corpus is REAL_STRUCTURALLY_VALID only. It grants no calendar completeness,
 profile approval, source licensing or research eligibility, and it is not evidence of qualification.
+
+Merge checkpoint: PR #14 merged the integration branch into `main` as `3d2d6f2` after hosted CI
+passed on the exact combined SHA `eeaad53` (run 44116712842). The 13 superseded PRs (#1–#13) were
+closed with their commits verified as ancestors of `main`; no branch was force-pushed or deleted.
+Hosted CI on `main` is verified on the merge commit. The converted legacy corpus remains
+REAL_STRUCTURALLY_VALID only and is not qualification evidence.

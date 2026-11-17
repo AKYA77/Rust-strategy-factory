@@ -2,13 +2,12 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
-Integration state: the `hermes/integration-codex-stack` branch merges all 13 open PRs (Codex
-stack #8–#13, the independent campaign-owned ledger #1, the Hermes historical Parquet→native
-migration #6, and the earlier checkpoint PRs #2–#5/#7 that the stack already carried) with no
-conflicts. Every PR head commit is an ancestor of that branch. The combined branch passes fmt,
-Clippy `-D warnings`, every Rust test binary, `scripts/check.sh`, the release build,
-`check-data-compute-identity.py`, `check-operations.py` and `check-full-horizon.py`; hosted CI is
-verified on the pushed SHA. The converted legacy corpus is REAL_STRUCTURALLY_VALID only.
+Integration state: all 13 open PRs were merged into `main` through #14 (merge commit `3d2d6f2`)
+with no conflicts — the Codex stack #8–#13, the independent campaign-owned ledger #1, the Hermes
+historical Parquet→native migration #6, and the earlier checkpoint PRs #2–#5/#7 the stack already
+carried. Every PR head commit is an ancestor of `main`; the 13 PRs were closed as superseded with
+their history preserved. Hosted CI is verified on the merge commit. The converted legacy corpus is
+REAL_STRUCTURALLY_VALID only.
 
 1. Harden foundational arithmetic/import/replay with adversarial/property tests; extend normalized importer coverage and immutable atomic artifacts.
 2. Acquire legally usable short real quote windows for all eight symbols in 2025 and 2026; retain source terms/URLs/archive hashes. No actual source has been acquired yet.
