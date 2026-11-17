@@ -198,7 +198,13 @@ impl Registry {
         let mut connection =
             Connection::open(path).map_err(crate::corpus_failure::AdmissionFailure::from)?;
         connection
-            .busy_timeout(Duration::from_secs(5))
+            // WAL serializes writers. The full suite runs 92 tests in parallel, each
+            // spawning subprocesses that write to per-test SQLite databases; a short busy
+            // timeout is exceeded by that write queue and surfaces as spurious
+            // "database is locked" failures unrelated to correctness. The busy timeout is
+            // SQLite's standard retry mechanism, so a generous value absorbs the queue
+            // without changing any transaction semantics.
+            .busy_timeout(Duration::from_secs(30))
             .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         connection
             .execute_batch(
