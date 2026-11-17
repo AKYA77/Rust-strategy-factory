@@ -72,6 +72,35 @@ fn save<T: serde::Serialize>(path: &str, value: &T) -> Result<()> {
     let cleanup = fs::remove_file(&temp);
     publication.and(cleanup).map_err(|e| e.to_string())
 }
+fn save_replace<T: serde::Serialize>(path: &str, value: &T) -> Result<()> {
+    // Derived report/specification: atomically replace an existing artifact.
+    let bytes = serde_json::to_vec_pretty(value).map_err(|e| e.to_string())?;
+    let destination = Path::new(path);
+    let parent = destination
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let name = destination
+        .file_name()
+        .ok_or("artifact filename missing")?
+        .to_string_lossy();
+    let temp = parent.join(format!(".{name}.{}.tmp", std::process::id()));
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&temp)
+        .map_err(|e| e.to_string())?;
+    let publication = (|| -> std::io::Result<()> {
+        file.write_all(&bytes)?;
+        file.sync_all()?;
+        fs::rename(&temp, destination)?;
+        fs::File::open(parent)?.sync_all()
+    })();
+    drop(file);
+    let _ = fs::remove_file(&temp);
+    publication.map_err(|e| e.to_string())
+}
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ResearchFile {
@@ -382,6 +411,318 @@ fn run(args: &[String]) -> Result<()> {
         ["import-status", directory] => print(&rust_strategy_factory::import_job::status(
             Path::new(directory),
         )?),
+        [
+            "historical-convert",
+            source,
+            output,
+            profile,
+            manifest,
+            import_receipt,
+            chunk_events,
+        ] => {
+            let profile: Profile = read_json(profile)?;
+            let config = rust_strategy_factory::historical_migration::Config::new(
+                Path::new(source),
+                Path::new(output),
+                profile,
+            )?
+            .with_manifest(Path::new(manifest))?
+            .with_import_receipt(Path::new(import_receipt))?
+            .with_chunk_events(chunk_events.parse().map_err(|_| "invalid chunk events")?)?;
+            print(&rust_strategy_factory::historical_migration::convert(
+                &config,
+            )?)
+        }
+        [
+            "historical-convert",
+            source,
+            output,
+            profile,
+            manifest,
+            import_receipt,
+        ] => {
+            let profile: Profile = read_json(profile)?;
+            let config = rust_strategy_factory::historical_migration::Config::new(
+                Path::new(source),
+                Path::new(output),
+                profile,
+            )?
+            .with_manifest(Path::new(manifest))?
+            .with_import_receipt(Path::new(import_receipt))?;
+            print(&rust_strategy_factory::historical_migration::convert(
+                &config,
+            )?)
+        }
+        ["historical-convert", source, output, profile, manifest] => {
+            let profile: Profile = read_json(profile)?;
+            let config = rust_strategy_factory::historical_migration::Config::new(
+                Path::new(source),
+                Path::new(output),
+                profile,
+            )?
+            .with_manifest(Path::new(manifest))?;
+            print(&rust_strategy_factory::historical_migration::convert(
+                &config,
+            )?)
+        }
+        ["historical-convert", source, output, profile] => {
+            let profile: Profile = read_json(profile)?;
+            let config = rust_strategy_factory::historical_migration::Config::new(
+                Path::new(source),
+                Path::new(output),
+                profile,
+            )?;
+            print(&rust_strategy_factory::historical_migration::convert(
+                &config,
+            )?)
+        }
+        ["historical-verify", directory, source] => {
+            print(&rust_strategy_factory::historical_migration::verify_output(
+                Path::new(directory),
+                Some(Path::new(source)),
+            )?)
+        }
+        ["historical-verify", directory] => {
+            print(&rust_strategy_factory::historical_migration::verify_output(
+                Path::new(directory),
+                None,
+            )?)
+        }
+        [
+            "historical-corpus-register",
+            root,
+            output_root,
+            instrument,
+            spec,
+            expected,
+        ] => {
+            let expected: usize = expected
+                .parse()
+                .map_err(|_| "invalid expected month count")?;
+            let corpus = rust_strategy_factory::historical_corpus::register(
+                Path::new(root),
+                Path::new(output_root),
+                instrument,
+                expected,
+            )?;
+            save_replace(spec, &corpus)?;
+            print(&serde_json::json!({
+                "identity": corpus.identity,
+                "instrument": corpus.instrument,
+                "months": corpus.months.len(),
+                "rows": corpus.months.iter().map(|m| m.rows).sum::<u64>(),
+            }))
+        }
+        [
+            "historical-corpus-register",
+            root,
+            output_root,
+            instrument,
+            spec,
+        ] => {
+            let corpus = rust_strategy_factory::historical_corpus::register(
+                Path::new(root),
+                Path::new(output_root),
+                instrument,
+                rust_strategy_factory::historical_corpus::EXPECTED_MONTHS,
+            )?;
+            save_replace(spec, &corpus)?;
+            print(&serde_json::json!({
+                "identity": corpus.identity,
+                "instrument": corpus.instrument,
+                "months": corpus.months.len(),
+                "rows": corpus.months.iter().map(|m| m.rows).sum::<u64>(),
+            }))
+        }
+        ["historical-corpus-verify", spec] => {
+            let corpus: rust_strategy_factory::historical_corpus::HistoricalCorpus =
+                read_json(spec)?;
+            rust_strategy_factory::historical_corpus::verify(&corpus)?;
+            print(&serde_json::json!({
+                "identity": corpus.identity,
+                "instrument": corpus.instrument,
+                "months": corpus.months.len(),
+                "rows": corpus.months.iter().map(|m| m.rows).sum::<u64>(),
+            }))
+        }
+        ["historical-corpus-verify-bound", spec] => {
+            let corpus: rust_strategy_factory::historical_corpus::HistoricalCorpus =
+                read_json(spec)?;
+            rust_strategy_factory::historical_corpus::verify_bound(&corpus)?;
+            print(&serde_json::json!({
+                "identity": corpus.identity,
+                "instrument": corpus.instrument,
+                "months": corpus.months.len(),
+                "source_bound": true,
+            }))
+        }
+        [
+            "historical-corpus-study",
+            root,
+            output_root,
+            instrument,
+            strategy,
+            max_candles,
+            feature_cells,
+            report,
+        ] => {
+            let spec = rust_strategy_factory::historical_corpus::register(
+                Path::new(root),
+                Path::new(output_root),
+                instrument,
+                rust_strategy_factory::historical_corpus::EXPECTED_MONTHS,
+            )?;
+            let strategy: rust_strategy_factory::strategies::Strategy = read_json(strategy)?;
+            let max_candles: usize = max_candles.parse().map_err(|_| "invalid candle budget")?;
+            let feature_cells: usize = feature_cells
+                .parse()
+                .map_err(|_| "invalid feature budget")?;
+            let study = rust_strategy_factory::historical_corpus::study(
+                &spec,
+                &strategy,
+                max_candles,
+                feature_cells,
+            )?;
+            save_replace(report, &study)?;
+            print(&serde_json::json!({
+                "identity": study.identity,
+                "instrument": study.instrument,
+                "months": study.months.len(),
+                "events": study.events,
+                "candles": study.candles,
+                "signals": study.signals,
+            }))
+        }
+        [
+            "historical-corpus-audit",
+            root,
+            output_root,
+            instrument,
+            report,
+        ] => {
+            let spec = rust_strategy_factory::historical_corpus::register(
+                Path::new(root),
+                Path::new(output_root),
+                instrument,
+                rust_strategy_factory::historical_corpus::EXPECTED_MONTHS,
+            )?;
+            let audit = rust_strategy_factory::historical_corpus::audit(&spec)?;
+            save_replace(report, &audit)?;
+            print(&serde_json::json!({
+                "identity": audit.identity,
+                "instrument": audit.instrument,
+                "months": audit.months,
+                "chunks": audit.chunks,
+                "rows": audit.rows,
+                "candles": audit.candles,
+                "first_ms": audit.first_ms,
+                "last_ms": audit.last_ms,
+            }))
+        }
+        ["historical-catalog-scan", root, output_root, report] => {
+            let catalog = rust_strategy_factory::historical_catalog::scan_catalog(
+                Path::new(root),
+                Path::new(output_root),
+                &[
+                    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD", "XAUUSD",
+                ],
+                rust_strategy_factory::historical_corpus::EXPECTED_MONTHS,
+            )?;
+            save_replace(report, &catalog)?;
+            print(&serde_json::json!({
+                "identity": catalog.identity,
+                "instruments": catalog.instruments.len(),
+                "eligible": catalog
+                    .instruments
+                    .iter()
+                    .filter(|i| i.eligible_for_research)
+                    .count(),
+                "structural_valid": catalog
+                    .instruments
+                    .iter()
+                    .filter(|i| i.structural_valid)
+                    .count(),
+            }))
+        }
+        ["historical-catalog-verify", report] => {
+            let catalog: rust_strategy_factory::historical_catalog::Catalog = read_json(report)?;
+            catalog.verify()?;
+            print(&serde_json::json!({
+                "identity": catalog.identity,
+                "instruments": catalog.instruments.len(),
+                "eligible": catalog
+                    .instruments
+                    .iter()
+                    .filter(|i| i.eligible_for_research)
+                    .count(),
+            }))
+        }
+        [
+            "historical-catalog-review",
+            catalog_path,
+            review_path,
+            output,
+        ] => {
+            let mut catalog: rust_strategy_factory::historical_catalog::Catalog =
+                read_json(catalog_path)?;
+            let report: rust_strategy_factory::data_review::Report = read_json(review_path)?;
+            catalog.bind_review(&report)?;
+            catalog.verify()?;
+            save_replace(output, &catalog)?;
+            print(&serde_json::json!({
+                "identity": catalog.identity,
+                "instruments": catalog.instruments.len(),
+                "eligible": catalog
+                    .instruments
+                    .iter()
+                    .filter(|i| i.eligible_for_research)
+                    .count(),
+                "review_state": report.state,
+            }))
+        }
+        ["historical-plan", root, output] => {
+            let partitions = rust_strategy_factory::historical_migration::plan(Path::new(root))?;
+            let rows = partitions.iter().map(|p| p.rows).sum::<u64>();
+            save(output, &partitions)?;
+            print(&serde_json::json!({"planned": partitions.len(), "rows": rows}))
+        }
+        [
+            "historical-batch",
+            root,
+            output_root,
+            profiles,
+            workers,
+            chunk_events,
+            limit,
+        ] => {
+            let report = rust_strategy_factory::historical_migration::run_batch(
+                Path::new(root),
+                Path::new(output_root),
+                Path::new(profiles),
+                workers.parse().map_err(|_| "invalid worker count")?,
+                chunk_events.parse().map_err(|_| "invalid chunk events")?,
+                Some(limit.parse().map_err(|_| "invalid limit")?),
+            )?;
+            print(&report)
+        }
+        [
+            "historical-batch",
+            root,
+            output_root,
+            profiles,
+            workers,
+            chunk_events,
+        ] => {
+            let report = rust_strategy_factory::historical_migration::run_batch(
+                Path::new(root),
+                Path::new(output_root),
+                Path::new(profiles),
+                workers.parse().map_err(|_| "invalid worker count")?,
+                chunk_events.parse().map_err(|_| "invalid chunk events")?,
+                None,
+            )?;
+            print(&report)
+        }
         ["pack-parquet", input, output] => {
             rust_strategy_factory::parquet_store::write(Path::new(output), &read_dataset(input)?)
         }

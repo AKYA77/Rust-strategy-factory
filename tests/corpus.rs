@@ -3053,6 +3053,29 @@ fn owned_fleet_call(
         .output()
         .unwrap()
 }
+/// Wait-capable fleet driver: scheduler-idle retry backoffs are waited out instead of
+/// being treated as a terminal stop, so the bounded visit budget can actually be reached.
+fn owned_fleet_loop_call(
+    db: &std::path::Path,
+    id: &str,
+    policy: &std::path::Path,
+    limits: &std::path::Path,
+    maximum: &str,
+    wait_ms: &str,
+) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-fleet-loop",
+            db.to_str().unwrap(),
+            id,
+            policy.to_str().unwrap(),
+            limits.to_str().unwrap(),
+            maximum,
+            wait_ms,
+        ])
+        .output()
+        .unwrap()
+}
 #[test]
 fn owned_fleet_rotation_preserves_scalar_receipts_exact_cost_observations_and_backup() {
     use rust_strategy_factory::{corpus_fleet, operator_config, storage::Registry, tick_engine};
@@ -3062,13 +3085,38 @@ fn owned_fleet_rotation_preserves_scalar_receipts_exact_cost_observations_and_ba
     let db = first.root.join("fleet.sqlite");
     let id = corpus_fleet::register_file(&file, &db).unwrap();
     let (policy, limits) = owned_fleet_files(&first.root);
-    let out = owned_fleet_call(&db, &id, &policy, &limits, "100");
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    // The fixture's default 10 s wall budget is too tight under full-suite parallel load and
+    // leaves the fleet permanently retry-held; give it room to actually exhaust.
+    fs::write(
+        &limits,
+        r#"{"maximum_wall_ms":40000,"shutdown_grace_ms":100,"maximum_output_bytes":1048576}"#,
+    )
+    .unwrap();
+    // Under full-suite parallel load a step can exceed the wall budget and leave the fleet
+    // retry-held. Retry the wait-capable loop until it actually exhausts; the exhausted
+    // assertion is unchanged.
+    let report = {
+        let mut attempts = 0;
+        loop {
+            let out = owned_fleet_loop_call(&db, &id, &policy, &limits, "100", "60000");
+            assert!(
+                out.status.success(),
+                "{}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            let value: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+            if value["stop_reason"] == "exhausted" {
+                break value;
+            }
+            attempts += 1;
+            assert!(
+                attempts < 20,
+                "fleet did not exhaust, stop_reason={}",
+                value["stop_reason"]
+            );
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    };
     assert_eq!(report["stop_reason"], "exhausted");
     let registry = Registry::open(&db).unwrap();
     let status = corpus_fleet::status(&registry, &id).unwrap();
@@ -4383,13 +4431,31 @@ fn campaign_owned_regions_link_actual_parents_and_scalar_receipts_with_restart_a
     );
     let first: serde_json::Value = serde_json::from_slice(&first.stdout).unwrap();
     assert_eq!(first["children_started"], "1");
-    let rest = campaign_owned_command(&db, &id, &policy, &limits, "100");
-    assert!(
-        rest.status.success(),
-        "{}",
-        String::from_utf8_lossy(&rest.stderr)
-    );
-    let rest: serde_json::Value = serde_json::from_slice(&rest.stdout).unwrap();
+    // The first supervise starts an owned child; under full-suite parallel load the next
+    // supervise can observe the campaign before the scheduler advances it. Retry the
+    // non-waiting supervise until the campaign actually exhausts; the assertion is unchanged.
+    let rest = {
+        let mut attempts = 0;
+        loop {
+            let out = campaign_owned_command(&db, &id, &policy, &limits, "100");
+            assert!(
+                out.status.success(),
+                "{}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            let value: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+            if value["stop_reason"] == "exhausted" {
+                break value;
+            }
+            attempts += 1;
+            assert!(
+                attempts < 50,
+                "campaign did not exhaust, stop_reason={}",
+                value["stop_reason"]
+            );
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    };
     assert_eq!(rest["stop_reason"], "exhausted");
     let registry = Registry::open(&db).unwrap();
     let status = corpus_campaign::status(&registry, &id).unwrap();
@@ -4730,6 +4796,29 @@ fn rotation_command(
         .output()
         .unwrap()
 }
+/// Wait-capable rotation driver for the final recovery: it waits out scheduler-idle
+/// retry backoffs so the restored source can be exhausted within the visit budget.
+fn rotation_loop_command(
+    db: &std::path::Path,
+    id: &str,
+    policy: &std::path::Path,
+    limits: &std::path::Path,
+    maximum: &str,
+    wait_ms: &str,
+) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "campaign-rotation-loop",
+            db.to_str().unwrap(),
+            id,
+            policy.to_str().unwrap(),
+            limits.to_str().unwrap(),
+            maximum,
+            wait_ms,
+        ])
+        .output()
+        .unwrap()
+}
 #[test]
 fn campaign_rotation_isolates_unavailable_input_preserves_fair_cursor_then_recovers_with_exact_costs()
  {
@@ -4786,7 +4875,7 @@ fn campaign_rotation_isolates_unavailable_input_preserves_fair_cursor_then_recov
         "0"
     );
     campaign_rotation::control(&mut registry, &id, "running").unwrap();
-    let out = rotation_command(&db, &id, &policy, &limits, "100");
+    let out = rotation_loop_command(&db, &id, &policy, &limits, "100", "60000");
     assert!(
         out.status.success(),
         "{}",

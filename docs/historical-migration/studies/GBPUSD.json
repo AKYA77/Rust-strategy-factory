@@ -1,0 +1,231 @@
+{
+  "instrument": "GBPUSD",
+  "identity": "cb645f2f1876c06c2069d48e0dc5e89b41165ef8ce70892a7211fbb70262e2a1",
+  "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2",
+  "months": [
+    {
+      "year": 2025,
+      "month": 1,
+      "corpus_identity": "bfd2a38c279fa4b3ccbefd1c3786f8796bb4beed4c51491e41a7ed344a7c7bdb",
+      "events": 2660109,
+      "candles": 31584,
+      "signals": 15043,
+      "first_ms": 1735768883324,
+      "last_ms": 1738360796085
+    },
+    {
+      "year": 2025,
+      "month": 2,
+      "corpus_identity": "3e782355ea06261e3e3f58ddf8b42ce59944b72572736589fee92bb3752a986c",
+      "events": 2193261,
+      "candles": 28684,
+      "signals": 13586,
+      "first_ms": 1738533607212,
+      "last_ms": 1740779986271
+    },
+    {
+      "year": 2025,
+      "month": 3,
+      "corpus_identity": "cbc58081ea682d6766524a42a41205ae1a024f150be72537f8cfbc72293e8120",
+      "events": 2078885,
+      "candles": 30444,
+      "signals": 14506,
+      "first_ms": 1740952861588,
+      "last_ms": 1743483598696
+    },
+    {
+      "year": 2025,
+      "month": 4,
+      "corpus_identity": "a40b7351ba9d740404a1e6070bf4d724b126175961c1362c783e8248a3136a7c",
+      "events": 3629551,
+      "candles": 31482,
+      "signals": 15189,
+      "first_ms": 1743483600208,
+      "last_ms": 1746075598182
+    },
+    {
+      "year": 2025,
+      "month": 5,
+      "corpus_identity": "27729f5e9524a9e4f1274d166d2b3a9e80cbbe26a932c3b054f5fcc3015a6614",
+      "events": 1963424,
+      "candles": 31067,
+      "signals": 14832,
+      "first_ms": 1746075602913,
+      "last_ms": 1748642399133
+    },
+    {
+      "year": 2025,
+      "month": 6,
+      "corpus_identity": "09cf873799742fcda44c360eafad7a9e8e7b257caba5e703757fb42da8a2e94b",
+      "events": 1831134,
+      "candles": 30478,
+      "signals": 14572,
+      "first_ms": 1748815205219,
+      "last_ms": 1751345999924
+    },
+    {
+      "year": 2025,
+      "month": 7,
+      "corpus_identity": "3011fc914052fac5addc779fef90f8642d0cc0ac0dcdb375495f1be4c88b2a44",
+      "events": 1820380,
+      "candles": 32990,
+      "signals": 15445,
+      "first_ms": 1751346000130,
+      "last_ms": 1754024394771
+    },
+    {
+      "year": 2025,
+      "month": 8,
+      "corpus_identity": "520b833773d674774d1681146eaf7e765c5574a64b5fb80bacbc4130bcc9bd56",
+      "events": 1454417,
+      "candles": 30024,
+      "signals": 14261,
+      "first_ms": 1754024401498,
+      "last_ms": 1756702796188
+    },
+    {
+      "year": 2025,
+      "month": 9,
+      "corpus_identity": "9f48ed9fe4f9ece7947f99815df7476f04c0da35fe73ca0ddf7ad369c10e5702",
+      "events": 1686674,
+      "candles": 31441,
+      "signals": 14743,
+      "first_ms": 1756702800867,
+      "last_ms": 1759294798985
+    },
+    {
+      "year": 2025,
+      "month": 10,
+      "corpus_identity": "930cae7a6afacac37de164081806fb68f2ebc01589a553617030db4736650951",
+      "events": 1788864,
+      "candles": 32494,
+      "signals": 15318,
+      "first_ms": 1759294800197,
+      "last_ms": 1761944399066
+    },
+    {
+      "year": 2025,
+      "month": 11,
+      "corpus_identity": "64fa9dc226d2bc39c5578c9b675bbc20c30cd7c60c327933b2754730173bdc3c",
+      "events": 1675253,
+      "candles": 29038,
+      "signals": 13535,
+      "first_ms": 1762120901925,
+      "last_ms": 1764565199048
+    },
+    {
+      "year": 2025,
+      "month": 12,
+      "corpus_identity": "eaf402a9b1bcf870a075d9a0c6c791fa474fb834a1736fc1d8b1054f130e54f1",
+      "events": 1623208,
+      "candles": 31294,
+      "signals": 14704,
+      "first_ms": 1764565201597,
+      "last_ms": 1767218339170
+    },
+    {
+      "year": 2026,
+      "month": 1,
+      "corpus_identity": "77fa42955e7d30ab54c41faddf56d7029575f25f1146cd7e219306f77f2fd514",
+      "events": 1808163,
+      "candles": 30107,
+      "signals": 14312,
+      "first_ms": 1767304841847,
+      "last_ms": 1769810399082
+    },
+    {
+      "year": 2026,
+      "month": 2,
+      "corpus_identity": "e1bdada796e4e95ce6621c199c16993365056ff09db87e66a0e4669e6c7f4cf7",
+      "events": 1631274,
+      "candles": 28668,
+      "signals": 13514,
+      "first_ms": 1769983446427,
+      "last_ms": 1772229599160
+    },
+    {
+      "year": 2026,
+      "month": 3,
+      "corpus_identity": "3e2bb12339747935a13b01a41d3b99ae7fb70ec39df284e40e0076040de93cca",
+      "events": 3206939,
+      "candles": 31945,
+      "signals": 15200,
+      "first_ms": 1772402419839,
+      "last_ms": 1775019594788
+    },
+    {
+      "year": 2026,
+      "month": 4,
+      "corpus_identity": "d2f353e48f286f44215ee8f8cbac2a0269b6d5c70e911a6aa9ef8407d45914ce",
+      "events": 2377655,
+      "candles": 31476,
+      "signals": 14765,
+      "first_ms": 1775019600159,
+      "last_ms": 1777611599446
+    },
+    {
+      "year": 2026,
+      "month": 5,
+      "corpus_identity": "67d605f68332ea91378cd78f6bc9ad3ff29a917c7890dbbf5d125e6c61e57d33",
+      "events": 1907551,
+      "candles": 29384,
+      "signals": 13671,
+      "first_ms": 1777611600058,
+      "last_ms": 1780289998093
+    },
+    {
+      "year": 2026,
+      "month": 6,
+      "corpus_identity": "ca7474632c0da074c78425cedb670eeef13dde98bf97ebfa5ec909d198dd6e0e",
+      "events": 1995283,
+      "candles": 31532,
+      "signals": 14674,
+      "first_ms": 1780290000104,
+      "last_ms": 1782881982000
+    },
+    {
+      "year": 2026,
+      "month": 7,
+      "corpus_identity": "5349ba8f24208afe70bafdac3f2f9f816e160fadfd259a07b5097e6880a9d214",
+      "events": 2214539,
+      "candles": 32532,
+      "signals": 15168,
+      "first_ms": 1782882000000,
+      "last_ms": 1785535199000
+    },
+    {
+      "year": 2026,
+      "month": 8,
+      "corpus_identity": "d9a9697220652f4f6715f5b9aab0065f3b4a461bcc5a76573110c60dd6775a8f",
+      "events": 1616415,
+      "candles": 30521,
+      "signals": 14063,
+      "first_ms": 1785708161000,
+      "last_ms": 1788238799000
+    },
+    {
+      "year": 2026,
+      "month": 9,
+      "corpus_identity": "7594e9e018f7c7e5f0afa3a5d3551619a7d5cbaa1f2646e9b0655a9a54e5ae4c",
+      "events": 1942965,
+      "candles": 31521,
+      "signals": 14404,
+      "first_ms": 1788238800000,
+      "last_ms": 1790830798000
+    },
+    {
+      "year": 2026,
+      "month": 10,
+      "corpus_identity": "8cf913ceb1da5f08d4c1acb38406aef49a82bb23cbf60762153e5c52a7ecdede",
+      "events": 2077198,
+      "candles": 31164,
+      "signals": 14499,
+      "first_ms": 1790830800000,
+      "last_ms": 1793393999000
+    }
+  ],
+  "events": 45183142,
+  "candles": 679870,
+  "signals": 320004,
+  "limitations": "Aggregate multi-month corpus over independently verified monthly native sources. Aggregate identity is not source approval: no calendar completeness, broker/profile approval, licensing or scientific eligibility is established. Month boundaries are explicit; per-month source identities and provenance remain distinct. Sequence numbers restart at each month and are not globally increasing across months."
+}
