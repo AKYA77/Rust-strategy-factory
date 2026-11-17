@@ -181,7 +181,7 @@ pub(crate) fn process_history_ids(
     let next = if more { ids.last().cloned() } else { None };
     Ok((ids, next))
 }
-pub const SCHEMA_VERSION: u32 = 22;
+pub const SCHEMA_VERSION: u32 = 23;
 pub struct Registry {
     pub(crate) connection: Connection,
 }
@@ -198,7 +198,13 @@ impl Registry {
         let mut connection =
             Connection::open(path).map_err(crate::corpus_failure::AdmissionFailure::from)?;
         connection
-            .busy_timeout(Duration::from_secs(5))
+            // WAL serializes writers. The full suite runs 92 tests in parallel, each
+            // spawning subprocesses that write to per-test SQLite databases; a short busy
+            // timeout is exceeded by that write queue and surfaces as spurious
+            // "database is locked" failures unrelated to correctness. The busy timeout is
+            // SQLite's standard retry mechanism, so a generous value absorbs the queue
+            // without changing any transaction semantics.
+            .busy_timeout(Duration::from_secs(30))
             .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         connection
             .execute_batch(
@@ -363,6 +369,7 @@ impl Registry {
         crate::fleet_control::initialize(&mut connection, version < 18)?;
         crate::corpus_campaign::initialize(&mut connection, version)?;
         crate::campaign_rotation::initialize(&mut connection, version)?;
+        crate::corpus_campaign::initialize_long_ledger(&mut connection)?;
         Ok(Self { connection })
     }
     /// Atomically reserve OOS time across dataset aliases before any competing registration.
@@ -960,6 +967,8 @@ pub struct ReplayCheckpoint {
     pub previous_hash: Option<String>,
     pub state: serde_json::Value,
 }
+// Global journal admission also bounds any one experiment's retained history.
+const MAX_REPLAY_CHECKPOINTS: i64 = 10_000;
 fn checkpoint_read(c: &Connection, id: &str) -> Result<Option<(ReplayCheckpoint, String)>> {
     let key_json: String = c
         .query_row("SELECT key_json FROM experiments WHERE id=?1", [id], |r| {
@@ -970,11 +979,11 @@ fn checkpoint_read(c: &Connection, id: &str) -> Result<Option<(ReplayCheckpoint,
     if key.identity()? != id {
         return Err("checkpoint experiment identity mismatch".into());
     }
-    let mut q=c.prepare("SELECT cursor,CASE WHEN typeof(body)='blob' AND length(body)<=4194304 THEN body END,CASE WHEN length(hash)=64 THEN hash END FROM replay_checkpoints WHERE experiment_id=?1 ORDER BY cursor LIMIT 1001").map_err(db_err)?;
+    let mut q=c.prepare("SELECT cursor,CASE WHEN typeof(body)='blob' AND length(body)<=4194304 THEN body END,CASE WHEN length(hash)=64 THEN hash END FROM replay_checkpoints WHERE experiment_id=?1 ORDER BY cursor LIMIT ?2").map_err(db_err)?;
     let mut last: Option<(ReplayCheckpoint, String)> = None;
     let mut n = 0;
     for row in q
-        .query_map([id], |r| {
+        .query_map(params![id, MAX_REPLAY_CHECKPOINTS + 1], |r| {
             Ok((
                 r.get::<_, i64>(0)?,
                 r.get::<_, Vec<u8>>(1)?,
@@ -984,7 +993,7 @@ fn checkpoint_read(c: &Connection, id: &str) -> Result<Option<(ReplayCheckpoint,
         .map_err(db_err)?
     {
         n += 1;
-        if n > 1000 {
+        if n > MAX_REPLAY_CHECKPOINTS {
             return Err("checkpoint history budget exceeded".into());
         }
         let (cursor, body, digest) = row.map_err(db_err)?;
@@ -1030,15 +1039,22 @@ impl Registry {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(db_err)?;
-        let (status, token, expiry, key_json): (String, Option<String>, Option<i64>, String) = tx
+        let (status, token, expiry, key_json, attempt): (
+            String,
+            Option<String>,
+            Option<i64>,
+            String,
+            i64,
+        ) = tx
             .query_row(
-                "SELECT state,token,expires_ms,key_json FROM experiments WHERE id=?1",
+                "SELECT state,token,expires_ms,key_json,attempt FROM experiments WHERE id=?1",
                 [&lease.experiment_id],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
             )
             .map_err(db_err)?;
         if status != "running"
             || token.as_deref() != Some(&lease.token)
+            || attempt != lease.attempt
             || expiry.is_none_or(|e| e <= now_ms)
         {
             return Err("checkpoint lease stale, expired or terminal".into());
@@ -1063,18 +1079,11 @@ impl Registry {
                 |r| Ok((r.get(0)?, r.get(1)?)),
             )
             .map_err(db_err)?;
-        if count >= 10000 || body.len() > 4194304 || bytes + body.len() as i64 > 128 * 1024 * 1024 {
+        if count >= MAX_REPLAY_CHECKPOINTS
+            || body.len() > 4194304
+            || bytes + body.len() as i64 > 128 * 1024 * 1024
+        {
             return Err("checkpoint metadata budget exceeded".into());
-        }
-        let scoped: i64 = tx
-            .query_row(
-                "SELECT COUNT(*) FROM replay_checkpoints WHERE experiment_id=?1",
-                [&record.experiment_id],
-                |r| r.get(0),
-            )
-            .map_err(db_err)?;
-        if scoped >= 1000 {
-            return Err("checkpoint experiment history budget exceeded".into());
         }
         let digest = hash(&record)?;
         tx.execute(

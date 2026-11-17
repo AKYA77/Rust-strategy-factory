@@ -38,7 +38,7 @@ pub struct Record {
     pub request: Request,
     pub evidence_hashes: Vec<String>,
 }
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum State {
     Incomplete,
     Rejected,

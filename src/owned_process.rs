@@ -182,6 +182,28 @@ struct RunInput<'a> {
     start_index: Option<u64>,
     expected_source_id: Option<&'a str>,
 }
+/// The parent supervisor deliberately keeps a short SQLite busy timeout so its sampling loop
+/// stays responsive. Its own bookkeeping writes are integral to the supervision record, so a
+/// transient lock taken by a concurrent writer (the child it spawned, or a peer worker) must be
+/// retried rather than abort an otherwise healthy child. Only a persistent failure surfaces.
+fn write_with_retry<T>(mut attempt: impl FnMut() -> Result<T>) -> Result<T> {
+    let mut failures = 0;
+    loop {
+        match attempt() {
+            Ok(value) => return Ok(value),
+            Err(error) => {
+                let transient = error.contains("locked") || error.contains("busy");
+                if transient && failures < 20 {
+                    failures += 1;
+                    std::thread::sleep(Duration::from_millis(10));
+                    continue;
+                }
+                return Err(error);
+            }
+        }
+    }
+}
+
 pub fn run_region(
     input: RegionInput<'_>,
     policy_path: &Path,
@@ -276,15 +298,19 @@ fn run_input(
         .connection
         .busy_timeout(Duration::from_millis(10))
         .map_err(|e| e.to_string())?;
-    let invocation = crate::owned_history::start(
-        &mut registry,
-        &source,
-        &crate::data::hash(&loaded.file)?,
-        &crate::data::hash(&policy)?,
-        rounds,
-        wait_ms,
-        limits,
-    )?;
+    let file_hash = crate::data::hash(&loaded.file)?;
+    let policy_hash = crate::data::hash(&policy)?;
+    let invocation = write_with_retry(|| {
+        crate::owned_history::start(
+            &mut registry,
+            &source,
+            &file_hash,
+            &policy_hash,
+            rounds,
+            wait_ms,
+            limits,
+        )
+    })?;
     let executable = std::env::current_exe().map_err(|e| e.to_string())?;
     let started_at = chrono::Utc::now().timestamp_millis();
     let start = Instant::now();
@@ -304,7 +330,7 @@ fn run_input(
             .map_err(|e| e.to_string())?,
     );
     let pid = owned.0.id();
-    crate::owned_history::attach(&mut registry, &invocation, pid)?;
+    write_with_retry(|| crate::owned_history::attach(&mut registry, &invocation, pid))?;
     let fault = Arc::new(AtomicBool::new(false));
     let (send, receive) = mpsc::sync_channel(1);
     let stdout = owned.0.stdout.take().ok_or("child stdout missing")?;
@@ -382,9 +408,12 @@ fn run_input(
                 observed_at_ms: chrono::Utc::now().timestamp_millis(),
                 observation_error: observation_error.clone(),
             };
-            if let Err(e) =
+            // The journal is best-effort telemetry written while the child may hold the
+            // database's single write lock. Retry transient locks; only a persistent failure
+            // is recorded as a stop.
+            if let Err(e) = write_with_retry(|| {
                 crate::owned_history::observe_resources(&mut registry, &invocation, &observation)
-            {
+            }) {
                 resource_journal_error = Some(e);
                 resource_stop = Some("parent-resource-journal-unavailable");
             }
@@ -463,15 +492,15 @@ fn run_input(
         observed_at_ms: chrono::Utc::now().timestamp_millis(),
         observation_error: observation_error.clone(),
     };
-    if let Err(e) =
+    if let Err(e) = write_with_retry(|| {
         crate::owned_history::observe_resources(&mut registry, &invocation, &observation)
-    {
+    }) {
         resource_journal_error = Some(e);
     }
     let mut report = serde_json::json!({"invocation_id":invocation.id,"version":"owned-corpus-process-v1","input_pin":pin,"resource_journal_error":resource_journal_error,"child_resources":{"samples":sample_count.to_string(),"peak_observed_rss_bytes":peak_rss.to_string(),"last_observed_cpu_ticks":last_cpu_ticks.map(|n|n.to_string()),"start_ticks":child_start_ticks.map(|n|n.to_string()),"observation_error":observation_error,"scope":"Owned child only; sampled RSS and native kernel user+system CPU ticks. No tick-to-time conversion, unsampled peak, cgroup aggregate or hard OS limit is implied."},"search_id":source,"pid":pid.to_string(),"started_at_ms":started_at.to_string(),"finished_at_ms":chrono::Utc::now().timestamp_millis().to_string(),"elapsed_ms":start.elapsed().as_millis().to_string(),"stop_reason":cancellation.map(|v|v.0).unwrap_or(if status.success(){"child-exited"}else{"child-failed"}),"reaped":true,"forced_kill":forced,"stop_request_delivered":stop_delivered,"stop_error":stop_error,"exit_success":status.success(),"exit_code":status.code().map(|n|n.to_string()),"stdout_bytes":output.total.to_string(),"stderr_bytes":errors.total.to_string(),"stdout_truncated":output.total>cap as u64,"stderr_truncated":errors.total>cap as u64,"stdout_read_error":output.error,"stderr_read_error":errors.error,"child_report":child_report,"session_id":session,"session_status":session_status,"session_status_error":session_status_error,"limits":limits,"limitations":"Explicit foreground parent, same executable only; sampled wall budget plus cooperative grace. Forced termination can leave an unclosed session and fenced work. No hard kernel/filesystem deadline or survival after parent death is claimed."});
 
     report["invocation_status"] =
-        crate::owned_history::finish(&mut registry, &invocation, &report)?;
+        write_with_retry(|| crate::owned_history::finish(&mut registry, &invocation, &report))?;
     Ok(report)
 }
 #[cfg(test)]

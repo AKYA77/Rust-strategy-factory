@@ -1,0 +1,454 @@
+{
+  "class": "SYNTHETIC_DEVELOPMENT_PIPELINE_ONLY",
+  "host": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "available_parallelism": 3
+  },
+  "quotes": 1000000,
+  "artifacts": 16,
+  "artifact_format": "native",
+  "strategy_timeframe": "M15",
+  "max_new_chunks_per_round": 1,
+  "workers": 2,
+  "strategies": 3,
+  "repetitions": 5,
+  "cache_scope": "Fresh worker processes and registries; OS cache uncontrolled, no physical-cold claim. Cached route checked separately and excluded from measured first-route timing/CPU/RSS.",
+  "measurement_scope": "Each timed pipeline includes actual corpus-batch CLI and registry integrity CLI. CPU and RSS are child-resource observations in a fresh worker, not total host/service memory.",
+  "versions": {
+    "before": {
+      "binary_sha256": "57b0dddf6aa4c9b856ac4d4a3b7dd0e50064b4a61466c890874fa7d1961d4665",
+      "version": {
+        "compute_revision": "compute-blake3:997bc97dc1523a15a79e24031a308c9a779f9593c7793e29e0d86e6d82cc0755",
+        "engine": "ordered-l1-v6-frozen-atr-stops",
+        "indicators": "causal-primitives-v4-outward-atr",
+        "package": "0.1.0",
+        "signals": "closed-publication-next-event-v3-scoped-features",
+        "software_status": "SOFTWARE_INCOMPLETE"
+      }
+    },
+    "after": {
+      "binary_sha256": "5d4826d3efad778ac68b0a3b168bbb7da204cd9cce62b37e7328b66b3b6b9a9c",
+      "version": {
+        "compute_revision": "compute-blake3:b62e7cfd6227f7d1c88faabf742a30ff07a0dc08d57578c44d06cbed98159c3f",
+        "engine": "ordered-l1-v6-frozen-atr-stops",
+        "indicators": "causal-primitives-v4-outward-atr",
+        "package": "0.1.0",
+        "signals": "closed-publication-next-event-v3-scoped-features",
+        "software_status": "SOFTWARE_INCOMPLETE"
+      }
+    }
+  },
+  "records": [
+    {
+      "role": "before",
+      "elapsed_ms": 15314.538109,
+      "child_user_seconds": 16.803499,
+      "child_system_seconds": 0.893359,
+      "peak_pipeline_child_rss_kib": 83164,
+      "financial_receipt_sha256": "c4112fef3d5f2ba4149a2c8dfdd5ee478f364e93210a1553441fb6c988433624",
+      "resolved_trades": 1676,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 48
+      },
+      "preparation": {
+        "account_events_replayed": 1125000,
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2023,
+        "reuses": 3,
+        "source_events_decoded": 1125000,
+        "trusted_prefix_events_skipped": 1875000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 0
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 8125.341114,
+      "child_user_seconds": 9.640281,
+      "child_system_seconds": 0.852679,
+      "peak_pipeline_child_rss_kib": 92948,
+      "financial_receipt_sha256": "c4112fef3d5f2ba4149a2c8dfdd5ee478f364e93210a1553441fb6c988433624",
+      "resolved_trades": 1676,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 48
+      },
+      "preparation": {
+        "account_events_replayed": 1125000,
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2023,
+        "preflight_inventory_builds": 0,
+        "preflight_inventory_reuses": 1,
+        "preflight_source_events_decoded": 0,
+        "reuses": 3,
+        "source_events_decoded": 1125000,
+        "trusted_prefix_events_skipped": 1875000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "preflight_inventory_builds": 1,
+        "preflight_inventory_reuses": 0,
+        "preflight_source_events_decoded": 1000000,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 0
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 7733.162543,
+      "child_user_seconds": 9.329305,
+      "child_system_seconds": 0.8640709999999999,
+      "peak_pipeline_child_rss_kib": 85100,
+      "financial_receipt_sha256": "c4112fef3d5f2ba4149a2c8dfdd5ee478f364e93210a1553441fb6c988433624",
+      "resolved_trades": 1676,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 48
+      },
+      "preparation": {
+        "account_events_replayed": 1125000,
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2023,
+        "preflight_inventory_builds": 0,
+        "preflight_inventory_reuses": 1,
+        "preflight_source_events_decoded": 0,
+        "reuses": 3,
+        "source_events_decoded": 1125000,
+        "trusted_prefix_events_skipped": 1875000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "preflight_inventory_builds": 1,
+        "preflight_inventory_reuses": 0,
+        "preflight_source_events_decoded": 1000000,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 1
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 15560.229302,
+      "child_user_seconds": 17.07499,
+      "child_system_seconds": 0.8900889999999999,
+      "peak_pipeline_child_rss_kib": 90324,
+      "financial_receipt_sha256": "c4112fef3d5f2ba4149a2c8dfdd5ee478f364e93210a1553441fb6c988433624",
+      "resolved_trades": 1676,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 48
+      },
+      "preparation": {
+        "account_events_replayed": 1125000,
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2023,
+        "reuses": 3,
+        "source_events_decoded": 1125000,
+        "trusted_prefix_events_skipped": 1875000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 1
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 15061.259484,
+      "child_user_seconds": 16.426207,
+      "child_system_seconds": 0.819508,
+      "peak_pipeline_child_rss_kib": 90192,
+      "financial_receipt_sha256": "c4112fef3d5f2ba4149a2c8dfdd5ee478f364e93210a1553441fb6c988433624",
+      "resolved_trades": 1676,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 48
+      },
+      "preparation": {
+        "account_events_replayed": 1125000,
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2023,
+        "reuses": 3,
+        "source_events_decoded": 1125000,
+        "trusted_prefix_events_skipped": 1875000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 2
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 7994.575256,
+      "child_user_seconds": 9.517573,
+      "child_system_seconds": 0.737236,
+      "peak_pipeline_child_rss_kib": 97376,
+      "financial_receipt_sha256": "c4112fef3d5f2ba4149a2c8dfdd5ee478f364e93210a1553441fb6c988433624",
+      "resolved_trades": 1676,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 48
+      },
+      "preparation": {
+        "account_events_replayed": 1125000,
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2023,
+        "preflight_inventory_builds": 0,
+        "preflight_inventory_reuses": 1,
+        "preflight_source_events_decoded": 0,
+        "reuses": 3,
+        "source_events_decoded": 1125000,
+        "trusted_prefix_events_skipped": 1875000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "preflight_inventory_builds": 1,
+        "preflight_inventory_reuses": 0,
+        "preflight_source_events_decoded": 1000000,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 2
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 7833.884186,
+      "child_user_seconds": 9.276093,
+      "child_system_seconds": 0.867464,
+      "peak_pipeline_child_rss_kib": 87108,
+      "financial_receipt_sha256": "c4112fef3d5f2ba4149a2c8dfdd5ee478f364e93210a1553441fb6c988433624",
+      "resolved_trades": 1676,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 48
+      },
+      "preparation": {
+        "account_events_replayed": 1125000,
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2023,
+        "preflight_inventory_builds": 0,
+        "preflight_inventory_reuses": 1,
+        "preflight_source_events_decoded": 0,
+        "reuses": 3,
+        "source_events_decoded": 1125000,
+        "trusted_prefix_events_skipped": 1875000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "preflight_inventory_builds": 1,
+        "preflight_inventory_reuses": 0,
+        "preflight_source_events_decoded": 1000000,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 3
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 15131.290536,
+      "child_user_seconds": 16.631022,
+      "child_system_seconds": 0.8988459999999999,
+      "peak_pipeline_child_rss_kib": 91388,
+      "financial_receipt_sha256": "c4112fef3d5f2ba4149a2c8dfdd5ee478f364e93210a1553441fb6c988433624",
+      "resolved_trades": 1676,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 48
+      },
+      "preparation": {
+        "account_events_replayed": 1125000,
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2023,
+        "reuses": 3,
+        "source_events_decoded": 1125000,
+        "trusted_prefix_events_skipped": 1875000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 3
+    },
+    {
+      "role": "before",
+      "elapsed_ms": 15260.251831,
+      "child_user_seconds": 16.693452,
+      "child_system_seconds": 0.9186369999999999,
+      "peak_pipeline_child_rss_kib": 94604,
+      "financial_receipt_sha256": "c4112fef3d5f2ba4149a2c8dfdd5ee478f364e93210a1553441fb6c988433624",
+      "resolved_trades": 1676,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 48
+      },
+      "preparation": {
+        "account_events_replayed": 1125000,
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2023,
+        "reuses": 3,
+        "source_events_decoded": 1125000,
+        "trusted_prefix_events_skipped": 1875000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 4
+    },
+    {
+      "role": "after",
+      "elapsed_ms": 7882.20574,
+      "child_user_seconds": 9.331428,
+      "child_system_seconds": 0.727602,
+      "peak_pipeline_child_rss_kib": 90564,
+      "financial_receipt_sha256": "c4112fef3d5f2ba4149a2c8dfdd5ee478f364e93210a1553441fb6c988433624",
+      "resolved_trades": 1676,
+      "counts": {
+        "registered": 3,
+        "completed": 3,
+        "running": 0,
+        "attempts": 48
+      },
+      "preparation": {
+        "account_events_replayed": 1125000,
+        "builds": 0,
+        "current_byte_checks": 3,
+        "inventory_byte_checks": 0,
+        "peak_retained_candles_per_worker": 2023,
+        "preflight_inventory_builds": 0,
+        "preflight_inventory_reuses": 1,
+        "preflight_source_events_decoded": 0,
+        "reuses": 3,
+        "source_events_decoded": 1125000,
+        "trusted_prefix_events_skipped": 1875000
+      },
+      "cached_preparation": {
+        "account_events_replayed": 0,
+        "builds": 0,
+        "current_byte_checks": 0,
+        "inventory_byte_checks": 3,
+        "peak_retained_candles_per_worker": 0,
+        "preflight_inventory_builds": 1,
+        "preflight_inventory_reuses": 0,
+        "preflight_source_events_decoded": 1000000,
+        "reuses": 0,
+        "source_events_decoded": 0,
+        "trusted_prefix_events_skipped": 0
+      },
+      "cached_receipt_and_counts_match": true,
+      "repetition": 4
+    }
+  ],
+  "summaries": {
+    "before": {
+      "median_elapsed_ms": 15260.251831,
+      "median_peak_pipeline_child_rss_kib": 90324
+    },
+    "after": {
+      "median_elapsed_ms": 7882.20574,
+      "median_peak_pipeline_child_rss_kib": 90564
+    }
+  },
+  "limitations": "Small one-symbol synthetic workload; declared worker count is recorded, not an equal CPU-share claim. Repetitions are repeated measurements of the selected fixed strategies, not independent trials. No genuine data, source approval, qualification, production default or universal throughput/RSS gain is established."
+}

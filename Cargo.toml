@@ -22,6 +22,7 @@ rusqlite = { version = "0.37", features = ["bundled", "backup"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision", "float_roundtrip"] }
 fs2 = "=0.4.3"
+sha2 = "=0.11.1"
 
 [profile.release]
 lto = "thin"

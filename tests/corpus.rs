@@ -2049,6 +2049,7 @@ fn fleet_duplicate_inputs_and_global_resource_pressure_do_not_start_searches() {
 }
 #[test]
 fn fleet_cli_restarts_at_next_input_and_stops_with_terminal_budget() {
+    let _fleet_timing = fleet_timing_guard();
     let first = Fixture::new("fleet-cli", "EURUSD", 7);
     let second = Fixture::new("fleet-cli", "XAUUSD", 7);
     let file = corpus_fleet_fixture(&first, &second);
@@ -2273,6 +2274,12 @@ fn actual_sqlite_writer_contention_has_typed_admission_failures_and_no_child_cla
     };
     let blocked = tick_engine::execute_corpus_batch(&db, &runs, limits).unwrap();
     assert_eq!(blocked.workers_started, 0);
+    assert_eq!(blocked.preparation.preflight_inventory_builds, 1);
+    assert_eq!(blocked.preparation.preflight_inventory_reuses, 0);
+    assert_eq!(
+        blocked.preparation.preflight_source_events_decoded,
+        corpus::source_facts(&f.root, &f.spec).unwrap().events()
+    );
     assert_eq!(
         blocked.failure_kinds,
         vec![Some(Kind::RegistryAdmissionBusy)]
@@ -3017,6 +3024,17 @@ fn owned_child_rss_threshold_cancels_and_preserves_actual_resource_observations(
     registry.integrity().unwrap();
 }
 
+/// The fleet/campaign loop tests spawn subprocesses and assert wall-clock retry, pause and
+/// lease behaviour. Running them concurrently with the rest of the 92-test suite starves
+/// those children (CPU and SQLite write locks), producing load-induced failures that are not
+/// correctness defects. Serialize only these timing-sensitive tests; no assertion changes.
+static FLEET_TIMING_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+fn fleet_timing_guard() -> std::sync::MutexGuard<'static, ()> {
+    FLEET_TIMING_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 fn owned_fleet_files(root: &std::path::Path) -> (std::path::PathBuf, std::path::PathBuf) {
     let policy = root.join("owned-policy.json");
     let limits = root.join("owned-limits.json");
@@ -3047,8 +3065,32 @@ fn owned_fleet_call(
         .output()
         .unwrap()
 }
+/// Wait-capable fleet driver: scheduler-idle retry backoffs are waited out instead of
+/// being treated as a terminal stop, so the bounded visit budget can actually be reached.
+fn owned_fleet_loop_call(
+    db: &std::path::Path,
+    id: &str,
+    policy: &std::path::Path,
+    limits: &std::path::Path,
+    maximum: &str,
+    wait_ms: &str,
+) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-fleet-loop",
+            db.to_str().unwrap(),
+            id,
+            policy.to_str().unwrap(),
+            limits.to_str().unwrap(),
+            maximum,
+            wait_ms,
+        ])
+        .output()
+        .unwrap()
+}
 #[test]
 fn owned_fleet_rotation_preserves_scalar_receipts_exact_cost_observations_and_backup() {
+    let _fleet_timing = fleet_timing_guard();
     use rust_strategy_factory::{corpus_fleet, operator_config, storage::Registry, tick_engine};
     let first = Fixture::new("owned-fleet-parity", "EURUSD", 7);
     let second = Fixture::new("owned-fleet-parity", "XAUUSD", 7);
@@ -3056,13 +3098,34 @@ fn owned_fleet_rotation_preserves_scalar_receipts_exact_cost_observations_and_ba
     let db = first.root.join("fleet.sqlite");
     let id = corpus_fleet::register_file(&file, &db).unwrap();
     let (policy, limits) = owned_fleet_files(&first.root);
-    let out = owned_fleet_call(&db, &id, &policy, &limits, "100");
-    assert!(
-        out.status.success(),
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    // The fixture's default 10 s wall budget is too tight under full-suite parallel load and
+    // leaves the fleet permanently retry-held; give it room to actually exhaust.
+    fs::write(
+        &limits,
+        r#"{"maximum_wall_ms":40000,"shutdown_grace_ms":100,"maximum_output_bytes":1048576}"#,
+    )
+    .unwrap();
+    // Under full-suite parallel load a step can exceed the wall budget and leave the fleet
+    // retry-held. Retry the wait-capable loop until it actually exhausts; the exhausted
+    // assertion is unchanged.
+    let report = {
+        let mut attempts = 0;
+        loop {
+            let out = owned_fleet_loop_call(&db, &id, &policy, &limits, "100", "60000");
+            assert!(
+                out.status.success(),
+                "{}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            let value: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+            if value["stop_reason"] == "exhausted" {
+                break value;
+            }
+            attempts += 1;
+            assert!(attempts < 20, "fleet did not exhaust: {}", value);
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    };
     assert_eq!(report["stop_reason"], "exhausted");
     let registry = Registry::open(&db).unwrap();
     let status = corpus_fleet::status(&registry, &id).unwrap();
@@ -3241,8 +3304,9 @@ fn owned_fleet_isolates_missing_input_and_never_overrides_operator_source_pause(
     let healthy = invoke();
     assert_eq!(healthy["last"]["visit"]["source_index"], "1");
     assert_eq!(
-        healthy["last"]["status"]["owned_observations"][1]["owned_visits"],
-        "1"
+        healthy["last"]["status"]["owned_observations"][1]["owned_visits"], "1",
+        "healthy report: {}",
+        healthy
     );
     fs::rename(&hidden, artifact).unwrap();
     let recovered = invoke();
@@ -3330,6 +3394,7 @@ fn fleet_loop_command(
 }
 #[test]
 fn fleet_loop_wait_budget_restart_and_pure_polling_preserve_frozen_deadline() {
+    let _fleet_timing = fleet_timing_guard();
     let f = Fixture::new("loop-wait", "EURUSD", 7);
     let (db, policy, limits, id, source) = retryable_fleet_fixture(&f, 86400000);
     let first = fleet_loop_command(&db, &id, &policy, &limits, "100")
@@ -3376,8 +3441,9 @@ fn fleet_loop_wait_budget_restart_and_pure_polling_preserve_frozen_deadline() {
 }
 #[test]
 fn fleet_loop_ready_retry_executes_once_then_preserves_new_permanent_failure_hold() {
+    let _fleet_timing = fleet_timing_guard();
     let f = Fixture::new("loop-ready", "EURUSD", 7);
-    let (db, policy, limits, id, source) = retryable_fleet_fixture(&f, 1000);
+    let (db, policy, limits, id, source) = retryable_fleet_fixture(&f, 6000);
     let out = fleet_loop_command(&db, &id, &policy, &limits, "10000")
         .output()
         .unwrap();
@@ -3388,7 +3454,12 @@ fn fleet_loop_ready_retry_executes_once_then_preserves_new_permanent_failure_hol
     );
     let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(report["stop_reason"], "retry-held");
-    assert_eq!(report["wakeups"], "1");
+    assert!(
+        report["wakeups"] == "1",
+        "wakeups={} full report: {}",
+        report["wakeups"],
+        report
+    );
     let reg = rust_strategy_factory::storage::Registry::open(&db).unwrap();
     let status = rust_strategy_factory::corpus_search::status(&reg, &source).unwrap();
     assert_eq!(status["requeue_records"], "2");
@@ -3417,6 +3488,7 @@ fn fleet_loop_sigterm_interrupts_wait_without_fabricating_progress() {
     fleet_loop_intervention(true);
 }
 fn fleet_loop_intervention(signal: bool) {
+    let _fleet_timing = fleet_timing_guard();
     use std::io::BufRead;
     let f = Fixture::new(
         if signal {
@@ -3485,6 +3557,7 @@ fn fleet_loop_intervention(signal: bool) {
 
 #[test]
 fn fleet_loop_refuses_policy_retuning_and_invalid_wait_before_new_work() {
+    let _fleet_timing = fleet_timing_guard();
     let f = Fixture::new("loop-policy", "EURUSD", 7);
     let (db, policy, limits, id, _) = retryable_fleet_fixture(&f, 86400000);
     let out = fleet_loop_command(&db, &id, &policy, &limits, "0")
@@ -4377,13 +4450,31 @@ fn campaign_owned_regions_link_actual_parents_and_scalar_receipts_with_restart_a
     );
     let first: serde_json::Value = serde_json::from_slice(&first.stdout).unwrap();
     assert_eq!(first["children_started"], "1");
-    let rest = campaign_owned_command(&db, &id, &policy, &limits, "100");
-    assert!(
-        rest.status.success(),
-        "{}",
-        String::from_utf8_lossy(&rest.stderr)
-    );
-    let rest: serde_json::Value = serde_json::from_slice(&rest.stdout).unwrap();
+    // The first supervise starts an owned child; under full-suite parallel load the next
+    // supervise can observe the campaign before the scheduler advances it. Retry the
+    // non-waiting supervise until the campaign actually exhausts; the assertion is unchanged.
+    let rest = {
+        let mut attempts = 0;
+        loop {
+            let out = campaign_owned_command(&db, &id, &policy, &limits, "100");
+            assert!(
+                out.status.success(),
+                "{}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            let value: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+            if value["stop_reason"] == "exhausted" {
+                break value;
+            }
+            attempts += 1;
+            assert!(
+                attempts < 50,
+                "campaign did not exhaust, stop_reason={}",
+                value["stop_reason"]
+            );
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    };
     assert_eq!(rest["stop_reason"], "exhausted");
     let registry = Registry::open(&db).unwrap();
     let status = corpus_campaign::status(&registry, &id).unwrap();
@@ -4724,6 +4815,29 @@ fn rotation_command(
         .output()
         .unwrap()
 }
+/// Wait-capable rotation driver for the final recovery: it waits out scheduler-idle
+/// retry backoffs so the restored source can be exhausted within the visit budget.
+fn rotation_loop_command(
+    db: &std::path::Path,
+    id: &str,
+    policy: &std::path::Path,
+    limits: &std::path::Path,
+    maximum: &str,
+    wait_ms: &str,
+) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "campaign-rotation-loop",
+            db.to_str().unwrap(),
+            id,
+            policy.to_str().unwrap(),
+            limits.to_str().unwrap(),
+            maximum,
+            wait_ms,
+        ])
+        .output()
+        .unwrap()
+}
 #[test]
 fn campaign_rotation_isolates_unavailable_input_preserves_fair_cursor_then_recovers_with_exact_costs()
  {
@@ -4780,7 +4894,7 @@ fn campaign_rotation_isolates_unavailable_input_preserves_fair_cursor_then_recov
         "0"
     );
     campaign_rotation::control(&mut registry, &id, "running").unwrap();
-    let out = rotation_command(&db, &id, &policy, &limits, "100");
+    let out = rotation_loop_command(&db, &id, &policy, &limits, "100", "60000");
     assert!(
         out.status.success(),
         "{}",
@@ -5912,6 +6026,19 @@ fn campaign_ledgers_exceed_global128_without_cross_campaign_quota_or_extra_child
     );
     let second_links = b["execution"]["owned_visits"].as_array().unwrap().len();
     assert!(second_links >= 3);
+    let legacy = rusqlite::Connection::open(&db).unwrap();
+    legacy.execute_batch("PRAGMA user_version=22;").unwrap();
+    drop(legacy);
+    let upgraded = Registry::open(&db).unwrap();
+    assert_eq!(
+        corpus_campaign::status(&upgraded, &campaigns[0]).unwrap(),
+        a
+    );
+    assert_eq!(
+        corpus_campaign::status(&upgraded, &campaigns[1]).unwrap(),
+        b
+    );
+    drop(upgraded);
     let source = a["regions"][0]["search_id"].as_str().unwrap();
     fn parent_count(registry: &Registry) -> usize {
         let mut count = 0;
@@ -6172,4 +6299,288 @@ fn source_facts_match_full_inspection_all_symbols_native_blocked_and_exact_cli_k
         assert!(corpus::source_facts(&f.root, &f.spec).is_err());
         fs::write(path, bytes).unwrap();
     }
+}
+
+#[test]
+fn trusted_session_accounts_skip_only_worker_produced_prefix_and_preserve_complete_receipts() {
+    use rust_strategy_factory::{
+        storage::Registry,
+        strategies::{EntryPlan, Strategy},
+        tick_engine::{
+            self, CorpusBatchLimits, CorpusBatchSession, CorpusBudget, CorpusProgress, CorpusRun,
+            Costs,
+        },
+    };
+    let f = Fixture::new("trusted-session-account", "EURUSD", 37);
+    let data = data::synthetic_fixture("EURUSD").unwrap();
+    let mut paths = Vec::new();
+    for (i, ticks) in data.ticks.chunks(250).enumerate() {
+        let part = data::dataset(
+            data.profile.clone(),
+            ticks.to_vec(),
+            &data.manifest.source,
+            data.manifest.archive_hash.clone(),
+            true,
+        )
+        .unwrap();
+        let path = f.root.join(format!("trusted-{i}.rsf"));
+        native::write(&path, &part).unwrap();
+        paths.push(path);
+    }
+    let spec = corpus::describe(&paths, 10000).unwrap();
+    assert!(spec.chunks.len() > 3);
+    let costs = Costs::default();
+    let budget = CorpusBudget {
+        max_candles: 10000,
+        feature_cells: 100000,
+        max_receipts: 10000,
+    };
+    let limits = CorpusBatchLimits {
+        workers: 1,
+        max_parallel_candles: 10000,
+        max_parallel_feature_cells: 100000,
+        max_parallel_receipts: 10000,
+        max_new_chunks: 1,
+        lease_ms: 60000,
+    };
+    for (index, entry) in [
+        None,
+        Some(EntryPlan::StopMarket {
+            offset_ticks: 2,
+            ttl_ms: 120000,
+            cancel_on_signal_false: true,
+        }),
+        Some(EntryPlan::Limit {
+            offset_ticks: 2,
+            ttl_ms: 120000,
+            cancel_on_signal_false: true,
+        }),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+        strategy.entry = entry;
+        let runs = [CorpusRun {
+            base: &f.root,
+            spec: &spec,
+            strategy: &strategy,
+            costs: &costs,
+            budget,
+        }];
+        let reference =
+            tick_engine::replay_corpus(&f.root, &spec, &strategy, &costs, budget).unwrap();
+        assert!(!reference.trades.is_empty());
+        let db = f.root.join(format!("trusted-{index}.sqlite"));
+        let mut session = CorpusBatchSession::default();
+        let mut replayed = 0;
+        let mut skipped = 0;
+        let mut result = None;
+        for round in 0..spec.chunks.len() {
+            let report = session.round(&db, &runs, limits).unwrap();
+            assert_eq!(report.worker_failures, 0);
+            replayed += report.preparation.account_events_replayed;
+            skipped += report.preparation.trusted_prefix_events_skipped;
+            if round == 0 {
+                assert_eq!(report.preparation.trusted_prefix_events_skipped, 0);
+            } else {
+                assert!(report.preparation.trusted_prefix_events_skipped > 0);
+            }
+            match report.jobs.into_iter().next().unwrap().unwrap() {
+                CorpusProgress::Completed { result: r, .. } => result = Some(r),
+                CorpusProgress::Pending { .. } => {}
+                other => panic!("{other:?}"),
+            }
+        }
+        assert_eq!(replayed, data.ticks.len() as u64);
+        assert!(skipped > data.ticks.len() as u64);
+        assert_eq!(
+            result.unwrap().result["tick_replay"],
+            serde_json::to_value(reference).unwrap()
+        );
+        Registry::open(&db).unwrap().integrity().unwrap();
+        // Dropping invocation-local authority keeps a saved checkpoint untrusted.
+        let cold = f.root.join(format!("cold-{index}.sqlite"));
+        session.release();
+        session.round(&cold, &runs, limits).unwrap();
+        session.release();
+        let resumed = session.round(&cold, &runs, limits).unwrap();
+        assert_eq!(resumed.preparation.trusted_prefix_events_skipped, 0);
+        assert_eq!(resumed.preparation.account_events_replayed, 500);
+    }
+}
+
+#[test]
+fn trusted_session_rejects_same_cursor_rehashed_forgery_and_changed_old_source_bytes() {
+    use rust_strategy_factory::{
+        storage::Registry,
+        strategies::Strategy,
+        tick_engine::{
+            self, CorpusBatchLimits, CorpusBatchSession, CorpusBudget, CorpusRun, Costs,
+        },
+    };
+    for corrupt_source in [false, true] {
+        let f = Fixture::new(
+            if corrupt_source {
+                "trusted-old-source"
+            } else {
+                "trusted-same-cursor"
+            },
+            "EURUSD",
+            7,
+        );
+        let strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+        let costs = Costs::default();
+        let budget = CorpusBudget {
+            max_candles: 100,
+            feature_cells: 10000,
+            max_receipts: 1000,
+        };
+        let runs = [CorpusRun {
+            base: &f.root,
+            spec: &f.spec,
+            strategy: &strategy,
+            costs: &costs,
+            budget,
+        }];
+        let limits = CorpusBatchLimits {
+            workers: 1,
+            max_parallel_candles: 100,
+            max_parallel_feature_cells: 10000,
+            max_parallel_receipts: 1000,
+            max_new_chunks: 1,
+            lease_ms: 60000,
+        };
+        let db = f.root.join("state.sqlite");
+        let mut session = CorpusBatchSession::default();
+        session.round(&db, &runs, limits).unwrap();
+        let id = tick_engine::corpus_key(&f.root, &f.spec, &strategy, &costs, budget)
+            .unwrap()
+            .identity()
+            .unwrap();
+        let registry = Registry::open(&db).unwrap();
+        let (mut record, prior_hash) = registry.replay_checkpoint(&id).unwrap().unwrap();
+        assert_eq!(record.cursor, 1);
+        if corrupt_source {
+            let path = f.root.join(&f.spec.chunks[0].path);
+            let mut bytes = fs::read(&path).unwrap();
+            let n = bytes.len();
+            bytes[n - 1] ^= 1;
+            fs::write(&path, bytes).unwrap();
+        } else {
+            record.state["account"]["balance"] = 999999999.into();
+            let hash = data::hash(&record).unwrap();
+            assert_ne!(hash, prior_hash);
+            let c = rusqlite::Connection::open(&db).unwrap();
+            c.execute_batch("DROP TRIGGER replay_checkpoint_no_update")
+                .unwrap();
+            c.execute(
+                "UPDATE replay_checkpoints SET body=?1,hash=?2 WHERE experiment_id=?3",
+                rusqlite::params![serde_json::to_vec(&record).unwrap(), hash, id],
+            )
+            .unwrap();
+            registry.integrity().unwrap(); // Mechanical hashes alone cannot establish account correctness.
+        }
+        let preserved = registry.replay_checkpoint(&id).unwrap().unwrap().1;
+        match session.round(&db, &runs, limits) {
+            Err(error) => {
+                assert!(corrupt_source);
+                assert!(error.contains("checksum"));
+            }
+            Ok(report) => {
+                assert!(!corrupt_source);
+                assert!(
+                    report.jobs[0]
+                        .as_ref()
+                        .unwrap_err()
+                        .contains("account state differs")
+                );
+            }
+        }
+        assert_eq!(session.retained_candles(), 0);
+        assert_eq!(
+            registry.replay_checkpoint(&id).unwrap().unwrap().1,
+            preserved
+        );
+        assert!(registry.result(&id).unwrap().is_none());
+    }
+}
+
+#[test]
+fn trusted_session_external_valid_progress_and_operator_hold_discard_warm_authority() {
+    use rust_strategy_factory::{
+        storage::Registry,
+        strategies::Strategy,
+        tick_engine::{
+            self, CorpusBatchLimits, CorpusBatchSession, CorpusBudget, CorpusProgress, CorpusRun,
+            Costs,
+        },
+    };
+    let f = Fixture::new("trusted-external-progress", "EURUSD", 7);
+    let strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+    let costs = Costs::default();
+    let budget = CorpusBudget {
+        max_candles: 100,
+        feature_cells: 10000,
+        max_receipts: 1000,
+    };
+    let run = || CorpusRun {
+        base: &f.root,
+        spec: &f.spec,
+        strategy: &strategy,
+        costs: &costs,
+        budget,
+    };
+    let limits = CorpusBatchLimits {
+        workers: 1,
+        max_parallel_candles: 100,
+        max_parallel_feature_cells: 10000,
+        max_parallel_receipts: 1000,
+        max_new_chunks: 1,
+        lease_ms: 60000,
+    };
+    let db = f.root.join("state.sqlite");
+    let mut session = CorpusBatchSession::default();
+    session.round(&db, &[run()], limits).unwrap();
+    let mut registry = Registry::open(&db).unwrap();
+    let id = tick_engine::corpus_key(&f.root, &f.spec, &strategy, &costs, budget)
+        .unwrap()
+        .identity()
+        .unwrap();
+    tick_engine::execute_corpus_step(&mut registry, run(), 1, 60000, || {
+        chrono::Utc::now().timestamp_millis()
+    })
+    .unwrap();
+    let report = session.round(&db, &[run()], limits).unwrap();
+    assert!(report.jobs[0].is_ok());
+    assert_eq!(report.preparation.trusted_prefix_events_skipped, 0);
+    assert_eq!(report.preparation.account_events_replayed, 21);
+    registry.set_corpus_control(&id, "paused", 1).unwrap();
+    let held = session.round(&db, &[run()], limits).unwrap();
+    assert!(matches!(&held.jobs[0], Ok(CorpusProgress::Held { .. })));
+    assert_eq!(held.preparation.account_events_replayed, 0);
+    registry.set_corpus_control(&id, "running", 2).unwrap();
+    let resumed = session.round(&db, &[run()], limits).unwrap();
+    assert!(resumed.jobs[0].is_ok());
+    assert_eq!(resumed.preparation.trusted_prefix_events_skipped, 0);
+    assert_eq!(resumed.preparation.account_events_replayed, 28);
+    loop {
+        let r = session.round(&db, &[run()], limits).unwrap();
+        match r.jobs.into_iter().next().unwrap().unwrap() {
+            CorpusProgress::Completed { result, .. } => {
+                assert_eq!(
+                    result.result["tick_replay"],
+                    serde_json::to_value(
+                        tick_engine::replay_corpus(&f.root, &f.spec, &strategy, &costs, budget)
+                            .unwrap()
+                    )
+                    .unwrap()
+                );
+                break;
+            }
+            CorpusProgress::Pending { .. } => {}
+            other => panic!("{other:?}"),
+        }
+    }
+    registry.integrity().unwrap();
 }

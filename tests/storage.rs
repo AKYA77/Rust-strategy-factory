@@ -76,7 +76,7 @@ fn compatible_event_lookup_upgrade_preserves_history_and_marker_semantics() {
     let version: i64 = c
         .query_row("PRAGMA user_version", [], |r| r.get(0))
         .unwrap();
-    assert_eq!(version, 22);
+    assert_eq!(version, 23);
     drop(c);
     let registry = Registry::open(&path).unwrap();
     registry.integrity().unwrap();
@@ -1124,6 +1124,103 @@ fn artifact_file_quota_reserves_staging_and_final_entries_before_publication() {
         rust_strategy_factory::result_artifact::inventory(&registry).unwrap()["partial_files"],
         "0"
     );
+    drop(registry);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn checkpoint_publication_rejects_wrong_attempt_without_writing_or_consuming_current_authority() {
+    let dir = directory();
+    let db = dir.join("checkpoint-attempt.sqlite");
+    let mut registry = Registry::open(&db).unwrap();
+    let id = registry.register(&key()).unwrap();
+    let Claim::Acquired(lease) = registry.claim(&id, 0, 1000).unwrap() else {
+        panic!()
+    };
+    for attempt in [0, -1, lease.attempt + 1, i64::MAX] {
+        let mut altered = lease.clone();
+        altered.attempt = attempt;
+        assert!(
+            registry
+                .save_replay_checkpoint(&altered, 1, 0, 1, json!({"untrusted_attempt":attempt}))
+                .is_err(),
+            "checkpoint publication accepted a mismatched attempt {attempt}"
+        );
+        assert!(registry.replay_checkpoint(&id).unwrap().is_none());
+        assert_eq!(registry.counts().unwrap().attempts, 1);
+        registry.validate_lease(&lease, 1).unwrap();
+    }
+    let first = registry
+        .save_replay_checkpoint(&lease, 2, 0, 1, json!({"valid":1}))
+        .unwrap();
+    registry.yield_lease(&lease, 3).unwrap();
+    let Claim::Acquired(current) = registry.claim(&id, 3, 1000).unwrap() else {
+        panic!()
+    };
+    let mut wrong = current.clone();
+    wrong.attempt = lease.attempt;
+    assert!(
+        registry
+            .save_replay_checkpoint(&wrong, 4, 1, 2, json!({"untrusted_attempt":wrong.attempt}))
+            .is_err()
+    );
+    assert!(
+        registry
+            .save_replay_checkpoint(&lease, 4, 1, 2, json!({"stale_nonce":true}))
+            .is_err()
+    );
+    assert_eq!(registry.replay_checkpoint(&id).unwrap().unwrap().1, first);
+    let second = registry
+        .save_replay_checkpoint(&current, 5, 1, 2, json!({"valid":2}))
+        .unwrap();
+    registry.integrity().unwrap();
+    let backup = dir.join("backup.sqlite");
+    registry.backup(&backup).unwrap();
+    let reopened = Registry::open(&backup).unwrap();
+    let (record, digest) = reopened.replay_checkpoint(&id).unwrap().unwrap();
+    assert_eq!(record.previous_hash, Some(first));
+    assert_eq!(digest, second);
+    assert_eq!(record.state, json!({"valid":2}));
+    assert_eq!(registry.counts().unwrap().attempts, 2);
+    drop(reopened);
+    drop(registry);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn competing_checkpoint_publication_never_accepts_wrong_attempt_with_a_current_nonce() {
+    use std::sync::{Arc, Barrier};
+    let dir = directory();
+    let db = dir.join("competing-attempt.sqlite");
+    let mut registry = Registry::open(&db).unwrap();
+    let id = registry.register(&key()).unwrap();
+    let Claim::Acquired(lease) = registry.claim(&id, 0, 1000).unwrap() else {
+        panic!()
+    };
+    let barrier = Arc::new(Barrier::new(2));
+    let outcomes = std::thread::scope(|scope| {
+        let handles = [false, true].map(|wrong| {
+            let barrier = barrier.clone();
+            let db = &db;
+            let mut lease = lease.clone();
+            scope.spawn(move || {
+                let mut actor = Registry::open(db).unwrap();
+                if wrong {
+                    lease.attempt += 1;
+                }
+                barrier.wait();
+                actor
+                    .save_replay_checkpoint(&lease, 1, 0, 1, json!({"wrong":wrong}))
+                    .is_ok()
+            })
+        });
+        handles.map(|h| h.join().unwrap())
+    });
+    assert_eq!(outcomes, [true, false]);
+    let (record, _) = registry.replay_checkpoint(&id).unwrap().unwrap();
+    assert_eq!(record.state, json!({"wrong":false}));
+    registry.validate_lease(&lease, 2).unwrap();
+    registry.integrity().unwrap();
     drop(registry);
     std::fs::remove_dir_all(dir).unwrap();
 }

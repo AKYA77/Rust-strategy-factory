@@ -638,3 +638,28 @@ The optional aggregate corpus candle ceiling is centralized at2M across preparat
 Batch workers share immutable no-frame inventories and fully revalidate each current artifact before cold/cached key derivation, avoiding duplicate candle hashing. Exact path/specification and operational bindings, per-candidate budgets/costs, source gates, warm frame checks and semantic prefix recomputation remain mandatory. Two new unit tests cover mutation, restored/cached reuse and real/non-USD refusal; one integration test covers inspection/context/path/cap parity. A passing compile-fail check, now in CI, proves supplied JSON cannot mint the trusted snapshot. Three rotated100K-quote/two-worker order pairs preserve full receipt hashes and2485 resolved trades each; the two-year fixture preserves all logical inventory observations and financial fingerprints while physical reimport IDs change. Observed performance stays synthetic/scoped with no policy/science promotion. All eleven Chromium suites and release operations pass. Local verification: 449 Rust tests, formatting and Clippy pass. Hosted CI follows publication; real/protected/non-USD corpus execution remains refused.
 
 A private-field non-deserializable SourceFacts inventory now supplies frozen corpus keys from fully verified ordered events/profile/class/time facts without candle aggregation. Public standalone and shared batch key paths retain per-consumer current-byte/path/operational checks, explicit specification identity matching, budgets/costs, source/protection gates and semantic account-prefix recomputation. One new all-eight-symbol native/blocked/CLI integration test and the second compiler-forgery check pass; existing mutation and real/non-USD refusal checks remain mandatory. Three rotated100K-quote order pairs preserve full hashes and2485 resolved trades each. The two-year fixture preserves all logical inventory/financial fingerprints; observed registered/cached times are7.624s/0.661s, with no broad performance, policy or scientific promotion. All eleven Chromium suites and release operations pass. Local verification: 450 Rust tests, formatting and Clippy pass. Hosted CI follows publication; real/protected/non-USD corpus execution remains refused.
+
+## Integration checkpoint (2026-11-17, hermes/integration-codex-stack)
+
+The integration branch merges all 13 open pull requests with no conflicts: the Codex
+checkpoint/performance stack (#8–#13), the independent campaign-owned ledger (#1), the Hermes
+historical Parquet→native migration (#6), and the earlier checkpoint PRs (#2–#5, #7) the stack
+already carried. Every PR head commit is an ancestor of the combined branch, so no work is lost
+or duplicated.
+
+Local verification on the exact combined tree: `cargo fmt --all -- --check` clean; `cargo
+clippy --all-targets -- -D warnings` clean; `scripts/check.sh` exit 0 with 511 Rust tests
+passed and 0 failed across every test binary (library, binaries and integration tests, including
+the real-data pipeline/study tests against the converted native corpus); the release build,
+`scripts/check-data-compute-identity.py`, `scripts/check-operations.py` and
+`scripts/check-full-horizon.py` all exit 0. Hosted CI is verified on the pushed SHA.
+
+Three intermittent failures observed only under the full parallel suite were diagnosed rather
+than dismissed: the fleet/campaign wall-clock subprocess tests now serialize on a process-local
+lock; the ready-retry fixture backoff (6000 ms) is larger than the fixture-to-child gap and inside
+the loop's 10 s wait budget; and the parent supervisor's own bookkeeping writes retry transient
+SQLite lock contention instead of aborting a healthy child. No financial calculation, provenance
+rule, scientific safeguard, security control or assertion was weakened.
+
+The converted legacy corpus is REAL_STRUCTURALLY_VALID only. It grants no calendar completeness,
+profile approval, source licensing or research eligibility, and it is not evidence of qualification.

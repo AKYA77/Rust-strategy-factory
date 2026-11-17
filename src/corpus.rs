@@ -180,6 +180,8 @@ pub struct SourceFacts {
     latest: crate::coverage::Event,
     max_resident_quote_events: usize,
     limitations: &'static str,
+    #[serde(skip)]
+    max_artifact_events: usize,
 }
 const FACTS_LIMITATIONS: &str = "Observed source identity/profile/declared class and exact ordered events only. No candle, complete coverage, independent approval, execution or scientific eligibility is established. Reuse must verify actual current artifacts; metadata is additional to bounded quote residency.";
 impl SourceFacts {
@@ -211,14 +213,66 @@ impl SourceFacts {
         self.max_resident_quote_events
     }
     pub fn verify_current(&self, base: &Path, spec: &Specification) -> Result<()> {
-        verify_current_identity(base, spec, &self.corpus_identity)
+        verify_current_identity(base, spec, &self.corpus_identity, self.max_artifact_events)
     }
 }
-fn verify_current_identity(base: &Path, spec: &Specification, identity: &str) -> Result<()> {
+fn validate_verified_specification(
+    spec: &Specification,
+    identity: &str,
+    max_artifact_events: usize,
+) -> Result<()> {
     if identity != spec.identity()? {
         return Err("verified source identity differs".into());
     }
-    visit_blocks(base, spec, |_| Ok(()))
+    if max_artifact_events == 0 || max_artifact_events > spec.max_chunk_events {
+        return Err("verified source exceeds current artifact event budget".into());
+    }
+    Ok(())
+}
+fn verify_current_identity(
+    base: &Path,
+    spec: &Specification,
+    identity: &str,
+    max_artifact_events: usize,
+) -> Result<()> {
+    validate_verified_specification(spec, identity, max_artifact_events)?;
+    // Only private, fully decoded snapshots reach this path. Equal complete
+    // file hashes plus the same ordered specification preserve the validated
+    // profile/class/quotes/order/root. Read every current byte on one descriptor;
+    // neither metadata nor the expected hash alone establishes current identity.
+    let mut buffer = [0u8; 65536];
+    for chunk in &spec.chunks {
+        let file = File::open(base.join(&chunk.path)).map_err(|e| e.to_string())?;
+        let length = file.metadata().map_err(|e| e.to_string())?.len();
+        let cap = if chunk.block_root.is_some() {
+            crate::blocked_native::MAX_BYTES
+        } else {
+            native::MAX_BYTES
+        };
+        if length == 0 || length > cap {
+            return Err("current corpus artifact byte budget exceeded".into());
+        }
+        let mut reader = file.take(cap + 1);
+        let mut hash = blake3::Hasher::new();
+        let mut bytes = 0u64;
+        loop {
+            let n = reader.read(&mut buffer).map_err(|e| e.to_string())?;
+            if n == 0 {
+                break;
+            }
+            bytes = bytes
+                .checked_add(n as u64)
+                .ok_or("artifact byte count overflow")?;
+            if bytes > cap {
+                return Err("current corpus artifact grew beyond byte budget".into());
+            }
+            hash.update(&buffer[..n]);
+        }
+        if bytes != length || hash.finalize().to_hex().as_str() != chunk.file_hash {
+            return Err("corpus artifact revision/fingerprint checksum mismatch".into());
+        }
+    }
+    Ok(())
 }
 /// Compute only source facts needed for a frozen execution key, without candles.
 pub fn source_facts(base: &Path, spec: &Specification) -> Result<SourceFacts> {
@@ -230,7 +284,16 @@ pub fn source_facts(base: &Path, spec: &Specification) -> Result<SourceFacts> {
     let mut latest = None;
     let mut peak = 0;
     let mut events = SequenceHash::new();
+    let mut artifact_events = 0usize;
+    let mut max_artifact_events = 0usize;
     visit_blocks(base, spec, |block| {
+        artifact_events = artifact_events
+            .checked_add(block.ticks.len())
+            .ok_or("artifact event count overflow")?;
+        if block.last_in_chunk {
+            max_artifact_events = max_artifact_events.max(artifact_events);
+            artifact_events = 0;
+        }
         if profile.is_none() {
             profile = Some(block.profile.clone());
             source = Some(block.manifest.source.clone());
@@ -258,6 +321,7 @@ pub fn source_facts(base: &Path, spec: &Specification) -> Result<SourceFacts> {
         latest: crate::coverage::Event::from(&latest.ok_or("empty source facts")?),
         max_resident_quote_events: peak,
         limitations: FACTS_LIMITATIONS,
+        max_artifact_events,
     })
 }
 /// Verified immutable candle contexts built alongside inspection in one source pass.
@@ -265,6 +329,7 @@ pub fn source_facts(base: &Path, spec: &Specification) -> Result<SourceFacts> {
 pub struct Prepared {
     report: Report,
     frames: std::collections::BTreeMap<Timeframe, Vec<candles::Candle>>,
+    max_artifact_events: usize,
 }
 impl Prepared {
     pub(crate) fn source_facts(&self) -> SourceFacts {
@@ -280,6 +345,7 @@ impl Prepared {
             latest: self.report.latest.clone(),
             max_resident_quote_events: self.report.max_resident_quote_events,
             limitations: FACTS_LIMITATIONS,
+            max_artifact_events: self.max_artifact_events,
         }
     }
     pub fn report(&self) -> &Report {
@@ -297,7 +363,32 @@ impl Prepared {
     /// Recheck every actual artifact before reusing this immutable context.
     /// Identity alone never establishes that the currently resolved bytes match.
     pub fn verify_current(&self, base: &Path, spec: &Specification) -> Result<()> {
-        verify_current_identity(base, spec, &self.report.corpus_identity)
+        verify_current_identity(
+            base,
+            spec,
+            &self.report.corpus_identity,
+            self.max_artifact_events,
+        )
+    }
+    /// Decode only the requested artifact range, then rehash EVERY current
+    /// artifact before returning success. The private source proof authenticates
+    /// source semantics, never an account checkpoint. Global indexes are retained.
+    pub(crate) fn visit_replay_range(
+        &self,
+        base: &Path,
+        spec: &Specification,
+        range: std::ops::Range<usize>,
+        visit: impl FnMut(QuoteBlock<'_>) -> Result<()>,
+    ) -> Result<()> {
+        validate_verified_specification(
+            spec,
+            &self.report.corpus_identity,
+            self.max_artifact_events,
+        )?;
+        visit_block_range(base, spec, range, visit)?;
+        // A skipped prefix or future artifact may change during the callback.
+        // Publish no account state unless the final full-byte check succeeds.
+        self.verify_current(base, spec)
     }
     pub fn signals(
         &self,
@@ -369,7 +460,16 @@ fn inspect_prepared(
     let mut repeats = 0;
     let mut gaps = 0;
     let mut peak = 0;
+    let mut artifact_events = 0usize;
+    let mut max_artifact_events = 0usize;
     visit_blocks(base, spec, |d| {
+        artifact_events = artifact_events
+            .checked_add(d.ticks.len())
+            .ok_or("artifact event count overflow")?;
+        if d.last_in_chunk {
+            max_artifact_events = max_artifact_events.max(artifact_events);
+            artifact_events = 0;
+        }
         if profile.is_none() {
             for tf in Timeframe::ALL {
                 streams.push(candles::Stream::new(d.profile.clone(), tf)?);
@@ -447,6 +547,7 @@ fn inspect_prepared(
             limitations: "Observed ordered native chunks and closed UTC candle fingerprints only. One bounded quote chunk plus seven candle states is retained; metadata and per-chunk validation allocations are additional. No empty/final unfinished candles, missing quotes, source completeness, approved class, acquisition/resume or scientific eligibility is established. Synthetic USD replay is a separate explicitly gated consumer. Source archives/provenance remain separate immutable artifacts; profiles/source/class cannot be mixed.",
         },
         frames,
+        max_artifact_events,
     })
 }
 
@@ -700,12 +801,29 @@ fn accept_block(
 pub fn visit_blocks(
     base: &Path,
     spec: &Specification,
+    visit: impl FnMut(QuoteBlock<'_>) -> Result<()>,
+) -> Result<()> {
+    visit_block_range(base, spec, 0..spec.chunks.len(), visit)
+}
+fn visit_block_range(
+    base: &Path,
+    spec: &Specification,
+    range: std::ops::Range<usize>,
     mut visit: impl FnMut(QuoteBlock<'_>) -> Result<()>,
 ) -> Result<()> {
     spec.identity()?;
+    if range.start > range.end || range.end > spec.chunks.len() {
+        return Err("corpus replay artifact range outside specification".into());
+    }
     let mut context = None;
     let mut previous = None;
-    for (chunk_index, chunk) in spec.chunks.iter().enumerate() {
+    for (chunk_index, chunk) in spec
+        .chunks
+        .iter()
+        .enumerate()
+        .take(range.end)
+        .skip(range.start)
+    {
         if let Some(root) = &chunk.block_root {
             let mut reader = crate::blocked_native::Reader::open(
                 &base.join(&chunk.path),
@@ -758,4 +876,92 @@ pub fn visit_blocks(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod replay_range_tests {
+    use super::*;
+    use std::{fs, path::PathBuf};
+    struct Temporary(PathBuf);
+    impl Drop for Temporary {
+        fn drop(&mut self) {
+            fs::remove_dir_all(&self.0).unwrap();
+        }
+    }
+    #[test]
+    fn final_range_verification_refuses_skipped_prefix_and_future_changes_during_callbacks() {
+        for format in 0..3 {
+            let root = Temporary(std::env::temp_dir().join(format!(
+                "source-range-callback-{}-{format}",
+                std::process::id()
+            )));
+            fs::create_dir(&root.0).unwrap();
+            let data = data::synthetic_fixture("EURUSD").unwrap();
+            let mut paths = Vec::new();
+            for (i, ticks) in data.ticks.chunks(data.ticks.len().div_ceil(3)).enumerate() {
+                let d = data::dataset(
+                    data.profile.clone(),
+                    ticks.to_vec(),
+                    &data.manifest.source,
+                    data.manifest.archive_hash.clone(),
+                    true,
+                )
+                .unwrap();
+                let blocked = format == 1 || (format == 2 && i % 2 == 1);
+                let path = root
+                    .0
+                    .join(format!("{i}.{}", if blocked { "rsfb" } else { "rsf" }));
+                if blocked {
+                    crate::blocked_native::write(&path, &d, 64).unwrap();
+                } else {
+                    native::write(&path, &d).unwrap();
+                }
+                paths.push(path);
+            }
+            assert_eq!(paths.len(), 3);
+            let spec = describe(&paths, 100000).unwrap();
+            let prepared = prepare(&root.0, &spec, Timeframe::M1, 10000).unwrap();
+            for changed_index in [0, 2] {
+                let original = fs::read(&paths[changed_index]).unwrap();
+                let mut changed = false;
+                let error = prepared
+                    .visit_replay_range(&root.0, &spec, 1..2, |block| {
+                        assert_eq!(block.chunk_index, 1);
+                        if !changed {
+                            let mut bytes = original.clone();
+                            let last = bytes.len() - 1;
+                            bytes[last] ^= 1;
+                            fs::write(&paths[changed_index], bytes).unwrap();
+                            changed = true;
+                        }
+                        Ok(())
+                    })
+                    .unwrap_err();
+                assert!(changed);
+                assert!(error.contains("checksum"), "{error}");
+                fs::write(&paths[changed_index], original).unwrap();
+            }
+            prepared
+                .visit_replay_range(&root.0, &spec, 1..1, |_| {
+                    panic!("empty range decoded quotes")
+                })
+                .unwrap();
+            assert!(
+                prepared
+                    .visit_replay_range(&root.0, &spec, 3..4, |_| Ok(()))
+                    .is_err()
+            );
+            assert!(
+                prepared
+                    .visit_replay_range(&root.0, &spec, usize::MAX..usize::MAX, |_| Ok(()))
+                    .is_err()
+            );
+            fs::remove_file(&paths[2]).unwrap();
+            assert!(
+                prepared
+                    .visit_replay_range(&root.0, &spec, 1..1, |_| Ok(()))
+                    .is_err()
+            );
+        }
+    }
 }
