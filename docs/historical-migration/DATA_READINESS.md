@@ -24,6 +24,10 @@ All figures come from the real VPS corpus via the commands listed at the end.
   USDCAD 2026-07. Timestamp ties are common (up to 20,219,432 for XAUUSD), i.e. multiple
   quotes share a millisecond.
 - **Structural validity:** 8/8 instruments structurally valid; **0 eligible for research**.
+- **End-to-end study receipt:** `REAL_DATA_STUDY_RECEIPT.json` consolidates one bounded M1
+  long/AboveMean(2) study per instrument over the migrated native corpus — 8 instruments,
+  176 instrument-months, 421,078,937 events (equal to the verified canonical total),
+  5,413,250 candles and 2,551,327 signals. Counts are observations, not performance evidence.
 
 ## Unknown — requires owner/external determination (do not invent)
 

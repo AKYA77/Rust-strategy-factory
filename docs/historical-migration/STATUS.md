@@ -276,6 +276,9 @@ equivalence checks. `audit` does not re-read the Parquet.
 10. Continue non-overlapping Rust-factory work from `docs/NEXT_ACTION.md`.
 11. Optional: independent scientific/qualification review of the migrated corpus (Codex), and
     explicit calendar/profile/licensing acceptance before any research use.
+12. ~~Consolidated real-data study receipt~~ — `REAL_DATA_STUDY_RECEIPT.json` records one bounded
+    M1 study per instrument over the migrated native corpus (176 instrument-months, 421,078,937
+    events, 5,413,250 candles, 2,551,327 signals); observations only, no eligibility grant.
 
 ## Safety notes
 
