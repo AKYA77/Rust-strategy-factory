@@ -147,9 +147,43 @@ pub fn register(
             partitions.len()
         ));
     }
+    register_partitions(output_root, instrument, &partitions)
+}
+
+/// Register the most recent `months` contiguous completed monthly partitions for one instrument.
+///
+/// The master blueprint asks for a configurable exact 24-completed-month research window. The
+/// canonical corpus currently holds fewer completed months, so this reports the precise shortfall
+/// instead of padding, truncating silently or fabricating periods. The selection is the latest
+/// contiguous run, so a window never spans a gap.
+pub fn register_window(
+    root: &Path,
+    output_root: &Path,
+    instrument: &str,
+    months: usize,
+) -> Result<HistoricalCorpus> {
+    if months == 0 {
+        return Err("historical window must be at least one completed month".into());
+    }
+    let partitions = plan_instrument(root, instrument)?;
+    if partitions.len() < months {
+        return Err(format!(
+            "only {} completed monthly partitions are available for {instrument}; a {months}-month window cannot be formed",
+            partitions.len()
+        ));
+    }
+    let start = partitions.len() - months;
+    register_partitions(output_root, instrument, &partitions[start..])
+}
+
+fn register_partitions(
+    output_root: &Path,
+    instrument: &str,
+    partitions: &[Partition],
+) -> Result<HistoricalCorpus> {
     let mut months = Vec::with_capacity(partitions.len());
     let mut profile: Option<Profile> = None;
-    for partition in &partitions {
+    for partition in partitions {
         let dir = output_root.join(format!(
             "{}-{year:04}{month:02}",
             partition.instrument,
@@ -191,7 +225,7 @@ pub fn register(
         });
     }
     let profile = profile.ok_or("no monthly sources")?;
-    validate_months(&months, expected)?;
+    validate_months(&months, partitions.len())?;
     let identity = identity(instrument, &profile, &months)?;
     Ok(HistoricalCorpus {
         version: VERSION.into(),

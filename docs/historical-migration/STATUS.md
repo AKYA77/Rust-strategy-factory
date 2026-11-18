@@ -287,6 +287,11 @@ equivalence checks. `audit` does not re-read the Parquet.
     refused because approved account/currency conversion semantics are unavailable.
     `DIAGNOSTIC_EXECUTION_RECEIPT.json` records the full-corpus run. Diagnostic only: no
     eligibility, approval or qualification.
+14. ~~Configurable completed-month research window~~ — `historical_corpus::register_window`
+    registers the latest N contiguous completed months and reports the precise shortfall instead of
+    padding. The blueprint's exact 24-completed-month interval is therefore supported in software;
+    the canonical corpus holds 22, so a 24-month window is refused with the exact missing input
+    (2026-11 and 2026-12 are not completed/available). New `historical-corpus-register-window` CLI.
 
 ## Safety notes
 
