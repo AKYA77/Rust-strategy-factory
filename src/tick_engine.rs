@@ -808,6 +808,16 @@ pub struct CorpusBudget {
     pub feature_cells: usize,
     pub max_receipts: usize,
 }
+/// Selects the input-class contract for corpus replay.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ReplayMode {
+    /// Registered research replay: synthetic literal-USD inputs only.
+    Registered,
+    /// Explicitly non-eligible diagnostic simulation over real structurally-valid literal-USD
+    /// corpora. Runs the identical engine and accounting as `Registered`; the result must never
+    /// be presented as research evidence, eligibility or qualification.
+    Diagnostic,
+}
 pub(crate) fn corpus_configuration_hash(
     source_identity: &str,
     strategy: &Strategy,
@@ -946,6 +956,7 @@ pub fn advance_corpus(
         }),
         None,
         None,
+        ReplayMode::Registered,
     )
 }
 pub fn replay_corpus(
@@ -966,6 +977,36 @@ pub fn replay_corpus(
         None,
         None,
         None,
+        ReplayMode::Registered,
+    )?
+    .ok_or_else(|| "unexpected incomplete corpus replay".into())
+}
+/// Diagnostic-only corpus replay over real structurally-valid literal-USD inputs.
+///
+/// This is the same sequential engine and accounting as [`replay_corpus`]; the only difference is
+/// the accepted input class. It exists so the converted historical corpus can be exercised
+/// end-to-end for diagnosis. The result is **not** research evidence: it must never be
+/// registered as an experiment, presented as eligibility, or used for qualification. FX
+/// conversion streams and eligibility-bearing data classes are refused.
+pub fn replay_corpus_diagnostic(
+    base: &std::path::Path,
+    spec: &crate::corpus::Specification,
+    strategy: &Strategy,
+    costs: &Costs,
+    budget: CorpusBudget,
+) -> Result<Replay> {
+    replay_corpus_internal(
+        CorpusRun {
+            base,
+            spec,
+            strategy,
+            costs,
+            budget,
+        },
+        None,
+        None,
+        None,
+        ReplayMode::Diagnostic,
     )?
     .ok_or_else(|| "unexpected incomplete corpus replay".into())
 }
@@ -974,6 +1015,7 @@ fn replay_corpus_internal(
     mut control: Option<ResumeControl<'_>>,
     prepared: Option<&crate::corpus::Prepared>,
     mut reuse: Option<&mut CheckpointReuse>,
+    mode: ReplayMode,
 ) -> Result<Option<Replay>> {
     let source_binding = if reuse.is_some() {
         Some(corpus_source_binding(&run)?)
@@ -1011,10 +1053,21 @@ fn replay_corpus_internal(
         return Err("prepared corpus budget or identity differs".into());
     }
     let observed = prepared.report();
-    if observed.declared_class != crate::data::DataClass::SyntheticTestOnly
-        || observed.profile.quote != "USD"
-    {
-        return Err("corpus replay currently requires synthetic literal-USD inputs; real/protected exposure and FX conversion streams are not integrated".into());
+    match mode {
+        ReplayMode::Registered => {
+            if observed.declared_class != crate::data::DataClass::SyntheticTestOnly
+                || observed.profile.quote != "USD"
+            {
+                return Err("corpus replay currently requires synthetic literal-USD inputs; real/protected exposure and FX conversion streams are not integrated".into());
+            }
+        }
+        ReplayMode::Diagnostic => {
+            if observed.declared_class != crate::data::DataClass::RealStructurallyValid
+                || observed.profile.quote != "USD"
+            {
+                return Err("diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused".into());
+            }
+        }
     }
     let candles = prepared.candles(strategy.timeframe)?;
     let mask = prepared.signals(&strategy, feature_cells)?;
@@ -1400,6 +1453,7 @@ fn execute_corpus_step_prepared(
             }),
             Some(prepared),
             Some(&mut resume),
+            ReplayMode::Registered,
         )? {
             None => {
                 let cursor = registry
@@ -1982,6 +2036,19 @@ mod worker_preparation_tests {
             feature_cells: 100000,
             max_receipts: 10000,
         }
+    }
+    #[test]
+    fn diagnostic_replay_refuses_synthetic_inputs() {
+        let source = Source::new("mode-gate");
+        let error = replay_corpus_diagnostic(
+            &source.root,
+            &source.spec,
+            &strategy(),
+            &Costs::default(),
+            budget(),
+        )
+        .expect_err("diagnostic replay must not accept synthetic test-only inputs");
+        assert!(error.contains("real structurally-valid"), "{error}");
     }
     fn affinity_source(name: &str) -> Source {
         let mut source = Source::new(name);

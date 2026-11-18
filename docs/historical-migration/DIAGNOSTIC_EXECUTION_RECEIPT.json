@@ -1,0 +1,154 @@
+{
+  "budget": {
+    "feature_cells": 1000000,
+    "max_candles": 1000000,
+    "max_receipts": 1000000
+  },
+  "classification": "diagnostic_simulation",
+  "corpus_root": "/var/lib/hermes-factory",
+  "eligibility": "none",
+  "engine": "authoritative sequential replay (unchanged financial rules)",
+  "instruments": [
+    {
+      "classification": "diagnostic_simulation",
+      "eligibility": "none",
+      "identity": "520e7141cb4abb7adc35caa1d410e2869ccef79e15290fe2e8eb58613840d256",
+      "initial_micro_usd": 440000000,
+      "instrument": "EURUSD",
+      "maximum_drawdown_micro_usd": 47783390,
+      "months_executed": 22,
+      "months_refused": 0,
+      "pnl_micro_usd": -439523130,
+      "refusal_reasons": [],
+      "rejections": 105786,
+      "trades": 3060,
+      "wall_secs": 203.8
+    },
+    {
+      "classification": "diagnostic_simulation",
+      "eligibility": "none",
+      "identity": "cb645f2f1876c06c2069d48e0dc5e89b41165ef8ce70892a7211fbb70262e2a1",
+      "initial_micro_usd": 440000000,
+      "instrument": "GBPUSD",
+      "maximum_drawdown_micro_usd": 39755050,
+      "months_executed": 22,
+      "months_refused": 0,
+      "pnl_micro_usd": -439714330,
+      "refusal_reasons": [],
+      "rejections": 159419,
+      "trades": 3341,
+      "wall_secs": 228.8
+    },
+    {
+      "classification": "diagnostic_simulation",
+      "eligibility": "none",
+      "identity": "669a72c6ab5e9dcfb1a87af324c77a059db89fc58f04d50577d1809778cfd901",
+      "initial_micro_usd": 0,
+      "instrument": "USDJPY",
+      "maximum_drawdown_micro_usd": 0,
+      "months_executed": 0,
+      "months_refused": 22,
+      "pnl_micro_usd": 0,
+      "refusal_reasons": [
+        "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+      ],
+      "rejections": 0,
+      "trades": 0,
+      "wall_secs": 253.9
+    },
+    {
+      "classification": "diagnostic_simulation",
+      "eligibility": "none",
+      "identity": "e763051d077e31332c8b9b0398df5a39e6bdab676ba26cabc95b043621f7bfad",
+      "initial_micro_usd": 0,
+      "instrument": "USDCHF",
+      "maximum_drawdown_micro_usd": 0,
+      "months_executed": 0,
+      "months_refused": 22,
+      "pnl_micro_usd": 0,
+      "refusal_reasons": [
+        "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+      ],
+      "rejections": 0,
+      "trades": 0,
+      "wall_secs": 140.8
+    },
+    {
+      "classification": "diagnostic_simulation",
+      "eligibility": "none",
+      "identity": "393c6d7ea07d88c2795d3839b58b74309ebefb1932795b7eab6ee3bc17ac8035",
+      "initial_micro_usd": 0,
+      "instrument": "USDCAD",
+      "maximum_drawdown_micro_usd": 0,
+      "months_executed": 0,
+      "months_refused": 22,
+      "pnl_micro_usd": 0,
+      "refusal_reasons": [
+        "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+      ],
+      "rejections": 0,
+      "trades": 0,
+      "wall_secs": 187.0
+    },
+    {
+      "classification": "diagnostic_simulation",
+      "eligibility": "none",
+      "identity": "056a656401f7b0ebd4895398343f7c6aa6fba2493cd00ef1132bf9f665026775",
+      "initial_micro_usd": 440000000,
+      "instrument": "AUDUSD",
+      "maximum_drawdown_micro_usd": 35026390,
+      "months_executed": 22,
+      "months_refused": 0,
+      "pnl_micro_usd": -439409720,
+      "refusal_reasons": [],
+      "rejections": 46848,
+      "trades": 2681,
+      "wall_secs": 189.1
+    },
+    {
+      "classification": "diagnostic_simulation",
+      "eligibility": "none",
+      "identity": "a9cf81658571bab392e46b3e18e4ed9a40ad3ff759b54230da5560ecc2a0e959",
+      "initial_micro_usd": 440000000,
+      "instrument": "NZDUSD",
+      "maximum_drawdown_micro_usd": 31243320,
+      "months_executed": 22,
+      "months_refused": 0,
+      "pnl_micro_usd": -439559400,
+      "refusal_reasons": [],
+      "rejections": 59034,
+      "trades": 2492,
+      "wall_secs": 162.5
+    },
+    {
+      "classification": "diagnostic_simulation",
+      "eligibility": "none",
+      "identity": "1a62a9702eb88d875086ff854c8dc489be5f0440ef76e8815602757c84eeb4b0",
+      "initial_micro_usd": 440000000,
+      "instrument": "XAUUSD",
+      "maximum_drawdown_micro_usd": 554870,
+      "months_executed": 22,
+      "months_refused": 0,
+      "pnl_micro_usd": -1170596,
+      "refusal_reasons": [],
+      "rejections": 323897,
+      "trades": 10,
+      "wall_secs": 896.3
+    }
+  ],
+  "kind": "historical-diagnostic-execution-receipt-v1",
+  "limitations": "Diagnostic simulation only. The authoritative sequential engine and frozen financial rules are applied to real structurally-valid literal-USD history using explicit test-convention profiles, so these are not broker-approved executions. No research eligibility, calendar/profile/licensing approval, scientific validity or qualification is granted. Non-USD-quote instruments are refused because approved account/currency conversion semantics are not available. Money figures are observations, not performance evidence.",
+  "native_output": "/root/workspace/historical-migration-output/full-100k",
+  "receipt_sha256": "9f21cf075e3fa77dd2e6091787580ba1452783c52e9158f2cb4ea7ce1f77a65a",
+  "totals": {
+    "instruments": 8,
+    "instruments_executed": 5,
+    "instruments_refused": 3,
+    "maximum_drawdown_micro_usd": 47783390,
+    "months_executed": 110,
+    "months_refused": 66,
+    "pnl_micro_usd": -1759377176,
+    "rejections": 694984,
+    "trades": 11584
+  }
+}
