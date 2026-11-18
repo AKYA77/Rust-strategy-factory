@@ -510,6 +510,199 @@ pub fn study(
     })
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MonthExecution {
+    pub year: u32,
+    pub month: u32,
+    pub corpus_identity: String,
+    pub dataset_hash: String,
+    pub declared_class: String,
+    pub profile_id: String,
+    pub initial_micro_usd: i128,
+    /// The engine's `realized_micro_usd` field, which is the ending account balance (it starts at
+    /// `contracts::INITIAL_EQUITY` and is not a profit figure by itself).
+    pub realized_micro_usd: i128,
+    pub final_marked_micro_usd: i128,
+    pub maximum_drawdown_micro_usd: i128,
+    pub trades: usize,
+    pub rejections: usize,
+    pub receipt_hash: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MonthRefusal {
+    pub year: u32,
+    pub month: u32,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExecutionTotals {
+    pub months_executed: usize,
+    pub months_refused: usize,
+    pub trades: usize,
+    pub rejections: usize,
+    /// Sum of each executed month's starting equity. Reported for transparency, not as a result.
+    pub initial_micro_usd: i128,
+    /// Sum over executed months of `final_marked_micro_usd - initial_micro_usd`. Additive.
+    pub pnl_micro_usd: i128,
+    /// Maximum single-month drawdown, not a sum of per-month drawdowns.
+    pub maximum_drawdown_micro_usd: i128,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExecutionReport {
+    pub instrument: String,
+    pub identity: String,
+    pub strategy_identity: String,
+    /// Always `diagnostic_simulation`. Never research evidence.
+    pub classification: String,
+    /// Always `none`. No eligibility is granted or implied.
+    pub eligibility: String,
+    pub months: Vec<MonthExecution>,
+    pub refusals: Vec<MonthRefusal>,
+    pub totals: ExecutionTotals,
+    pub limitations: String,
+}
+
+pub const EXECUTION_CLASSIFICATION: &str = "diagnostic_simulation";
+pub const EXECUTION_ELIGIBILITY: &str = "none";
+const EXECUTION_LIMITATIONS: &str = "Diagnostic simulation only. The authoritative sequential engine and frozen financial rules are applied to real structurally-valid literal-USD history using explicit test-convention profiles, so results are not broker-approved execution. No research eligibility, calendar/profile/licensing approval, scientific validity or qualification is granted. Non-USD-quote instruments and eligibility-bearing data classes are refused. Counts and money figures are observations, not performance evidence.";
+
+/// Execute one month through the authoritative sequential engine.
+///
+/// The month's provenance is re-verified here rather than trusted: the aggregate identity must
+/// recompute, and every chunk must still hash to the inventory recorded in the specification, so a
+/// forged or stale `HistoricalCorpus` cannot produce a report bound to values it did not read.
+/// Callers wanting the whole corpus should use [`execute`], which additionally re-verifies every
+/// monthly migration receipt.
+pub fn execute_month(
+    spec: &HistoricalCorpus,
+    index: usize,
+    strategy: &crate::strategies::Strategy,
+    costs: &crate::tick_engine::Costs,
+    budget: crate::tick_engine::CorpusBudget,
+) -> Result<MonthExecution> {
+    if spec.identity != identity(&spec.instrument, &spec.profile, &spec.months)? {
+        return Err("historical corpus identity mismatch".into());
+    }
+    let month = spec
+        .months
+        .get(index)
+        .ok_or("historical corpus month index out of range")?;
+    let dir = Path::new(&month.output_dir);
+    for (file, hash) in month.chunk_files.iter().zip(&month.chunk_hashes) {
+        let dataset = native::read(&dir.join(file))?;
+        if data::hash(&dataset)? != *hash || dataset.profile != spec.profile {
+            return Err("historical corpus chunk mismatch during diagnostic execution".into());
+        }
+    }
+    let chunks: Vec<std::path::PathBuf> = month
+        .chunk_files
+        .iter()
+        .map(|file| dir.join(file))
+        .collect();
+    let corpus_spec =
+        crate::corpus::describe(&chunks, crate::historical_migration::MAX_CHUNK_EVENTS)?;
+    crate::corpus::inspect(dir, &corpus_spec)?;
+    let facts = crate::corpus::source_facts(dir, &corpus_spec)?;
+    let replay =
+        crate::tick_engine::replay_corpus_diagnostic(dir, &corpus_spec, strategy, costs, budget)?;
+    Ok(MonthExecution {
+        year: month.year,
+        month: month.month,
+        corpus_identity: corpus_spec.identity()?,
+        dataset_hash: month.dataset_hash.clone(),
+        declared_class: format!("{:?}", facts.declared_class()),
+        profile_id: crate::data::hash(&spec.profile)?,
+        initial_micro_usd: replay.initial_micro_usd,
+        realized_micro_usd: replay.realized_micro_usd,
+        final_marked_micro_usd: replay.final_marked_micro_usd,
+        maximum_drawdown_micro_usd: replay.maximum_drawdown_micro_usd,
+        trades: replay.trades.len(),
+        rejections: replay.rejections.len(),
+        receipt_hash: crate::data::hash(&replay)?,
+    })
+}
+
+/// Aggregate executed months and refusals. Only additive quantities are summed; the drawdown is
+/// the worst single month, and the P&L is the sum of per-month marked-equity deltas.
+fn aggregate_totals(
+    months: &[MonthExecution],
+    refusals: &[MonthRefusal],
+) -> Result<ExecutionTotals> {
+    let mut totals = ExecutionTotals {
+        months_executed: months.len(),
+        months_refused: refusals.len(),
+        trades: 0,
+        rejections: 0,
+        initial_micro_usd: 0,
+        pnl_micro_usd: 0,
+        maximum_drawdown_micro_usd: 0,
+    };
+    for executed in months {
+        totals.trades += executed.trades;
+        totals.rejections += executed.rejections;
+        totals.initial_micro_usd = totals
+            .initial_micro_usd
+            .checked_add(executed.initial_micro_usd)
+            .ok_or("diagnostic execution initial equity total overflow")?;
+        let month_pnl = executed
+            .final_marked_micro_usd
+            .checked_sub(executed.initial_micro_usd)
+            .ok_or("diagnostic execution monthly P&L overflow")?;
+        totals.pnl_micro_usd = totals
+            .pnl_micro_usd
+            .checked_add(month_pnl)
+            .ok_or("diagnostic execution P&L total overflow")?;
+        totals.maximum_drawdown_micro_usd = totals
+            .maximum_drawdown_micro_usd
+            .max(executed.maximum_drawdown_micro_usd);
+    }
+    Ok(totals)
+}
+
+/// Diagnostic execution of one instrument's verified historical corpus through the authoritative
+/// sequential engine, month by month. Each month keeps its own corpus identity, declared class and
+/// profile; months that the engine refuses (for example non-USD quote currencies) are recorded as
+/// refusals rather than silently dropped.
+pub fn execute(
+    spec: &HistoricalCorpus,
+    strategy: &crate::strategies::Strategy,
+    costs: &crate::tick_engine::Costs,
+    budget: crate::tick_engine::CorpusBudget,
+) -> Result<ExecutionReport> {
+    verify(spec)?;
+    let mut months = Vec::with_capacity(spec.months.len());
+    let mut refusals = Vec::new();
+    for index in 0..spec.months.len() {
+        let (year, month) = (spec.months[index].year, spec.months[index].month);
+        match execute_month(spec, index, strategy, costs, budget) {
+            Ok(executed) => months.push(executed),
+            Err(reason) => refusals.push(MonthRefusal {
+                year,
+                month,
+                reason,
+            }),
+        }
+    }
+    Ok(ExecutionReport {
+        instrument: spec.instrument.clone(),
+        identity: spec.identity.clone(),
+        strategy_identity: strategy.identity()?,
+        classification: EXECUTION_CLASSIFICATION.into(),
+        eligibility: EXECUTION_ELIGIBILITY.into(),
+        months: months.clone(),
+        refusals: refusals.clone(),
+        totals: aggregate_totals(&months, &refusals)?,
+        limitations: EXECUTION_LIMITATIONS.into(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -543,6 +736,62 @@ mod tests {
                 )
             })
             .collect()
+    }
+
+    fn execution(
+        year: u32,
+        month: u32,
+        initial: i128,
+        marked: i128,
+        drawdown: i128,
+        trades: usize,
+        rejections: usize,
+    ) -> MonthExecution {
+        MonthExecution {
+            year,
+            month,
+            corpus_identity: "a".repeat(64),
+            dataset_hash: "b".repeat(64),
+            declared_class: "RealStructurallyValid".into(),
+            profile_id: "c".repeat(64),
+            initial_micro_usd: initial,
+            realized_micro_usd: marked,
+            final_marked_micro_usd: marked,
+            maximum_drawdown_micro_usd: drawdown,
+            trades,
+            rejections,
+            receipt_hash: "d".repeat(64),
+        }
+    }
+
+    #[test]
+    fn aggregate_totals_sums_only_additive_quantities() {
+        let months = vec![
+            execution(2025, 1, 20_000_000, 20_500_000, 1_000_000, 10, 100),
+            execution(2025, 2, 20_000_000, 19_000_000, 3_000_000, 5, 50),
+        ];
+        let refusals = vec![MonthRefusal {
+            year: 2025,
+            month: 3,
+            reason: "unapproved FX conversion".into(),
+        }];
+        let totals = aggregate_totals(&months, &refusals).unwrap();
+        assert_eq!(totals.months_executed, 2);
+        assert_eq!(totals.months_refused, 1);
+        assert_eq!(totals.trades, 15);
+        assert_eq!(totals.rejections, 150);
+        assert_eq!(totals.initial_micro_usd, 40_000_000);
+        assert_eq!(totals.pnl_micro_usd, -500_000);
+        assert_eq!(totals.maximum_drawdown_micro_usd, 3_000_000);
+    }
+
+    #[test]
+    fn aggregate_totals_refuses_overflow() {
+        let months = vec![
+            execution(2025, 1, i128::MAX, 0, 0, 0, 0),
+            execution(2025, 2, 1, 0, 0, 0, 0),
+        ];
+        assert!(aggregate_totals(&months, &[]).is_err());
     }
 
     #[test]

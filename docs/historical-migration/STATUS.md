@@ -279,6 +279,14 @@ equivalence checks. `audit` does not re-read the Parquet.
 12. ~~Consolidated real-data study receipt~~ — `REAL_DATA_STUDY_RECEIPT.json` records one bounded
     M1 study per instrument over the migrated native corpus (176 instrument-months, 421,078,937
     events, 5,413,250 candles, 2,551,327 signals); observations only, no eligibility grant.
+13. ~~Historical-data → authoritative execution bridge~~ — `tick_engine::replay_corpus_diagnostic`
+    runs the unchanged sequential engine over `RealStructurallyValid` literal-USD corpora behind a
+    new `ReplayMode::Diagnostic` gate (the registered gate is byte-identical), and
+    `historical_corpus::execute`/`execute_month` return a report labelled
+    `diagnostic_simulation`/`none`. Five USD-quoted instruments execute; USDJPY/USDCHF/USDCAD are
+    refused because approved account/currency conversion semantics are unavailable.
+    `DIAGNOSTIC_EXECUTION_RECEIPT.json` records the full-corpus run. Diagnostic only: no
+    eligibility, approval or qualification.
 
 ## Safety notes
 

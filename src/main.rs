@@ -594,6 +594,52 @@ fn run(args: &[String]) -> Result<()> {
             }))
         }
         [
+            "historical-corpus-execute",
+            root,
+            output_root,
+            instrument,
+            strategy,
+            costs,
+            max_candles,
+            feature_cells,
+            max_receipts,
+            report,
+        ] => {
+            let spec = rust_strategy_factory::historical_corpus::register(
+                Path::new(root),
+                Path::new(output_root),
+                instrument,
+                rust_strategy_factory::historical_corpus::EXPECTED_MONTHS,
+            )?;
+            let strategy: rust_strategy_factory::strategies::Strategy = read_json(strategy)?;
+            let costs: rust_strategy_factory::tick_engine::Costs = read_json(costs)?;
+            let max_candles: usize = max_candles.parse().map_err(|_| "invalid candle budget")?;
+            let feature_cells: usize = feature_cells
+                .parse()
+                .map_err(|_| "invalid feature budget")?;
+            let max_receipts: usize = max_receipts.parse().map_err(|_| "invalid receipt budget")?;
+            let execution = rust_strategy_factory::historical_corpus::execute(
+                &spec,
+                &strategy,
+                &costs,
+                rust_strategy_factory::tick_engine::CorpusBudget {
+                    max_candles,
+                    feature_cells,
+                    max_receipts,
+                },
+            )?;
+            save_replace(report, &execution)?;
+            print(&serde_json::json!({
+                "identity": execution.identity,
+                "instrument": execution.instrument,
+                "classification": execution.classification,
+                "eligibility": execution.eligibility,
+                "months_executed": execution.totals.months_executed,
+                "months_refused": execution.totals.months_refused,
+                "trades": execution.totals.trades,
+            }))
+        }
+        [
             "historical-corpus-audit",
             root,
             output_root,

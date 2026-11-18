@@ -37,9 +37,11 @@ are historical.
 ## 4. Partially implemented
 
 - Real historical data → research pipeline: monthly native corpora load and run through
-  candles/signals; `tests/historical_pipeline_real.rs` is a committed real-data structural
-  acceptance test and `REAL_DATA_STUDY_RECEIPT.json` records a multi-month study (8 instruments,
-  176 instrument-months, 421,078,937 events). Real replay/execution remains refused.
+  candles/signals, and `tick_engine::replay_corpus_diagnostic` now executes the authoritative
+  sequential engine over the real structurally-valid corpus as explicitly non-eligible
+  `diagnostic_simulation` (`tests/historical_pipeline_real.rs` plus
+  `DIAGNOSTIC_EXECUTION_RECEIPT.json`). Approved real/protected *research* execution and FX
+  conversion semantics remain refused.
 - Full-history qualification, fast-seek resume, complete indexed accounting.
 - Autonomous campaign replenishment and durable multi-worker supervision.
 - Dashboard historical instruments/months/coverage/gate views.
