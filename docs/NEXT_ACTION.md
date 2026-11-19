@@ -4,6 +4,22 @@ Status: SOFTWARE_INCOMPLETE. Use the existing checkout. Read AGENTS.md, PROJECT_
 
 ## Latest verified local milestone
 
+`main` integrates PR #19 (`hermes/integration-codex-stack` @ `cd5ec86`, configurable
+completed-month research window) and PR #20 (`hermes/historical-execution-cache` @ `2603073`,
+resumable self-labelling diagnostic execution). PR #20 merged through GitHub as `f7e1cd1`; PR
+#19's unique commit was integrated by a normal merge of `origin/hermes/integration-codex-stack`
+into `main`. Only the two state docs conflicted, and both were resolved by keeping BOTH
+features' entries; `src/historical_corpus.rs` and `src/main.rs` auto-merged with the window
+registration and the execution cache both present. Both PR heads are ancestors of `main`. The
+merged tree passes `cargo fmt --all -- --check`, `cargo clippy --locked --all-targets -- -D
+warnings`, `cargo test --locked --lib --bins --tests` (518 Rust tests passed, 0 failed) and
+`scripts/check.sh`. Hosted CI on the exact merge SHA follows this push and its concluded run id
+is recorded in `docs/PROJECT_STATE.json`. The research window is configurable and refuses a
+24-month window with the exact shortfall (2026-11 and 2026-12 are not completed/available);
+diagnostic execution resumes identical months from a content-addressed, self-hashed cache and
+every month record stays `diagnostic_simulation`/`none`. Neither feature grants eligibility,
+approval or qualification.
+
 The integration branch `hermes/integration-codex-stack` combined the Codex stack tip
 (`codex/retained-preflight-inventory` @ `74790a4`, PRs #8–#13), the independent
 `codex/long-campaign-ledger` (PR #1) and the Hermes historical Parquet→native migration (PR #6),

@@ -594,6 +594,34 @@ fn run(args: &[String]) -> Result<()> {
             }))
         }
         [
+            "historical-corpus-register-window",
+            root,
+            output_root,
+            instrument,
+            months,
+            report,
+        ] => {
+            let months: usize = months.parse().map_err(|_| "invalid month window")?;
+            let spec = rust_strategy_factory::historical_corpus::register_window(
+                Path::new(root),
+                Path::new(output_root),
+                instrument,
+                months,
+            )?;
+            save_replace(report, &spec)?;
+            print(&serde_json::json!({
+                "identity": spec.identity,
+                "instrument": spec.instrument,
+                "months": spec.months.len(),
+                "first": format!("{}-{:02}", spec.months[0].year, spec.months[0].month),
+                "last": format!(
+                    "{}-{:02}",
+                    spec.months[spec.months.len() - 1].year,
+                    spec.months[spec.months.len() - 1].month
+                ),
+            }))
+        }
+        [
             "historical-corpus-execute",
             root,
             output_root,

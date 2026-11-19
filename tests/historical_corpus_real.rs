@@ -119,3 +119,40 @@ fn catalog_refuses_foreign_receipt() {
     assert!(!status.structural_valid);
     let _ = std::fs::remove_dir_all(&tmp);
 }
+
+/// The blueprint's exact 24-completed-month research window must be configurable in software and
+/// must report the precise shortfall rather than pad or fabricate periods.
+#[test]
+fn configurable_window_refuses_shortfall_and_selects_latest_months() {
+    let catalog_root = Path::new("/var/lib/hermes-factory");
+    let output = Path::new("/root/workspace/historical-migration-output/full-100k");
+    if !catalog_root.join("catalog").is_dir() || !output.is_dir() {
+        eprintln!("skipping real historical window: data absent");
+        return;
+    }
+    let shortfall = historical_corpus::register_window(catalog_root, output, "EURUSD", 24)
+        .expect_err("a 24-month window must be refused while fewer completed months exist");
+    assert!(
+        shortfall.contains("only 22 completed monthly partitions"),
+        "{shortfall}"
+    );
+    assert!(shortfall.contains("24-month window"), "{shortfall}");
+    assert!(historical_corpus::register_window(catalog_root, output, "EURUSD", 0).is_err());
+
+    let window =
+        historical_corpus::register_window(catalog_root, output, "EURUSD", EXPECTED_MONTHS)
+            .unwrap();
+    assert_eq!(window.months.len(), EXPECTED_MONTHS);
+    assert_eq!((window.months[0].year, window.months[0].month), (2025, 1));
+    let latest = historical_corpus::register_window(catalog_root, output, "EURUSD", 1).unwrap();
+    assert_eq!(latest.months.len(), 1);
+    assert_eq!((latest.months[0].year, latest.months[0].month), (2026, 10));
+    assert_eq!(
+        latest.months[0].dataset_hash,
+        window.months.last().unwrap().dataset_hash
+    );
+    assert_eq!(
+        latest.months[0].chunk_hashes,
+        window.months.last().unwrap().chunk_hashes
+    );
+}
