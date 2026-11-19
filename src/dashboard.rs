@@ -76,10 +76,13 @@ struct App {
     registry: Mutex<Registry>,
     catalog_path: Option<PathBuf>,
     review_config: Option<ReviewConfig>,
+    operations: Option<OperationsConfig>,
     review_slots: Arc<tokio::sync::Semaphore>,
     recovery_slots: Arc<tokio::sync::Semaphore>,
     recovery_read_slots: Arc<tokio::sync::Semaphore>,
+    operations_slots: Arc<tokio::sync::Semaphore>,
     review_bucket: Mutex<(Instant, u32)>,
+    operations_bucket: Mutex<(Instant, u32)>,
     password_hash: String,
     sessions: Mutex<HashMap<String, Session>>,
     login_bucket: Mutex<(Instant, u32)>,
@@ -1581,18 +1584,29 @@ async fn disk_status(State(app): State<Arc<App>>) -> Response {
     }
 }
 async fn resource_status() -> Response {
-    match crate::resource::observe() {
-        Ok(snapshot) => {
-            let mut value = serde_json::json!(snapshot);
-            for field in [
-                "process_rss_bytes",
-                "host_available_memory_bytes",
-                "available_parallelism",
-            ] {
-                value[field] = serde_json::Value::String(value[field].to_string());
-            }
-            Json(value).into_response()
+    let observe = || -> Result<serde_json::Value> {
+        let snapshot = crate::resource::observe()?;
+        let mut value = serde_json::json!(snapshot);
+        for field in [
+            "process_rss_bytes",
+            "host_available_memory_bytes",
+            "available_parallelism",
+        ] {
+            value[field] = serde_json::Value::String(value[field].to_string());
         }
+        let peak = crate::resource::observe_peak_rss()?;
+        let process = crate::resource::observe_process(std::process::id())?;
+        value["peak_rss_bytes"] = serde_json::json!(peak.to_string());
+        value["process_user_ticks"] = serde_json::json!(process.user_ticks.to_string());
+        value["process_system_ticks"] = serde_json::json!(process.system_ticks.to_string());
+        value["process_start_ticks"] = serde_json::json!(process.start_ticks.to_string());
+        value["cpu_scope"] = serde_json::json!(
+            "Kernel accounting ticks for the dashboard process only; raw units, not milliseconds, not worker aggregates and not hard OS enforcement."
+        );
+        Ok(value)
+    };
+    match observe() {
+        Ok(value) => Json(value).into_response(),
         Err(_) => api_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "resource observations unavailable",
@@ -1961,6 +1975,607 @@ async fn control(
         Err(_) => api_error(StatusCode::BAD_REQUEST, "invalid run or control state"),
     }
 }
+// Operator-owned operations configuration: requests never choose local paths.
+// Import activation registers a local catalog observation only; a declared
+// class is never approval, eligibility or qualification.
+#[derive(Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OperationsConfig {
+    #[serde(default)]
+    imports: Vec<ImportTarget>,
+    #[serde(default)]
+    coverage: Vec<CoverageTarget>,
+}
+#[derive(Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ImportTarget {
+    name: String,
+    directory: PathBuf,
+}
+#[derive(Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CoverageTarget {
+    name: String,
+    dataset: PathBuf,
+    start_ms: i64,
+    end_exclusive_ms: i64,
+    gap_threshold_ms: i64,
+}
+fn lower_alnum(b: u8) -> bool {
+    b.is_ascii_lowercase() || b.is_ascii_digit()
+}
+fn operations_name(name: &str) -> bool {
+    let bytes = name.as_bytes();
+    (1..=64).contains(&bytes.len())
+        && lower_alnum(bytes[0])
+        && bytes.iter().all(|b| lower_alnum(*b) || *b == b'-')
+}
+impl OperationsConfig {
+    fn load(path: &Path) -> Result<Self> {
+        let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
+        if !metadata.is_file() || metadata.len() > 128 * 1024 {
+            return Err("operations configuration must be a regular file within128KiB".into());
+        }
+        let body = fs::read(path).map_err(|e| e.to_string())?;
+        if body.len() > 128 * 1024 {
+            return Err("operations configuration exceeds128KiB".into());
+        }
+        let mut cfg: Self =
+            serde_json::from_slice(&body).map_err(|_| "invalid operations configuration")?;
+        if cfg.imports.len() > 16 || cfg.coverage.len() > 16 {
+            return Err(
+                "operations configuration allows at most16 imports and16 coverage targets".into(),
+            );
+        }
+        if cfg.imports.is_empty() && cfg.coverage.is_empty() {
+            return Err("operations configuration declares no targets".into());
+        }
+        let base = path.parent().unwrap_or(Path::new("."));
+        let mut seen = std::collections::HashSet::new();
+        for import in &mut cfg.imports {
+            if !operations_name(&import.name)
+                || !seen.insert(import.name.clone())
+                || import.directory.as_os_str().is_empty()
+            {
+                return Err("invalid or duplicate configured import target".into());
+            }
+            import.directory = base.join(&import.directory);
+            if import.directory.exists() && !import.directory.is_dir() {
+                return Err("configured import target must be a directory".into());
+            }
+        }
+        for target in &mut cfg.coverage {
+            if !operations_name(&target.name)
+                || !seen.insert(target.name.clone())
+                || target.dataset.as_os_str().is_empty()
+            {
+                return Err("invalid or duplicate configured coverage target".into());
+            }
+            target.dataset = base.join(&target.dataset);
+            if chrono::DateTime::from_timestamp_millis(target.start_ms).is_none()
+                || chrono::DateTime::from_timestamp_millis(target.end_exclusive_ms).is_none()
+                || target.start_ms >= target.end_exclusive_ms
+                || target.gap_threshold_ms <= 0
+                || target.gap_threshold_ms > 366 * 24 * 3600 * 1000
+            {
+                return Err("invalid configured coverage interval or gap threshold".into());
+            }
+            if target.dataset.exists() && !target.dataset.is_file() {
+                return Err("configured coverage dataset must be a regular file".into());
+            }
+        }
+        Ok(cfg)
+    }
+    fn import(&self, name: &str) -> Option<&ImportTarget> {
+        self.imports.iter().find(|t| t.name == name)
+    }
+    fn coverage(&self, name: &str) -> Option<&CoverageTarget> {
+        self.coverage.iter().find(|t| t.name == name)
+    }
+    fn redaction_paths(&self) -> Vec<String> {
+        let mut paths = Vec::new();
+        for import in &self.imports {
+            paths.push(import.directory.to_string_lossy().into_owned());
+        }
+        for target in &self.coverage {
+            paths.push(target.dataset.to_string_lossy().into_owned());
+        }
+        paths
+    }
+}
+/// Exact module refusal reasons stay visible; configured local paths never leak.
+fn redact(text: &str, paths: &[String]) -> String {
+    let mut value = text.to_string();
+    for path in paths {
+        if !path.is_empty() {
+            value = value.replace(path.as_str(), "[redacted-path]");
+        }
+    }
+    value
+}
+const DECISION_FILE: &str = "activation-decisions.jsonl";
+const DECISION_LIMIT: usize = 1024;
+const DECISION_LINE_LIMIT: usize = 8192;
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ActivationDecision {
+    version: String,
+    kind: String,
+    name: String,
+    at_ms: i64,
+    expected_archive_hash: String,
+    verification: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    verification_error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    events: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    dataset_identity: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    catalog_entry_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    reused: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    declared_class: Option<String>,
+    hash: String,
+}
+fn decision_body_hash(value: &serde_json::Value) -> Result<String> {
+    let mut body = value.clone();
+    body.as_object_mut()
+        .ok_or("decision receipt must be an object")?
+        .remove("hash");
+    crate::data::hash(&body)
+}
+fn read_decisions(directory: &Path) -> Result<Vec<ActivationDecision>> {
+    let path = directory.join(DECISION_FILE);
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let file = fs::File::open(&path).map_err(|e| e.to_string())?;
+    let mut text = String::new();
+    file.take((DECISION_LIMIT * DECISION_LINE_LIMIT + 1) as u64)
+        .read_to_string(&mut text)
+        .map_err(|e| e.to_string())?;
+    if text.len() > DECISION_LIMIT * DECISION_LINE_LIMIT {
+        return Err("activation decision history exceeds budget".into());
+    }
+    let mut decisions = Vec::new();
+    for line in text.lines() {
+        if line.len() > DECISION_LINE_LIMIT {
+            return Err("activation decision receipt exceeds budget".into());
+        }
+        let value: serde_json::Value =
+            serde_json::from_str(line).map_err(|_| "activation decision history corrupt")?;
+        let decision: ActivationDecision = serde_json::from_value(value.clone())
+            .map_err(|_| "activation decision history corrupt")?;
+        if decision.version != "import-activation-decision-v1"
+            || decision.hash != decision_body_hash(&value)?
+        {
+            return Err("activation decision history integrity mismatch".into());
+        }
+        decisions.push(decision);
+        if decisions.len() > DECISION_LIMIT {
+            return Err("activation decision history exceeds budget".into());
+        }
+    }
+    Ok(decisions)
+}
+fn append_decision(directory: &Path, mut decision: ActivationDecision) -> Result<()> {
+    use fs2::FileExt;
+    let path = directory.join(DECISION_FILE);
+    let file = OpenOptions::new()
+        .read(true)
+        .append(true)
+        .create(true)
+        .open(&path)
+        .map_err(|e| e.to_string())?;
+    file.lock_exclusive().map_err(|e| e.to_string())?;
+    let result = (|| -> Result<()> {
+        let mut text = String::new();
+        (&file)
+            .take((DECISION_LIMIT * DECISION_LINE_LIMIT + 1) as u64)
+            .read_to_string(&mut text)
+            .map_err(|e| e.to_string())?;
+        if text.len() > DECISION_LIMIT * DECISION_LINE_LIMIT
+            || text.lines().count() >= DECISION_LIMIT
+        {
+            return Err("activation decision history full; preserve retained evidence".into());
+        }
+        for line in text.lines() {
+            let value: serde_json::Value =
+                serde_json::from_str(line).map_err(|_| "activation decision history corrupt")?;
+            let stored: ActivationDecision = serde_json::from_value(value.clone())
+                .map_err(|_| "activation decision history corrupt")?;
+            if stored.hash != decision_body_hash(&value)? {
+                return Err("activation decision history integrity mismatch".into());
+            }
+        }
+        decision.hash = String::new();
+        let mut body = serde_json::to_value(&decision).map_err(|e| e.to_string())?;
+        let hash = decision_body_hash(&body)?;
+        body["hash"] = serde_json::Value::String(hash.clone());
+        decision.hash = hash;
+        let line = serde_json::to_string(&body).map_err(|e| e.to_string())?;
+        if line.len() > DECISION_LINE_LIMIT {
+            return Err("activation decision receipt exceeds budget".into());
+        }
+        let mut writer = &file;
+        writer
+            .write_all(line.as_bytes())
+            .map_err(|e| e.to_string())?;
+        writer.write_all(b"\n").map_err(|e| e.to_string())?;
+        file.sync_all().map_err(|e| e.to_string())?;
+        Ok(())
+    })();
+    let _ = file.unlock();
+    result
+}
+fn import_observation(target: &ImportTarget, paths: &[String]) -> serde_json::Value {
+    let mut value = serde_json::json!({"name": target.name});
+    if !target.directory.join("normalized-import.sqlite").is_file() {
+        value["state"] = serde_json::json!("not_initialized");
+        value["limitations"] = serde_json::json!(
+            "No import ledger exists in the configured directory. Nothing is inferred about source data."
+        );
+        return value;
+    }
+    match crate::import_job::status(&target.directory) {
+        Ok(p) => {
+            value["state"] = serde_json::json!(if p.complete {
+                "complete"
+            } else {
+                "in_progress"
+            });
+            value["complete"] = serde_json::json!(p.complete);
+            value["events"] = serde_json::json!(p.events.to_string());
+            value["chunks"] = serde_json::json!(p.chunks.len().to_string());
+            value["archive_hash"] = serde_json::json!(p.configuration.archive_hash);
+            value["archive_bytes"] = serde_json::json!(p.configuration.archive_bytes.to_string());
+            value["synthetic"] = serde_json::json!(p.configuration.synthetic);
+            value["started_at"] = serde_json::json!(p.started_at);
+            value["limitations"] = serde_json::json!(p.limitations);
+        }
+        Err(e) => {
+            value["state"] = serde_json::json!("refused");
+            value["reason"] = serde_json::json!(redact(&e.to_string(), paths));
+        }
+    }
+    match read_decisions(&target.directory) {
+        Ok(decisions) => {
+            value["decision_count"] = serde_json::json!(decisions.len().to_string());
+            value["last_decision"] = serde_json::json!(decisions.last().map(|d| {
+                serde_json::json!({"kind": d.kind, "at_ms": d.at_ms.to_string(), "hash": d.hash})
+            }));
+        }
+        Err(e) => {
+            value["decision_history"] = serde_json::json!("corrupt");
+            value["decision_history_reason"] = serde_json::json!(redact(&e.to_string(), paths));
+        }
+    }
+    value
+}
+async fn imports_inventory(State(app): State<Arc<App>>) -> Response {
+    let Some(config) = app.operations.clone() else {
+        return Json(serde_json::json!({"configured":false,"imports":[],"limitations":"No import directories configured. Import activation is unavailable."})).into_response();
+    };
+    if !bucket(&app.operations_bucket, 60) {
+        return api_error(StatusCode::TOO_MANY_REQUESTS, "operations rate limit");
+    }
+    let Ok(permit) = app.operations_slots.clone().try_acquire_owned() else {
+        return api_error(StatusCode::TOO_MANY_REQUESTS, "operations work busy");
+    };
+    let result = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        let paths = config.redaction_paths();
+        config
+            .imports
+            .iter()
+            .map(|t| import_observation(t, &paths))
+            .collect::<Vec<_>>()
+    })
+    .await;
+    match result {
+        Ok(rows) => Json(serde_json::json!({"configured":true,"imports":rows,"maximum_imports":16,"limitations":"Verified checkpoint observations only. Complete means this exact source snapshot was parsed; not historical completeness, calendar/quality/profile approval or research eligibility. Activation registers a local catalog observation; a declared class is never approval."})).into_response(),
+        _ => api_error(StatusCode::INTERNAL_SERVER_ERROR, "import inventory unavailable"),
+    }
+}
+async fn import_detail(State(app): State<Arc<App>>, Param(name): Param<String>) -> Response {
+    let Some(config) = app.operations.clone() else {
+        return api_error(StatusCode::NOT_FOUND, "import operations not configured");
+    };
+    let Some(target) = config.import(&name).cloned() else {
+        return api_error(StatusCode::NOT_FOUND, "import target not configured");
+    };
+    if !bucket(&app.operations_bucket, 60) {
+        return api_error(StatusCode::TOO_MANY_REQUESTS, "operations rate limit");
+    }
+    let Ok(permit) = app.operations_slots.clone().try_acquire_owned() else {
+        return api_error(StatusCode::TOO_MANY_REQUESTS, "operations work busy");
+    };
+    let result = tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
+        let _permit = permit;
+        let paths = config.redaction_paths();
+        let progress = crate::import_job::status(&target.directory)
+            .map_err(|e| redact(&e.to_string(), &paths))?;
+        let decisions = read_decisions(&target.directory)
+            .map_err(|e| redact(&e.to_string(), &paths))?;
+        Ok(serde_json::json!({"name":target.name,"state":if progress.complete{"complete"}else{"in_progress"},"progress":progress,"decisions":decisions,"limitations":"Every published chunk was re-verified for this receipt. Decisions are operator evidence, not approval. A declared class is never eligibility or qualification."}))
+    })
+    .await;
+    match result {
+        Ok(Ok(value)) => Json(value).into_response(),
+        Ok(Err(reason)) => api_error(StatusCode::CONFLICT, &reason),
+        _ => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "verified import receipt unavailable",
+        ),
+    }
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ImportActivate {
+    expected_archive_hash: String,
+    expected_events: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ImportRefuse {
+    expected_archive_hash: String,
+    reason: String,
+}
+fn canonical_events(value: &str) -> Option<usize> {
+    if value.is_empty() || value.len() > 7 || !value.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let n: usize = value.parse().ok()?;
+    (n.to_string() == value && n <= 2_000_000).then_some(n)
+}
+async fn import_activate(
+    State(app): State<Arc<App>>,
+    Param(name): Param<String>,
+    Json(body): Json<ImportActivate>,
+) -> Response {
+    let (Some(config), Some(catalog)) = (app.operations.clone(), app.catalog_path.clone()) else {
+        return api_error(
+            StatusCode::CONFLICT,
+            "activation requires configured imports and a dataset catalog",
+        );
+    };
+    let Some(target) = config.import(&name).cloned() else {
+        return api_error(StatusCode::NOT_FOUND, "import target not configured");
+    };
+    if !crate::machine_evidence::hex(&body.expected_archive_hash)
+        || canonical_events(&body.expected_events).is_none()
+    {
+        return api_error(
+            StatusCode::BAD_REQUEST,
+            "invalid expected archive hash or event count",
+        );
+    }
+    if !bucket(&app.operations_bucket, 60) {
+        return api_error(StatusCode::TOO_MANY_REQUESTS, "operations rate limit");
+    }
+    let Ok(permit) = app.operations_slots.clone().try_acquire_owned() else {
+        return api_error(StatusCode::TOO_MANY_REQUESTS, "operations work busy");
+    };
+    let result = tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
+        let _permit = permit;
+        let paths = config.redaction_paths();
+        let fail = |e: String| redact(&e, &paths);
+        let progress = crate::import_job::status(&target.directory).map_err(fail)?;
+        if !progress.complete || progress.events == 0 || progress.chunks.is_empty() {
+            return Err("only a complete nonempty import can be activated".into());
+        }
+        if progress.configuration.archive_hash != body.expected_archive_hash {
+            return Err("expected archive hash does not match the verified import".into());
+        }
+        if progress.events.to_string() != body.expected_events {
+            return Err("expected event count does not match the verified import".into());
+        }
+        read_decisions(&target.directory).map_err(fail)?;
+        let dataset = crate::import_job::assemble(&target.directory).map_err(fail)?;
+        let mut catalog = crate::catalog::Catalog::open(&catalog).map_err(fail)?;
+        let registration = catalog.register(&dataset).map_err(fail)?;
+        let decision = ActivationDecision {
+            version: "import-activation-decision-v1".into(),
+            kind: "activated".into(),
+            name: target.name.clone(),
+            at_ms: chrono::Utc::now().timestamp_millis(),
+            expected_archive_hash: body.expected_archive_hash.clone(),
+            verification: "verified".into(),
+            verification_error: None,
+            reason: None,
+            events: Some(progress.events.to_string()),
+            dataset_identity: Some(registration.entry.receipt.facts.dataset_identity.clone()),
+            catalog_entry_hash: Some(registration.entry.hash.clone()),
+            reused: Some(registration.reused),
+            declared_class: Some(format!("{:?}", dataset.manifest.class)),
+            hash: String::new(),
+        };
+        append_decision(&target.directory, decision.clone()).map_err(fail)?;
+        Ok(serde_json::json!({"decision":decision,"registration":registration.entry,"reused":registration.reused,"activation_performed":true,"limitations":"Activation registered a local catalog observation only. The declared class is not approval; no calendar/profile/legal/scientific gate, research eligibility or qualification is granted. No acquisition or live execution occurred."}))
+    })
+    .await;
+    match result {
+        Ok(Ok(value)) => Json(value).into_response(),
+        Ok(Err(reason)) => api_error(StatusCode::CONFLICT, &reason),
+        _ => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "import activation unavailable",
+        ),
+    }
+}
+async fn import_refuse(
+    State(app): State<Arc<App>>,
+    Param(name): Param<String>,
+    Json(body): Json<ImportRefuse>,
+) -> Response {
+    let Some(config) = app.operations.clone() else {
+        return api_error(StatusCode::NOT_FOUND, "import operations not configured");
+    };
+    let Some(target) = config.import(&name).cloned() else {
+        return api_error(StatusCode::NOT_FOUND, "import target not configured");
+    };
+    if !crate::machine_evidence::hex(&body.expected_archive_hash)
+        || body.reason.trim().is_empty()
+        || body.reason.chars().count() > 4096
+    {
+        return api_error(
+            StatusCode::BAD_REQUEST,
+            "invalid expected archive hash or refusal reason",
+        );
+    }
+    if !bucket(&app.operations_bucket, 60) {
+        return api_error(StatusCode::TOO_MANY_REQUESTS, "operations rate limit");
+    }
+    let Ok(permit) = app.operations_slots.clone().try_acquire_owned() else {
+        return api_error(StatusCode::TOO_MANY_REQUESTS, "operations work busy");
+    };
+    let result = tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
+        let _permit = permit;
+        let paths = config.redaction_paths();
+        let fail = |e: String| redact(&e, &paths);
+        read_decisions(&target.directory).map_err(fail)?;
+        let (verification, verification_error, events) =
+            match crate::import_job::status(&target.directory) {
+                Ok(p) => {
+                    if p.configuration.archive_hash != body.expected_archive_hash {
+                        return Err("expected archive hash does not match the verified import".into());
+                    }
+                    ("verified", None, Some(p.events.to_string()))
+                }
+                Err(e) => ("unverified", Some(redact(&e.to_string(), &paths)), None),
+            };
+        let decision = ActivationDecision {
+            version: "import-activation-decision-v1".into(),
+            kind: "refused".into(),
+            name: target.name.clone(),
+            at_ms: chrono::Utc::now().timestamp_millis(),
+            expected_archive_hash: body.expected_archive_hash.clone(),
+            verification: verification.into(),
+            verification_error,
+            reason: Some(body.reason.clone()),
+            events,
+            dataset_identity: None,
+            catalog_entry_hash: None,
+            reused: None,
+            declared_class: None,
+            hash: String::new(),
+        };
+        append_decision(&target.directory, decision.clone()).map_err(fail)?;
+        Ok(serde_json::json!({"decision":decision,"activation_performed":false,"limitations":"Refusal is retained operator evidence. No import artifact, checkpoint or catalog entry was changed or deleted."}))
+    })
+    .await;
+    match result {
+        Ok(Ok(value)) => Json(value).into_response(),
+        Ok(Err(reason)) => api_error(StatusCode::CONFLICT, &reason),
+        _ => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "import refusal unavailable",
+        ),
+    }
+}
+async fn coverage_inventory(State(app): State<Arc<App>>) -> Response {
+    let Some(config) = &app.operations else {
+        return Json(serde_json::json!({"configured":false,"targets":[],"limitations":"No coverage targets configured. Coverage observations are unavailable."})).into_response();
+    };
+    let targets = config
+        .coverage
+        .iter()
+        .map(|t| {
+            serde_json::json!({"name":t.name,"start_ms":t.start_ms.to_string(),"end_exclusive_ms":t.end_exclusive_ms.to_string(),"gap_threshold_ms":t.gap_threshold_ms.to_string(),"detail_limit":100})
+        })
+        .collect::<Vec<_>>();
+    Json(serde_json::json!({"configured":true,"targets":targets,"maximum_targets":16,"limitations":"Operator-configured observation windows only. Empty months and elapsed gaps do not prove missing source ranges without an approved trading calendar/source inventory. No completeness, approval or eligibility is established."})).into_response()
+}
+async fn coverage_report(State(app): State<Arc<App>>, Param(name): Param<String>) -> Response {
+    let Some(config) = app.operations.clone() else {
+        return api_error(StatusCode::NOT_FOUND, "coverage operations not configured");
+    };
+    let Some(target) = config.coverage(&name).cloned() else {
+        return api_error(StatusCode::NOT_FOUND, "coverage target not configured");
+    };
+    if !bucket(&app.operations_bucket, 60) {
+        return api_error(StatusCode::TOO_MANY_REQUESTS, "operations rate limit");
+    }
+    let Ok(permit) = app.operations_slots.clone().try_acquire_owned() else {
+        return api_error(StatusCode::TOO_MANY_REQUESTS, "operations work busy");
+    };
+    let result = tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
+        let _permit = permit;
+        let paths = config.redaction_paths();
+        let dataset =
+            review_dataset(&target.dataset).map_err(|e| redact(&e.to_string(), &paths))?;
+        let report = crate::coverage::report(
+            &dataset,
+            crate::validation::Interval {
+                start_ms: target.start_ms,
+                end_exclusive_ms: target.end_exclusive_ms,
+            },
+            target.gap_threshold_ms,
+            100,
+        )
+        .map_err(|e| redact(&e.to_string(), &paths))?;
+        let mut value = serde_json::to_value(report).map_err(|e| e.to_string())?;
+        value["name"] = serde_json::json!(target.name);
+        Ok(value)
+    })
+    .await;
+    match result {
+        Ok(Ok(value)) => Json(value).into_response(),
+        Ok(Err(reason)) => api_error(StatusCode::CONFLICT, &reason),
+        _ => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "verified coverage report unavailable",
+        ),
+    }
+}
+async fn registry_audit(State(app): State<Arc<App>>) -> Response {
+    if !bucket(&app.operations_bucket, 60) {
+        return api_error(StatusCode::TOO_MANY_REQUESTS, "operations rate limit");
+    }
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    let audit = || -> Result<serde_json::Value> {
+        registry.integrity()?;
+        Ok(
+            serde_json::json!({"integrity":"ok","counts":registry.counts()?,"audit_health":audit_health(&registry)?,"scope":"Read-only registry integrity observation at request time. Not a continuous audit, hard enforcement, audit coverage certification or qualification."}),
+        )
+    };
+    match audit() {
+        Ok(value) => Json(value).into_response(),
+        Err(_) => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "registry integrity verification refused; preserve evidence and inspect the registry",
+        ),
+    }
+}
+async fn campaign_verify_inputs(State(app): State<Arc<App>>, Param(id): Param<String>) -> Response {
+    if !catalog_id(&id) {
+        return api_error(StatusCode::BAD_REQUEST, "invalid campaign identity");
+    }
+    let Ok(registry) = app.registry.lock() else {
+        return api_error(StatusCode::INTERNAL_SERVER_ERROR, "database unavailable");
+    };
+    let exists: std::result::Result<bool, _> = registry.connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM corpus_campaigns WHERE id=?1)",
+        [&id],
+        |r| r.get(0),
+    );
+    if matches!(exists, Ok(false)) {
+        return api_error(StatusCode::NOT_FOUND, "campaign not found");
+    }
+    match crate::corpus_campaign::verify_inputs(&registry, &id) {
+        Ok(value) => Json(value).into_response(),
+        Err(_) => api_error(
+            StatusCode::CONFLICT,
+            "campaign frozen input verification refused; the frozen plan, build or trial scope changed or is unavailable",
+        ),
+    }
+}
 pub async fn serve(database: &Path, auth_path: &Path, port: u16) -> Result<()> {
     serve_with_catalog(database, auth_path, port, None).await
 }
@@ -1979,7 +2594,18 @@ pub async fn serve_with_reviews(
     catalog: Option<&Path>,
     review_path: Option<&Path>,
 ) -> Result<()> {
+    serve_with_operations(database, auth_path, port, catalog, review_path, None).await
+}
+pub async fn serve_with_operations(
+    database: &Path,
+    auth_path: &Path,
+    port: u16,
+    catalog: Option<&Path>,
+    review_path: Option<&Path>,
+    operations_path: Option<&Path>,
+) -> Result<()> {
     let review_config = review_path.map(ReviewConfig::load).transpose()?;
+    let operations = operations_path.map(OperationsConfig::load).transpose()?;
     if review_config.is_some() && catalog.is_none() {
         return Err("review workflow requires a configured catalog".into());
     }
@@ -2029,10 +2655,13 @@ pub async fn serve_with_reviews(
         registry: Mutex::new(Registry::open(database)?),
         catalog_path: catalog.map(Path::to_path_buf),
         review_config,
+        operations,
         review_slots: Arc::new(tokio::sync::Semaphore::new(1)),
         recovery_slots: Arc::new(tokio::sync::Semaphore::new(1)),
         recovery_read_slots: Arc::new(tokio::sync::Semaphore::new(2)),
+        operations_slots: Arc::new(tokio::sync::Semaphore::new(1)),
         review_bucket: Mutex::new((Instant::now(), 0)),
+        operations_bucket: Mutex::new((Instant::now(), 0)),
         password_hash: auth.password_hash,
         sessions: Mutex::new(HashMap::new()),
         login_bucket: Mutex::new((Instant::now(), 0)),
@@ -2096,6 +2725,17 @@ pub async fn serve_with_reviews(
         .route("/api/campaigns/{id}", get(campaign_status))
         .route("/api/campaigns/{id}/control", post(campaign_control))
         .route("/api/campaigns/{id}/owned-visits", get(campaign_owned_page))
+        .route(
+            "/api/campaigns/{id}/verify-inputs",
+            get(campaign_verify_inputs),
+        )
+        .route("/api/imports", get(imports_inventory))
+        .route("/api/imports/{name}", get(import_detail))
+        .route("/api/imports/{name}/activate", post(import_activate))
+        .route("/api/imports/{name}/refuse", post(import_refuse))
+        .route("/api/coverage", get(coverage_inventory))
+        .route("/api/coverage/{name}", get(coverage_report))
+        .route("/api/registry-audit", get(registry_audit))
         .route("/api/corpus-fleets", get(corpus_fleets))
         .route("/api/corpus-fleets/{id}", get(corpus_fleet_status))
         .route(
@@ -2456,5 +3096,562 @@ mod trade_page_tests {
         assert_eq!(page["total_trades"], 0);
         assert!(page["next_cursor"].is_null());
         assert!(page["first_ordinal"].is_null());
+    }
+}
+
+#[cfg(test)]
+mod operations_tests {
+    use super::*;
+    use crate::{contracts::Profile, data, import_job, native};
+    use axum::extract::{Path as Param, State};
+
+    struct OpsFixture {
+        root: PathBuf,
+        db: PathBuf,
+        catalog: PathBuf,
+    }
+    impl OpsFixture {
+        fn new(label: &str) -> Self {
+            let root = std::env::temp_dir().join(format!(
+                "factory-dashboard-ops-{label}-{}",
+                std::process::id()
+            ));
+            fs::create_dir_all(&root).unwrap();
+            Self {
+                db: root.join("state.sqlite"),
+                catalog: root.join("catalog.sqlite"),
+                root,
+            }
+        }
+        fn import_dir(&self, name: &str) -> PathBuf {
+            let dir = self.root.join(name);
+            fs::create_dir_all(&dir).unwrap();
+            dir
+        }
+        fn complete_import(&self, name: &str) -> PathBuf {
+            let dir = self.import_dir(name);
+            let input = self.root.join(format!("{name}.csv"));
+            let rows = (0..8)
+                .map(|i| format!("{},{},1.00000,1.00010", 1735689600000i64 + i * 60000, i))
+                .collect::<Vec<_>>()
+                .join("\n");
+            fs::write(&input, format!("timestamp_ms,sequence,bid,ask\n{rows}\n")).unwrap();
+            let profile = Profile::synthetic("EURUSD").unwrap();
+            import_job::step(
+                &input,
+                &dir,
+                profile.clone(),
+                "SYNTHETIC_TEST_ONLY dashboard ops fixture",
+                true,
+                4,
+            )
+            .unwrap();
+            import_job::step(
+                &input,
+                &dir,
+                profile,
+                "SYNTHETIC_TEST_ONLY dashboard ops fixture",
+                true,
+                4,
+            )
+            .unwrap();
+            dir
+        }
+        fn operations(&self, body: serde_json::Value) -> OperationsConfig {
+            let path = self.root.join("operations.json");
+            fs::write(&path, serde_json::to_vec(&body).unwrap()).unwrap();
+            OperationsConfig::load(&path).unwrap()
+        }
+        fn app(&self, operations: Option<OperationsConfig>, catalog: bool) -> Arc<App> {
+            Arc::new(App {
+                registry: Mutex::new(Registry::open(&self.db).unwrap()),
+                catalog_path: catalog.then(|| self.catalog.clone()),
+                review_config: None,
+                operations,
+                review_slots: Arc::new(tokio::sync::Semaphore::new(1)),
+                recovery_slots: Arc::new(tokio::sync::Semaphore::new(1)),
+                recovery_read_slots: Arc::new(tokio::sync::Semaphore::new(2)),
+                operations_slots: Arc::new(tokio::sync::Semaphore::new(1)),
+                review_bucket: Mutex::new((Instant::now(), 0)),
+                operations_bucket: Mutex::new((Instant::now(), 0)),
+                password_hash: "fixture-not-a-real-hash".into(),
+                sessions: Mutex::new(HashMap::new()),
+                login_bucket: Mutex::new((Instant::now(), 0)),
+                requests: Mutex::new((Instant::now(), 0)),
+                login_slots: Arc::new(tokio::sync::Semaphore::new(2)),
+                port: 0,
+            })
+        }
+    }
+    impl Drop for OpsFixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+    async fn json_of(response: Response) -> serde_json::Value {
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&bytes).unwrap()
+    }
+    fn config_body(import: &str) -> serde_json::Value {
+        serde_json::json!({"imports":[{"name":import,"directory":import}]})
+    }
+
+    #[test]
+    fn operations_config_enforces_names_duplicates_bounds_and_intervals() {
+        let fixture = OpsFixture::new("config");
+        let write = |value: serde_json::Value| {
+            let path = fixture.root.join("bad-operations.json");
+            fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+            OperationsConfig::load(&path)
+        };
+        assert!(write(serde_json::json!({})).is_err());
+        assert!(write(serde_json::json!({"imports":[],"coverage":[]})).is_err());
+        assert!(
+            write(serde_json::json!({"imports":[{"name":"Bad_Name","directory":"x"}]})).is_err()
+        );
+        assert!(write(serde_json::json!({"imports":[{"name":"-lead","directory":"x"}]})).is_err());
+        assert!(
+            write(serde_json::json!({"imports":[{"name":"x".repeat(65),"directory":"x"}]}))
+                .is_err()
+        );
+        assert!(write(serde_json::json!({"imports":[{"name":"a","directory":"x"},{"name":"a","directory":"y"}]})).is_err());
+        assert!(write(serde_json::json!({"imports":[{"name":"a","directory":"x"}],"coverage":[{"name":"a","dataset":"d.rsf","start_ms":0,"end_exclusive_ms":1,"gap_threshold_ms":1}]})).is_err());
+        assert!(
+            write(serde_json::json!({"imports":[{"name":"a","directory":"x","extra":1}]})).is_err()
+        );
+        assert!(write(serde_json::json!({"coverage":[{"name":"c","dataset":"d.rsf","start_ms":5,"end_exclusive_ms":5,"gap_threshold_ms":1}]})).is_err());
+        assert!(write(serde_json::json!({"coverage":[{"name":"c","dataset":"d.rsf","start_ms":0,"end_exclusive_ms":1,"gap_threshold_ms":0}]})).is_err());
+        assert!(write(serde_json::json!({"coverage":[{"name":"c","dataset":"d.rsf","start_ms":0,"end_exclusive_ms":1,"gap_threshold_ms":366i64*24*3600*1000+1}]})).is_err());
+        let many = (0..17)
+            .map(|i| serde_json::json!({"name":format!("import-{i}"),"directory":format!("dir-{i}")}))
+            .collect::<Vec<_>>();
+        assert!(write(serde_json::json!({"imports":many})).is_err());
+        // Valid relative paths resolve against the configuration file's parent.
+        let ok = fixture
+            .operations(serde_json::json!({"imports":[{"name":"job","directory":"sub/dir"}]}));
+        assert_eq!(ok.imports[0].directory, fixture.root.join("sub/dir"));
+        assert!(ok.import("job").is_some());
+        assert!(ok.import("missing").is_none());
+    }
+
+    #[tokio::test]
+    async fn import_activation_lifecycle_verifies_confirms_and_registers_observation_only() {
+        let fixture = OpsFixture::new("activate");
+        let dir = fixture.complete_import("import-complete");
+        let config = fixture.operations(config_body("import-complete"));
+        let app = fixture.app(Some(config), true);
+        let inventory = json_of(imports_inventory(State(app.clone())).await).await;
+        assert_eq!(inventory["configured"], true);
+        assert_eq!(inventory["imports"][0]["state"], "complete");
+        assert_eq!(inventory["imports"][0]["events"], "8");
+        assert_eq!(inventory["imports"][0]["chunks"], "2");
+        let progress = import_job::status(&dir).unwrap();
+        let hash = progress.configuration.archive_hash.clone();
+        // Stale or wrong confirmation refuses before any catalog write.
+        let wrong_hash = import_activate(
+            State(app.clone()),
+            Param("import-complete".into()),
+            Json(ImportActivate {
+                expected_archive_hash: "0".repeat(64),
+                expected_events: "8".into(),
+            }),
+        )
+        .await;
+        assert_eq!(wrong_hash.status(), StatusCode::CONFLICT);
+        let wrong_events = import_activate(
+            State(app.clone()),
+            Param("import-complete".into()),
+            Json(ImportActivate {
+                expected_archive_hash: hash.clone(),
+                expected_events: "9".into(),
+            }),
+        )
+        .await;
+        assert_eq!(wrong_events.status(), StatusCode::CONFLICT);
+        assert!(!fixture.catalog.exists());
+        let activated = import_activate(
+            State(app.clone()),
+            Param("import-complete".into()),
+            Json(ImportActivate {
+                expected_archive_hash: hash.clone(),
+                expected_events: "8".into(),
+            }),
+        )
+        .await;
+        assert_eq!(activated.status(), StatusCode::OK);
+        let value = json_of(activated).await;
+        assert_eq!(value["decision"]["kind"], "activated");
+        assert_eq!(value["decision"]["verification"], "verified");
+        assert_eq!(value["decision"]["declared_class"], "SyntheticTestOnly");
+        assert_eq!(value["reused"], false);
+        assert_eq!(value["registration"]["receipt"]["facts"]["events"], 8);
+        let identity = value["registration"]["receipt"]["facts"]["dataset_identity"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let entry = crate::catalog::Catalog::existing(&fixture.catalog)
+            .unwrap()
+            .entry(&identity)
+            .unwrap();
+        assert!(entry.is_some());
+        // Repeat activation is idempotent and retained as a second decision.
+        let again = json_of(
+            import_activate(
+                State(app.clone()),
+                Param("import-complete".into()),
+                Json(ImportActivate {
+                    expected_archive_hash: hash,
+                    expected_events: "8".into(),
+                }),
+            )
+            .await,
+        )
+        .await;
+        assert_eq!(again["reused"], true);
+        let decisions = read_decisions(&dir).unwrap();
+        assert_eq!(decisions.len(), 2);
+        assert!(decisions.iter().all(|d| d.kind == "activated"));
+        let detail =
+            json_of(import_detail(State(app.clone()), Param("import-complete".into())).await).await;
+        assert_eq!(detail["state"], "complete");
+        assert_eq!(detail["decisions"].as_array().unwrap().len(), 2);
+        assert!(
+            !serde_json::to_string(&detail)
+                .unwrap()
+                .contains(fixture.root.to_str().unwrap())
+        );
+    }
+
+    #[tokio::test]
+    async fn import_refusal_retains_evidence_and_preserves_artifacts() {
+        let fixture = OpsFixture::new("refuse");
+        let dir = fixture.complete_import("import-refused");
+        let config = fixture.operations(config_body("import-refused"));
+        let app = fixture.app(Some(config), true);
+        let progress = import_job::status(&dir).unwrap();
+        let hash = progress.configuration.archive_hash.clone();
+        let chunk = fs::read(dir.join("chunk-000000.rsf")).unwrap();
+        let refused = import_refuse(
+            State(app.clone()),
+            Param("import-refused".into()),
+            Json(ImportRefuse {
+                expected_archive_hash: hash.clone(),
+                reason: "source revision superseded; keep for audit".into(),
+            }),
+        )
+        .await;
+        assert_eq!(refused.status(), StatusCode::OK);
+        let value = json_of(refused).await;
+        assert_eq!(value["decision"]["kind"], "refused");
+        assert_eq!(value["decision"]["verification"], "verified");
+        assert_eq!(value["activation_performed"], false);
+        assert_eq!(fs::read(dir.join("chunk-000000.rsf")).unwrap(), chunk);
+        assert!(!fixture.catalog.exists());
+        let inventory = json_of(imports_inventory(State(app.clone())).await).await;
+        assert_eq!(inventory["imports"][0]["last_decision"]["kind"], "refused");
+        assert_eq!(inventory["imports"][0]["decision_count"], "1");
+        let mismatch = import_refuse(
+            State(app.clone()),
+            Param("import-refused".into()),
+            Json(ImportRefuse {
+                expected_archive_hash: "0".repeat(64),
+                reason: "stale".into(),
+            }),
+        )
+        .await;
+        assert_eq!(mismatch.status(), StatusCode::CONFLICT);
+        // Activation remains possible after a refusal; history keeps both decisions.
+        let activated = import_activate(
+            State(app.clone()),
+            Param("import-refused".into()),
+            Json(ImportActivate {
+                expected_archive_hash: hash,
+                expected_events: "8".into(),
+            }),
+        )
+        .await;
+        assert_eq!(activated.status(), StatusCode::OK);
+        assert_eq!(read_decisions(&dir).unwrap().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn tampered_chunk_refuses_inventory_detail_and_activation() {
+        let fixture = OpsFixture::new("tamper");
+        let dir = fixture.complete_import("import-tampered");
+        let config = fixture.operations(config_body("import-tampered"));
+        let app = fixture.app(Some(config), true);
+        let progress = import_job::status(&dir).unwrap();
+        let hash = progress.configuration.archive_hash.clone();
+        let path = dir.join("chunk-000000.rsf");
+        let mut bytes = fs::read(&path).unwrap();
+        let last = bytes.len() - 1;
+        bytes[last] ^= 1;
+        fs::write(&path, bytes).unwrap();
+        let inventory = json_of(imports_inventory(State(app.clone())).await).await;
+        assert_eq!(inventory["imports"][0]["state"], "refused");
+        assert!(
+            inventory["imports"][0]["reason"]
+                .as_str()
+                .unwrap()
+                .contains("mismatch")
+        );
+        let detail = import_detail(State(app.clone()), Param("import-tampered".into())).await;
+        assert_eq!(detail.status(), StatusCode::CONFLICT);
+        let activation = import_activate(
+            State(app.clone()),
+            Param("import-tampered".into()),
+            Json(ImportActivate {
+                expected_archive_hash: hash,
+                expected_events: "8".into(),
+            }),
+        )
+        .await;
+        assert_eq!(activation.status(), StatusCode::CONFLICT);
+        assert!(!fixture.catalog.exists());
+        // Operator refusal of an unverified import is retained with its exact obstacle.
+        let refusal = import_refuse(
+            State(app.clone()),
+            Param("import-tampered".into()),
+            Json(ImportRefuse {
+                expected_archive_hash: "0".repeat(64),
+                reason: "tampered chunk retained for investigation".into(),
+            }),
+        )
+        .await;
+        assert_eq!(refusal.status(), StatusCode::OK);
+        let value = json_of(refusal).await;
+        assert_eq!(value["decision"]["verification"], "unverified");
+        assert!(
+            value["decision"]["verification_error"]
+                .as_str()
+                .unwrap()
+                .contains("mismatch")
+        );
+    }
+
+    #[tokio::test]
+    async fn corrupt_decision_history_refuses_actions_and_uninitialized_imports_report_no_state() {
+        let fixture = OpsFixture::new("corrupt");
+        let dir = fixture.complete_import("import-corrupt");
+        fixture.import_dir("import-empty");
+        let config = fixture.operations(serde_json::json!({"imports":[
+            {"name":"import-corrupt","directory":"import-corrupt"},
+            {"name":"import-empty","directory":"import-empty"}
+        ]}));
+        let app = fixture.app(Some(config), true);
+        fs::write(dir.join(DECISION_FILE), "{\"forged\":true}\n").unwrap();
+        let inventory = json_of(imports_inventory(State(app.clone())).await).await;
+        assert_eq!(inventory["imports"][0]["decision_history"], "corrupt");
+        assert_eq!(inventory["imports"][1]["state"], "not_initialized");
+        let progress = import_job::status(&dir).unwrap();
+        let activation = import_activate(
+            State(app.clone()),
+            Param("import-corrupt".into()),
+            Json(ImportActivate {
+                expected_archive_hash: progress.configuration.archive_hash,
+                expected_events: "8".into(),
+            }),
+        )
+        .await;
+        assert_eq!(activation.status(), StatusCode::CONFLICT);
+        let refusal = import_refuse(
+            State(app.clone()),
+            Param("import-corrupt".into()),
+            Json(ImportRefuse {
+                expected_archive_hash: "0".repeat(64),
+                reason: "history corrupt".into(),
+            }),
+        )
+        .await;
+        assert_eq!(refusal.status(), StatusCode::CONFLICT);
+        let missing_detail = import_detail(State(app.clone()), Param("import-empty".into())).await;
+        assert_eq!(missing_detail.status(), StatusCode::CONFLICT);
+        let unknown = import_detail(State(app.clone()), Param("not-configured".into())).await;
+        assert_eq!(unknown.status(), StatusCode::NOT_FOUND);
+        // Decision history budget refuses instead of truncating retained evidence.
+        let budget_dir = fixture.import_dir("import-budget");
+        fs::write(
+            budget_dir.join(DECISION_FILE),
+            "x".repeat(DECISION_LIMIT * DECISION_LINE_LIMIT + 1),
+        )
+        .unwrap();
+        assert!(read_decisions(&budget_dir).is_err());
+    }
+
+    #[tokio::test]
+    async fn activation_requires_catalog_and_valid_confirmation_fields() {
+        let fixture = OpsFixture::new("nocatalog");
+        fixture.complete_import("import-nocatalog");
+        let config = fixture.operations(config_body("import-nocatalog"));
+        let app = fixture.app(Some(config), false);
+        let progress = import_job::status(&fixture.root.join("import-nocatalog")).unwrap();
+        let refused = import_activate(
+            State(app.clone()),
+            Param("import-nocatalog".into()),
+            Json(ImportActivate {
+                expected_archive_hash: progress.configuration.archive_hash,
+                expected_events: "8".into(),
+            }),
+        )
+        .await;
+        assert_eq!(refused.status(), StatusCode::CONFLICT);
+        let app = fixture.app(
+            Some(fixture.operations(config_body("import-nocatalog"))),
+            true,
+        );
+        for events in ["08", "-1", "", "2000001", "1e3", "99999999"] {
+            let bad = import_activate(
+                State(app.clone()),
+                Param("import-nocatalog".into()),
+                Json(ImportActivate {
+                    expected_archive_hash: "0".repeat(64),
+                    expected_events: events.into(),
+                }),
+            )
+            .await;
+            assert_eq!(bad.status(), StatusCode::BAD_REQUEST, "events {events}");
+        }
+        assert_eq!(canonical_events("2000000"), Some(2000000));
+        assert_eq!(canonical_events("0"), Some(0));
+        assert_eq!(canonical_events("08"), None);
+    }
+
+    #[tokio::test]
+    async fn coverage_reports_are_exact_bounded_and_labelled_observations() {
+        let fixture = OpsFixture::new("coverage");
+        let dataset = data::synthetic_fixture("EURUSD").unwrap();
+        let artifact = fixture.root.join("coverage.rsf");
+        native::write(&artifact, &dataset).unwrap();
+        let config = fixture.operations(serde_json::json!({"coverage":[
+            {"name":"month-window","dataset":"coverage.rsf","start_ms":1735689600000i64,"end_exclusive_ms":1738368000000i64,"gap_threshold_ms":60000},
+            {"name":"full-span","dataset":"coverage.rsf","start_ms":1735689600000i64,"end_exclusive_ms":1769904000000i64,"gap_threshold_ms":60000},
+            {"name":"dense-gaps","dataset":"coverage.rsf","start_ms":1735689600000i64,"end_exclusive_ms":1769904000000i64,"gap_threshold_ms":1}
+        ]}));
+        let app = fixture.app(Some(config), false);
+        let inventory = json_of(coverage_inventory(State(app.clone())).await).await;
+        assert_eq!(inventory["configured"], true);
+        assert_eq!(inventory["targets"].as_array().unwrap().len(), 3);
+        assert_eq!(inventory["targets"][0]["start_ms"], "1735689600000");
+        let month =
+            json_of(coverage_report(State(app.clone()), Param("month-window".into())).await).await;
+        assert_eq!(month["events"], 1000);
+        assert_eq!(month["months"].as_array().unwrap().len(), 1);
+        assert_eq!(month["gap_count"], 0);
+        assert_eq!(month["name"], "month-window");
+        let span =
+            json_of(coverage_report(State(app.clone()), Param("full-span".into())).await).await;
+        assert_eq!(span["events"], 2000);
+        assert_eq!(span["months"].as_array().unwrap().len(), 13);
+        assert_eq!(span["gap_count"], 1);
+        assert_eq!(span["gaps"][0]["elapsed_ms"], 31526010000i64);
+        assert_eq!(span["gap_details_truncated"], false);
+        assert!(
+            span["limitations"]
+                .as_str()
+                .unwrap()
+                .contains("No acquisition")
+        );
+        let dense =
+            json_of(coverage_report(State(app.clone()), Param("dense-gaps".into())).await).await;
+        assert_eq!(dense["gap_count"], 1999);
+        assert_eq!(dense["gaps"].as_array().unwrap().len(), 100);
+        assert_eq!(dense["gap_details_truncated"], true);
+        let unknown = coverage_report(State(app.clone()), Param("missing".into())).await;
+        assert_eq!(unknown.status(), StatusCode::NOT_FOUND);
+        // A missing configured artifact refuses; no coverage is fabricated.
+        fs::remove_file(&artifact).unwrap();
+        let missing = coverage_report(State(app.clone()), Param("month-window".into())).await;
+        assert_eq!(missing.status(), StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn registry_audit_observes_integrity_and_refuses_corruption() {
+        let fixture = OpsFixture::new("audit");
+        let app = fixture.app(None, false);
+        let healthy = registry_audit(State(app.clone())).await;
+        assert_eq!(healthy.status(), StatusCode::OK);
+        let value = json_of(healthy).await;
+        assert_eq!(value["integrity"], "ok");
+        assert_eq!(value["counts"]["registered"], 0);
+        assert!(
+            value["scope"]
+                .as_str()
+                .unwrap()
+                .contains("not a continuous audit")
+                || value["scope"]
+                    .as_str()
+                    .unwrap()
+                    .contains("Not a continuous audit")
+        );
+        {
+            let registry = app.registry.lock().unwrap();
+            registry.connection.execute(
+                "INSERT INTO experiments(id,key_json,state,result_json,result_hash) VALUES('corrupt','{}','completed','{}',?1)",
+                rusqlite::params!["0".repeat(64)],
+            ).unwrap();
+        }
+        let corrupt = registry_audit(State(app.clone())).await;
+        assert_eq!(corrupt.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[tokio::test]
+    async fn resource_observations_extend_with_exact_peak_and_cpu_strings() {
+        let response = resource_status().await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let value = json_of(response).await;
+        for field in [
+            "process_rss_bytes",
+            "host_available_memory_bytes",
+            "available_parallelism",
+            "peak_rss_bytes",
+            "process_user_ticks",
+            "process_system_ticks",
+            "process_start_ticks",
+        ] {
+            assert!(
+                value[field].is_string(),
+                "field {field} must stay an exact string"
+            );
+        }
+        assert!(
+            value["peak_rss_bytes"]
+                .as_str()
+                .unwrap()
+                .parse::<u64>()
+                .unwrap()
+                > 0
+        );
+        assert!(
+            value["cpu_scope"]
+                .as_str()
+                .unwrap()
+                .contains("not milliseconds")
+        );
+    }
+
+    #[test]
+    fn redaction_keeps_exact_reasons_without_local_paths() {
+        let paths = vec!["/tmp/private/import-dir".to_string()];
+        let text = "committed import chunk mismatch at /tmp/private/import-dir/chunk-000000.rsf";
+        let redacted = redact(text, &paths);
+        assert!(redacted.contains("committed import chunk mismatch"));
+        assert!(redacted.contains("[redacted-path]"));
+        assert!(!redacted.contains("/tmp/private"));
+    }
+
+    #[tokio::test]
+    async fn unconfigured_operations_report_explicit_absence() {
+        let fixture = OpsFixture::new("unconfigured");
+        let app = fixture.app(None, false);
+        let imports = json_of(imports_inventory(State(app.clone())).await).await;
+        assert_eq!(imports["configured"], false);
+        let coverage = json_of(coverage_inventory(State(app.clone())).await).await;
+        assert_eq!(coverage["configured"], false);
+        let detail = import_detail(State(app.clone()), Param("any".into())).await;
+        assert_eq!(detail.status(), StatusCode::NOT_FOUND);
+        let report = coverage_report(State(app.clone()), Param("any".into())).await;
+        assert_eq!(report.status(), StatusCode::NOT_FOUND);
     }
 }
