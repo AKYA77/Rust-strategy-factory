@@ -13,8 +13,9 @@ features' entries; `src/historical_corpus.rs` and `src/main.rs` auto-merged with
 registration and the execution cache both present. Both PR heads are ancestors of `main`. The
 merged tree passes `cargo fmt --all -- --check`, `cargo clippy --locked --all-targets -- -D
 warnings`, `cargo test --locked --lib --bins --tests` (518 Rust tests passed, 0 failed) and
-`scripts/check.sh`. Hosted CI on the exact merge SHA follows this push and its concluded run id
-is recorded in `docs/PROJECT_STATE.json`. The research window is configurable and refuses a
+`scripts/check.sh`. Hosted CI on the exact merge SHA `65daf72` concluded green (run
+`44577035194`, success) and is recorded in `docs/PROJECT_STATE.json`. The research window is
+configurable and refuses a
 24-month window with the exact shortfall (2026-11 and 2026-12 are not completed/available);
 diagnostic execution resumes identical months from a content-addressed, self-hashed cache and
 every month record stays `diagnostic_simulation`/`none`. Neither feature grants eligibility,
