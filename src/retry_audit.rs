@@ -40,9 +40,7 @@ pub(crate) fn register(c: &Connection, id: &str) -> Result<()> {
     )
 }
 pub(crate) fn initialize(c: &mut Connection, migrate: bool) -> Result<()> {
-    let tx = c
-        .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx_open(c).map_err(|e| e.to_string())?;
     tx.execute_batch("CREATE TABLE IF NOT EXISTS corpus_retry_audit_heads(search_id TEXT PRIMARY KEY REFERENCES corpus_searches(id),body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=4096),hash TEXT NOT NULL CHECK(length(hash)=64));CREATE TABLE IF NOT EXISTS corpus_retry_decisions(search_id TEXT NOT NULL REFERENCES corpus_searches(id),sequence INTEGER NOT NULL CHECK(sequence>0),body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=4096),hash TEXT NOT NULL CHECK(length(hash)=64),PRIMARY KEY(search_id,sequence));CREATE TRIGGER IF NOT EXISTS retry_decision_no_update BEFORE UPDATE ON corpus_retry_decisions BEGIN SELECT RAISE(ABORT,'retry decision immutable');END;CREATE TRIGGER IF NOT EXISTS retry_decision_no_delete BEFORE DELETE ON corpus_retry_decisions BEGIN SELECT RAISE(ABORT,'retry decision immutable');END;CREATE TRIGGER IF NOT EXISTS retry_audit_head_no_delete BEFORE DELETE ON corpus_retry_audit_heads BEGIN SELECT RAISE(ABORT,'retry audit head retained');END;CREATE TRIGGER IF NOT EXISTS retry_audit_head_key BEFORE UPDATE OF search_id ON corpus_retry_audit_heads BEGIN SELECT RAISE(ABORT,'retry audit head key immutable');END;").map_err(|e|e.to_string())?;
     if migrate {
         let ids = {

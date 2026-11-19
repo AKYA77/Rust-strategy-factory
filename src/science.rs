@@ -362,7 +362,10 @@ pub fn execute(
         &ids,
     )?;
     let json = serde_json::to_string(&definition).map_err(|e| e.to_string())?;
-    registry.connection.execute("INSERT OR IGNORE INTO scientific_protocols(id,definition_json,definition_hash) VALUES (?1,?2,?3)",params![id,json,data::hash(&definition)?]).map_err(|e|e.to_string())?;
+    {
+        let _guard = crate::storage::writer_guard(&registry.connection)?;
+        registry.connection.execute("INSERT OR IGNORE INTO scientific_protocols(id,definition_json,definition_hash) VALUES (?1,?2,?3)",params![id,json,data::hash(&definition)?]).map_err(|e|e.to_string())?;
+    }
     let stored: String = registry
         .connection
         .query_row(
@@ -535,7 +538,10 @@ pub fn execute(
     if json.len() > 8 * 1024 * 1024 {
         return Err("scientific report exceeds metadata budget".into());
     }
-    let n=registry.connection.execute("UPDATE scientific_protocols SET report_json=?2,report_hash=?3 WHERE id=?1 AND report_json IS NULL",params![id,json,data::hash(&report)?]).map_err(|e|e.to_string())?;
+    let n = {
+        let _guard = crate::storage::writer_guard(&registry.connection)?;
+        registry.connection.execute("UPDATE scientific_protocols SET report_json=?2,report_hash=?3 WHERE id=?1 AND report_json IS NULL",params![id,json,data::hash(&report)?]).map_err(|e|e.to_string())?
+    };
     if n != 1 {
         let stored = read_report(registry, &id)?.ok_or("concurrent report publication failed")?;
         return Ok(ProtocolResult {

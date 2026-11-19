@@ -58,6 +58,7 @@ pub(crate) fn guard(connection: &rusqlite::Connection) -> Result<()> {
     Ok(())
 }
 pub(crate) fn record_failure(registry: &Registry, lease: &Lease) -> Result<()> {
+    let _guard = crate::storage::writer_guard(&registry.connection)?;
     registry.connection.execute("INSERT INTO events(experiment_id,at_ms,action,attempt) VALUES (?1,?2,'indexed-audit-contradiction-v1',?3)",rusqlite::params![lease.experiment_id,chrono::Utc::now().timestamp_millis(),lease.attempt]).map_err(|e|e.to_string())?;
     Ok(())
 }

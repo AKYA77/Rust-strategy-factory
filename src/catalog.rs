@@ -4,7 +4,7 @@ use crate::{
     contracts::Profile,
     data::{self, DataClass, Dataset, Manifest},
 };
-use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File, OpenOptions},
@@ -367,12 +367,9 @@ impl Catalog {
             {
                 return Err("catalog snapshot schema or quota unsupported".into());
             }
-            let mut dest = Self::open(&temp)?;
+            let dest = Self::open(&temp)?;
             {
-                let write = dest
-                    .connection
-                    .transaction_with_behavior(TransactionBehavior::Immediate)
-                    .map_err(db)?;
+                let write = crate::storage::writer_tx(&dest.connection)?;
                 let mut copied = 0i64;
                 {
                     let mut q = source
@@ -540,10 +537,7 @@ impl Catalog {
         request: crate::data_review::Request,
     ) -> Result<crate::data_review::Report> {
         let report = crate::data_review::Report::create(request)?;
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(db)?;
+        let tx = crate::storage::writer_tx(&self.connection)?;
         verify_review_scope(&tx, &report)?;
         if let Some(old) = read_review(&tx, &report.hash)? {
             tx.commit().map_err(db)?;
@@ -641,10 +635,7 @@ impl Catalog {
         correction: Option<Correction>,
     ) -> Result<Registration> {
         let facts = Facts::observe(d)?;
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(db)?;
+        let tx = crate::storage::writer_tx(&self.connection)?;
         if let Some(entry) = get(&tx, &facts.dataset_identity)? {
             if entry.receipt.facts != facts || entry.receipt.correction != correction {
                 return Err("catalog identity already has conflicting facts".into());

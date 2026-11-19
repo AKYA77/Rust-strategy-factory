@@ -192,7 +192,16 @@ fn write_with_retry<T>(mut attempt: impl FnMut() -> Result<T>) -> Result<T> {
         match attempt() {
             Ok(value) => return Ok(value),
             Err(error) => {
-                let transient = error.contains("locked") || error.contains("busy");
+                // Typed writer-admission refusals are transient by construction
+                // (bounded gate wait exhausted); classify them through the
+                // schema12 provenance cell, never by human text. The text check
+                // remains only as the legacy fallback for raw SQLite busy/locked
+                // errors from ungated autocommit writes.
+                let transient = matches!(
+                    crate::corpus_failure::classify_error(&error),
+                    crate::corpus_failure::Kind::RegistryAdmissionBusy
+                ) || error.contains("locked")
+                    || error.contains("busy");
                 if transient && failures < 20 {
                     failures += 1;
                     std::thread::sleep(Duration::from_millis(10));

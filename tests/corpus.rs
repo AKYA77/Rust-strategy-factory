@@ -2816,6 +2816,79 @@ fn owned_foreground_child_exit_and_wall_budget_are_reaped_with_exact_receipts() 
     registry.integrity().unwrap();
 }
 #[test]
+fn owned_child_survives_sustained_cross_process_writer_pressure() {
+    let _fleet_timing = fleet_timing_guard();
+    let f = Fixture::new("owned-pressure", "EURUSD", 7);
+    let (config, db, policy, _source) = foreground_config(&f);
+    let limits = f.root.join("parent.json");
+    fs::write(
+        &limits,
+        r#"{"maximum_wall_ms":30000,"shutdown_grace_ms":3000,"maximum_output_bytes":1048576}"#,
+    )
+    .unwrap();
+    let child = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
+        .args([
+            "corpus-supervise-owned",
+            config.to_str().unwrap(),
+            policy.to_str().unwrap(),
+            db.to_str().unwrap(),
+            "1",
+            "0",
+            limits.to_str().unwrap(),
+        ])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    // Sustained cross-process write pressure while the supervisor and its
+    // child run. The gate is per process, so this exercises the SQLite WAL
+    // write-lock path: the parent's journal writes must retry transient
+    // typed busy/admission refusals instead of aborting a healthy child.
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mut pressers = Vec::new();
+    for _ in 0..2 {
+        let db = db.clone();
+        let stop = stop.clone();
+        pressers.push(std::thread::spawn(move || {
+            let mut conn = rusqlite::Connection::open(&db).unwrap();
+            conn.busy_timeout(std::time::Duration::from_secs(5))
+                .unwrap();
+            conn.execute_batch("CREATE TABLE IF NOT EXISTS pressure(n INTEGER)")
+                .unwrap();
+            let mut n = 0i64;
+            while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                let tx = conn
+                    .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+                    .unwrap();
+                tx.execute("INSERT INTO pressure VALUES(?1)", [n]).unwrap();
+                tx.commit().unwrap();
+                n += 1;
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+        }));
+    }
+    let out = child.wait_with_output().unwrap();
+    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    for p in pressers {
+        p.join().unwrap();
+    }
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(report["stop_reason"], "child-exited", "{report}");
+    assert_eq!(report["exit_success"], true, "{report}");
+    assert_eq!(report["forced_kill"], false, "{report}");
+    assert!(
+        report["resource_journal_error"].is_null(),
+        "healthy child aborted by journal backpressure: {report}"
+    );
+    let registry = rust_strategy_factory::storage::Registry::open(&db).unwrap();
+    registry.integrity().unwrap();
+}
+#[test]
 #[cfg(unix)]
 fn owned_parent_signal_escalates_only_its_actual_child_and_reaps_it() {
     let f = Fixture::new("owned-signal", "EURUSD", 7);

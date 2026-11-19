@@ -5,17 +5,19 @@ use crate::{
     corpus_search, data, operator_config, resource,
     storage::Registry,
 };
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 const VERSION: &str = "synthetic-corpus-fleet-v1";
 pub(crate) fn initialize(connection: &Connection) -> Result<()> {
-    connection.execute_batch("CREATE TABLE IF NOT EXISTS corpus_fleets(id TEXT PRIMARY KEY,configuration TEXT NOT NULL,cursor INTEGER NOT NULL DEFAULT 0 CHECK(cursor>=0),state TEXT NOT NULL DEFAULT 'running' CHECK(state IN ('running','paused','stopped','exhausted')),token TEXT,expires_ms INTEGER,attempt INTEGER NOT NULL DEFAULT 0 CHECK(attempt>=0),visits INTEGER NOT NULL DEFAULT 0 CHECK(visits>=0),idle_visits INTEGER NOT NULL DEFAULT 0 CHECK(idle_visits>=0));
+    let tx = crate::storage::writer_tx_open(connection).map_err(|e| e.to_string())?;
+    tx.execute_batch("CREATE TABLE IF NOT EXISTS corpus_fleets(id TEXT PRIMARY KEY,configuration TEXT NOT NULL,cursor INTEGER NOT NULL DEFAULT 0 CHECK(cursor>=0),state TEXT NOT NULL DEFAULT 'running' CHECK(state IN ('running','paused','stopped','exhausted')),token TEXT,expires_ms INTEGER,attempt INTEGER NOT NULL DEFAULT 0 CHECK(attempt>=0),visits INTEGER NOT NULL DEFAULT 0 CHECK(visits>=0),idle_visits INTEGER NOT NULL DEFAULT 0 CHECK(idle_visits>=0));
     CREATE TABLE IF NOT EXISTS corpus_fleet_sources(fleet_id TEXT NOT NULL REFERENCES corpus_fleets(id),source_index INTEGER NOT NULL CHECK(source_index>=0),visits INTEGER NOT NULL DEFAULT 0 CHECK(visits>=0),progress_visits INTEGER NOT NULL DEFAULT 0 CHECK(progress_visits>=0),last_kind TEXT NOT NULL DEFAULT 'unvisited',last_obstacle TEXT,obstacle_at_visit INTEGER,PRIMARY KEY(fleet_id,source_index));
     CREATE TRIGGER IF NOT EXISTS corpus_fleet_definition_immutable BEFORE UPDATE OF id,configuration ON corpus_fleets BEGIN SELECT RAISE(ABORT,'fleet definition immutable');END;
     CREATE TRIGGER IF NOT EXISTS corpus_fleet_no_delete BEFORE DELETE ON corpus_fleets BEGIN SELECT RAISE(ABORT,'fleet immutable');END;
     CREATE TRIGGER IF NOT EXISTS corpus_fleet_source_key_immutable BEFORE UPDATE OF fleet_id,source_index ON corpus_fleet_sources BEGIN SELECT RAISE(ABORT,'fleet source reference immutable');END;
-    CREATE TRIGGER IF NOT EXISTS corpus_fleet_source_no_delete BEFORE DELETE ON corpus_fleet_sources BEGIN SELECT RAISE(ABORT,'fleet source immutable');END;").map_err(|e|e.to_string())
+    CREATE TRIGGER IF NOT EXISTS corpus_fleet_source_no_delete BEFORE DELETE ON corpus_fleet_sources BEGIN SELECT RAISE(ABORT,'fleet source immutable');END;").map_err(|e|e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -144,11 +146,8 @@ pub fn register_file(config_path: &Path, database: &Path) -> Result<String> {
     if body.len() > 65536 {
         return Err("fleet definition exceeds64 KiB".into());
     }
-    let mut registry = Registry::open(database)?;
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let registry = Registry::open(database)?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     let previous: Option<String> = tx
         .query_row(
             "SELECT configuration FROM corpus_fleets WHERE id=?1",
@@ -283,10 +282,7 @@ pub fn control(registry: &mut Registry, id: &str, state: &str) -> Result<()> {
     if !["running", "paused", "stopped"].contains(&state) {
         return Err("invalid fleet control".into());
     }
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     crate::fleet_control::transition(
         &tx,
         id,
@@ -372,10 +368,7 @@ fn publish(
     obstacle: Option<&str>,
     invocation: Option<&str>,
 ) -> Result<()> {
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     coordinator::fence(&tx, lease, chrono::Utc::now().timestamp_millis())?;
     let snapshot = read(&tx, &lease.id)?;
     if snapshot.cursor != index {
@@ -621,9 +614,7 @@ pub fn list(registry: &Registry) -> Result<Vec<serde_json::Value>> {
 }
 
 pub(crate) fn initialize_owned(connection: &mut Connection, migrate: bool) -> Result<()> {
-    let tx = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx_open(connection).map_err(|e| e.to_string())?;
     tx.execute_batch("CREATE TABLE IF NOT EXISTS corpus_fleet_owned_visits(invocation_id TEXT PRIMARY KEY REFERENCES corpus_owned_invocations(id),fleet_id TEXT NOT NULL REFERENCES corpus_fleets(id),source_index INTEGER NOT NULL,visit_sequence INTEGER NOT NULL CHECK(visit_sequence>0),UNIQUE(fleet_id,visit_sequence),FOREIGN KEY(fleet_id,source_index) REFERENCES corpus_fleet_sources(fleet_id,source_index));CREATE TRIGGER IF NOT EXISTS fleet_owned_no_update BEFORE UPDATE ON corpus_fleet_owned_visits BEGIN SELECT RAISE(ABORT,'owned fleet visit immutable');END;CREATE TRIGGER IF NOT EXISTS fleet_owned_no_delete BEFORE DELETE ON corpus_fleet_owned_visits BEGIN SELECT RAISE(ABORT,'owned fleet visit retained');END;").map_err(|e|e.to_string())?;
     if migrate {
         tx.execute_batch("UPDATE corpus_fleets SET token=NULL,expires_ms=NULL;UPDATE corpus_searches SET token=NULL,expires_ms=NULL;PRAGMA user_version=17;").map_err(|e|e.to_string())?;

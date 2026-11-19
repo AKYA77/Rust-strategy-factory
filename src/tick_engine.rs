@@ -1865,7 +1865,8 @@ fn execute_corpus_batch_session(
     // reservation is cancelled BEFORE opening this gate, so no job is lost.
     let gate = (std::sync::Mutex::new(false), std::sync::Condvar::new());
     let next = AtomicUsize::new(0);
-    let mut results: Vec<Option<Result<CorpusProgress>>> = (0..runs.len()).map(|_| None).collect();
+    let mut results: Vec<Option<(Result<CorpusProgress>, Option<crate::corpus_failure::Kind>)>> =
+        (0..runs.len()).map(|_| None).collect();
     let mut worker_failures = 0;
     let mut workers_started = 0;
     std::thread::scope(|scope| {
@@ -1906,7 +1907,7 @@ fn execute_corpus_batch_session(
                         let binding = match corpus_source_binding(run) {
                             Ok(binding) => binding,
                             Err(error) => {
-                                completed.push((index, Err(error)));
+                                completed.push((index, Err(error), None));
                                 continue;
                             }
                         };
@@ -1927,7 +1928,15 @@ fn execute_corpus_batch_session(
                             &mut || chrono::Utc::now().timestamp_millis(),
                             &mut preparation,
                         );
-                        completed.push((index, result));
+                        // Classify on the worker thread: the typed admission
+                        // provenance cell is thread-local, so a writer-gate
+                        // refusal must be captured here, before join, to stay
+                        // a retry candidate instead of an unclassified error.
+                        let kind = match &result {
+                            Err(error) => Some(crate::corpus_failure::classify_error(error)),
+                            Ok(_) => None,
+                        };
+                        completed.push((index, result, kind));
                     }
                     (completed, preparation)
                 }) {
@@ -1961,8 +1970,8 @@ fn execute_corpus_batch_session(
                     preparation.peak_retained_candles_per_worker = preparation
                         .peak_retained_candles_per_worker
                         .max(stats.peak_retained_candles_per_worker);
-                    for (index, result) in completed {
-                        results[index] = Some(result);
+                    for (index, result, kind) in completed {
+                        results[index] = Some((result, kind));
                     }
                 }
                 Err(_) => worker_failures += 1,
@@ -1974,8 +1983,8 @@ fn execute_corpus_batch_session(
     let failure_kinds = results
         .iter()
         .map(|r| match r {
-            Some(Ok(_)) => None,
-            Some(Err(_)) => Some(crate::corpus_failure::Kind::Unclassified),
+            Some((Ok(_), _)) => None,
+            Some((Err(_), kind)) => Some(kind.unwrap_or(crate::corpus_failure::Kind::Unclassified)),
             None => Some(crate::corpus_failure::Kind::WorkerInterrupted),
         })
         .collect();
@@ -1987,7 +1996,7 @@ fn execute_corpus_batch_session(
         jobs: results
             .into_iter()
             .map(|r| {
-                r.unwrap_or_else(|| {
+                r.map(|(result, _)| result).unwrap_or_else(|| {
                     Err("worker interrupted; inspect registry and retry after lease expiry".into())
                 })
             })
@@ -2049,6 +2058,74 @@ mod worker_preparation_tests {
         )
         .expect_err("diagnostic replay must not accept synthetic test-only inputs");
         assert!(error.contains("real structurally-valid"), "{error}");
+    }
+    #[test]
+    fn saturated_writer_gate_refuses_batch_typed_and_recovers_after_pressure() {
+        let source = Source::new("gate-saturation");
+        let db = source.root.join("saturated.sqlite");
+        let costs = Costs::default();
+        let budget = budget();
+        let s = strategy();
+        let runs = [CorpusRun {
+            base: &source.root,
+            spec: &source.spec,
+            strategy: &s,
+            costs: &costs,
+            budget,
+        }];
+        let limits = CorpusBatchLimits {
+            workers: 1,
+            max_parallel_candles: 20000,
+            max_parallel_feature_cells: 200000,
+            max_parallel_receipts: 20000,
+            max_new_chunks: 1,
+            lease_ms: 60000,
+        };
+        // Occupy both in-process admission slots for this database file for
+        // the whole batch call: startup must refuse with the typed busy kind
+        // (a retry candidate), not panic or abort unclassified.
+        // Open both handles before the write lock is held: schema bootstrap
+        // writes would otherwise queue behind the open transaction.
+        let holder_a = crate::storage::Registry::open(&db).unwrap();
+        let holder_b = crate::storage::Registry::open(&db).unwrap();
+        holder_b
+            .connection
+            .busy_timeout(std::time::Duration::from_secs(60))
+            .unwrap();
+        let tx_a = crate::storage::writer_tx(&holder_a.connection).unwrap();
+        // WAL allows only one open writer: the second admitted slot parks in
+        // BEGIN IMMEDIATE's busy wait on a separate thread (long busy timeout
+        // so it cannot expire inside the test window).
+        let parked = std::thread::spawn(move || {
+            let tx = crate::storage::writer_tx(&holder_b.connection).unwrap();
+            tx.commit().unwrap();
+        });
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while holder_a.writer_admission()["in_flight"] != "2" {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "gate never saturated: {}",
+                holder_a.writer_admission()
+            );
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let mut session = CorpusBatchSession::default();
+        let refused = session.round(&db, &runs, limits).unwrap();
+        assert_eq!(refused.workers_started, 0);
+        assert_eq!(refused.worker_failures, 1);
+        assert_eq!(
+            refused.failure_kinds,
+            vec![Some(crate::corpus_failure::Kind::RegistryAdmissionBusy)]
+        );
+        assert!(refused.jobs[0].is_err());
+        assert!(refused.failure_kinds[0].unwrap().retry_candidate());
+        drop(tx_a);
+        parked.join().unwrap();
+        drop(holder_a);
+        // Once pressure clears, the same session admits and completes the job.
+        let recovered = session.round(&db, &runs, limits).unwrap();
+        assert_eq!(recovered.worker_failures, 0);
+        assert!(recovered.jobs[0].is_ok(), "{:?}", recovered.jobs[0]);
     }
     fn affinity_source(name: &str) -> Source {
         let mut source = Source::new(name);
