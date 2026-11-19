@@ -287,6 +287,13 @@ equivalence checks. `audit` does not re-read the Parquet.
     refused because approved account/currency conversion semantics are unavailable.
     `DIAGNOSTIC_EXECUTION_RECEIPT.json` records the full-corpus run. Diagnostic only: no
     eligibility, approval or qualification.
+14. ~~Resumable diagnostic execution~~ — `historical_corpus::ExecutionCache` is a caller-supplied,
+    content-addressed month cache (key binds corpus identity, month, chunk inventory, strategy,
+    costs, budgets and engine version; entries carry a self-hash and unreadable or mismatched
+    entries are refused). `historical-corpus-execute-cached` resumes identical months instead of
+    replaying them: on real EURUSD the first run is 22 misses / 216 s and the second is 22 hits /
+    46 s with identical results. A local performance aid only — it grants no eligibility and
+    cannot feed registered research.
 
 ## Safety notes
 
