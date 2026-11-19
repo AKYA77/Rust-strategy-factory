@@ -988,7 +988,7 @@ pub fn replay_corpus(
 /// end-to-end for diagnosis. The result is **not** research evidence: it must never be
 /// registered as an experiment, presented as eligibility, or used for qualification. FX
 /// conversion streams and eligibility-bearing data classes are refused.
-pub fn replay_corpus_diagnostic(
+pub(crate) fn replay_corpus_diagnostic(
     base: &std::path::Path,
     spec: &crate::corpus::Specification,
     strategy: &Strategy,

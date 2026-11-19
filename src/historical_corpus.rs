@@ -515,8 +515,17 @@ pub fn study(
 pub struct MonthExecution {
     pub year: u32,
     pub month: u32,
+    /// Always `diagnostic_simulation`. Every month record is self-labelling so a diagnostic result
+    /// cannot be republished as research evidence by a future caller.
+    pub classification: String,
+    /// Always `none`. No eligibility is granted or implied.
+    pub eligibility: String,
     pub corpus_identity: String,
-    pub dataset_hash: String,
+    /// The migration source dataset hash for this month; a provenance binding, not the replay id.
+    pub source_dataset_hash: String,
+    /// The replay's own `dataset_id` (`observed.ordered_events_hash`); this is what `receipt_hash`
+    /// actually binds.
+    pub replay_dataset_id: String,
     pub declared_class: String,
     pub profile_id: String,
     pub initial_micro_usd: i128,
@@ -566,6 +575,10 @@ pub struct ExecutionReport {
     pub months: Vec<MonthExecution>,
     pub refusals: Vec<MonthRefusal>,
     pub totals: ExecutionTotals,
+    /// Months served from the caller's content-addressed cache instead of being replayed.
+    pub cache_hits: usize,
+    /// Months actually replayed (cache absent, empty or not usable).
+    pub cache_misses: usize,
     pub limitations: String,
 }
 
@@ -615,8 +628,11 @@ pub fn execute_month(
     Ok(MonthExecution {
         year: month.year,
         month: month.month,
+        classification: EXECUTION_CLASSIFICATION.into(),
+        eligibility: EXECUTION_ELIGIBILITY.into(),
         corpus_identity: corpus_spec.identity()?,
-        dataset_hash: month.dataset_hash.clone(),
+        source_dataset_hash: month.dataset_hash.clone(),
+        replay_dataset_id: replay.dataset_id.clone(),
         declared_class: format!("{:?}", facts.declared_class()),
         profile_id: crate::data::hash(&spec.profile)?,
         initial_micro_usd: replay.initial_micro_usd,
@@ -645,8 +661,14 @@ fn aggregate_totals(
         maximum_drawdown_micro_usd: 0,
     };
     for executed in months {
-        totals.trades += executed.trades;
-        totals.rejections += executed.rejections;
+        totals.trades = totals
+            .trades
+            .checked_add(executed.trades)
+            .ok_or("diagnostic execution trade total overflow")?;
+        totals.rejections = totals
+            .rejections
+            .checked_add(executed.rejections)
+            .ok_or("diagnostic execution rejection total overflow")?;
         totals.initial_micro_usd = totals
             .initial_micro_usd
             .checked_add(executed.initial_micro_usd)
@@ -666,22 +688,134 @@ fn aggregate_totals(
     Ok(totals)
 }
 
+/// Content-addressed, caller-supplied cache for diagnostic month executions.
+///
+/// This is a local performance and resumption aid, not a research artifact: entries are keyed by a
+/// hash of every input that can change the result (corpus identity, month, chunk inventory,
+/// strategy, costs, budgets and engine version), so a hit is only possible when the inputs are
+/// identical. Entries carry a self-hash and an unreadable or mismatched entry is refused rather
+/// than trusted. Nothing here grants eligibility or feeds the registered research pipeline.
+#[derive(Debug, Clone)]
+pub struct ExecutionCache {
+    dir: std::path::PathBuf,
+}
+
+const EXECUTION_CACHE_VERSION: &str = "historical-diagnostic-execution-cache-v2";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CacheEntry {
+    entry_hash: String,
+    execution: MonthExecution,
+}
+
+impl ExecutionCache {
+    pub fn open(dir: &Path) -> Result<Self> {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        Ok(Self {
+            dir: dir.to_path_buf(),
+        })
+    }
+
+    pub fn key(
+        spec: &HistoricalCorpus,
+        index: usize,
+        strategy: &crate::strategies::Strategy,
+        costs: &crate::tick_engine::Costs,
+        budget: crate::tick_engine::CorpusBudget,
+    ) -> Result<String> {
+        let month = spec
+            .months
+            .get(index)
+            .ok_or("historical corpus month index out of range")?;
+        crate::data::hash(&(
+            EXECUTION_CACHE_VERSION,
+            &spec.identity,
+            index,
+            &month.dataset_hash,
+            &month.chunk_hashes,
+            strategy.identity()?,
+            crate::data::hash(costs)?,
+            budget.max_candles,
+            budget.feature_cells,
+            budget.max_receipts,
+            crate::ENGINE_VERSION,
+        ))
+    }
+
+    pub fn load(&self, key: &str) -> Result<Option<MonthExecution>> {
+        let Ok(bytes) = std::fs::read(self.dir.join(format!("{key}.json"))) else {
+            return Ok(None);
+        };
+        let entry: CacheEntry = serde_json::from_slice(&bytes)
+            .map_err(|e| format!("diagnostic execution cache entry unreadable: {e}"))?;
+        if entry.entry_hash != crate::data::hash(&entry.execution)? {
+            return Err("diagnostic execution cache entry hash mismatch".into());
+        }
+        Ok(Some(entry.execution))
+    }
+
+    pub fn store(&self, key: &str, execution: &MonthExecution) -> Result<()> {
+        let entry = CacheEntry {
+            entry_hash: crate::data::hash(execution)?,
+            execution: execution.clone(),
+        };
+        let bytes = serde_json::to_vec_pretty(&entry).map_err(|e| e.to_string())?;
+        let final_path = self.dir.join(format!("{key}.json"));
+        let temp_path = self.dir.join(format!(".{key}.{}.tmp", std::process::id()));
+        std::fs::write(&temp_path, bytes).map_err(|e| e.to_string())?;
+        std::fs::rename(&temp_path, &final_path).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+}
+
 /// Diagnostic execution of one instrument's verified historical corpus through the authoritative
 /// sequential engine, month by month. Each month keeps its own corpus identity, declared class and
 /// profile; months that the engine refuses (for example non-USD quote currencies) are recorded as
 /// refusals rather than silently dropped.
-pub fn execute(
+///
+/// Pass `None` for `cache` to always replay. With a cache, identical months are resumed from the
+/// content-addressed entry instead of being replayed; the report records how many months were hits
+/// and misses.
+pub fn execute_with_cache(
     spec: &HistoricalCorpus,
     strategy: &crate::strategies::Strategy,
     costs: &crate::tick_engine::Costs,
     budget: crate::tick_engine::CorpusBudget,
+    cache: Option<&ExecutionCache>,
 ) -> Result<ExecutionReport> {
     verify(spec)?;
     let mut months = Vec::with_capacity(spec.months.len());
     let mut refusals = Vec::new();
+    let mut cache_hits = 0usize;
+    let mut cache_misses = 0usize;
     for index in 0..spec.months.len() {
         let (year, month) = (spec.months[index].year, spec.months[index].month);
-        match execute_month(spec, index, strategy, costs, budget) {
+        let key = match cache {
+            Some(_) => Some(ExecutionCache::key(spec, index, strategy, costs, budget)?),
+            None => None,
+        };
+        let cached = match (&cache, &key) {
+            (Some(cache), Some(key)) => cache.load(key)?,
+            _ => None,
+        };
+        let outcome = match cached {
+            Some(executed) => {
+                cache_hits += 1;
+                Ok(executed)
+            }
+            None => {
+                cache_misses += 1;
+                let executed = execute_month(spec, index, strategy, costs, budget);
+                if let (Some(cache), Some(key)) = (cache, &key)
+                    && let Ok(executed) = &executed
+                {
+                    cache.store(key, executed)?;
+                }
+                executed
+            }
+        };
+        match outcome {
             Ok(executed) => months.push(executed),
             Err(reason) => refusals.push(MonthRefusal {
                 year,
@@ -699,8 +833,20 @@ pub fn execute(
         months: months.clone(),
         refusals: refusals.clone(),
         totals: aggregate_totals(&months, &refusals)?,
+        cache_hits,
+        cache_misses,
         limitations: EXECUTION_LIMITATIONS.into(),
     })
+}
+
+/// Diagnostic execution with no cache: every month is replayed from source.
+pub fn execute(
+    spec: &HistoricalCorpus,
+    strategy: &crate::strategies::Strategy,
+    costs: &crate::tick_engine::Costs,
+    budget: crate::tick_engine::CorpusBudget,
+) -> Result<ExecutionReport> {
+    execute_with_cache(spec, strategy, costs, budget, None)
 }
 
 #[cfg(test)]
@@ -750,8 +896,11 @@ mod tests {
         MonthExecution {
             year,
             month,
+            classification: EXECUTION_CLASSIFICATION.into(),
+            eligibility: EXECUTION_ELIGIBILITY.into(),
             corpus_identity: "a".repeat(64),
-            dataset_hash: "b".repeat(64),
+            source_dataset_hash: "b".repeat(64),
+            replay_dataset_id: "e".repeat(64),
             declared_class: "RealStructurallyValid".into(),
             profile_id: "c".repeat(64),
             initial_micro_usd: initial,
@@ -792,6 +941,97 @@ mod tests {
             execution(2025, 2, 1, 0, 0, 0, 0),
         ];
         assert!(aggregate_totals(&months, &[]).is_err());
+    }
+
+    fn cache_spec() -> HistoricalCorpus {
+        let profile = Profile::synthetic("EURUSD").unwrap();
+        let months = contiguous();
+        let identity = identity("EURUSD", &profile, &months).unwrap();
+        HistoricalCorpus {
+            version: VERSION.into(),
+            instrument: "EURUSD".into(),
+            profile,
+            months,
+            identity,
+            limitations: LIMITATIONS.into(),
+        }
+    }
+
+    fn cache_strategy() -> crate::strategies::Strategy {
+        crate::strategies::Strategy {
+            timeframe: crate::candles::Timeframe::M1,
+            side: crate::contracts::Side::Long,
+            stop_ticks: 100,
+            rule: crate::strategies::Rule::AboveMean { window: 2 },
+            entry: None,
+            stop_policy: None,
+        }
+    }
+
+    #[test]
+    fn execution_cache_key_binds_every_result_input() {
+        let spec = cache_spec();
+        let strategy = cache_strategy();
+        let costs = crate::tick_engine::Costs::default();
+        let budget = crate::tick_engine::CorpusBudget {
+            max_candles: 1000,
+            feature_cells: 1000,
+            max_receipts: 1000,
+        };
+        let other_budget = crate::tick_engine::CorpusBudget {
+            max_receipts: 2000,
+            ..budget
+        };
+        let base = ExecutionCache::key(&spec, 0, &strategy, &costs, budget).unwrap();
+        assert_eq!(
+            base,
+            ExecutionCache::key(&spec, 0, &strategy, &costs, budget).unwrap(),
+            "cache key must be deterministic"
+        );
+        assert_ne!(
+            base,
+            ExecutionCache::key(&spec, 1, &strategy, &costs, budget).unwrap(),
+            "different month must not share a key"
+        );
+        assert_ne!(
+            base,
+            ExecutionCache::key(&spec, 0, &strategy, &costs, other_budget).unwrap(),
+            "different budget must not share a key"
+        );
+    }
+
+    #[test]
+    fn execution_cache_roundtrips_and_refuses_corruption() {
+        let dir = std::env::temp_dir().join(format!("exec-cache-roundtrip-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let cache = ExecutionCache::open(&dir).unwrap();
+        let key = "k".repeat(64);
+        assert!(
+            cache.load(&key).unwrap().is_none(),
+            "absent entry is a miss"
+        );
+        let value = execution(2025, 1, 20_000_000, 20_500_000, 1_000_000, 10, 100);
+        cache.store(&key, &value).unwrap();
+        let loaded = cache.load(&key).unwrap().unwrap();
+        assert_eq!(
+            serde_json::to_string(&loaded).unwrap(),
+            serde_json::to_string(&value).unwrap()
+        );
+        // A truncated entry is refused rather than trusted.
+        std::fs::write(dir.join(format!("{key}.json")), b"{ not json").unwrap();
+        assert!(cache.load(&key).is_err());
+        // A well-formed entry whose self-hash does not match is refused.
+        let tampered = CacheEntry {
+            entry_hash: "0".repeat(64),
+            execution: value.clone(),
+        };
+        std::fs::write(
+            dir.join(format!("{key}.json")),
+            serde_json::to_vec(&tampered).unwrap(),
+        )
+        .unwrap();
+        assert!(cache.load(&key).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
