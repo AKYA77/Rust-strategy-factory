@@ -167,10 +167,16 @@ fn batch_corpus(root: &std::path::Path) {
         let out = Command::new(binary).args(args).output().unwrap();
         assert!(
             out.status.success(),
-            "{}",
+            "{args:?} failed: {}",
             String::from_utf8_lossy(&out.stderr)
         );
-        serde_json::from_slice(&out.stdout).unwrap()
+        serde_json::from_slice(&out.stdout).unwrap_or_else(|e| {
+            panic!(
+                "{args:?} produced invalid JSON: {e}; stdout={:?}; stderr={:?}",
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr)
+            )
+        })
     };
     let profile = root.join("profile.json");
     fs::write(
@@ -225,7 +231,15 @@ fn batch_corpus(root: &std::path::Path) {
     for p in &owned {
         args.push(p);
     }
-    invoke(&args);
+    // corpus-create publishes the specification file and prints nothing on
+    // success; only its exit status is contractual. The spec's content is
+    // exercised end-to-end by the corpus-batch runs below.
+    let out = Command::new(binary).args(&args).output().unwrap();
+    assert!(
+        out.status.success(),
+        "corpus-create failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
 fn batch_config(
     root: &std::path::Path,
