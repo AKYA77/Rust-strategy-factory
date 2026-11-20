@@ -47,10 +47,19 @@ else
 fi
 cd "$ROOT"
 
-# --- pinned cargo / rustup environment ----------------------------------------
-export CARGO_HOME="${CARGO_HOME:-/workspace/.cargo}"
-export RUSTUP_HOME="${RUSTUP_HOME:-/workspace/.rustup}"
-export PATH="$CARGO_HOME/bin:$PATH"
+# --- cargo / rustup environment -----------------------------------------------
+# Respect an existing cargo/rustup environment (VPS lanes preset it; hosted CI has
+# its own). Only fall back to the VPS locations when they actually exist, so we do
+# NOT point rustup at a nonexistent /workspace/.rustup on a CI runner.
+if [ -z "${CARGO_HOME:-}" ] && [ -d /workspace/.cargo ]; then
+  export CARGO_HOME=/workspace/.cargo
+fi
+if [ -z "${RUSTUP_HOME:-}" ] && [ -d /workspace/.rustup ]; then
+  export RUSTUP_HOME=/workspace/.rustup
+fi
+if [ -n "${CARGO_HOME:-}" ]; then
+  export PATH="$CARGO_HOME/bin:$PATH"
+fi
 # Respect CARGO_BUILD_JOBS if the caller set it (VPS lanes use 4); do not override
 # it here so hosted CI keeps its own parallelism.
 
@@ -79,7 +88,11 @@ mkdir -p "$LOG_DIR"
 PKG=rust-strategy-factory
 
 # --- resolve the REAL cargo (toolchain binary; never a PATH shim) -------------
-REAL_CARGO=$(rustup which cargo 2>/dev/null || printf '%s/bin/cargo' "$CARGO_HOME")
+REAL_CARGO=$(rustup which cargo 2>/dev/null || printf '%s/bin/cargo' "${CARGO_HOME:-$HOME/.cargo}")
+if [ -z "$REAL_CARGO" ] || [ ! -x "$REAL_CARGO" ]; then
+  echo "cargo-locked: cannot resolve a real cargo binary (rustup which cargo failed)" >&2
+  exit 127
+fi
 
 SUB=${1:-}
 is_build_like() {
