@@ -957,9 +957,18 @@ fn step_with(
         .as_ref()
         .map(|guard| guard.check())
         .transpose()?;
-    if disk.as_ref().is_some_and(|d| !d.allowed) || resource.as_ref().is_some_and(|d| !d.allowed) {
+    let cpu = loaded
+        .file
+        .cpu_guard
+        .as_ref()
+        .map(|guard| guard.check())
+        .transpose()?;
+    if disk.as_ref().is_some_and(|d| !d.allowed)
+        || resource.as_ref().is_some_and(|d| !d.allowed)
+        || cpu.as_ref().is_some_and(|d| !d.allowed)
+    {
         return Ok(
-            serde_json::json!({"kind":"pressure","disk_admission":disk,"resource_admission":resource,"status":status(&registry,id)?}),
+            serde_json::json!({"kind":"pressure","disk_admission":disk,"resource_admission":resource,"cpu_admission":cpu,"status":status(&registry,id)?}),
         );
     }
     let Some(lease) = crate::coordinator::claim(
@@ -1241,6 +1250,38 @@ mod tests {
         let db = root.join("state.sqlite");
         let id = register_file(&config_path, &db, 2).unwrap();
         (root, db, id)
+    }
+    #[test]
+    fn campaign_cpu_guard_refuses_before_any_lease_claim() {
+        let root =
+            std::env::temp_dir().join(format!("campaign-cpu-refusal-{}", std::process::id()));
+        std::fs::create_dir(&root).unwrap();
+        let source = root.join("source.rsf");
+        crate::native::write(&source, &crate::data::synthetic_fixture("EURUSD").unwrap()).unwrap();
+        let spec = crate::corpus::describe(&[source], 10000).unwrap();
+        std::fs::write(root.join("corpus.json"), serde_json::to_vec(&spec).unwrap()).unwrap();
+        let config = serde_json::json!({"specification":"corpus.json","seed":42,"start_index":12,"maximum_candidates":1,"queue_width":1,"cpu_guard":{"maximum_host_busy_share_numerator":0,"maximum_host_busy_share_denominator":1,"observation_window_ms":10},"budget":{"max_candles":10000,"feature_cells":1000000,"max_receipts":10000},"limits":{"workers":1,"max_parallel_candles":10000,"max_parallel_feature_cells":1000000,"max_parallel_receipts":10000,"max_new_chunks":1,"lease_ms":60000}});
+        let config_path = root.join("search.json");
+        std::fs::write(&config_path, serde_json::to_vec(&config).unwrap()).unwrap();
+        let db = root.join("state.sqlite");
+        let id = register_file(&config_path, &db, 2).unwrap();
+        let step = step(&db, &id).unwrap();
+        assert_eq!(step["kind"], "pressure");
+        assert_eq!(step["cpu_admission"]["allowed"], false);
+        let registry = Registry::open(&db).unwrap();
+        let (token, attempt): (Option<String>, i64) = registry
+            .connection
+            .query_row(
+                "SELECT token,attempt FROM corpus_campaign_runs WHERE id=?1",
+                [&id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(token, None);
+        assert_eq!(attempt, 0);
+        registry.integrity().unwrap();
+        drop(registry);
+        std::fs::remove_dir_all(root).unwrap();
     }
     #[test]
     fn long_ledger_migration_preserves_legacy_shape_and_revokes_only_prior_parent() {

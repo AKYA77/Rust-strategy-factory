@@ -31,6 +31,8 @@ struct FleetFile {
     #[serde(default)]
     resource_guard: Option<resource::Guard>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    cpu_guard: Option<resource::CpuGuard>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     disk_guard: Option<crate::disk::Guard>,
 }
 #[derive(Clone, Serialize, Deserialize)]
@@ -48,6 +50,8 @@ struct Definition {
     coordinator_lease_ms: i64,
     resource_guard: Option<resource::Guard>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    cpu_guard: Option<resource::CpuGuard>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     disk_guard: Option<crate::disk::Guard>,
 }
 #[derive(Serialize)]
@@ -56,6 +60,7 @@ pub struct Step {
     pub visit: Option<serde_json::Value>,
     pub admission_observation: Option<resource::Decision>,
     pub disk_admission: Option<crate::disk::Decision>,
+    pub cpu_admission: Option<resource::CpuDecision>,
     pub status: serde_json::Value,
 }
 struct Source {
@@ -85,6 +90,9 @@ fn validate(definition: &Definition) -> Result<()> {
         return Err("invalid fleet definition bounds".into());
     }
     if let Some(guard) = &definition.resource_guard {
+        guard.validate()?;
+    }
+    if let Some(guard) = &definition.cpu_guard {
         guard.validate()?;
     }
     if let Some(guard) = &definition.disk_guard {
@@ -136,6 +144,7 @@ pub fn register_file(config_path: &Path, database: &Path) -> Result<String> {
         sources,
         coordinator_lease_ms: file.coordinator_lease_ms,
         resource_guard: file.resource_guard,
+        cpu_guard: file.cpu_guard,
         disk_guard: file.disk_guard,
     };
     validate(&definition)?;
@@ -237,6 +246,7 @@ fn read(connection: &Connection, id: &str) -> Result<Snapshot> {
                 "held-or-busy",
                 "blocked",
                 "resource-pressure",
+                "cpu-pressure",
                 "disk-pressure",
                 "paused",
                 "stopped",
@@ -337,6 +347,17 @@ fn visit(
         if !decision.allowed {
             return Ok((
                 "resource-pressure".into(),
+                false,
+                Some(decision.reasons.join("; ")),
+                None,
+            ));
+        }
+    }
+    if let Some(guard) = &loaded.file.cpu_guard {
+        let decision = guard.check()?;
+        if !decision.allowed {
+            return Ok((
+                "cpu-pressure".into(),
                 false,
                 Some(decision.reasons.join("; ")),
                 None,
@@ -475,6 +496,7 @@ fn step_internal(database: &Path, id: &str, supervision: Option<&Supervision<'_>
             visit: None,
             admission_observation: None,
             disk_admission,
+            cpu_admission: None,
             status: status(&registry, id)?,
         });
     }
@@ -490,6 +512,25 @@ fn step_internal(database: &Path, id: &str, supervision: Option<&Supervision<'_>
             visit: None,
             admission_observation: observation,
             disk_admission,
+            cpu_admission: None,
+            status: status(&registry, id)?,
+        });
+    }
+    // Sampled CPU-share admission refuses BEFORE any coordinator claim, exactly
+    // like the memory/disk guards; it is a scheduling threshold, not OS enforcement.
+    let cpu_admission = snapshot
+        .definition
+        .cpu_guard
+        .as_ref()
+        .map(resource::CpuGuard::check)
+        .transpose()?;
+    if cpu_admission.as_ref().is_some_and(|d| !d.allowed) {
+        return Ok(Step {
+            kind: "cpu-pressure".into(),
+            visit: None,
+            admission_observation: observation,
+            disk_admission,
+            cpu_admission,
             status: status(&registry, id)?,
         });
     }
@@ -514,6 +555,7 @@ fn step_internal(database: &Path, id: &str, supervision: Option<&Supervision<'_>
             visit: None,
             admission_observation: observation,
             disk_admission,
+            cpu_admission,
             status,
         });
     };
@@ -564,6 +606,7 @@ fn step_internal(database: &Path, id: &str, supervision: Option<&Supervision<'_>
             visit: Some(visit),
             admission_observation: observation.clone(),
             disk_admission: disk_admission.clone(),
+            cpu_admission: cpu_admission.clone(),
             status,
         })
     })();
@@ -704,6 +747,7 @@ fn owned_visit(
         let kind = match report["stop_reason"].as_str() {
             Some("disk-pressure") => "disk-pressure",
             Some("resource-pressure") => "resource-pressure",
+            Some("cpu-pressure") => "cpu-pressure",
             _ => "blocked",
         };
         return Ok((

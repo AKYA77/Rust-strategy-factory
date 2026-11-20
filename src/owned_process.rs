@@ -283,6 +283,11 @@ fn run_input(
     {
         return Ok(serde_json::json!({"workers_started":0,"stop_reason":"resource-pressure"}));
     }
+    if let Some(guard) = &loaded.file.cpu_guard
+        && !guard.check()?.allowed
+    {
+        return Ok(serde_json::json!({"workers_started":0,"stop_reason":"cpu-pressure"}));
+    }
     let pin = InputPin::freeze(&loaded, &policy, input.start_index)?;
     if input
         .expected_source_id

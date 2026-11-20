@@ -24,6 +24,8 @@ pub fn read<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T> {
 pub struct SearchFile {
     #[serde(default)]
     pub resource_guard: Option<resource::Guard>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cpu_guard: Option<resource::CpuGuard>,
     #[serde(default)]
     pub disk_guard: Option<crate::disk::Guard>,
     pub specification: String,
@@ -58,6 +60,9 @@ impl LoadedSearch {
 pub fn load_search(path: &Path) -> Result<LoadedSearch> {
     let file: SearchFile = read(path)?;
     if let Some(guard) = &file.resource_guard {
+        guard.validate()?;
+    }
+    if let Some(guard) = &file.cpu_guard {
         guard.validate()?;
     }
     if let Some(guard) = &file.disk_guard {

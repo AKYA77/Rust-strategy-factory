@@ -39,6 +39,18 @@ aborting a healthy child. Software remains incomplete.
 
 ## Implement next
 
+Scheduler/resource controls (queue item 10) are implemented on branch
+`hermes/scheduler-resource-controls` from `main` @ `ee5d08a`, pending hosted CI and review:
+measured per-thread CPU allocation windows with exact native-tick shares and observed/unknown
+separation, a bounded deterministic adaptive worker-selection policy (hysteresis, dead band,
+declared caps, fail-closed on unknown), reproducible cgroup-v2 OS-enforcement evidence
+(`resource-enforcement`, `resource-allocation`), and sampled `cpu_guard` admission that refuses
+before fleet/campaign/rotation lease claims and owned-child spawn and pauses the research Driver
+before experiment registration. On this VPS the deploy templates' CPUQuota/MemoryMax measure as
+declared-only for the gateway process (no cpu controller, memory.max=max); no hard kernel
+enforcement is claimed. Adaptive `corpus-batch` worker counts provably preserve complete receipt
+hashes. The remaining queue below is unchanged by this branch until it merges.
+
 The highest-priority blockers are external: real/protected/non-USD execution, approved source
 acquisition, broker/calendar/conversion facts and target-VPS acceptance all remain pending (source
 access still returns 403 and no legitimate real quote window has been obtained). Continue the

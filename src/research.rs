@@ -33,6 +33,10 @@ pub struct Config {
     pub proof_policy: Option<crate::proof_screen::Policy>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub indexed_policy: Option<crate::indexed_policy::Policy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_guard: Option<crate::resource::Guard>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_guard: Option<crate::resource::CpuGuard>,
 }
 fn zero_children(n: &usize) -> bool {
     *n == 0
@@ -51,6 +55,8 @@ impl Default for Config {
             shadow_policy: None,
             proof_policy: None,
             indexed_policy: None,
+            resource_guard: None,
+            cpu_guard: None,
         }
     }
 }
@@ -1001,6 +1007,12 @@ impl Driver {
         if let Some(window) = &config.training_window {
             window.validate()?;
         }
+        if let Some(guard) = &config.resource_guard {
+            guard.validate()?;
+        }
+        if let Some(guard) = &config.cpu_guard {
+            guard.validate()?;
+        }
         for input in &inputs {
             input.dataset.verify()?;
             if input.dataset.manifest.class != crate::data::DataClass::SyntheticTestOnly
@@ -1112,6 +1124,24 @@ impl Driver {
         if let Err(error) = check_state_budget(&self.registry, self.config.state_budget_bytes) {
             self.registry.connection.execute("UPDATE research_runs SET state='paused',active=0,last_error=?3 WHERE id=?1 AND token=?2",params![self.id,token,error]).map_err(|e|e.to_string())?;
             return Ok(false);
+        }
+        // Sampled resource admission pauses BEFORE any experiment registration or
+        // improvement work; declared thresholds are scheduling decisions, not OS limits.
+        if let Some(guard) = &self.config.resource_guard {
+            let decision = guard.check()?;
+            if !decision.allowed {
+                let error = format!("resource-pressure: {}", decision.reasons.join("; "));
+                self.registry.connection.execute("UPDATE research_runs SET state='paused',active=0,last_error=?3 WHERE id=?1 AND token=?2",params![self.id,token,error]).map_err(|e|e.to_string())?;
+                return Ok(false);
+            }
+        }
+        if let Some(guard) = &self.config.cpu_guard {
+            let decision = guard.check()?;
+            if !decision.allowed {
+                let error = format!("cpu-pressure: {}", decision.reasons.join("; "));
+                self.registry.connection.execute("UPDATE research_runs SET state='paused',active=0,last_error=?3 WHERE id=?1 AND token=?2",params![self.id,token,error]).map_err(|e|e.to_string())?;
+                return Ok(false);
+            }
         }
         if let Some(job) = pending {
             return self.improvement_step(now, started, job);
