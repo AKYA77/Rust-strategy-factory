@@ -2,29 +2,43 @@ name: Rust checks
 on: [push, pull_request]
 permissions:
   contents: read
+# Quality-neutral CI throughput settings (docs/RUNBOOKS/verification-throughput.md):
+# incremental off (CI artifacts are cached whole, not incrementally), no debug info in CI
+# (panic locations and symbol names remain; local profiles keep line tables for backtraces).
+# Neither variable is bound by build.rs compute identity, so CI and local identities match.
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
 jobs:
   check:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: Install mold linker (link-phase acceleration; no rustflag/identity change)
+        run: sudo apt-get update && sudo apt-get install -y mold
       - name: Install pinned toolchain
         run: rustup show
-      - run: sh scripts/check.sh
+      - name: Cache cargo registry and target artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rsf-checks-v1
+      - run: mold -run sh scripts/check.sh
       - name: Verify trusted inventory cannot deserialize supplied JSON
-        run: cargo test --locked --doc
+        run: mold -run cargo test --locked --doc
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium
-      - run: cargo build --locked
+      - run: mold -run cargo build --locked
       - name: Verify data compute identity boundaries
         run: |
           mkdir -p work
-          python3 scripts/check-data-compute-identity.py work/data-compute-identity.json
+          mold -run python3 scripts/check-data-compute-identity.py work/data-compute-identity.json
       - run: npm run test:browser
-      - run: cargo build --locked --release
+      - run: mold -run cargo build --locked --release
       - run: python3 scripts/check-operations.py
       - name: Verify continuous UTC horizon and declared context ceiling
         run: python3 scripts/check-full-horizon.py --binary target/release/rust-strategy-factory --output work/full-horizon-context.json
