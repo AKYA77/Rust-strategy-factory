@@ -1,6 +1,6 @@
 //! Prespecified synthetic campaign scopes and bounded foreground region execution.
 use crate::{Result, corpus_search, data, operator_config, storage::Registry};
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, path::Path};
 
@@ -11,9 +11,7 @@ pub(crate) fn initialize(connection: &mut Connection, previous: i64) -> Result<(
     if previous >= 21 {
         return Ok(());
     }
-    let tx = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(db)?;
+    let tx = crate::storage::writer_tx_open(connection).map_err(|e| e.to_string())?;
     let current: i64 = tx
         .query_row("PRAGMA user_version", [], |r| r.get(0))
         .map_err(db)?;
@@ -50,9 +48,7 @@ pub(crate) fn initialize_long_ledger(connection: &mut Connection) -> Result<()> 
     if version >= 23 {
         return Ok(());
     }
-    let tx = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(db)?;
+    let tx = crate::storage::writer_tx_open(connection).map_err(|e| e.to_string())?;
     let current: i64 = tx
         .query_row("PRAGMA user_version", [], |r| r.get(0))
         .map_err(db)?;
@@ -214,11 +210,8 @@ pub fn register_file_with_owned_limit(
         return Err("campaign metadata cap exceeded".into());
     }
     let id = data::hash(&plan)?;
-    let mut registry = Registry::open(database)?;
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(db)?;
+    let registry = Registry::open(database)?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     let prior: Option<String> = tx
         .query_row(
             "SELECT body FROM corpus_campaigns WHERE id=?1",
@@ -792,10 +785,7 @@ fn control_at(
     if !["running", "paused", "stopped"].contains(&state) {
         return Err("invalid campaign control".into());
     }
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(db)?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     let head = execution(&tx, id, &read(&tx, id)?)?;
     if expected_epoch.is_some_and(|epoch| epoch != head.epoch) {
         return Err("stale campaign control epoch".into());
@@ -828,10 +818,7 @@ fn publish_result(
     parent: Option<&serde_json::Value>,
     require_exhausted: bool,
 ) -> Result<(bool, bool)> {
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(db)?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     crate::coordinator::fence(&tx, lease, chrono::Utc::now().timestamp_millis())?;
     let head = execution(&tx, &lease.id, plan)?;
     let source =

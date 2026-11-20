@@ -2171,9 +2171,8 @@ mod history_tests {
     #[test]
     fn history_keeps_full_sqlite_cursor_range_and_empty_boundaries_exact() {
         // Isolated SQL projection fixture, not a valid research/evidence registry.
-        let registry = Registry {
-            connection: rusqlite::Connection::open_in_memory().unwrap(),
-        };
+        let registry =
+            crate::storage::wrap_connection(rusqlite::Connection::open_in_memory().unwrap());
         registry
             .connection
             .execute_batch(

@@ -1,6 +1,6 @@
 //! Durable fleet pause intent and state epochs, with bounded immutable transition detail.
 use crate::{Result, data};
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 const VERSION: &str = "fleet-control-v1";
 const PER_FLEET: usize = 128;
@@ -87,9 +87,7 @@ pub(crate) fn initialize(
     c: &mut Connection,
     migrate: bool,
 ) -> std::result::Result<(), crate::corpus_failure::AdmissionFailure> {
-    let tx = c
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(crate::corpus_failure::AdmissionFailure::from)?;
+    let tx = crate::storage::writer_tx_open(c)?;
     tx.execute_batch("CREATE TABLE IF NOT EXISTS corpus_fleet_runtime(fleet_id TEXT PRIMARY KEY REFERENCES corpus_fleets(id),body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=4096),hash TEXT NOT NULL CHECK(length(hash)=64));
     CREATE TABLE IF NOT EXISTS corpus_fleet_transitions(event_id INTEGER PRIMARY KEY,fleet_id TEXT NOT NULL REFERENCES corpus_fleets(id),epoch INTEGER NOT NULL CHECK(epoch>0),body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=4096),hash TEXT NOT NULL CHECK(length(hash)=64),UNIQUE(fleet_id,epoch));
     CREATE TRIGGER IF NOT EXISTS fleet_runtime_key_immutable BEFORE UPDATE OF fleet_id ON corpus_fleet_runtime BEGIN SELECT RAISE(ABORT,'fleet runtime key immutable');END;
@@ -337,10 +335,7 @@ pub fn resume_idle(
     expected_epoch: i64,
     now: i64,
 ) -> Result<()> {
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(db)?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     let head = read(&tx, id)?;
     if head.epoch != expected_epoch
         || head.state != "paused"
@@ -363,10 +358,7 @@ mod tests {
         corpus_fleet::tests::fixture(name)
     }
     fn idle(reg: &mut Registry, id: &str) -> i64 {
-        let tx = reg
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .unwrap();
+        let tx = crate::storage::writer_tx(&reg.connection).unwrap();
         let h = transition(&tx, id, "paused", Cause::SchedulerIdle, 1000).unwrap();
         tx.commit().unwrap();
         h.epoch

@@ -184,9 +184,373 @@ pub(crate) fn process_history_ids(
 pub const SCHEMA_VERSION: u32 = 23;
 pub struct Registry {
     pub(crate) connection: Connection,
+    pub(crate) writer_gate: std::sync::Arc<WriterGate>,
 }
 fn db_err(e: rusqlite::Error) -> String {
     e.to_string()
+}
+// ---------------------------------------------------------------------------
+// Bounded writer admission (implementation queue item 9).
+//
+// SQLite WAL serializes writer transactions per database file. Previously every
+// writer queued blindly inside SQLite's busy handler for up to the connection
+// busy timeout, then surfaced an unclassified "database is locked" error that
+// could abort an otherwise healthy worker. Writer admission now bounds how many
+// writer transactions one process admits per database file: excess callers wait
+// within an explicit budget and are then refused with the typed registry
+// admission busy classification (schema12), which the frozen opt-in retry
+// policy (schema13) already understands. Transient SQLite lock contention on
+// BEGIN IMMEDIATE is retried a bounded number of times with backoff; permanent
+// errors stay typed and are never retried.
+//
+// Declared scope and limitations (not measured OS enforcement):
+// - The gate is per process and per database file. Cross-process writers still
+//   serialize through SQLite's WAL write lock; the connection busy timeout plus
+//   bounded typed retries absorb that contention.
+// - Observations are runtime counters, not persisted schema. They live while a
+//   registry handle on the file is open in this process and reset on restart.
+// - Waits are cooperative wall-clock budgets; a descheduled thread can exceed
+//   them, exactly like the existing sampled resource observations.
+// - Readers are not gated: WAL readers do not block on writers. Backpressure
+//   bounds writer queueing so worker threads cannot pile up in the busy handler.
+// ---------------------------------------------------------------------------
+/// Maximum writer transactions admitted concurrently per database file per process.
+pub const WRITER_ADMISSION_CAPACITY: usize = 2;
+/// Default bounded wait for an admission slot before typed refusal.
+pub const WRITER_ADMISSION_WAIT_MS: u64 = 2_000;
+/// Bounded retries of BEGIN IMMEDIATE after the busy timeout reports typed busy.
+pub const WRITER_LOCK_RETRIES: u32 = 3;
+/// Busy timeout of registry connections. Admission above bounds the queue, so a
+/// shorter timeout plus bounded typed retry replaces the old blind 30 s wait.
+const WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
+/// Startup admission refuses faster: a locked registry must not start workers.
+const OPEN_GATE_WAIT_MS: u64 = 250;
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct WriterPolicy {
+    pub gate_wait_ms: u64,
+    pub lock_retries: u32,
+}
+impl WriterPolicy {
+    fn validate(self) -> Result<()> {
+        if self.gate_wait_ms > 60_000 || self.lock_retries > 8 {
+            return Err("writer admission policy outside declared bounds".into());
+        }
+        Ok(())
+    }
+}
+pub(crate) const WRITE_POLICY: WriterPolicy = WriterPolicy {
+    gate_wait_ms: WRITER_ADMISSION_WAIT_MS,
+    lock_retries: WRITER_LOCK_RETRIES,
+};
+const OPEN_POLICY: WriterPolicy = WriterPolicy {
+    gate_wait_ms: OPEN_GATE_WAIT_MS,
+    // Startup stays bounded but patient enough for a healthy worker to open a
+    // momentarily locked registry: 5 s busy timeout x (1 + 2 retries) + backoff.
+    lock_retries: 2,
+};
+/// Short-wait policy for the parent supervisor's own bookkeeping writes; the
+/// caller owns the bounded retry loop and the connection a 10 ms busy timeout.
+pub(crate) const SUPERVISED_POLICY: WriterPolicy = WriterPolicy {
+    gate_wait_ms: 100,
+    lock_retries: 0,
+};
+#[derive(Debug, Default)]
+struct GateState {
+    in_flight: usize,
+    admitted: u64,
+    refused: u64,
+    waited: u64,
+    wait_ms_total: u64,
+    busy_retries: u64,
+    max_in_flight: usize,
+}
+/// Bounded counting admission gate shared by every connection this process
+/// opens on one database file. Nothing here is persisted or schema-visible.
+pub struct WriterGate {
+    id: u64,
+    state: std::sync::Mutex<GateState>,
+    ready: std::sync::Condvar,
+}
+static NEXT_GATE_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+static WRITER_GATES: std::sync::OnceLock<
+    std::sync::Mutex<std::collections::HashMap<std::path::PathBuf, std::sync::Weak<WriterGate>>>,
+> = std::sync::OnceLock::new();
+impl WriterGate {
+    fn new() -> Self {
+        Self {
+            id: NEXT_GATE_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            state: std::sync::Mutex::new(GateState::default()),
+            ready: std::sync::Condvar::new(),
+        }
+    }
+    /// Cumulative runtime observations with exact string counters.
+    pub fn observe(&self) -> serde_json::Value {
+        let s = self.state.lock().unwrap_or_else(|p| p.into_inner());
+        serde_json::json!({
+            "capacity": WRITER_ADMISSION_CAPACITY.to_string(),
+            "default_wait_budget_ms": WRITER_ADMISSION_WAIT_MS.to_string(),
+            "lock_retries": WRITER_LOCK_RETRIES.to_string(),
+            "busy_timeout_ms": WRITER_BUSY_TIMEOUT.as_millis().to_string(),
+            "in_flight": s.in_flight.to_string(),
+            "admitted": s.admitted.to_string(),
+            "refused": s.refused.to_string(),
+            "waited": s.waited.to_string(),
+            "wait_ms_total": s.wait_ms_total.to_string(),
+            "busy_retries": s.busy_retries.to_string(),
+            "max_in_flight": s.max_in_flight.to_string(),
+            "limitations": "Declared in-process admission per database file; cross-process writers serialize through SQLite WAL. Runtime counters only, not persisted; not measured OS enforcement.",
+        })
+    }
+}
+thread_local! {
+    /// Reentrancy depth per gate for the current thread: a nested writer
+    /// transaction on the same connection must not deadlock on its own slot.
+    /// Depth is recorded only after a slot is actually admitted, and every
+    /// guard (outermost or reentrant) decrements it on drop, so a refusal can
+    /// never leave a stale depth that bypasses admission later.
+    static HELD_GATES: std::cell::RefCell<std::collections::HashMap<u64, usize>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+/// Resolve (or create) the shared gate for a connection's database file.
+/// In-memory databases are per-connection and get a private gate.
+pub(crate) fn writer_gate_for(path: Option<&str>) -> std::sync::Arc<WriterGate> {
+    let Some(path) = path.filter(|p| !p.is_empty() && *p != ":memory:") else {
+        return std::sync::Arc::new(WriterGate::new());
+    };
+    let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| std::path::PathBuf::from(path));
+    let map = WRITER_GATES.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+    let mut map = map.lock().unwrap_or_else(|p| p.into_inner());
+    if let Some(gate) = map.get(&canonical).and_then(std::sync::Weak::upgrade) {
+        return gate;
+    }
+    let gate = std::sync::Arc::new(WriterGate::new());
+    map.insert(canonical, std::sync::Arc::downgrade(&gate));
+    // Bounded housekeeping: drop dead entries once the map grows large.
+    if map.len() > 4096 {
+        map.retain(|_, weak| weak.strong_count() > 0);
+    }
+    gate
+}
+/// Admission guard: releases the slot (or reentrancy depth) on drop.
+pub(crate) struct WriterGuard {
+    gate: std::sync::Arc<WriterGate>,
+    reentrant: bool,
+}
+impl Drop for WriterGuard {
+    fn drop(&mut self) {
+        HELD_GATES.with(|held| {
+            let mut held = held.borrow_mut();
+            if let Some(depth) = held.get_mut(&self.gate.id) {
+                *depth -= 1;
+                if *depth == 0 {
+                    held.remove(&self.gate.id);
+                }
+            }
+        });
+        if self.reentrant {
+            return;
+        }
+        let mut state = self.gate.state.lock().unwrap_or_else(|p| p.into_inner());
+        state.in_flight = state.in_flight.saturating_sub(1);
+        drop(state);
+        self.gate.ready.notify_all();
+    }
+}
+fn admit(
+    gate: &std::sync::Arc<WriterGate>,
+    policy: WriterPolicy,
+) -> std::result::Result<WriterGuard, crate::corpus_failure::AdmissionFailure> {
+    // A nested writer on this thread already holds a slot for this gate; it
+    // must not wait on itself. SQLite itself refuses a nested BEGIN, so the
+    // reentrant path only bypasses the gate, never the database's own rules.
+    let reentrant = HELD_GATES.with(|held| {
+        let mut held = held.borrow_mut();
+        match held.get_mut(&gate.id) {
+            Some(depth) => {
+                *depth += 1;
+                true
+            }
+            None => false,
+        }
+    });
+    if reentrant {
+        return Ok(WriterGuard {
+            gate: gate.clone(),
+            reentrant: true,
+        });
+    }
+    let started = std::time::Instant::now();
+    let deadline = started + Duration::from_millis(policy.gate_wait_ms);
+    let mut state = gate.state.lock().unwrap_or_else(|p| p.into_inner());
+    loop {
+        if state.in_flight < WRITER_ADMISSION_CAPACITY {
+            state.in_flight += 1;
+            state.admitted = state.admitted.saturating_add(1);
+            state.max_in_flight = state.max_in_flight.max(state.in_flight);
+            let waited_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+            if waited_ms > 0 {
+                state.waited = state.waited.saturating_add(1);
+                state.wait_ms_total = state.wait_ms_total.saturating_add(waited_ms);
+            }
+            drop(state);
+            HELD_GATES.with(|held| held.borrow_mut().insert(gate.id, 1));
+            return Ok(WriterGuard {
+                gate: gate.clone(),
+                reentrant: false,
+            });
+        }
+        let now = std::time::Instant::now();
+        if now >= deadline {
+            state.refused = state.refused.saturating_add(1);
+            let message = format!(
+                "registry writer admission refused: {} writers in flight (cap {}), waited {} ms of {} ms budget",
+                state.in_flight,
+                WRITER_ADMISSION_CAPACITY,
+                u64::try_from(now.duration_since(started).as_millis()).unwrap_or(u64::MAX),
+                policy.gate_wait_ms
+            );
+            drop(state);
+            let failure = crate::corpus_failure::AdmissionFailure {
+                kind: crate::corpus_failure::Kind::RegistryAdmissionBusy,
+                message,
+            };
+            crate::corpus_failure::record_admission_failure(failure.clone());
+            return Err(failure);
+        }
+        state = gate
+            .ready
+            .wait_timeout(state, deadline.saturating_duration_since(now))
+            .unwrap_or_else(|p| p.into_inner())
+            .0;
+    }
+}
+/// A writer transaction admitted through the bounded gate. Derefs to the
+/// rusqlite transaction; dropping it rolls back and releases the slot.
+pub(crate) struct WriterTransaction<'a> {
+    tx: rusqlite::Transaction<'a>,
+    _guard: WriterGuard,
+}
+impl std::fmt::Debug for WriterTransaction<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WriterTransaction").finish_non_exhaustive()
+    }
+}
+impl<'a> std::ops::Deref for WriterTransaction<'a> {
+    type Target = rusqlite::Transaction<'a>;
+    fn deref(&self) -> &Self::Target {
+        &self.tx
+    }
+}
+impl<'a> std::ops::DerefMut for WriterTransaction<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.tx
+    }
+}
+impl WriterTransaction<'_> {
+    pub(crate) fn commit(self) -> std::result::Result<(), rusqlite::Error> {
+        let result = self.tx.commit();
+        if let Err(error) = &result {
+            let failure = crate::corpus_failure::AdmissionFailure::from_sqlite(error);
+            if failure.kind == crate::corpus_failure::Kind::RegistryAdmissionBusy {
+                crate::corpus_failure::record_admission_failure(failure);
+            }
+        }
+        result
+    }
+}
+/// Admit one writer transaction with the default bounded wait/retry policy.
+/// Errors are String-typed for existing call sites; the typed admission cause
+/// remains recoverable through `corpus_failure::classify_error`.
+pub(crate) fn writer_tx(c: &Connection) -> Result<WriterTransaction<'_>> {
+    writer_tx_classified(c).map_err(|e| e.to_string())
+}
+pub(crate) fn writer_tx_classified(
+    c: &Connection,
+) -> std::result::Result<WriterTransaction<'_>, crate::corpus_failure::AdmissionFailure> {
+    writer_tx_with_policy(c, WRITE_POLICY)
+}
+pub(crate) fn writer_tx_open(
+    c: &Connection,
+) -> std::result::Result<WriterTransaction<'_>, crate::corpus_failure::AdmissionFailure> {
+    writer_tx_with_policy(c, OPEN_POLICY)
+}
+/// Supervisor bookkeeping (owned invocation journal) keeps the parent sampling
+/// loop responsive: a short gate wait and no extra BEGIN retries, because the
+/// supervisor connection already carries a 10 ms busy timeout and its caller
+/// (`owned_process::write_with_retry`) owns the bounded retry loop.
+pub(crate) fn writer_tx_supervised(c: &Connection) -> Result<WriterTransaction<'_>> {
+    writer_tx_with_policy(c, SUPERVISED_POLICY).map_err(|e| e.to_string())
+}
+pub(crate) fn writer_tx_with_policy(
+    c: &Connection,
+    policy: WriterPolicy,
+) -> std::result::Result<WriterTransaction<'_>, crate::corpus_failure::AdmissionFailure> {
+    policy.validate()?;
+    let gate = writer_gate_for(c.path());
+    let guard = admit(&gate, policy)?;
+    let mut attempt = 0u32;
+    loop {
+        // `new_unchecked` issues BEGIN IMMEDIATE on a shared connection borrow
+        // (rusqlite's `transaction_with_behavior` only adds a compile-time
+        // nesting guard; SQLite itself still refuses a nested BEGIN, and the
+        // gate's reentrancy tracking keeps a nested writer from deadlocking on
+        // its own slot). The shared borrow lets the bounded retry loop re-attempt
+        // without conflicting with the returned transaction's lifetime.
+        match rusqlite::Transaction::new_unchecked(c, TransactionBehavior::Immediate) {
+            Ok(tx) => return Ok(WriterTransaction { tx, _guard: guard }),
+            Err(error) => {
+                let failure = crate::corpus_failure::AdmissionFailure::from_sqlite(&error);
+                if failure.kind == crate::corpus_failure::Kind::RegistryAdmissionBusy
+                    && attempt < policy.lock_retries
+                {
+                    attempt += 1;
+                    {
+                        let mut state = gate.state.lock().unwrap_or_else(|p| p.into_inner());
+                        state.busy_retries = state.busy_retries.saturating_add(1);
+                    }
+                    std::thread::sleep(Duration::from_millis(25 << attempt.min(4)));
+                    continue;
+                }
+                crate::corpus_failure::record_admission_failure(failure.clone());
+                return Err(failure);
+            }
+        }
+    }
+}
+/// Admission guard for a single autocommit write statement on the same gate.
+pub(crate) fn writer_guard(c: &Connection) -> Result<WriterGuard> {
+    let gate = writer_gate_for(c.path());
+    admit(&gate, WRITE_POLICY).map_err(|e| e.to_string())
+}
+/// Wrap an existing connection (read-only recovery snapshots, fixtures) with
+/// its per-file admission gate.
+pub(crate) fn wrap_connection(connection: Connection) -> Registry {
+    let writer_gate = writer_gate_for(connection.path());
+    Registry {
+        connection,
+        writer_gate,
+    }
+}
+/// String-typed initializers keep their typed admission cause through the
+/// provenance cell. Exact message equality only correlates the recorded
+/// failure with the propagated error; the kind itself is never parsed from
+/// human text (schema12 rule).
+fn init_classified(
+    result: Result<()>,
+) -> std::result::Result<(), crate::corpus_failure::AdmissionFailure> {
+    result.map_err(|message| {
+        crate::corpus_failure::take_admission_failure()
+            .filter(|failure| failure.message == message)
+            .unwrap_or_else(|| crate::corpus_failure::AdmissionFailure::from(message))
+    })
+}
+impl Registry {
+    /// Runtime writer-admission observations for this registry's database file.
+    /// Declared in-process caps and cumulative counters; not persisted schema
+    /// and not measured OS enforcement.
+    pub fn writer_admission(&self) -> serde_json::Value {
+        self.writer_gate.observe()
+    }
 }
 impl Registry {
     pub fn open(path: &Path) -> Result<Self> {
@@ -198,13 +562,12 @@ impl Registry {
         let mut connection =
             Connection::open(path).map_err(crate::corpus_failure::AdmissionFailure::from)?;
         connection
-            // WAL serializes writers. The full suite runs 92 tests in parallel, each
-            // spawning subprocesses that write to per-test SQLite databases; a short busy
-            // timeout is exceeded by that write queue and surfaces as spurious
-            // "database is locked" failures unrelated to correctness. The busy timeout is
-            // SQLite's standard retry mechanism, so a generous value absorbs the queue
-            // without changing any transaction semantics.
-            .busy_timeout(Duration::from_secs(30))
+            // WAL serializes writers. Writer admission (above) now bounds the
+            // in-process write queue per database file, so the busy timeout no
+            // longer needs to absorb an unbounded queue blindly: a shorter
+            // timeout plus bounded typed retries keeps contention typed and
+            // bounded instead of stalling workers for half a minute.
+            .busy_timeout(WRITER_BUSY_TIMEOUT)
             .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         connection
             .execute_batch(
@@ -218,9 +581,7 @@ impl Registry {
             return Err("database schema newer than supported".into());
         }
         if version == 0 {
-            let tx = connection
-                .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
+            let tx = writer_tx_open(&connection)?;
             tx.execute_batch("CREATE TABLE IF NOT EXISTS experiments (
                 id TEXT PRIMARY KEY, key_json TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('queued','running','completed','rejected','invalid','inconclusive','failed')),
                 token TEXT, expires_ms INTEGER, attempt INTEGER NOT NULL DEFAULT 0,
@@ -237,9 +598,7 @@ impl Registry {
                 .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         }
         if version < 2 {
-            let tx = connection
-                .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
+            let tx = writer_tx_open(&connection)?;
             tx.execute_batch("CREATE TABLE IF NOT EXISTS holdouts (
                 dataset_hash TEXT PRIMARY KEY, start_ms INTEGER NOT NULL, end_ms INTEGER NOT NULL,
                 protocol_hash TEXT NOT NULL, selected_json TEXT NOT NULL
@@ -253,9 +612,7 @@ impl Registry {
                 .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         }
         if version < 3 {
-            let tx = connection
-                .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
+            let tx = writer_tx_open(&connection)?;
             tx.execute_batch("CREATE TABLE IF NOT EXISTS research_runs (
                 id TEXT PRIMARY KEY, configuration TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'running' CHECK(state IN ('running','paused','stopped')),
                 cursor INTEGER NOT NULL DEFAULT 0 CHECK(cursor>=0), token TEXT, expires_ms INTEGER,
@@ -272,26 +629,28 @@ impl Registry {
                 .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         }
         if version < 4 {
-            connection.execute_batch("CREATE TABLE IF NOT EXISTS scientific_protocols (
+            let tx = writer_tx_open(&connection)?;
+            tx.execute_batch("CREATE TABLE IF NOT EXISTS scientific_protocols (
                 id TEXT PRIMARY KEY, definition_json TEXT NOT NULL, definition_hash TEXT NOT NULL,
                 report_json TEXT, report_hash TEXT,
                 CHECK ((report_json IS NULL AND report_hash IS NULL) OR (report_json IS NOT NULL AND report_hash IS NOT NULL))
-            ); PRAGMA user_version=4;").map_err(crate::corpus_failure::AdmissionFailure::from)?;
+            ); PRAGMA user_version=4;")?;
+            tx.commit()?;
         }
         if version < 5 {
-            connection.execute_batch("CREATE TABLE IF NOT EXISTS instrument_holdouts (
+            let tx = writer_tx_open(&connection)?;
+            tx.execute_batch("CREATE TABLE IF NOT EXISTS instrument_holdouts (
                 dataset_hash TEXT NOT NULL, instrument TEXT NOT NULL, start_ms INTEGER NOT NULL,end_ms INTEGER NOT NULL,
                 protocol_hash TEXT NOT NULL,selected_json TEXT NOT NULL,PRIMARY KEY(dataset_hash,instrument)
             );CREATE TABLE IF NOT EXISTS instrument_holdout_exposures (
                 dataset_hash TEXT NOT NULL,instrument TEXT NOT NULL,concept_hash TEXT NOT NULL,experiment_id TEXT NOT NULL REFERENCES experiments(id),
                 PRIMARY KEY(dataset_hash,instrument,concept_hash),UNIQUE(experiment_id),
                 FOREIGN KEY(dataset_hash,instrument) REFERENCES instrument_holdouts(dataset_hash,instrument)
-            );PRAGMA user_version=5;").map_err(crate::corpus_failure::AdmissionFailure::from)?;
+            );PRAGMA user_version=5;")?;
+            tx.commit()?;
         }
         if version < 6 {
-            let tx = connection
-                .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
+            let tx = writer_tx_open(&connection)?;
             tx.execute_batch("CREATE TABLE IF NOT EXISTS protocol_ranges (
                 instrument TEXT NOT NULL, start_ms INTEGER NOT NULL, end_ms INTEGER NOT NULL,
                 dataset_hash TEXT NOT NULL, protocol_hash TEXT NOT NULL,
@@ -302,9 +661,7 @@ impl Registry {
                 .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         }
         if version < 7 {
-            let tx = connection
-                .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
+            let tx = writer_tx_open(&connection)?;
             tx.execute_batch(
                 "CREATE TABLE IF NOT EXISTS training_diagnoses (
                 id TEXT PRIMARY KEY, parent_id TEXT NOT NULL REFERENCES experiments(id),
@@ -316,9 +673,7 @@ impl Registry {
                 .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         }
         if version < 8 {
-            let tx = connection
-                .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
+            let tx = writer_tx_open(&connection)?;
             tx.execute_batch(
                 "CREATE TABLE IF NOT EXISTS training_reviews (
                 id TEXT PRIMARY KEY, diagnosis_id TEXT NOT NULL REFERENCES training_diagnoses(id),
@@ -330,9 +685,7 @@ impl Registry {
                 .map_err(crate::corpus_failure::AdmissionFailure::from)?;
         }
         if version < 9 {
-            let tx = connection
-                .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
+            let tx = writer_tx_open(&connection)?;
             tx.execute_batch("CREATE TABLE IF NOT EXISTS improvement_jobs (
                 run_id TEXT NOT NULL REFERENCES research_runs(id), parent_cursor INTEGER NOT NULL,
                 input_index INTEGER NOT NULL CHECK(input_index>=0), parent_id TEXT NOT NULL REFERENCES experiments(id),
@@ -346,31 +699,61 @@ impl Registry {
         }
         // Additive lookup optimization: no table/row-format or version change.
         // Older v9 readers/writers remain compatible and SQLite maintains it.
-        connection
-            .execute_batch("CREATE INDEX IF NOT EXISTS event_action_lookup ON events(action) WHERE action='proof-audit-contradiction-v1' OR action='indexed-audit-contradiction-v1';")
-            .map_err(crate::corpus_failure::AdmissionFailure::from)?;
-        connection.execute_batch("CREATE TABLE IF NOT EXISTS replay_checkpoints(experiment_id TEXT NOT NULL REFERENCES experiments(id),cursor INTEGER NOT NULL CHECK(cursor>0),body BLOB NOT NULL CHECK(typeof(body)='blob' AND length(body)<=4194304),hash TEXT NOT NULL CHECK(length(hash)=64),PRIMARY KEY(experiment_id,cursor));CREATE TRIGGER IF NOT EXISTS replay_checkpoint_no_update BEFORE UPDATE ON replay_checkpoints BEGIN SELECT RAISE(ABORT,'checkpoint immutable');END;CREATE TRIGGER IF NOT EXISTS replay_checkpoint_no_delete BEFORE DELETE ON replay_checkpoints BEGIN SELECT RAISE(ABORT,'checkpoint immutable');END;").map_err(crate::corpus_failure::AdmissionFailure::from)?;
-        connection.execute_batch("CREATE TABLE IF NOT EXISTS corpus_controls(experiment_id TEXT PRIMARY KEY REFERENCES experiments(id),state TEXT NOT NULL CHECK(state IN ('running','paused','stopped')));").map_err(crate::corpus_failure::AdmissionFailure::from)?;
-        crate::result_artifact::initialize(&connection)?;
-        if version < 10 {
-            connection
-                .execute_batch("PRAGMA user_version=10;")
-                .map_err(crate::corpus_failure::AdmissionFailure::from)?;
+        // Idempotent schema bootstrap is admitted as one writer transaction.
+        {
+            let tx = writer_tx_open(&connection)?;
+            tx.execute_batch("CREATE INDEX IF NOT EXISTS event_action_lookup ON events(action) WHERE action='proof-audit-contradiction-v1' OR action='indexed-audit-contradiction-v1';")?;
+            tx.execute_batch("CREATE TABLE IF NOT EXISTS replay_checkpoints(experiment_id TEXT NOT NULL REFERENCES experiments(id),cursor INTEGER NOT NULL CHECK(cursor>0),body BLOB NOT NULL CHECK(typeof(body)='blob' AND length(body)<=4194304),hash TEXT NOT NULL CHECK(length(hash)=64),PRIMARY KEY(experiment_id,cursor));CREATE TRIGGER IF NOT EXISTS replay_checkpoint_no_update BEFORE UPDATE ON replay_checkpoints BEGIN SELECT RAISE(ABORT,'checkpoint immutable');END;CREATE TRIGGER IF NOT EXISTS replay_checkpoint_no_delete BEFORE DELETE ON replay_checkpoints BEGIN SELECT RAISE(ABORT,'checkpoint immutable');END;")?;
+            tx.execute_batch("CREATE TABLE IF NOT EXISTS corpus_controls(experiment_id TEXT PRIMARY KEY REFERENCES experiments(id),state TEXT NOT NULL CHECK(state IN ('running','paused','stopped')));")?;
+            tx.commit()?;
         }
-        crate::corpus_search::initialize(&connection)?;
+        init_classified(crate::result_artifact::initialize(&connection))?;
+        if version < 10 {
+            let tx = writer_tx_open(&connection)?;
+            tx.execute_batch("PRAGMA user_version=10;")?;
+            tx.commit()?;
+        }
+        init_classified(crate::corpus_search::initialize(&connection))?;
         crate::search_control::initialize(&mut connection, version < 11)?;
-        crate::corpus_fleet::initialize(&connection)?;
-        crate::corpus_failure::initialize(&mut connection, version < 12)?;
-        crate::retry_policy::initialize(&mut connection, version < 13)?;
-        crate::retry_audit::initialize(&mut connection, version < 14)?;
-        crate::supervision_session::initialize(&mut connection, version < 15)?;
-        crate::owned_history::initialize(&mut connection, version < 16)?;
-        crate::corpus_fleet::initialize_owned(&mut connection, version < 17)?;
+        init_classified(crate::corpus_fleet::initialize(&connection))?;
+        init_classified(crate::corpus_failure::initialize(
+            &mut connection,
+            version < 12,
+        ))?;
+        init_classified(crate::retry_policy::initialize(
+            &mut connection,
+            version < 13,
+        ))?;
+        init_classified(crate::retry_audit::initialize(
+            &mut connection,
+            version < 14,
+        ))?;
+        init_classified(crate::supervision_session::initialize(
+            &mut connection,
+            version < 15,
+        ))?;
+        init_classified(crate::owned_history::initialize(
+            &mut connection,
+            version < 16,
+        ))?;
+        init_classified(crate::corpus_fleet::initialize_owned(
+            &mut connection,
+            version < 17,
+        ))?;
         crate::fleet_control::initialize(&mut connection, version < 18)?;
-        crate::corpus_campaign::initialize(&mut connection, version)?;
-        crate::campaign_rotation::initialize(&mut connection, version)?;
-        crate::corpus_campaign::initialize_long_ledger(&mut connection)?;
-        Ok(Self { connection })
+        init_classified(crate::corpus_campaign::initialize(&mut connection, version))?;
+        init_classified(crate::campaign_rotation::initialize(
+            &mut connection,
+            version,
+        ))?;
+        init_classified(crate::corpus_campaign::initialize_long_ledger(
+            &mut connection,
+        ))?;
+        let writer_gate = writer_gate_for(connection.path());
+        Ok(Self {
+            connection,
+            writer_gate,
+        })
     }
     /// Atomically reserve OOS time across dataset aliases before any competing registration.
     /// No unlock API: retries may recover only the exact same dataset/protocol/ranges.
@@ -398,10 +781,7 @@ impl Registry {
                 return Err("overlapping protected OOS ranges".into());
             }
         }
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(db_err)?;
+        let tx = writer_tx(&self.connection)?;
         let existing: i64 = tx
             .query_row(
                 "SELECT COUNT(*) FROM protocol_ranges WHERE protocol_hash=?1",
@@ -462,10 +842,7 @@ impl Registry {
         {
             return Err("invalid frozen holdout selection".into());
         }
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(db_err)?;
+        let tx = writer_tx(&self.connection)?;
         let existing:Option<(i64,i64,String,String)>=tx.query_row("SELECT start_ms,end_ms,protocol_hash,selected_json FROM holdouts WHERE dataset_hash=?1",[dataset_hash],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).optional().map_err(db_err)?;
         if let Some((start, end, protocol, json)) = existing {
             let stored: Vec<String> = serde_json::from_str(&json).map_err(|e| e.to_string())?;
@@ -527,10 +904,7 @@ impl Registry {
         {
             return Err("invalid instrument holdout selection".into());
         }
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(db_err)?;
+        let tx = writer_tx(&self.connection)?;
         let legacy: bool = tx
             .query_row(
                 "SELECT EXISTS(SELECT 1 FROM holdouts WHERE dataset_hash=?1)",
@@ -582,10 +956,7 @@ impl Registry {
     pub fn register(&mut self, key: &ExperimentKey) -> Result<String> {
         let id = key.identity()?;
         let json = serde_json::to_string(key).map_err(|e| e.to_string())?;
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(db_err)?;
+        let tx = writer_tx(&self.connection)?;
         let outside_protocol: bool = tx.query_row(
             "SELECT EXISTS(SELECT 1 FROM protocol_ranges WHERE instrument=?1 AND start_ms<?4 AND end_ms>?3 AND (dataset_hash<>?2 OR protocol_hash<>?5))",
             params![key.instrument,key.dataset_hash,key.start_ms,key.end_exclusive_ms,key.protocol_hash],|r|r.get(0)
@@ -669,10 +1040,7 @@ impl Registry {
             return Err("lease duration outside budget".into());
         }
         let expires = now_ms.checked_add(lease_ms).ok_or("lease time overflow")?;
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(db_err)?;
+        let tx = writer_tx(&self.connection)?;
         let (state, expiry, attempt): (String, Option<i64>, i64) = tx
             .query_row(
                 "SELECT state,expires_ms,attempt FROM experiments WHERE id=?1",
@@ -719,10 +1087,7 @@ impl Registry {
     ) -> Result<bool> {
         let bytes = crate::result_artifact::serialize(result, crate::result_artifact::MAX_BYTES)?;
         let result_hash = blake3::hash(&bytes).to_hex().to_string();
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(db_err)?;
+        let tx = writer_tx(&self.connection)?;
         if result["kind"] == "synthetic-corpus-replay-v1" {
             let control: Option<String> = tx
                 .query_row(
@@ -1035,10 +1400,7 @@ impl Registry {
         if next_cursor <= expected_cursor || expected_cursor < 0 {
             return Err("checkpoint cursor must advance".into());
         }
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(db_err)?;
+        let tx = writer_tx(&self.connection)?;
         let (status, token, expiry, key_json, attempt): (
             String,
             Option<String>,
@@ -1099,10 +1461,7 @@ impl Registry {
 impl Registry {
     /// Yield after a committed checkpoint. Attempts and immutable evidence remain.
     pub fn yield_lease(&mut self, lease: &Lease, now_ms: i64) -> Result<()> {
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(db_err)?;
+        let tx = writer_tx(&self.connection)?;
         let n=tx.execute("UPDATE experiments SET state='queued',token=NULL,expires_ms=NULL WHERE id=?1 AND state='running' AND token=?2 AND attempt=?3 AND expires_ms>?4",params![lease.experiment_id,lease.token,lease.attempt,now_ms]).map_err(db_err)?;
         if n != 1 {
             return Err("cannot yield stale, expired or terminal lease".into());
@@ -1140,10 +1499,7 @@ impl Registry {
             return Err("invalid corpus control".into());
         }
         self.corpus_control(id)?;
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(db_err)?;
+        let tx = writer_tx(&self.connection)?;
         let (status,control):(String,Option<String>)=tx.query_row("SELECT e.state,c.state FROM experiments e LEFT JOIN corpus_controls c ON c.experiment_id=e.id WHERE e.id=?1",[id],|r|Ok((r.get(0)?,r.get(1)?))).map_err(db_err)?;
         if !["queued", "running"].contains(&status.as_str())
             || control.as_deref() == Some("stopped")
@@ -1176,5 +1532,334 @@ impl Registry {
         let value = serde_json::json!({"experiment_id":id,"state":state,"control":control,"attempt":attempt.to_string(),"expires_ms":expiry,"checkpoint_cursor":checkpoint.as_ref().map(|(r,_)|r.cursor),"checkpoint_hash":checkpoint.map(|(_,h)|h),"limitations":"Recovery metadata only; checkpoints do not establish qualification or completed replay."});
         tx.commit().map_err(db_err)?;
         Ok(value)
+    }
+}
+
+#[cfg(test)]
+mod writer_admission_tests {
+    use super::*;
+    use crate::corpus_failure::{Kind, classify_error};
+    use std::sync::{Arc, Barrier};
+
+    struct Temp(std::path::PathBuf);
+    impl Temp {
+        fn new(name: &str) -> Self {
+            let p = std::env::temp_dir()
+                .join(format!("writer-admission-{name}-{}", std::process::id()));
+            std::fs::create_dir_all(&p).unwrap();
+            Self(p)
+        }
+    }
+    impl Drop for Temp {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    /// Fill both admission slots: holder A owns the SQLite write lock with an
+    /// open writer transaction (slot 1); holder B is admitted to slot 2 and
+    /// parks in BEGIN IMMEDIATE's busy wait with a long busy timeout so it
+    /// cannot time out inside the test window. WAL permits only ONE open
+    /// writer per file, so "two slots held" means one writing plus one parked
+    /// in BEGIN — never two open transactions. All registries are opened
+    /// BEFORE the write lock is held (schema bootstrap writes would otherwise
+    /// queue behind it), and A acquires the lock before B is spawned so the
+    /// saturation is deterministic. Returns once both slots are in flight;
+    /// the lock stays held until `release` fires.
+    fn saturate_gate(db: &Path, release: Arc<Barrier>) -> Vec<std::thread::JoinHandle<()>> {
+        let reg_a = Registry::open(db).unwrap();
+        let reg_b = Registry::open(db).unwrap();
+        reg_b
+            .connection
+            .busy_timeout(Duration::from_secs(60))
+            .unwrap();
+        let ready = Arc::new(Barrier::new(2));
+        let ready2 = ready.clone();
+        let a = std::thread::spawn(move || {
+            let tx = writer_tx(&reg_a.connection).unwrap();
+            ready2.wait();
+            release.wait();
+            tx.commit().unwrap();
+        });
+        ready.wait();
+        let b = std::thread::spawn(move || {
+            let tx = writer_tx(&reg_b.connection).unwrap();
+            tx.commit().unwrap();
+        });
+        vec![a, b]
+    }
+
+    fn wait_in_flight(reg: &Registry, want: &str) {
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        while reg.writer_admission()["in_flight"] != want {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "gate never reached in_flight={want}: {}",
+                reg.writer_admission()
+            );
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    #[test]
+    fn concurrent_writers_wait_within_budget_and_all_commit() {
+        let dir = Temp::new("wait");
+        let db = dir.0.join("registry.sqlite");
+        let main_reg = Registry::open(&db).unwrap();
+        {
+            let tx = writer_tx(&main_reg.connection).unwrap();
+            tx.execute_batch("CREATE TABLE pressure(n INTEGER)")
+                .unwrap();
+            tx.commit().unwrap();
+        }
+        let writer_regs: Vec<Registry> = (0..6).map(|_| Registry::open(&db).unwrap()).collect();
+        let release = Arc::new(Barrier::new(2));
+        let holders = saturate_gate(&db, release.clone());
+        wait_in_flight(&main_reg, "2");
+        let start = Arc::new(Barrier::new(7));
+        let mut writers = Vec::new();
+        for (t, reg) in writer_regs.into_iter().enumerate() {
+            let start = start.clone();
+            writers.push(std::thread::spawn(move || {
+                start.wait();
+                for i in 0..5 {
+                    // Bounded wait generous enough for a loaded suite; the
+                    // refusal budget itself is exercised separately.
+                    let tx = writer_tx_with_policy(
+                        &reg.connection,
+                        WriterPolicy {
+                            gate_wait_ms: 10_000,
+                            lock_retries: WRITER_LOCK_RETRIES,
+                        },
+                    )
+                    .unwrap();
+                    tx.execute(
+                        "INSERT INTO pressure VALUES(?1)",
+                        params![(t * 5 + i) as i64],
+                    )
+                    .unwrap();
+                    tx.commit().unwrap();
+                }
+            }));
+        }
+        start.wait();
+        // Both slots stay held, so every writer must queue at the gate.
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(main_reg.writer_admission()["in_flight"], "2");
+        release.wait();
+        for h in holders {
+            h.join().unwrap();
+        }
+        for w in writers {
+            w.join().unwrap();
+        }
+        let n: i64 = main_reg
+            .connection
+            .query_row("SELECT count(*) FROM pressure", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(n, 30);
+        let obs = main_reg.writer_admission();
+        assert_eq!(obs["refused"], "0", "{obs}");
+        assert_eq!(obs["in_flight"], "0", "{obs}");
+        assert_eq!(obs["max_in_flight"], "2", "{obs}");
+        let waited: u64 = obs["waited"].as_str().unwrap().parse().unwrap();
+        assert!(waited >= 6, "every writer waited at least once: {obs}");
+    }
+
+    #[test]
+    fn saturated_gate_refuses_typed_and_the_refused_thread_recovers() {
+        let dir = Temp::new("refuse");
+        let db = dir.0.join("registry.sqlite");
+        let main_reg = Registry::open(&db).unwrap();
+        let release = Arc::new(Barrier::new(2));
+        let holders = saturate_gate(&db, release.clone());
+        wait_in_flight(&main_reg, "2");
+        let policy = WriterPolicy {
+            gate_wait_ms: 50,
+            lock_retries: 0,
+        };
+        let first = writer_tx_with_policy(&main_reg.connection, policy)
+            .expect_err("saturated gate must refuse after the wait budget");
+        assert_eq!(first.kind, Kind::RegistryAdmissionBusy);
+        assert_eq!(
+            classify_error(&first.to_string()),
+            Kind::RegistryAdmissionBusy
+        );
+        // Regression: a refusal must not leave a stale reentrancy depth that
+        // lets this same thread bypass admission afterwards.
+        let second = writer_tx_with_policy(&main_reg.connection, policy)
+            .expect_err("still saturated: the second attempt must also be refused");
+        assert_eq!(
+            classify_error(&second.to_string()),
+            Kind::RegistryAdmissionBusy
+        );
+        assert_eq!(main_reg.writer_admission()["refused"], "2");
+        assert_eq!(main_reg.writer_admission()["in_flight"], "2");
+        release.wait();
+        for h in holders {
+            h.join().unwrap();
+        }
+        // The refused thread admits and commits normally once pressure clears.
+        let tx = writer_tx(&main_reg.connection).unwrap();
+        tx.execute_batch("CREATE TABLE recovered(n INTEGER)")
+            .unwrap();
+        tx.commit().unwrap();
+        assert_eq!(main_reg.writer_admission()["in_flight"], "0");
+    }
+
+    #[test]
+    fn refusal_provenance_survives_successful_cleanup_writes() {
+        let dir = Temp::new("provenance");
+        let db = dir.0.join("registry.sqlite");
+        let main_reg = Registry::open(&db).unwrap();
+        let release = Arc::new(Barrier::new(2));
+        let holders = saturate_gate(&db, release.clone());
+        wait_in_flight(&main_reg, "2");
+        let failure = writer_tx_with_policy(
+            &main_reg.connection,
+            WriterPolicy {
+                gate_wait_ms: 50,
+                lock_retries: 0,
+            },
+        )
+        .expect_err("saturated gate must refuse");
+        let message = failure.to_string();
+        release.wait();
+        for h in holders {
+            h.join().unwrap();
+        }
+        // A successful cleanup write (e.g. lease release after a failed step)
+        // must not erase the typed kind of the earlier refusal.
+        let tx = writer_tx(&main_reg.connection).unwrap();
+        tx.execute_batch("CREATE TABLE cleanup(n INTEGER)").unwrap();
+        tx.commit().unwrap();
+        assert_eq!(classify_error(&message), Kind::RegistryAdmissionBusy);
+        // An unrelated error can never inherit the recorded busy kind.
+        assert_eq!(
+            classify_error("unrelated permanent refusal"),
+            Kind::Unclassified
+        );
+    }
+
+    #[test]
+    fn reentrant_writer_neither_deadlocks_nor_consumes_a_slot() {
+        let dir = Temp::new("reentrant");
+        let db = dir.0.join("registry.sqlite");
+        let outer_reg = Registry::open(&db).unwrap();
+        let inner_reg = Registry::open(&db).unwrap();
+        inner_reg
+            .connection
+            .busy_timeout(Duration::from_millis(10))
+            .unwrap();
+        // Open every handle before the write lock is held: schema bootstrap
+        // writes would otherwise queue behind the outer transaction.
+        let reg_b = Registry::open(&db).unwrap();
+        reg_b
+            .connection
+            .busy_timeout(Duration::from_secs(60))
+            .unwrap();
+        // The outer writer on this thread owns slot 1 and the write lock.
+        let outer = writer_tx(&outer_reg.connection).unwrap();
+        // A second connection parks in BEGIN IMMEDIATE on slot 2.
+        let parked = std::thread::spawn(move || {
+            let tx = writer_tx(&reg_b.connection).unwrap();
+            tx.commit().unwrap();
+        });
+        wait_in_flight(&outer_reg, "2");
+        // Same thread, third connection on the same file: the gate must not
+        // make the nested writer wait on its own slot. SQLite itself refuses
+        // the nested BEGIN IMMEDIATE while the outer write lock is held.
+        let started = std::time::Instant::now();
+        let inner = writer_tx_with_policy(
+            &inner_reg.connection,
+            WriterPolicy {
+                gate_wait_ms: 50,
+                lock_retries: 0,
+            },
+        );
+        let elapsed = started.elapsed();
+        let inner = inner.expect_err("nested BEGIN is refused by SQLite, not by the gate");
+        assert_eq!(inner.kind, Kind::RegistryAdmissionBusy);
+        assert!(
+            elapsed < Duration::from_millis(1000),
+            "reentrant admission must not queue on the gate: {elapsed:?}"
+        );
+        assert_eq!(outer_reg.writer_admission()["in_flight"], "2");
+        drop(outer);
+        parked.join().unwrap();
+        assert_eq!(outer_reg.writer_admission()["in_flight"], "0");
+        // Depth fully released: the same thread admits normally afterwards.
+        let tx = writer_tx(&inner_reg.connection).unwrap();
+        tx.execute_batch("CREATE TABLE reentrant_ok(n INTEGER)")
+            .unwrap();
+        tx.commit().unwrap();
+        assert_eq!(outer_reg.writer_admission()["in_flight"], "0");
+    }
+
+    #[test]
+    fn writer_policy_outside_declared_bounds_is_refused() {
+        let dir = Temp::new("bounds");
+        let db = dir.0.join("registry.sqlite");
+        let reg = Registry::open(&db).unwrap();
+        for policy in [
+            WriterPolicy {
+                gate_wait_ms: 60_001,
+                lock_retries: 0,
+            },
+            WriterPolicy {
+                gate_wait_ms: 0,
+                lock_retries: 9,
+            },
+        ] {
+            let failure = writer_tx_with_policy(&reg.connection, policy)
+                .expect_err("policy outside declared bounds must be refused");
+            assert_eq!(failure.kind, Kind::Unclassified);
+            assert!(
+                failure.message.contains("outside declared bounds"),
+                "{}",
+                failure.message
+            );
+        }
+        assert_eq!(reg.writer_admission()["in_flight"], "0");
+    }
+
+    #[test]
+    fn gates_are_per_file_and_observations_are_runtime_only() {
+        let dir = Temp::new("identity");
+        let db = dir.0.join("a.sqlite");
+        let db2 = dir.0.join("b.sqlite");
+        let reg1 = Registry::open(&db).unwrap();
+        let reg2 = Registry::open(&db).unwrap();
+        assert!(Arc::ptr_eq(&reg1.writer_gate, &reg2.writer_gate));
+        let other = Registry::open(&db2).unwrap();
+        assert!(!Arc::ptr_eq(&reg1.writer_gate, &other.writer_gate));
+        let g1 = writer_gate_for(None);
+        let g2 = writer_gate_for(None);
+        assert!(!Arc::ptr_eq(&g1, &g2));
+        {
+            let tx = writer_tx(&reg1.connection).unwrap();
+            tx.execute_batch("CREATE TABLE runtime_only(n INTEGER)")
+                .unwrap();
+            tx.commit().unwrap();
+        }
+        let version: u32 = reg1
+            .connection
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(version, SCHEMA_VERSION);
+        drop(reg1);
+        drop(reg2);
+        // Counters are runtime observations, not persisted schema: a fresh
+        // handle starts clean and the schema version is unchanged.
+        let reopened = Registry::open(&db).unwrap();
+        let obs = reopened.writer_admission();
+        assert_eq!(obs["refused"], "0", "{obs}");
+        assert_eq!(obs["in_flight"], "0", "{obs}");
+        assert_eq!(obs["busy_retries"], "0", "{obs}");
+        let version2: u32 = reopened
+            .connection
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(version2, SCHEMA_VERSION);
     }
 }

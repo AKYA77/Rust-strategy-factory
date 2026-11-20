@@ -50,7 +50,7 @@ use crate::{
     catalog::{self, Catalog},
     data,
 };
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use std::{fs::File, io::Read};
 const VERSION: &str = "persisted-machine-consistency-v1";
 const MAX_BODY: usize = 16 * 1024 * 1024;
@@ -245,10 +245,7 @@ impl Catalog {
             calendar,
         };
         let id = data::hash(&b)?;
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(|e| e.to_string())?;
+        let tx = crate::storage::writer_tx(&self.connection)?;
         if let Some(old) = read(&tx, &id)? {
             tx.commit().map_err(|e| e.to_string())?;
             return Ok(old);

@@ -116,3 +116,5 @@ pub mod recovery;
 pub mod corpus_campaign;
 
 pub mod campaign_rotation;
+
+pub mod qualification;

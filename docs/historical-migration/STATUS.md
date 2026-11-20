@@ -310,6 +310,14 @@ equivalence checks. `audit` does not re-read the Parquet.
     (no reinterpretation of completed results), and exact out-of-range refusals. No eligibility,
     approval or qualification change.
 
+## Verification throughput branch pointer (2026-11-20)
+
+`hermes/verification-throughput` (PR #21) carries the quality-neutral verification-throughput
+program: dev/test opt profiles + three-job parallel cached CI (mold evaluated, SKIPped —
+default rust-lld already at parity). Evidence:
+docs/VERIFICATION/verification-throughput-v1.json and docs/RUNBOOKS/verification-throughput.md.
+Measurement harness/logs: /root/.hermes/profiles/rsf-commander/cache/scratch/rsf-throughput-2026-11-20/.
+
 ## Safety notes
 
 - Do not modify `/var/lib/hermes-factory` source archives, canonical partitions or receipts.
