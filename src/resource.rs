@@ -906,6 +906,17 @@ mod host_cpu_tests {
     }
 }
 
+/// Sets the stop flag on EVERY scope exit path, including panic unwind, so the
+/// scoped workers can never be joined while still spinning on done=false.
+#[cfg(test)]
+struct DoneOnDrop(std::sync::Arc<std::sync::atomic::AtomicBool>);
+#[cfg(test)]
+impl Drop for DoneOnDrop {
+    fn drop(&mut self) {
+        self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 #[cfg(test)]
 mod thread_cpu_tests {
     use super::*;
@@ -946,16 +957,20 @@ mod thread_cpu_tests {
         let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let (send, receive) = std::sync::mpsc::channel();
         std::thread::scope(|scope| {
+            // Panic-safe: any unwind below still releases the workers.
+            let _release = DoneOnDrop(done.clone());
             for i in 0..3 {
                 let done = done.clone();
                 let send = send.clone();
                 std::thread::Builder::new()
                     .name(format!("rsf-test-w{i}"))
                     .spawn_scoped(scope, move || {
-                        // comm can lag thread start; retry bounded until the own
-                        // full name is visible, then report the enumeration result.
+                        // comm can lag thread start; retry TIME-bounded well inside
+                        // the parent's 15s recv deadline, then report the result.
+                        let deadline =
+                            std::time::Instant::now() + std::time::Duration::from_secs(5);
                         let mut own = Vec::new();
-                        for _ in 0..200 {
+                        while std::time::Instant::now() < deadline {
                             own = named_worker_threads(&format!("rsf-test-w{i}")).unwrap();
                             if own.len() == 1 {
                                 break;
@@ -1240,6 +1255,8 @@ mod sampler_tests {
         let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let (ready_send, ready_recv) = std::sync::mpsc::channel();
         std::thread::scope(|scope| {
+            // Panic-safe: any unwind below still releases the burners.
+            let _release = DoneOnDrop(done.clone());
             for i in 0..2 {
                 let done = done.clone();
                 let ready_send = ready_send.clone();
@@ -1248,9 +1265,11 @@ mod sampler_tests {
                     .spawn_scoped(scope, move || {
                         // Readiness: the thread has run and its comm is set, so the
                         // sampler's first sample cannot miss it. comm can lag thread
-                        // start; retry bounded instead of asserting in the worker.
+                        // start; retry TIME-bounded inside the parent's recv deadline.
+                        let deadline =
+                            std::time::Instant::now() + std::time::Duration::from_secs(5);
                         let mut own = Vec::new();
-                        for _ in 0..200 {
+                        while std::time::Instant::now() < deadline {
                             own = named_worker_threads(&format!("corpus-smp-t{i}")).unwrap();
                             if own.len() == 1 {
                                 break;
