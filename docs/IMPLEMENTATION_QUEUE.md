@@ -252,3 +252,21 @@ per instrument (8 instruments, 176 instrument-months, 421,078,937 events, 5,413,
 or session profile approval, source licensing, scientific eligibility or qualification is granted,
 and no financial, provenance, scientific or security safeguard was weakened. Real/protected/non-USD
 execution, approved source acquisition and target-VPS acceptance remain externally pending.
+
+Verification throughput follow-up (2026-11-20, PR #21): dev/test opt profiles + three-job
+parallel cached CI merged FIRST per admin directive so every later PR benefits. Measured on
+the QA-sweep baseline protocol (exclusive flock, -j4): full suite 3986.68s -> 440.25s
+(9.06x), real-data suites 906.96/53.82/2873.76s -> 99.45/7.55/281.04s, exact parity 54
+binaries/518 passed/0 failed/lib 148 verified twice; hosted CI 27.75min single-job (run
+44581603412) -> 15.37min cold parallel (run 44656886446, all three jobs success on 40f5711).
+mold evaluated and SKIPped: clean concurrency-guarded link-only A/B shows default rust-lld
+23.1.5 matches mold 2.30 (6.00s vs 6.55s for 54 executables); the first-pass 77.54s vs 6.29s
+was contamination-inflated (cold lib recompile from a concurrent non-flock lane build) and
+is retained as a documented measurement error. CI-first pre-push gate exercised:
+fmt/clippy/targeted 293/293 + provenance under flock; hosted CI ran the full clean ladder;
+QA review on the exact SHA. Also SKIPped with evidence: nextest (process-local
+FLEET_TIMING_LOCK serialization incompatible with process-per-test), sccache (rust-cache
+covers dep reuse; revisit with cache-hit telemetry), Cranelift (nightly-only), consolidation
+(invasive). Compute identity changes only via bound Cargo.toml bytes (honest build-metadata,
+30/30 reversible probes restored). PROGRESS.md rubric percentages unchanged: throughput
+infrastructure is not a rubric requirement. Remaining queue unchanged.
