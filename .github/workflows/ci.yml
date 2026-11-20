@@ -10,8 +10,13 @@ env:
   CARGO_INCREMENTAL: "0"
   CARGO_PROFILE_DEV_DEBUG: "0"
   CARGO_PROFILE_TEST_DEBUG: "0"
+# Three PARALLEL jobs (admin lever 2026-11-20): wall time = max(jobs), not sum.
+# Every previous stage/assertion is preserved; ALL three jobs are required for merge
+# (branch protection required status checks + QA verifies the full rollup on the exact SHA).
+# Each job gets its own job-scoped rust-cache (no shared-key -> no parallel save races).
 jobs:
-  check:
+  rust-checks:
+    name: rust-checks
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -21,11 +26,20 @@ jobs:
         run: rustup show
       - name: Cache cargo registry and target artifacts
         uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: rsf-checks-v1
       - run: mold -run sh scripts/check.sh
       - name: Verify trusted inventory cannot deserialize supplied JSON
         run: mold -run cargo test --locked --doc
+  browser:
+    name: browser
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mold linker (link-phase acceleration; no rustflag/identity change)
+        run: sudo apt-get update && sudo apt-get install -y mold
+      - name: Install pinned toolchain
+        run: rustup show
+      - name: Cache cargo registry and target artifacts
+        uses: Swatinem/rust-cache@v2
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -33,11 +47,23 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium
       - run: mold -run cargo build --locked
+      - run: npm run test:browser
+  release-acceptance:
+    name: release-acceptance
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mold linker (link-phase acceleration; no rustflag/identity change)
+        run: sudo apt-get update && sudo apt-get install -y mold
+      - name: Install pinned toolchain
+        run: rustup show
+      - name: Cache cargo registry and target artifacts
+        uses: Swatinem/rust-cache@v2
+      - run: mold -run cargo build --locked
       - name: Verify data compute identity boundaries
         run: |
           mkdir -p work
           mold -run python3 scripts/check-data-compute-identity.py work/data-compute-identity.json
-      - run: npm run test:browser
       - run: mold -run cargo build --locked --release
       - run: python3 scripts/check-operations.py
       - name: Verify continuous UTC horizon and declared context ceiling
