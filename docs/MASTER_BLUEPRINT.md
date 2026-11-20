@@ -379,13 +379,28 @@ The intended research period is:
 
 January 1, 2025 through the latest verified available date in 2026.
 
+**Owner decision (2026-11-19, final for the current research configuration):** the active
+research window is pinned to exactly the 22 completed months 2025-01-01 through 2026-10-31
+present in the structurally verified canonical corpus (8 instruments, 176 partitions). This is
+an explicit owner-selected calendar period, not a sliding default: the software resolves it by
+its calendar boundaries (`historical_corpus::ResearchWindow::OWNER_SELECTED`, CLI
+`historical-corpus-register-research-window`), refuses any window extending beyond available
+completed months with the exact missing months, and never downloads or backfills data to
+satisfy a longer interval. 2026-11 and 2026-12 are not completed/available and are not part of
+the active window. This supersedes the earlier 24-completed-month wording below for the active
+configuration; it changes no completed result's scientific meaning. See
+DECISIONS/0056-owner-selected-research-window.md.
+
 The system must report precise coverage and the actual latest included event.
 
 As of this directive, November 12, 2026, 2026 is still incomplete.
 
 Do not call January 2025–November 2026 a full 24-month period.
 
-If a separate exact 24-month research window is needed, support a configurable 24-completed-month interval.
+The configurable completed-month interval mechanism is retained (originally specified here as a
+configurable 24-completed-month interval): any exact interval is expressible in software and is
+refused with the precise shortfall when the required completed months do not exist. A 24-month
+window remains expressible and is refused while 2026-11 and 2026-12 are not completed/available.
 
 The full historical backfill will occur later on the VPS.
 

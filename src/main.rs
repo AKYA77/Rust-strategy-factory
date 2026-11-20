@@ -570,11 +570,11 @@ fn run(args: &[String]) -> Result<()> {
             instrument,
             spec,
         ] => {
-            let corpus = rust_strategy_factory::historical_corpus::register(
+            let corpus = rust_strategy_factory::historical_corpus::register_research_window(
                 Path::new(root),
                 Path::new(output_root),
                 instrument,
-                rust_strategy_factory::historical_corpus::EXPECTED_MONTHS,
+                &rust_strategy_factory::historical_corpus::ResearchWindow::OWNER_SELECTED,
             )?;
             save_replace(spec, &corpus)?;
             print(&serde_json::json!({
@@ -616,11 +616,11 @@ fn run(args: &[String]) -> Result<()> {
             feature_cells,
             report,
         ] => {
-            let spec = rust_strategy_factory::historical_corpus::register(
+            let spec = rust_strategy_factory::historical_corpus::register_research_window(
                 Path::new(root),
                 Path::new(output_root),
                 instrument,
-                rust_strategy_factory::historical_corpus::EXPECTED_MONTHS,
+                &rust_strategy_factory::historical_corpus::ResearchWindow::OWNER_SELECTED,
             )?;
             let strategy: rust_strategy_factory::strategies::Strategy = read_json(strategy)?;
             let max_candles: usize = max_candles.parse().map_err(|_| "invalid candle budget")?;
@@ -672,6 +672,66 @@ fn run(args: &[String]) -> Result<()> {
             }))
         }
         [
+            "historical-corpus-register-research-window",
+            root,
+            output_root,
+            instrument,
+            spec,
+        ] => {
+            let window = rust_strategy_factory::historical_corpus::ResearchWindow::OWNER_SELECTED;
+            let corpus = rust_strategy_factory::historical_corpus::register_research_window(
+                Path::new(root),
+                Path::new(output_root),
+                instrument,
+                &window,
+            )?;
+            save_replace(spec, &corpus)?;
+            print(&serde_json::json!({
+                "identity": corpus.identity,
+                "instrument": corpus.instrument,
+                "months": corpus.months.len(),
+                "first": format!("{}-{:02}", corpus.months[0].year, corpus.months[0].month),
+                "last": format!(
+                    "{}-{:02}",
+                    corpus.months[corpus.months.len() - 1].year,
+                    corpus.months[corpus.months.len() - 1].month
+                ),
+                "window": window.label(),
+                "window_source": "owner-selected-2026-11-19",
+            }))
+        }
+        [
+            "historical-corpus-register-window-config",
+            root,
+            output_root,
+            instrument,
+            window_config,
+            spec,
+        ] => {
+            let window: rust_strategy_factory::historical_corpus::ResearchWindow =
+                read_json(window_config)?;
+            let corpus = rust_strategy_factory::historical_corpus::register_research_window(
+                Path::new(root),
+                Path::new(output_root),
+                instrument,
+                &window,
+            )?;
+            save_replace(spec, &corpus)?;
+            print(&serde_json::json!({
+                "identity": corpus.identity,
+                "instrument": corpus.instrument,
+                "months": corpus.months.len(),
+                "first": format!("{}-{:02}", corpus.months[0].year, corpus.months[0].month),
+                "last": format!(
+                    "{}-{:02}",
+                    corpus.months[corpus.months.len() - 1].year,
+                    corpus.months[corpus.months.len() - 1].month
+                ),
+                "window": window.label(),
+                "window_source": "explicit-config",
+            }))
+        }
+        [
             "historical-corpus-execute",
             root,
             output_root,
@@ -683,11 +743,11 @@ fn run(args: &[String]) -> Result<()> {
             max_receipts,
             report,
         ] => {
-            let spec = rust_strategy_factory::historical_corpus::register(
+            let spec = rust_strategy_factory::historical_corpus::register_research_window(
                 Path::new(root),
                 Path::new(output_root),
                 instrument,
-                rust_strategy_factory::historical_corpus::EXPECTED_MONTHS,
+                &rust_strategy_factory::historical_corpus::ResearchWindow::OWNER_SELECTED,
             )?;
             let strategy: rust_strategy_factory::strategies::Strategy = read_json(strategy)?;
             let costs: rust_strategy_factory::tick_engine::Costs = read_json(costs)?;
@@ -730,11 +790,11 @@ fn run(args: &[String]) -> Result<()> {
             cache_dir,
             report,
         ] => {
-            let spec = rust_strategy_factory::historical_corpus::register(
+            let spec = rust_strategy_factory::historical_corpus::register_research_window(
                 Path::new(root),
                 Path::new(output_root),
                 instrument,
-                rust_strategy_factory::historical_corpus::EXPECTED_MONTHS,
+                &rust_strategy_factory::historical_corpus::ResearchWindow::OWNER_SELECTED,
             )?;
             let strategy: rust_strategy_factory::strategies::Strategy = read_json(strategy)?;
             let costs: rust_strategy_factory::tick_engine::Costs = read_json(costs)?;
@@ -777,11 +837,11 @@ fn run(args: &[String]) -> Result<()> {
             instrument,
             report,
         ] => {
-            let spec = rust_strategy_factory::historical_corpus::register(
+            let spec = rust_strategy_factory::historical_corpus::register_research_window(
                 Path::new(root),
                 Path::new(output_root),
                 instrument,
-                rust_strategy_factory::historical_corpus::EXPECTED_MONTHS,
+                &rust_strategy_factory::historical_corpus::ResearchWindow::OWNER_SELECTED,
             )?;
             let audit = rust_strategy_factory::historical_corpus::audit(&spec)?;
             save_replace(report, &audit)?;

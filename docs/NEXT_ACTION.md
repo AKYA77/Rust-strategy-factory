@@ -4,6 +4,7 @@ Status: SOFTWARE_INCOMPLETE. Use the existing checkout. Read AGENTS.md, PROJECT_
 
 ## Latest verified local milestone
 
+<<<<<<< HEAD
 Branch `hermes/dashboard-activation-panels` (implementation `de6724f`, spawn-diagnostics fix
 `d4a4325`, this docs reconciliation; PR #24) closes the authenticated dashboard's remaining
 operational gaps from queue item 14: an optional `--operations` serve configuration exposes the
@@ -24,6 +25,25 @@ all 13 Chromium suites, release/identity/operations/full-horizon). The docs foll
 run is recorded on PR #24 before merge. Observations are not enforcement; no eligibility,
 approval, qualification, acquisition, live trading or public exposure is granted. Software
 remains incomplete.
+=======
+`hermes/research-22m-window` (branched from `main` @ `ee5d08a`) pins the owner-selected research
+window: `historical_corpus::ResearchWindow::OWNER_SELECTED` = 2025-01..2026-10 (exactly 22
+completed months; owner decision 2026-11-19), `EXPECTED_MONTHS` derives from the pin, and
+`register_research_window` resolves exactly those calendar months from the canonical corpus,
+refusing any window with missing months by exact list (2026-11/2026-12 are not
+completed/available; no padding, backfill or silent truncation). `verify` requires full-length
+specifications to cover the pinned boundaries. The full-corpus research CLIs
+(register/study/execute/execute-cached/audit) register through the pin; new
+`historical-corpus-register-research-window` and `historical-corpus-register-window-config` CLIs
+expose the configuration surface (RUNBOOKS/research-window.md, DECISIONS/0056). Real-data tests
+assert the 22-month boundaries for all eight instruments, identity equality with exact-count
+registration (no reinterpretation of completed results), and exact out-of-range refusals. Local
+ladder on the branch under the shared heavy lock (project artifacts cleaned first): `cargo fmt
+--all -- --check`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo test --locked
+--lib --bins --tests` (54 binaries, 524 passed, 0 failed) and `scripts/check.sh` (54 binaries,
+524 passed, 0 failed). Hosted CI follows publication. No eligibility, approval or qualification
+change; the corpus remains REAL_STRUCTURALLY_VALID only.
+>>>>>>> origin/main
 
 Verification throughput landed through PR #21 (`hermes/verification-throughput`):
 quality-neutral dev/test optimization profiles (deps opt2 cached once, test code opt1,

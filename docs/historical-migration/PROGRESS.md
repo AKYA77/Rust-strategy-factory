@@ -9,7 +9,7 @@ are not counted as integrated into `main`.
 |---|---|---|---|---|
 | Core Rust implementation | 20 | ~87% | ~72% | Engine, corpus, campaign/fleet, checkpoint modules exist and are tested; Codex stack #8–#13 unmerged. |
 | Data ingestion and provenance | 15 | ~90% | ~80% | Legacy Parquet → native conversion with source binding, receipt identity, restart safety; corpus/catalog/audit CLIs. |
-| Multi-instrument historical integration | 15 | ~88% | ~70% | 8/8 instruments converted and registered; real corpus → source facts → candles → causal signals verified on genuine data. Replay/execution remains synthetic literal-USD scoped. |
+| Multi-instrument historical integration | 15 | ~89% | ~71% | 8/8 instruments converted and registered; real corpus → source facts → candles → causal signals verified on genuine data; owner-selected 22-month window explicitly pinned and verified (boundaries/refusals/identity preservation, all 8 instruments). Replay/execution remains synthetic literal-USD scoped. |
 | Engine correctness and verification | 20 | ~82% | ~68% | CI green, adversarial review, regression tests; full unmerged stack not jointly accepted. |
 | Operational usability and recovery | 10 | ~70% | ~55% | Migration/corpus/catalog/audit CLIs and real-data tests; dashboard historical views and live VPS recovery incomplete. |
 | Performance | 5 | ~78% | ~68% | Measured bounded conversion, windowed decode, receipt-only catalog scan, 12-min full-corpus audit. |
@@ -20,13 +20,17 @@ are not counted as integrated into `main`.
 
 - **Software implementation completeness (Metric A): ~76%.**
 - **Verified end-to-end completion (Metric B): ~63%.**
-- **Progress added this milestone: +3 points.** A genuine VPS-data structural pipeline
-  (corpus → observed source facts → closed M1 candles → causal signals) runs for all eight
-  instruments; a deterministic per-instrument **study report** is now produced; and
-  `historical-corpus-verify-bound` confirmed full source-byte equivalence for **all 421,078,937
-  events** across all eight instruments. The whole-project gap assessment, storage report and
-  Codex compatibility notes are recorded. The gain is bounded because real/FX execution, the
-  merged Codex stack, live VPS acceptance and external approvals did not move.
+- **Progress added this milestone: +0.15 weighted points (each metric).** The owner-selected
+  22-month research window (2025-01..2026-10) is now an explicit, tested calendar pin rather than
+  a count-coincidence default: exact boundaries for all eight instruments, exact out-of-range
+  refusals, and identity preservation versus exact-count registration are verified on the real
+  corpus (+1 implementation / +1 verified point on the 15%-weighted historical-integration row;
+  unchanged at whole-percent granularity). The gain is bounded because this closes a
+  configuration requirement, not a new execution capability: real/FX execution, external
+  approvals and full-corpus diagnostic execution over the pin (next card) did not move. Prior
+  milestone (+3 points): genuine VPS-data structural pipeline for all eight instruments,
+  deterministic per-instrument study reports, and `historical-corpus-verify-bound` source-byte
+  equivalence for all 421,078,937 events.
 - **Remaining: ~38% software, ~38% verified. Target gap to 95%: 19 points software, 33 points
   verified.**
 - Baseline used: external provisional estimates (software 74%, verified 60%). The rubric and
