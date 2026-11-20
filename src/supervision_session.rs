@@ -1,6 +1,6 @@
 //! Foreground invocation observations and owner-fenced completion, not PID liveness.
 use crate::{Result, data, storage::Registry};
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 #[derive(Clone)]
 pub struct Owner {
@@ -29,9 +29,7 @@ fn valid_time(n: i64) -> bool {
     chrono::DateTime::from_timestamp_millis(n).is_some()
 }
 pub(crate) fn initialize(c: &mut Connection, migrate: bool) -> Result<()> {
-    let tx = c
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx_open(c).map_err(|e| e.to_string())?;
     tx.execute_batch("CREATE TABLE IF NOT EXISTS corpus_supervision_sessions(id TEXT PRIMARY KEY,search_id TEXT NOT NULL REFERENCES corpus_searches(id),token TEXT,body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=4096),hash TEXT NOT NULL CHECK(length(hash)=64),stop_at_ms INTEGER);CREATE TABLE IF NOT EXISTS corpus_supervision_receipts(id TEXT PRIMARY KEY REFERENCES corpus_supervision_sessions(id),body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=4096),hash TEXT NOT NULL CHECK(length(hash)=64));CREATE TRIGGER IF NOT EXISTS supervision_session_no_delete BEFORE DELETE ON corpus_supervision_sessions BEGIN SELECT RAISE(ABORT,'session retained');END;CREATE TRIGGER IF NOT EXISTS supervision_session_identity BEFORE UPDATE OF id,search_id ON corpus_supervision_sessions BEGIN SELECT RAISE(ABORT,'session identity immutable');END;CREATE TRIGGER IF NOT EXISTS supervision_session_terminal BEFORE UPDATE ON corpus_supervision_sessions WHEN json_extract(OLD.body,'$.finished_at_ms') IS NOT NULL BEGIN SELECT RAISE(ABORT,'terminal session immutable');END;CREATE TRIGGER IF NOT EXISTS supervision_receipt_no_update BEFORE UPDATE ON corpus_supervision_receipts BEGIN SELECT RAISE(ABORT,'session receipt immutable');END;CREATE TRIGGER IF NOT EXISTS supervision_receipt_no_delete BEFORE DELETE ON corpus_supervision_receipts BEGIN SELECT RAISE(ABORT,'session receipt immutable');END;").map_err(|e|e.to_string())?;
     tx.execute_batch("CREATE INDEX IF NOT EXISTS supervision_unclosed_owners ON corpus_supervision_sessions(id) WHERE token IS NOT NULL;").map_err(|e|e.to_string())?;
     if migrate {
@@ -97,10 +95,7 @@ pub fn start(
     {
         return Err("invalid session admission".into());
     }
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     crate::search_control::read(&tx, source)?;
     let count: usize = tx
         .query_row(
@@ -147,10 +142,7 @@ fn update(
     now: i64,
     reason: Option<&str>,
 ) -> Result<()> {
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     let (mut b, token, stop, _) = read(&tx, &owner.id)?;
     if token.as_deref() != Some(&owner.token)
         || !valid_time(now)
@@ -218,10 +210,7 @@ pub fn request_stop(registry: &mut Registry, id: &str, now: i64) -> Result<bool>
     if !valid_time(now) {
         return Err("invalid stop observation time".into());
     }
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     let (b, _, stop, _) = read(&tx, id)?;
     if b.finished_at_ms.is_some() || stop.is_some() {
         return Ok(false);

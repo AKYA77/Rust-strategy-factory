@@ -334,7 +334,7 @@ fn verify_at(directory: &Path, id: &str) -> Result<Manifest> {
     if mode != "delete" {
         return Err("snapshot journal mode is not sealed offline".into());
     }
-    let reg = Registry { connection };
+    let reg = crate::storage::wrap_connection(connection);
     let schema: u32 = reg
         .connection
         .query_row("PRAGMA user_version", [], |r| r.get(0))
@@ -378,10 +378,10 @@ fn finish(
     secure_file(&db)?;
     offline(&db)?;
     let files = artifacts(&directory.join("registry.sqlite.artifacts"), true)?;
-    let reg = Registry {
-        connection: Connection::open_with_flags(&db, OpenFlags::SQLITE_OPEN_READ_ONLY)
+    let reg = crate::storage::wrap_connection(
+        Connection::open_with_flags(&db, OpenFlags::SQLITE_OPEN_READ_ONLY)
             .map_err(|e| e.to_string())?,
-    };
+    );
     let schema = reg
         .connection
         .query_row("PRAGMA user_version", [], |r| r.get(0))
@@ -834,13 +834,13 @@ mod tests {
         let before = crate::supervision_session::status(&reg, &owner.id).unwrap();
         backup(&db, "one").unwrap();
         restore(&db, "one", "copy").unwrap();
-        let copied = Registry {
-            connection: Connection::open_with_flags(
+        let copied = crate::storage::wrap_connection(
+            Connection::open_with_flags(
                 path(&db, "copy").unwrap(),
                 OpenFlags::SQLITE_OPEN_READ_ONLY,
             )
             .unwrap(),
-        };
+        );
         assert_eq!(
             crate::supervision_session::status(&copied, &owner.id).unwrap(),
             before

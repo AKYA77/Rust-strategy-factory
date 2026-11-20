@@ -5,19 +5,21 @@ use crate::{
     strategies::Strategy,
     tick_engine::{self, CorpusBatchLimits, CorpusBudget, CorpusProgress, CorpusRun, Costs},
 };
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 const VERSION: &str = "synthetic-corpus-search-v1";
 const GENERATOR: &str = "candidate-at-regions-v1";
 pub(crate) fn initialize(connection: &Connection) -> Result<()> {
-    connection.execute_batch("CREATE TABLE IF NOT EXISTS corpus_searches(id TEXT PRIMARY KEY,configuration TEXT NOT NULL,cursor INTEGER NOT NULL DEFAULT 0 CHECK(cursor>=0),state TEXT NOT NULL DEFAULT 'running' CHECK(state IN ('running','paused','stopped','exhausted')),token TEXT,expires_ms INTEGER,attempt INTEGER NOT NULL DEFAULT 0 CHECK(attempt>=0));
+    let tx = crate::storage::writer_tx_open(connection).map_err(|e| e.to_string())?;
+    tx.execute_batch("CREATE TABLE IF NOT EXISTS corpus_searches(id TEXT PRIMARY KEY,configuration TEXT NOT NULL,cursor INTEGER NOT NULL DEFAULT 0 CHECK(cursor>=0),state TEXT NOT NULL DEFAULT 'running' CHECK(state IN ('running','paused','stopped','exhausted')),token TEXT,expires_ms INTEGER,attempt INTEGER NOT NULL DEFAULT 0 CHECK(attempt>=0));
     CREATE TABLE IF NOT EXISTS corpus_search_jobs(search_id TEXT NOT NULL REFERENCES corpus_searches(id),slot INTEGER NOT NULL CHECK(slot>=0),body TEXT NOT NULL,hash TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('queued','pending','completed','terminal','error')),error TEXT,PRIMARY KEY(search_id,slot));
     CREATE TRIGGER IF NOT EXISTS corpus_search_definition_immutable BEFORE UPDATE OF id,configuration ON corpus_searches BEGIN SELECT RAISE(ABORT,'search definition immutable');END;
     CREATE TRIGGER IF NOT EXISTS corpus_search_job_immutable BEFORE UPDATE OF search_id,slot,body,hash ON corpus_search_jobs BEGIN SELECT RAISE(ABORT,'search job immutable');END;
     CREATE TRIGGER IF NOT EXISTS corpus_search_no_delete BEFORE DELETE ON corpus_searches BEGIN SELECT RAISE(ABORT,'search immutable');END;
     CREATE TRIGGER IF NOT EXISTS corpus_search_job_no_delete BEFORE DELETE ON corpus_search_jobs BEGIN SELECT RAISE(ABORT,'search job immutable');END;").map_err(|e|e.to_string())?;
-    connection.execute_batch("CREATE TABLE IF NOT EXISTS corpus_search_requeues(event_id INTEGER PRIMARY KEY,search_id TEXT NOT NULL,slot INTEGER NOT NULL,sequence INTEGER NOT NULL CHECK(sequence BETWEEN 1 AND 3),body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=4096),hash TEXT NOT NULL CHECK(length(hash)=64),UNIQUE(search_id,slot,sequence),FOREIGN KEY(search_id,slot) REFERENCES corpus_search_jobs(search_id,slot));CREATE TRIGGER IF NOT EXISTS corpus_search_requeue_no_update BEFORE UPDATE ON corpus_search_requeues BEGIN SELECT RAISE(ABORT,'requeue history immutable');END;CREATE TRIGGER IF NOT EXISTS corpus_search_requeue_no_delete BEFORE DELETE ON corpus_search_requeues BEGIN SELECT RAISE(ABORT,'requeue history immutable');END;").map_err(|e|e.to_string())
+    tx.execute_batch("CREATE TABLE IF NOT EXISTS corpus_search_requeues(event_id INTEGER PRIMARY KEY,search_id TEXT NOT NULL,slot INTEGER NOT NULL,sequence INTEGER NOT NULL CHECK(sequence BETWEEN 1 AND 3),body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=4096),hash TEXT NOT NULL CHECK(length(hash)=64),UNIQUE(search_id,slot,sequence),FOREIGN KEY(search_id,slot) REFERENCES corpus_search_jobs(search_id,slot));CREATE TRIGGER IF NOT EXISTS corpus_search_requeue_no_update BEFORE UPDATE ON corpus_search_requeues BEGIN SELECT RAISE(ABORT,'requeue history immutable');END;CREATE TRIGGER IF NOT EXISTS corpus_search_requeue_no_delete BEFORE DELETE ON corpus_search_requeues BEGIN SELECT RAISE(ABORT,'requeue history immutable');END;").map_err(|e|e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())
 }
 pub struct SearchRun<'a> {
     pub base: &'a Path,
@@ -147,10 +149,7 @@ fn register(registry: &mut Registry, config: &Configuration) -> Result<String> {
             .map_err(|error| format!("frozen candidate slot {slot} refused: {error}"))?;
         }
     }
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     let stored_bytes: Option<usize> = tx
         .query_row(
             "SELECT length(CAST(configuration AS BLOB)) FROM corpus_searches WHERE id=?1",
@@ -410,10 +409,7 @@ pub fn requeue_errors(
     id: &str,
     maximum_slots: usize,
 ) -> Result<serde_json::Value> {
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     let value = requeue_in(
         &tx,
         id,
@@ -573,10 +569,7 @@ pub(crate) fn retry_admit(
     if chrono::DateTime::from_timestamp_millis(now).is_none() {
         return Err("invalid retry admission time".into());
     }
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     if expected_epoch < 0 {
         return Err("retry epoch must be nonnegative".into());
     }
@@ -795,10 +788,7 @@ pub(crate) fn integrity(registry: &Registry) -> Result<()> {
     tx.commit().map_err(|e| e.to_string())
 }
 pub fn control(registry: &mut Registry, id: &str, state: &str) -> Result<()> {
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     crate::search_control::transition(
         &tx,
         id,
@@ -830,10 +820,7 @@ fn admit(registry: &mut Registry, lease: &Lease, config: &Configuration) -> Resu
         bytes += body.len();
         incoming.push((slot, body, data::hash(&definition)?));
     }
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     fence(&tx, lease, chrono::Utc::now().timestamp_millis())?;
     let (count, size): (usize, usize) = tx
         .query_row(
@@ -962,10 +949,7 @@ pub fn step(database: &Path, run: SearchRun<'_>, limits: CorpusBatchLimits) -> R
                 })
                 .collect::<Vec<_>>()
         };
-        let tx = registry
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(|e| e.to_string())?;
+        let tx = crate::storage::writer_tx(&registry.connection)?;
         fence(&tx, &lease, chrono::Utc::now().timestamp_millis())?;
         let errored = updates.iter().any(|(_, state, _, _)| *state == "error");
         for (slot, state, error, kind) in updates {
@@ -1255,10 +1239,7 @@ mod tests {
         .unwrap();
         let lease = claim(&mut registry, &id, 100, 1000).unwrap().unwrap();
         {
-            let tx = registry
-                .connection
-                .transaction_with_behavior(TransactionBehavior::Immediate)
-                .unwrap();
+            let tx = crate::storage::writer_tx(&registry.connection).unwrap();
             crate::search_control::transition(
                 &tx,
                 &id,
@@ -1416,12 +1397,9 @@ mod tests {
             let id = id.clone();
             let barrier = barrier.clone();
             std::thread::spawn(move || {
-                let mut registry = Registry::open(&path).unwrap();
+                let registry = Registry::open(&path).unwrap();
                 barrier.wait();
-                let tx = registry
-                    .connection
-                    .transaction_with_behavior(TransactionBehavior::Immediate)
-                    .unwrap();
+                let tx = crate::storage::writer_tx(&registry.connection).unwrap();
                 if fence(&tx, &lease, 110).is_ok() {
                     crate::search_control::transition(
                         &tx,
@@ -1677,10 +1655,7 @@ mod tests {
             .unwrap();
         registry.connection.execute("UPDATE corpus_search_jobs SET error_kind='registry_admission_busy',failure_hash=?2 WHERE search_id=?1",params![id,crate::corpus_failure::fingerprint(&id,0,&hash,crate::corpus_failure::Kind::RegistryAdmissionBusy,&error).unwrap()]).unwrap();
         control(&mut registry, &id, "running").unwrap();
-        let tx = registry
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .unwrap();
+        let tx = crate::storage::writer_tx(&registry.connection).unwrap();
         crate::search_control::transition(
             &tx,
             &id,
@@ -1959,10 +1934,7 @@ mod tests {
         );
         control(&mut registry, &id, "running").unwrap();
         fixture_error(&registry, &id, "permanent configuration refusal");
-        let tx = registry
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .unwrap();
+        let tx = crate::storage::writer_tx(&registry.connection).unwrap();
         crate::search_control::transition(
             &tx,
             &id,
@@ -2032,10 +2004,7 @@ mod tests {
                 "admission busy",
             );
             registry.connection.execute("UPDATE corpus_search_jobs SET state='error',error=?2,error_kind='registry_admission_busy',failure_hash=?3 WHERE search_id=?1",params![id,error,crate::corpus_failure::fingerprint(&id,0,&hash,crate::corpus_failure::Kind::RegistryAdmissionBusy,error).unwrap()]).unwrap();
-            let tx = registry
-                .connection
-                .transaction_with_behavior(TransactionBehavior::Immediate)
-                .unwrap();
+            let tx = crate::storage::writer_tx(&registry.connection).unwrap();
             crate::search_control::transition(
                 &tx,
                 &id,

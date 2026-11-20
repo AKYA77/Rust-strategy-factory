@@ -1,6 +1,6 @@
 //! Bounded durable visit fairness across frozen campaigns; never equal CPU shares.
 use crate::{Result, corpus_campaign, data, operator_config, storage::Registry};
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 const VERSION: &str = "campaign-rotation-v1";
@@ -14,9 +14,7 @@ pub(crate) fn initialize(connection: &mut Connection, previous: i64) -> Result<(
     if previous >= 22 {
         return Ok(());
     }
-    let tx = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(db)?;
+    let tx = crate::storage::writer_tx_open(connection).map_err(|e| e.to_string())?;
     let current: i64 = tx
         .query_row("PRAGMA user_version", [], |r| r.get(0))
         .map_err(db)?;
@@ -147,11 +145,8 @@ pub fn register_file(path: &Path, database: &Path) -> Result<String> {
     if configuration.len() > 65536 {
         return Err("rotation definition exceeds cap".into());
     }
-    let mut registry = Registry::open(database)?;
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(db)?;
+    let registry = Registry::open(database)?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     for member in &definition.campaigns {
         corpus_campaign::status_on(&tx, &member.campaign_id)?;
     }
@@ -475,10 +470,7 @@ fn control_at(
     if !["running", "paused", "stopped"].contains(&state) {
         return Err("invalid rotation control".into());
     }
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(db)?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     let mut s = read(&tx, id)?;
     if expected_epoch.is_some_and(|epoch| epoch != s.epoch) {
         return Err("stale rotation control epoch".into());
@@ -612,10 +604,7 @@ pub fn step(
         let campaign = &current.definition.campaigns[index].campaign_id;
         let before = corpus_campaign::status(&registry, campaign).ok();
         let child = corpus_campaign::supervised_step(database, campaign, supervision);
-        let tx = registry
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(db)?;
+        let tx = crate::storage::writer_tx(&registry.connection)?;
         crate::coordinator::fence(&tx, &lease, chrono::Utc::now().timestamp_millis())?;
         let mut current = read(&tx, id)?;
         let (kind, outcome, unknown, progress) = match &child {
@@ -789,10 +778,7 @@ fn retry_wakeup(
         .min()
 }
 fn resume_idle(registry: &mut Registry, id: &str, expected_epoch: i64) -> Result<bool> {
-    let tx = registry
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(db)?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     let mut s = read(&tx, id)?;
     if s.state != "paused"
         || s.origin.as_deref() != Some("scheduler_idle")

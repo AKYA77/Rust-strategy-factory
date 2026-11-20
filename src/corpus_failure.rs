@@ -1,6 +1,6 @@
 //! Typed provenance; only actual SQLite busy/locked admission errors are retry candidates.
 use crate::{Result, data};
-use rusqlite::{Connection, TransactionBehavior, params};
+use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -57,7 +57,13 @@ impl From<&str> for AdmissionFailure {
 }
 impl From<rusqlite::Error> for AdmissionFailure {
     fn from(error: rusqlite::Error) -> Self {
-        let busy = matches!(&error,rusqlite::Error::SqliteFailure(code,_) if matches!(code.code,rusqlite::ErrorCode::DatabaseBusy|rusqlite::ErrorCode::DatabaseLocked));
+        Self::from_sqlite(&error)
+    }
+}
+impl AdmissionFailure {
+    /// Classify by SQLite error code only, never by human text (schema12).
+    pub(crate) fn from_sqlite(error: &rusqlite::Error) -> Self {
+        let busy = matches!(error,rusqlite::Error::SqliteFailure(code,_) if matches!(code.code,rusqlite::ErrorCode::DatabaseBusy|rusqlite::ErrorCode::DatabaseLocked));
         Self {
             kind: if busy {
                 Kind::RegistryAdmissionBusy
@@ -66,6 +72,36 @@ impl From<rusqlite::Error> for AdmissionFailure {
             },
             message: error.to_string(),
         }
+    }
+}
+thread_local! {
+    /// Typed provenance of the most recent writer-admission refusal on this
+    /// thread. Writer admission records the exact `AdmissionFailure` here so
+    /// callers whose error channel is `String` (the historical registry API)
+    /// can recover the kind without parsing human text. One cell per thread.
+    /// The cell persists until consumed (`classify_error`/`take`) or
+    /// overwritten by a newer refusal: successful writes deliberately do NOT
+    /// erase it, because cleanup writes after a failed operation (e.g. lease
+    /// release) must not destroy the failure's typed kind. Exact message
+    /// equality in `classify_error` prevents a stale record from ever
+    /// classifying an unrelated error.
+    static LAST_ADMISSION_FAILURE: std::cell::RefCell<Option<AdmissionFailure>> =
+        const { std::cell::RefCell::new(None) };
+}
+pub(crate) fn record_admission_failure(failure: AdmissionFailure) {
+    LAST_ADMISSION_FAILURE.with(|cell| *cell.borrow_mut() = Some(failure));
+}
+pub fn take_admission_failure() -> Option<AdmissionFailure> {
+    LAST_ADMISSION_FAILURE.with(|cell| cell.borrow_mut().take())
+}
+/// Classify a stringified job/write error using the recorded typed admission
+/// failure. The kind comes from the cell, never from the text; exact message
+/// equality only correlates the recorded refusal with the propagated error,
+/// so an unrelated later error can never inherit a stale busy kind.
+pub fn classify_error(error: &str) -> Kind {
+    match take_admission_failure() {
+        Some(failure) if failure.message == error => failure.kind,
+        _ => Kind::Unclassified,
     }
 }
 pub(crate) fn fingerprint(
@@ -78,9 +114,7 @@ pub(crate) fn fingerprint(
     data::hash(&("corpus-failure-v1", id, slot, job_hash, kind, error))
 }
 pub(crate) fn initialize(c: &mut Connection, migrate: bool) -> Result<()> {
-    let tx = c
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx_open(c).map_err(|e| e.to_string())?;
     let columns:usize=tx.query_row("SELECT count(*) FROM pragma_table_info('corpus_search_jobs') WHERE name IN ('error_kind','failure_hash')",[],|r|r.get(0)).map_err(|e|e.to_string())?;
     if migrate {
         if columns == 0 {

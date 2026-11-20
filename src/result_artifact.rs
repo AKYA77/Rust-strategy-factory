@@ -12,9 +12,11 @@ pub const MAX_BYTES: usize = 64 * 1024 * 1024;
 const MAX_FILES: usize = 4096;
 const MAX_STORE_BYTES: u64 = 1024 * 1024 * 1024;
 pub(crate) fn initialize(c: &Connection) -> Result<()> {
-    c.execute_batch("CREATE TABLE IF NOT EXISTS result_artifacts(experiment_id TEXT PRIMARY KEY REFERENCES experiments(id),hash TEXT NOT NULL CHECK(length(hash)=64),bytes INTEGER NOT NULL CHECK(bytes>262144 AND bytes<=67108864));
+    let tx = crate::storage::writer_tx_open(c).map_err(|e| e.to_string())?;
+    tx.execute_batch("CREATE TABLE IF NOT EXISTS result_artifacts(experiment_id TEXT PRIMARY KEY REFERENCES experiments(id),hash TEXT NOT NULL CHECK(length(hash)=64),bytes INTEGER NOT NULL CHECK(bytes>262144 AND bytes<=67108864));
     CREATE TRIGGER IF NOT EXISTS result_artifact_no_update BEFORE UPDATE ON result_artifacts BEGIN SELECT RAISE(ABORT,'result artifact immutable');END;
-    CREATE TRIGGER IF NOT EXISTS result_artifact_no_delete BEFORE DELETE ON result_artifacts BEGIN SELECT RAISE(ABORT,'result artifact immutable');END;").map_err(|e|e.to_string())
+    CREATE TRIGGER IF NOT EXISTS result_artifact_no_delete BEFORE DELETE ON result_artifacts BEGIN SELECT RAISE(ABORT,'result artifact immutable');END;").map_err(|e|e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())
 }
 struct Limited {
     bytes: Vec<u8>,
@@ -231,9 +233,7 @@ pub(crate) fn resolve(c: &Connection, id: &str, stored: Value, expected: &str) -
     Ok(result)
 }
 pub(crate) fn copy_referenced(source: &Connection, destination: &mut Connection) -> Result<()> {
-    let tx = destination
-        .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx(destination)?;
     {
         let mut query = tx
             .prepare("SELECT experiment_id,hash,bytes FROM result_artifacts ORDER BY bytes DESC,experiment_id")

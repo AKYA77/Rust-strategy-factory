@@ -25,6 +25,23 @@ run is recorded on PR #24 before merge. Observations are not enforcement; no eli
 approval, qualification, acquisition, live trading or public exposure is granted. Software
 remains incomplete.
 
+Verification throughput landed through PR #21 (`hermes/verification-throughput`):
+quality-neutral dev/test optimization profiles (deps opt2 cached once, test code opt1,
+line-tables-only debug, workspace build script opt3) and a three-job parallel hosted CI
+(rust-checks / browser / release-acceptance) with per-job rust-cache, CARGO_INCREMENTAL=0
+and CI debug=0. Measured: full suite 3986.68s -> 440.25s (9.06x) with exact 54/518/148
+parity verified twice; real-data suites 9.1x/7.1x/10.2x faster; hosted CI 27.75min
+single-job -> 15.37min cold parallel. mold was evaluated and SKIPped: a clean
+concurrency-guarded link-only A/B shows the rustc-1.100 default rust-lld already matches
+mold (6.00s vs 6.55s for 54 executables); the first-pass 12.3x figure was
+contamination-inflated and is documented as a measurement error. Receipts:
+`docs/VERIFICATION/verification-throughput-v1.json`; runbook
+`docs/RUNBOOKS/verification-throughput.md` records all SKIP decisions
+(mold/nextest/sccache/Cranelift/consolidation) and the CI-first pre-push gate. The
+Cargo.toml edit is an honest compute-identity build-metadata change (3b7b85d9... ->
+47d1658d...). No gate, test or financial contract changed; no percentage claim from
+throughput alone.
+
 `main` integrates PR #19 (`hermes/integration-codex-stack` @ `cd5ec86`, configurable
 completed-month research window) and PR #20 (`hermes/historical-execution-cache` @ `2603073`,
 resumable self-labelling diagnostic execution). PR #20 merged through GitHub as `f7e1cd1`; PR
