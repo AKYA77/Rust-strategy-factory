@@ -4,7 +4,7 @@
 
 use rust_strategy_factory::candles::{self, Timeframe};
 use rust_strategy_factory::historical_catalog::{self};
-use rust_strategy_factory::historical_corpus::{self, EXPECTED_MONTHS};
+use rust_strategy_factory::historical_corpus::{self, EXPECTED_MONTHS, ResearchWindow};
 use std::path::Path;
 
 const INSTRUMENTS: [&str; 8] = [
@@ -23,6 +23,15 @@ fn real_corpus_end_to_end() {
         historical_corpus::register(catalog_root, output, "EURUSD", EXPECTED_MONTHS).unwrap();
     assert_eq!(spec.months.len(), EXPECTED_MONTHS);
     assert_eq!(spec.instrument, "EURUSD");
+    // The canonical corpus is exactly the owner-selected 22-month window.
+    assert_eq!((spec.months[0].year, spec.months[0].month), (2025, 1));
+    assert_eq!(
+        (
+            spec.months[spec.months.len() - 1].year,
+            spec.months[spec.months.len() - 1].month
+        ),
+        (2026, 10)
+    );
     let expected_rows: u64 = spec.months.iter().map(|m| m.rows).sum();
     historical_corpus::verify(&spec).unwrap();
 
@@ -120,8 +129,10 @@ fn catalog_refuses_foreign_receipt() {
     let _ = std::fs::remove_dir_all(&tmp);
 }
 
-/// The blueprint's exact 24-completed-month research window must be configurable in software and
-/// must report the precise shortfall rather than pad or fabricate periods.
+/// The configurable completed-month mechanism must report the precise shortfall rather than pad
+/// or fabricate periods. The owner-selected active window is the explicit 22-month pin
+/// 2025-01..2026-10 (owner decision 2026-11-19); 23- and 24-month windows exceed the available
+/// completed months and must be refused.
 #[test]
 fn configurable_window_refuses_shortfall_and_selects_latest_months() {
     let catalog_root = Path::new("/var/lib/hermes-factory");
@@ -137,6 +148,13 @@ fn configurable_window_refuses_shortfall_and_selects_latest_months() {
         "{shortfall}"
     );
     assert!(shortfall.contains("24-month window"), "{shortfall}");
+    let shortfall23 = historical_corpus::register_window(catalog_root, output, "EURUSD", 23)
+        .expect_err("a 23-month window must be refused while only 22 completed months exist");
+    assert!(
+        shortfall23.contains("only 22 completed monthly partitions"),
+        "{shortfall23}"
+    );
+    assert!(shortfall23.contains("23-month window"), "{shortfall23}");
     assert!(historical_corpus::register_window(catalog_root, output, "EURUSD", 0).is_err());
 
     let window =
@@ -144,6 +162,13 @@ fn configurable_window_refuses_shortfall_and_selects_latest_months() {
             .unwrap();
     assert_eq!(window.months.len(), EXPECTED_MONTHS);
     assert_eq!((window.months[0].year, window.months[0].month), (2025, 1));
+    assert_eq!(
+        (
+            window.months[window.months.len() - 1].year,
+            window.months[window.months.len() - 1].month
+        ),
+        (2026, 10)
+    );
     let latest = historical_corpus::register_window(catalog_root, output, "EURUSD", 1).unwrap();
     assert_eq!(latest.months.len(), 1);
     assert_eq!((latest.months[0].year, latest.months[0].month), (2026, 10));
@@ -155,4 +180,125 @@ fn configurable_window_refuses_shortfall_and_selects_latest_months() {
         latest.months[0].chunk_hashes,
         window.months.last().unwrap().chunk_hashes
     );
+}
+
+/// The owner-selected research window is an explicit calendar pin: it must resolve to exactly
+/// the 22 completed months 2025-01..2026-10 of the canonical corpus, bind the same sources as
+/// the exact-count registration (unchanged scientific meaning), and pass full verification.
+#[test]
+fn owner_selected_research_window_pins_2025_01_to_2026_10() {
+    let catalog_root = Path::new("/var/lib/hermes-factory");
+    let output = Path::new("/root/workspace/historical-migration-output/full-100k");
+    if !catalog_root.join("catalog").is_dir() || !output.is_dir() {
+        eprintln!("skipping real owner-selected research window: data absent");
+        return;
+    }
+    let window = ResearchWindow::OWNER_SELECTED;
+    assert_eq!(window.label(), "2025-01..2026-10");
+    assert_eq!(window.month_count().unwrap(), EXPECTED_MONTHS);
+    let spec = historical_corpus::register_research_window(catalog_root, output, "EURUSD", &window)
+        .unwrap();
+    assert_eq!(spec.months.len(), 22);
+    assert_eq!((spec.months[0].year, spec.months[0].month), (2025, 1));
+    assert_eq!(
+        (
+            spec.months[spec.months.len() - 1].year,
+            spec.months[spec.months.len() - 1].month
+        ),
+        (2026, 10)
+    );
+    // Every one of the 22 calendar months is present exactly once, in order.
+    let months: Vec<(u32, u32)> = spec.months.iter().map(|m| (m.year, m.month)).collect();
+    assert_eq!(months, window.months().unwrap());
+    historical_corpus::verify(&spec).unwrap();
+
+    // The pin binds the identical canonical sources as the exact-count registration and the
+    // latest-22 selection: no reinterpretation of completed results.
+    let counted =
+        historical_corpus::register(catalog_root, output, "EURUSD", EXPECTED_MONTHS).unwrap();
+    assert_eq!(spec.identity, counted.identity);
+    let latest22 =
+        historical_corpus::register_window(catalog_root, output, "EURUSD", EXPECTED_MONTHS)
+            .unwrap();
+    assert_eq!(spec.identity, latest22.identity);
+}
+
+/// Windows extending beyond the available completed months must be refused with the exact
+/// missing months — no November/December 2026, no padding, no backfill. Valid sub-windows of
+/// the completed corpus still resolve exactly.
+#[test]
+fn research_window_refuses_months_beyond_completed_corpus() {
+    let catalog_root = Path::new("/var/lib/hermes-factory");
+    let output = Path::new("/root/workspace/historical-migration-output/full-100k");
+    if !catalog_root.join("catalog").is_dir() || !output.is_dir() {
+        eprintln!("skipping real research-window refusal checks: data absent");
+        return;
+    }
+    let register = |window: ResearchWindow| {
+        historical_corpus::register_research_window(catalog_root, output, "EURUSD", &window)
+    };
+
+    // Extends past the last completed month (2026-10): both missing months are named.
+    let beyond = ResearchWindow {
+        start_year: 2025,
+        start_month: 1,
+        end_year: 2026,
+        end_month: 12,
+    };
+    let error = register(beyond).expect_err("2026-11/2026-12 are not completed/available");
+    assert!(error.contains("2025-01..2026-12"), "{error}");
+    assert!(error.contains("requires 24 completed months"), "{error}");
+    assert!(error.contains("only 22 available"), "{error}");
+    assert!(error.contains("missing: 2026-11, 2026-12"), "{error}");
+
+    // A shifted 22-month window still demands the unavailable 2026-11.
+    let shifted = ResearchWindow {
+        start_year: 2025,
+        start_month: 2,
+        end_year: 2026,
+        end_month: 11,
+    };
+    let error = register(shifted).expect_err("2026-11 is not completed/available");
+    assert!(error.contains("missing: 2026-11"), "{error}");
+
+    // Starts before the first completed month.
+    let early = ResearchWindow {
+        start_year: 2024,
+        start_month: 12,
+        end_year: 2026,
+        end_month: 10,
+    };
+    let error = register(early).expect_err("2024-12 is not part of the canonical corpus");
+    assert!(error.contains("missing: 2024-12"), "{error}");
+
+    // Entirely beyond the corpus.
+    let future = ResearchWindow {
+        start_year: 2026,
+        start_month: 11,
+        end_year: 2026,
+        end_month: 12,
+    };
+    let error = register(future).expect_err("no completed month exists in 2026-11..2026-12");
+    assert!(error.contains("missing: 2026-11, 2026-12"), "{error}");
+
+    // Valid sub-windows resolve exactly, with explicit boundaries.
+    let sub = ResearchWindow {
+        start_year: 2025,
+        start_month: 3,
+        end_year: 2025,
+        end_month: 5,
+    };
+    let spec = register(sub).unwrap();
+    assert_eq!(spec.months.len(), 3);
+    assert_eq!((spec.months[0].year, spec.months[0].month), (2025, 3));
+    assert_eq!((spec.months[2].year, spec.months[2].month), (2025, 5));
+    let single = ResearchWindow {
+        start_year: 2026,
+        start_month: 10,
+        end_year: 2026,
+        end_month: 10,
+    };
+    let spec = register(single).unwrap();
+    assert_eq!(spec.months.len(), 1);
+    assert_eq!((spec.months[0].year, spec.months[0].month), (2026, 10));
 }

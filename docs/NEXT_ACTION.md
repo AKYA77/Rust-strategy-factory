@@ -4,6 +4,24 @@ Status: SOFTWARE_INCOMPLETE. Use the existing checkout. Read AGENTS.md, PROJECT_
 
 ## Latest verified local milestone
 
+`hermes/research-22m-window` (branched from `main` @ `ee5d08a`) pins the owner-selected research
+window: `historical_corpus::ResearchWindow::OWNER_SELECTED` = 2025-01..2026-10 (exactly 22
+completed months; owner decision 2026-11-19), `EXPECTED_MONTHS` derives from the pin, and
+`register_research_window` resolves exactly those calendar months from the canonical corpus,
+refusing any window with missing months by exact list (2026-11/2026-12 are not
+completed/available; no padding, backfill or silent truncation). `verify` requires full-length
+specifications to cover the pinned boundaries. The full-corpus research CLIs
+(register/study/execute/execute-cached/audit) register through the pin; new
+`historical-corpus-register-research-window` and `historical-corpus-register-window-config` CLIs
+expose the configuration surface (RUNBOOKS/research-window.md, DECISIONS/0056). Real-data tests
+assert the 22-month boundaries for all eight instruments, identity equality with exact-count
+registration (no reinterpretation of completed results), and exact out-of-range refusals. Local
+ladder on the branch under the shared heavy lock (project artifacts cleaned first): `cargo fmt
+--all -- --check`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo test --locked
+--lib --bins --tests` (54 binaries, 524 passed, 0 failed) and `scripts/check.sh` (54 binaries,
+524 passed, 0 failed). Hosted CI follows publication. No eligibility, approval or qualification
+change; the corpus remains REAL_STRUCTURALLY_VALID only.
+
 `main` integrates PR #19 (`hermes/integration-codex-stack` @ `cd5ec86`, configurable
 completed-month research window) and PR #20 (`hermes/historical-execution-cache` @ `2603073`,
 resumable self-labelling diagnostic execution). PR #20 merged through GitHub as `f7e1cd1`; PR
