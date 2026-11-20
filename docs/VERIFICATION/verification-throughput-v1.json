@@ -1,0 +1,977 @@
+{
+ "class": "VERIFICATION_THROUGHPUT_MEASUREMENT",
+ "generated_at": "2026-11-20T06:22:53+00:00",
+ "card": "t_72dd165f",
+ "pr": 21,
+ "session_status": "COMPLETE_MOLD",
+ "linkab_status": "LINKAB_COMPLETE",
+ "source_sha_session": "40f571171c005ccd6d8f9640971204c0c10e804a",
+ "source_sha_linkab": "40f571171c005ccd6d8f9640971204c0c10e804a",
+ "baseline": {
+  "source_sha": "ee5d08ad2afca39fa3ba924d48ba1344492debe0",
+  "receipt": "/root/workspace/rsf-audit/ACCEPTANCE_SWEEP_2026-11-19.md (QA clean re-run, exclusive flock, CARGO_BUILD_JOBS=4, no concurrent cargo)",
+  "check_sh_secs": 4018,
+  "summary": {
+   "binaries": 54,
+   "passed": 518,
+   "failed": 0,
+   "ignored": 0,
+   "lib_tests": 148,
+   "all_ok": true,
+   "real_data": {
+    "tests/historical_corpus_real.rs": [
+     3,
+     906.96
+    ],
+    "tests/historical_migration_real.rs": [
+     1,
+     53.82
+    ],
+    "tests/historical_pipeline_real.rs": [
+     3,
+     2873.76
+    ]
+   }
+  }
+ },
+ "profiles": {
+  "dev_debug": "line-tables-only",
+  "dev_split_debuginfo": "unpacked",
+  "dev_package_wildcard": {
+   "opt-level": 2,
+   "debug": false
+  },
+  "dev_build_override": {
+   "opt-level": 3
+  },
+  "test": {
+   "opt-level": 1
+  },
+  "opt_level_evidence_test_build": {
+   "build_script_build": [
+    {
+     "opt": [
+      "3"
+     ],
+     "debuginfo": []
+    }
+   ],
+   "rust_strategy_factory": [
+    {
+     "opt": [
+      "1"
+     ],
+     "debuginfo": [
+      "line-tables-only"
+     ]
+    },
+    {
+     "opt": [
+      "1"
+     ],
+     "debuginfo": [
+      "line-tables-only"
+     ]
+    },
+    {
+     "opt": [
+      "1"
+     ],
+     "debuginfo": [
+      "line-tables-only"
+     ]
+    },
+    {
+     "opt": [
+      "1"
+     ],
+     "debuginfo": [
+      "line-tables-only"
+     ]
+    }
+   ]
+  },
+  "opt_level_evidence_clippy_prepush": {
+   "build_script_build": [
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    },
+    {
+     "opt": [
+      "3"
+     ],
+     "debuginfo": []
+    }
+   ],
+   "tokio": [
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    }
+   ],
+   "serde": [
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    }
+   ],
+   "libsqlite3_sys": [
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    }
+   ],
+   "rusqlite": [
+    {
+     "opt": [
+      "2"
+     ],
+     "debuginfo": []
+    }
+   ],
+   "rust_strategy_factory": [
+    {
+     "opt": [],
+     "debuginfo": [
+      "line-tables-only"
+     ]
+    },
+    {
+     "opt": [],
+     "debuginfo": [
+      "line-tables-only"
+     ]
+    },
+    {
+     "opt": [],
+     "debuginfo": [
+      "line-tables-only"
+     ]
+    },
+    {
+     "opt": [],
+     "debuginfo": [
+      "line-tables-only"
+     ]
+    }
+   ]
+  },
+  "note": "dep build scripts (incl. bundled SQLite/zstd C via cc) take opt2 from the package wildcard; workspace build.rs takes opt3 from build-override. Verified from actual rustc invocations."
+ },
+ "prepush_targeted_gate": {
+  "class": "CI_FIRST_PREPUSH_TARGETED_RECEIPT",
+  "source_sha": "40f571171c005ccd6d8f9640971204c0c10e804a",
+  "summary": {
+   "binaries": 5,
+   "passed": 293,
+   "failed": 0,
+   "ignored": 0,
+   "lib_tests": 148,
+   "all_ok": true,
+   "real_data": {},
+   "total_secs": 35.21
+  },
+  "rows": [
+   {
+    "t": "unittests src/lib.rs",
+    "path": "target/debug/build/rust-strategy-factory/cc508c73a14a3352/out/rust_strategy_factory-cc508c73a14a3352",
+    "s": "ok",
+    "p": 148,
+    "f": 0,
+    "i": 0,
+    "secs": 3.46
+   },
+   {
+    "t": "tests/batch.rs",
+    "path": "target/debug/build/rust-strategy-factory/185bf1508bdfd8ef/out/batch-185bf1508bdfd8ef",
+    "s": "ok",
+    "p": 7,
+    "f": 0,
+    "i": 0,
+    "secs": 0.68
+   },
+   {
+    "t": "tests/core.rs",
+    "path": "target/debug/build/rust-strategy-factory/e73ad4e3cc3eb44d/out/core-e73ad4e3cc3eb44d",
+    "s": "ok",
+    "p": 16,
+    "f": 0,
+    "i": 0,
+    "secs": 0.0
+   },
+   {
+    "t": "tests/corpus.rs",
+    "path": "target/debug/build/rust-strategy-factory/c0179138e04dcc9b/out/corpus-c0179138e04dcc9b",
+    "s": "ok",
+    "p": 95,
+    "f": 0,
+    "i": 0,
+    "secs": 30.19
+   },
+   {
+    "t": "tests/storage.rs",
+    "path": "target/debug/build/rust-strategy-factory/9f1e907a7fbb3fe6/out/storage-9f1e907a7fbb3fe6",
+    "s": "ok",
+    "p": 27,
+    "f": 0,
+    "i": 0,
+    "secs": 0.88
+   }
+  ],
+  "binary_sha256": {
+   "target/debug/build/rust-strategy-factory/cc508c73a14a3352/out/rust_strategy_factory-cc508c73a14a3352": "4bfe69918cd663ff8b4b1da8d0e7d59c7dc608b0aa48aae81c0bb775a67ae827",
+   "target/debug/build/rust-strategy-factory/185bf1508bdfd8ef/out/batch-185bf1508bdfd8ef": "ef7c8208f8bc80c71526a54fa469f0673a201734ef1ad4e8fe0dd4bc62a75ed6",
+   "target/debug/build/rust-strategy-factory/e73ad4e3cc3eb44d/out/core-e73ad4e3cc3eb44d": "5ed633dc25b88b43216b1c718a7a8030dcdf2da326d054406727d69033f1de3f",
+   "target/debug/build/rust-strategy-factory/c0179138e04dcc9b/out/corpus-c0179138e04dcc9b": "f946e116adc0738bfac4d89d454aeb25ce994e2532223c4138e51176403597e4",
+   "target/debug/build/rust-strategy-factory/9f1e907a7fbb3fe6/out/storage-9f1e907a7fbb3fe6": "623e28ef97b58060d610a6a4f94ce7e7ae4f1a1fd6ee3c66be979caf402c6db7"
+  },
+  "targeted_rationale": "global build-profile change; unit suite + timing-sensitive fleet/campaign subprocess suite + core contracts + SQLite-heavy storage + batch workers; full 54-binary suite on hosted CI; full local real-data parity in the throughput measurement session"
+ },
+ "profile_parity_gnu_ld": {
+  "stages": {
+   "A0-clean-p": {
+    "rc": 0,
+    "secs": 0.67
+   },
+   "A1-fmt": {
+    "rc": 0,
+    "secs": 0.98
+   },
+   "A2-clippy": {
+    "rc": 0,
+    "secs": 13.97
+   },
+   "A3-test-build": {
+    "rc": 0,
+    "secs": 81.57
+   },
+   "A3b-relink-gnu-ld": {
+    "rc": 0,
+    "secs": 0.16
+   },
+   "B2-relink-mold": {
+    "rc": 0,
+    "secs": 0.18
+   },
+   "B3-test-run": {
+    "rc": 0,
+    "secs": 412.18
+   },
+   "B4-release-build": {
+    "rc": 0,
+    "secs": 124.35
+   },
+   "B5-identity": {
+    "rc": 0,
+    "secs": 290.48
+   },
+   "B6-operations": {
+    "rc": 0,
+    "secs": 2.96
+   },
+   "B6-horizon": {
+    "rc": 0,
+    "secs": 18.3
+   },
+   "B7-browser": {
+    "rc": 0,
+    "secs": 156.61
+   }
+  },
+  "summary": {
+   "binaries": 54,
+   "passed": 518,
+   "failed": 0,
+   "ignored": 0,
+   "lib_tests": 148,
+   "all_ok": true,
+   "real_data": {
+    "tests/historical_corpus_real.rs": [
+     3,
+     94.94
+    ],
+    "tests/historical_migration_real.rs": [
+     1,
+     7.23
+    ],
+    "tests/historical_pipeline_real.rs": [
+     3,
+     257.81
+    ]
+   },
+   "total_secs": 411.79
+  },
+  "real_data": {
+   "tests/historical_corpus_real.rs": [
+    3,
+    94.94
+   ],
+   "tests/historical_migration_real.rs": [
+    1,
+    7.23
+   ],
+   "tests/historical_pipeline_real.rs": [
+    3,
+    257.81
+   ]
+  },
+  "binary_sha256": {
+   "target/debug/build/rust-strategy-factory/cc508c73a14a3352/out/rust_strategy_factory-cc508c73a14a3352": "0ce6ba4dcbc334db91e643b04c015e57b1b4fb4dfe4f2cfc8306d54635cd45de",
+   "target/debug/build/rust-strategy-factory/daf466963a5184c7/out/rust_strategy_factory-daf466963a5184c7": "f2ab4b9140b4e9f3c8462cda6d9a51686176d214cf1fd57309acb3aa06feb371",
+   "target/debug/build/rust-strategy-factory/f3faee510b055b6d/out/archive_evidence-f3faee510b055b6d": "e88e85b704dcffce23e0c167cd14c4d443c31c747233db6f26412641bd347b6c",
+   "target/debug/build/rust-strategy-factory/40e2b214425ba8ab/out/atr-40e2b214425ba8ab": "eedead5c1810d9c98a0285f921bf62f23fe1b43f8afd6a463b9c18ab8ba103a7",
+   "target/debug/build/rust-strategy-factory/185bf1508bdfd8ef/out/batch-185bf1508bdfd8ef": "67a06a61946f6778bf3323ccf26e01233056aa10397a6a65f84c701eb8d056bb",
+   "target/debug/build/rust-strategy-factory/67be562ed362ae4c/out/blocked_native-67be562ed362ae4c": "059052f9e65b652a4d5f3b5bc99d4f7b21814b8e5278106b779b6a04861700c2",
+   "target/debug/build/rust-strategy-factory/0225bc108a280e8d/out/calendar_evidence-0225bc108a280e8d": "470604f5877f7d15682c43e072aaad664c064ba6f8767f63b19967a39d345e75",
+   "target/debug/build/rust-strategy-factory/d22f591d5c453809/out/candidate_screen-d22f591d5c453809": "dfd6a488e451662c1836fa57c699e2b72386a37dd45e7e56ff74d4d07ae9d0b7",
+   "target/debug/build/rust-strategy-factory/d99ee6e12d7d11bb/out/catalog-d99ee6e12d7d11bb": "670e85eefda22471a359e52cd24ddea264eede6ea4f1a7915fb86b1e57181a57",
+   "target/debug/build/rust-strategy-factory/d597ef97a54b0d7a/out/checkpoint_history-d597ef97a54b0d7a": "ed09c9405ef62e15b699b8c55bc9070a065f515f8b1f565981c2c56f96b5aa24",
+   "target/debug/build/rust-strategy-factory/9c03a72e7da6e6c9/out/checkpoint_rehash_integration-9c03a72e7da6e6c9": "5dd2612673568e62a8b5fdd5a08c16429a57fdad01219af72f46f1b390468a66",
+   "target/debug/build/rust-strategy-factory/c3bf1bcd90aa2fe0/out/cli-c3bf1bcd90aa2fe0": "624929ad8b731509bc43cc62e729bbcafaeb4e472f8554a047bc3576ed239f36",
+   "target/debug/build/rust-strategy-factory/249cc20ff163aeb0/out/compressed-249cc20ff163aeb0": "e605b4e0a15684efee766ba741eb24236603f11f7472f49c9c7685a7df2e04bb",
+   "target/debug/build/rust-strategy-factory/e73ad4e3cc3eb44d/out/core-e73ad4e3cc3eb44d": "cde1d8c52209764fb8c86e75f639acb7167c1b3aca623769e839358b17723162",
+   "target/debug/build/rust-strategy-factory/c0179138e04dcc9b/out/corpus-c0179138e04dcc9b": "79b7caa51c631e3cf8314188f3fa463d3b607b649e8f6bda8bd01d0693b5fbed",
+   "target/debug/build/rust-strategy-factory/6983020b347ec71d/out/corpus_lifecycle-6983020b347ec71d": "2d3dcc268c585fbe7c7047b63ff5c9c81d949282b64be12297d3bcd31edd0148",
+   "target/debug/build/rust-strategy-factory/db71a5bcb924b98a/out/coverage-db71a5bcb924b98a": "162b14d6b050e0813c93ce3a1b5e27f6ebad90c5b31f23c78935fb57aadd5caa",
+   "target/debug/build/rust-strategy-factory/eb16ad98cc422949/out/data_approval-eb16ad98cc422949": "f0a31ab6db81486e538f8d393731c01e45bfe8cd002904b2e633170b6d1e180e",
+   "target/debug/build/rust-strategy-factory/76a8759f47e76347/out/data_review-76a8759f47e76347": "fff0f847b37326f34e17f7b511e512aa1946a35f1500be92088623410cb630b8",
+   "target/debug/build/rust-strategy-factory/2b3cc49f79f755c7/out/diagnostics-2b3cc49f79f755c7": "cba09d0b71637bc3a8b83aada5cbf46be49dd236808c2fab6caeed5bd6de3f39",
+   "target/debug/build/rust-strategy-factory/e9dba2e15f1c3805/out/exploration-e9dba2e15f1c3805": "fa6e779216efdff644c89eb8c7b612a17bc224a75c1f01db3f3a0e2b819b6628",
+   "target/debug/build/rust-strategy-factory/ff7744ed674b69de/out/families-ff7744ed674b69de": "96893bbfbe2b62b0f2c2939b110f91702e685f089888fd57077a4b038f467582",
+   "target/debug/build/rust-strategy-factory/6f91cda0e3c1b375/out/higher_timeframe-6f91cda0e3c1b375": "3f161c93f5ea8d7061dd06c3a861f02211ec74761cced632f3f5a0bbfaf337ab",
+   "target/debug/build/rust-strategy-factory/da95cd4a64196fab/out/historical_corpus_real-da95cd4a64196fab": "e94bad1c83c9c47ef1f308a791af816c1c3a39eb792efcc1a363ca1f20bb9b64",
+   "target/debug/build/rust-strategy-factory/66e59ab256e44535/out/historical_migration_real-66e59ab256e44535": "13602b25633f1a529b67ce875f5b699793e5b4789d36340b16b679907a49ec3d",
+   "target/debug/build/rust-strategy-factory/2468daff28e920aa/out/historical_pipeline_real-2468daff28e920aa": "abaefd99a716b073f0c6403c955566af1f82948582dc9addc75610cdee078b38",
+   "target/debug/build/rust-strategy-factory/29fbbce469c17997/out/import_job-29fbbce469c17997": "8c18dcb1bb628e4c36ecbcad03c41c1c36ea74a4e986a8cc8e2b0cc58b07f33b",
+   "target/debug/build/rust-strategy-factory/bd2046f5be12279a/out/improvement-bd2046f5be12279a": "1e1517e4ae84d0f01f352e0e58c91fb0ef0e3d996c62b5ca4ae7087f2ebd812b",
+   "target/debug/build/rust-strategy-factory/01c6c7f6c2c50057/out/indexed_replay-01c6c7f6c2c50057": "ce0de17a2451c543fa3a385d49bb7226f2c339518e9aff3c9a2932372ba85bb4",
+   "target/debug/build/rust-strategy-factory/b12730a3c6cc3c88/out/machine_evidence-b12730a3c6cc3c88": "a0c64b1435f4993da36cc84aebd39467e8fa4914e558b5718569ee44e680b1bd",
+   "target/debug/build/rust-strategy-factory/8e021ff0b2e972df/out/market_stop_proof-8e021ff0b2e972df": "f7c444e7fbbd6334af68f93c99f6a137be4ab6daf9a9959104351af3d0005772",
+   "target/debug/build/rust-strategy-factory/1c6fe46887532f77/out/mask_prefix-1c6fe46887532f77": "0d3d5d5e02278c08cc80ce4f688180bbe42c6318713c45f595760a8c683d5eeb",
+   "target/debug/build/rust-strategy-factory/beba45de0931808c/out/native-beba45de0931808c": "774e84db89d869e46c61d2e309693f14882a66f376b2b8f4957a2432e387bbe9",
+   "target/debug/build/rust-strategy-factory/2d7d08da90ee0748/out/neighborhood-2d7d08da90ee0748": "d165deea349ebcb660d35b48325972f68c98c946a22078fa45cf966818a6f87a",
+   "target/debug/build/rust-strategy-factory/e106d32912d44764/out/operators-e106d32912d44764": "25a00888ad6ac54566167beb6e9ddbf23510fa59e3badee6bf5005d183043244",
+   "target/debug/build/rust-strategy-factory/a2c8a535cf545eca/out/orders-a2c8a535cf545eca": "3b3d5367063bf02111ab65e7fdc6c66c25e2a8a8dc8beee7fe71ce73f8959f78",
+   "target/debug/build/rust-strategy-factory/fc304e757fbec3f9/out/parquet-fc304e757fbec3f9": "da2b4ae7d82431dd9e9603aa3ead6f6d53eac1c724e0fac749963f9c051b3e49",
+   "target/debug/build/rust-strategy-factory/654c2f0aae5de76c/out/pending_replay-654c2f0aae5de76c": "cdfdbfbbd34fcfbef50c16b055f2883441548e25943792af48344436778b11de",
+   "target/debug/build/rust-strategy-factory/af65e3e5bc285be1/out/recovery-af65e3e5bc285be1": "f05dbe0b531a536e99e5155d28c89250adf789f528fd81be0fec734e1186554e",
+   "target/debug/build/rust-strategy-factory/c00a234dcc08ef53/out/regimes-c00a234dcc08ef53": "2e3c82b806d86a86c90b9f578b2f6ecf2869037f9d6692bd2fb57e7fafbf759d",
+   "target/debug/build/rust-strategy-factory/331d2e9e7eb114f0/out/research-331d2e9e7eb114f0": "8d78eba3e3b4f15ae1be3b4ec2cb7dbda6a868f23debc868c51415b734d20fbd",
+   "target/debug/build/rust-strategy-factory/9756ae530ee13155/out/research_cli-9756ae530ee13155": "1264cdef8e409aec0c405bb7c4852d531aca853f27ac424742d3d47255bff38b",
+   "target/debug/build/rust-strategy-factory/b856c858577c4c2b/out/risk-b856c858577c4c2b": "907584e2ebe6205e4c6554f2db90248c2d8f7e2690ebffc98f3ad9790162b5e3",
+   "target/debug/build/rust-strategy-factory/67d089731c1c98e1/out/robustness-67d089731c1c98e1": "b94aaded8c3766fc9b83b8618b4eed2f294ad1733295223e168cb5e2f84ed04a",
+   "target/debug/build/rust-strategy-factory/511ef67ee7eb3384/out/science-511ef67ee7eb3384": "24267bc8be3484456412d1250341e295e3fd2ede629294d5e03a2bf4eedadd7f",
+   "target/debug/build/rust-strategy-factory/ea9a6d0985372b44/out/screen-ea9a6d0985372b44": "4634afe5302c2f21d726b9d739427ab3a3af760112663e20c115ebb59bcb8a4e",
+   "target/debug/build/rust-strategy-factory/b156e0333fdcfcd9/out/source_rehash-b156e0333fdcfcd9": "0aa24d3c9da2edcd04fb63c7c157d176ffae5f330867b6f01131bd6c519b0978",
+   "target/debug/build/rust-strategy-factory/fef1c66174e1c162/out/sparse_mask-fef1c66174e1c162": "29f2937d9fd7aab35254040257464d3236b70e62d4c82adb0fb89fe78fabee52",
+   "target/debug/build/rust-strategy-factory/9f1e907a7fbb3fe6/out/storage-9f1e907a7fbb3fe6": "faa0a3f955e97c6a3f05035eb416127524c6d7b8ee5dcd5939f65059420a5345",
+   "target/debug/build/rust-strategy-factory/5487c1d910e7d697/out/tick_index-5487c1d910e7d697": "bb36fe0bb3baee9efde33921b73044d5682d306e9fa16ccbff16a089b3e026be",
+   "target/debug/build/rust-strategy-factory/ced923b889f51915/out/training_diagnostics-ced923b889f51915": "bdfd5bd31938b2dc40234e12f9294dc1b82550e4a60f3e9a2349d29076a8823f",
+   "target/debug/build/rust-strategy-factory/d3f97f73209d2ad6/out/uncertainty-d3f97f73209d2ad6": "d622cdd4c8fa7d1b7383ca1e3035d833af3c4e92d33eac4f1fc59f1fb76efea1",
+   "target/debug/build/rust-strategy-factory/6cf612d20f5ee0cf/out/validation-6cf612d20f5ee0cf": "0156cc786bff5ff19b267030427785c081ed71d503450d530d54ea5b7c366ea8",
+   "target/debug/build/rust-strategy-factory/24a5bbc802fb280e/out/windows-24a5bbc802fb280e": "f4ab907a706163520e6ae2067e50d99407857a8cbf1b1804af249d002082ab49",
+   "target/debug/rust-strategy-factory": "d54de92fa85c167e08d44638b63b445391c8969bfb1700b6286c9191dc2dfbd8",
+   "target/release/rust-strategy-factory": "b27078976212d031d1dd9ce18b989c72d60b1c89fe13a5e7eb81365a9594f84d"
+  },
+  "note": "B3 full suite ran on default-linker (rust-lld 23.1.5) test binaries: the session A3b/B2 relink stages were no-ops because cargo -v prints Executable lines in backtick/absolute-path format which the first parser missed (0 executables removed). Corrected link A/B and a full mold-linked parity re-run follow in final_config_mold. B3 remains valid profile-parity evidence (linker does not affect execution semantics)."
+ },
+ "final_config_mold": {
+  "stages": {
+   "L1-relink-gnu-ld": {
+    "rc": 0,
+    "secs": 77.54
+   },
+   "L2-relink-mold": {
+    "rc": 0,
+    "secs": 6.29
+   },
+   "L3-test-run-mold": {
+    "rc": 0,
+    "secs": 440.74
+   }
+  },
+  "summary": {
+   "binaries": 54,
+   "passed": 518,
+   "failed": 0,
+   "ignored": 0,
+   "lib_tests": 148,
+   "all_ok": true,
+   "real_data": {
+    "tests/historical_corpus_real.rs": [
+     3,
+     99.45
+    ],
+    "tests/historical_migration_real.rs": [
+     1,
+     7.55
+    ],
+    "tests/historical_pipeline_real.rs": [
+     3,
+     281.04
+    ]
+   },
+   "total_secs": 440.25
+  },
+  "real_data": {
+   "tests/historical_corpus_real.rs": [
+    3,
+    99.45
+   ],
+   "tests/historical_migration_real.rs": [
+    1,
+    7.55
+   ],
+   "tests/historical_pipeline_real.rs": [
+    3,
+    281.04
+   ]
+  },
+  "binary_sha256": {
+   "target/debug/build/rust-strategy-factory/cc508c73a14a3352/out/rust_strategy_factory-cc508c73a14a3352": "0eaeffde8460e8e4a4a1a287c58cb5e108b624a2e13253eaed16ee4f191884e2",
+   "target/debug/build/rust-strategy-factory/daf466963a5184c7/out/rust_strategy_factory-daf466963a5184c7": "20ee40bca2cc9bbb42a90151f888f6f8282a810f5333a3ff1081b15e64a3809e",
+   "target/debug/build/rust-strategy-factory/f3faee510b055b6d/out/archive_evidence-f3faee510b055b6d": "678645d282a6c38e27304bdd33699c2b9f5eec5298ae30da69f1192eaada90e2",
+   "target/debug/build/rust-strategy-factory/40e2b214425ba8ab/out/atr-40e2b214425ba8ab": "cbc9acb3a24875913046a4dbc3f16488602c0d1d08b40efcba1f8fc677030eb0",
+   "target/debug/build/rust-strategy-factory/185bf1508bdfd8ef/out/batch-185bf1508bdfd8ef": "c58b21dce375a6fadf73fec0efdd9fe7e6ad6f1bd458b29c616934f59dc9b964",
+   "target/debug/build/rust-strategy-factory/67be562ed362ae4c/out/blocked_native-67be562ed362ae4c": "a0bbe1016d378cc1116ac8dac8f561b506f0f82d9dc51b9156a94e45b7d5ce4d",
+   "target/debug/build/rust-strategy-factory/0225bc108a280e8d/out/calendar_evidence-0225bc108a280e8d": "32a502812eb5ec9ce58d983eb3023462f1a96d2bac2395e0a34932c255e6541c",
+   "target/debug/build/rust-strategy-factory/d22f591d5c453809/out/candidate_screen-d22f591d5c453809": "ce344e017ad8a953fefaa33b1388554e78a734ba2fd6cbf0673ec17dae509ef4",
+   "target/debug/build/rust-strategy-factory/d99ee6e12d7d11bb/out/catalog-d99ee6e12d7d11bb": "67d61e3a9923842cd5f63b62546d3d214cd89a3adf1e8ff5a1f5360fa4006f32",
+   "target/debug/build/rust-strategy-factory/d597ef97a54b0d7a/out/checkpoint_history-d597ef97a54b0d7a": "feb6c6f9920f9bf760ca0090a1c9e9480343cc5446219ec7a38b46d01d76e2a0",
+   "target/debug/build/rust-strategy-factory/9c03a72e7da6e6c9/out/checkpoint_rehash_integration-9c03a72e7da6e6c9": "f564b4cc16a24b512c8bb3d6f89b8d1afdc7c3a7a33738c24ec17be32892a029",
+   "target/debug/build/rust-strategy-factory/c3bf1bcd90aa2fe0/out/cli-c3bf1bcd90aa2fe0": "67d3dd9f57944fafd814583086de1233bf07e1fc61c2dd0f0cf11085459bb962",
+   "target/debug/build/rust-strategy-factory/249cc20ff163aeb0/out/compressed-249cc20ff163aeb0": "ffe2919b0e36528bea34f001307d6cde1b144aea90452a85cc60a2bff74a12c7",
+   "target/debug/build/rust-strategy-factory/e73ad4e3cc3eb44d/out/core-e73ad4e3cc3eb44d": "9544d2712a8d4cd5ca0bdbb62904575c40e1d0c540ed498649a52dc0aadeffe5",
+   "target/debug/build/rust-strategy-factory/c0179138e04dcc9b/out/corpus-c0179138e04dcc9b": "ee7883c6545122bb1581e947ce8ee0544c419621500e894149c087ecdfff98af",
+   "target/debug/build/rust-strategy-factory/6983020b347ec71d/out/corpus_lifecycle-6983020b347ec71d": "09f75a54b3301158e9373b8580f5dba92f669114b88c92985d9c5d155ae66476",
+   "target/debug/build/rust-strategy-factory/db71a5bcb924b98a/out/coverage-db71a5bcb924b98a": "079e1f34bbafa2e80fbc1d911b5af1a01e58d2bd0c5ea79a337d3aa661152a8b",
+   "target/debug/build/rust-strategy-factory/eb16ad98cc422949/out/data_approval-eb16ad98cc422949": "d85e2c6147a62e09cf866105ac5d5ba2556c16aafad611bdbc2e9e3d95fe5bf9",
+   "target/debug/build/rust-strategy-factory/76a8759f47e76347/out/data_review-76a8759f47e76347": "f5a2c78d1cef01bf43bc328be88c1b600e6361aba6472623294f5a92e8813bce",
+   "target/debug/build/rust-strategy-factory/2b3cc49f79f755c7/out/diagnostics-2b3cc49f79f755c7": "ba08ef09aa75bf7ea1fa77dcbf97e8604d0a33c855f2024366844a5ae5c508a0",
+   "target/debug/build/rust-strategy-factory/e9dba2e15f1c3805/out/exploration-e9dba2e15f1c3805": "7079a2d9577655a424851c5763dd36f4860b113e337fd3a149188f4ae6d34131",
+   "target/debug/build/rust-strategy-factory/ff7744ed674b69de/out/families-ff7744ed674b69de": "778a86f11c54e07013ca2ab024be00ab06de7f890f527b32a766a3a606fd3a83",
+   "target/debug/build/rust-strategy-factory/6f91cda0e3c1b375/out/higher_timeframe-6f91cda0e3c1b375": "73e19696783696f90114e4d79d7a17d1b147174df1a12e4bfd70fcd1bac44d76",
+   "target/debug/build/rust-strategy-factory/da95cd4a64196fab/out/historical_corpus_real-da95cd4a64196fab": "a2cd6faa9f1280d1bee8c9303e4fcf4bb3f500c56f8361f5b304b21b1463cdf3",
+   "target/debug/build/rust-strategy-factory/66e59ab256e44535/out/historical_migration_real-66e59ab256e44535": "c066ab3a271f3d45fcd440a9f4ed3248098ab9ec5083c7f6c159c2e583d3d887",
+   "target/debug/build/rust-strategy-factory/2468daff28e920aa/out/historical_pipeline_real-2468daff28e920aa": "776313e2a409364f8f25a649850f76de3a4d3338c6c0271c59c60ae7556a9dff",
+   "target/debug/build/rust-strategy-factory/29fbbce469c17997/out/import_job-29fbbce469c17997": "4f604404ed4147357fb11bdb0a80952c57b0a1639c5dc34435aff77c1cdbf92f",
+   "target/debug/build/rust-strategy-factory/bd2046f5be12279a/out/improvement-bd2046f5be12279a": "9fe650b1a4fe5bca45999ba4c6e502becdd88097bc08efdc4e2a282cd24db5d2",
+   "target/debug/build/rust-strategy-factory/01c6c7f6c2c50057/out/indexed_replay-01c6c7f6c2c50057": "0975a1cccf7f5e4a3f8315ff2fa9724d6b3d14c7022a68c2dc35b1b3320dde80",
+   "target/debug/build/rust-strategy-factory/b12730a3c6cc3c88/out/machine_evidence-b12730a3c6cc3c88": "67150db02d9fed76d2d5043e2f71450c1e066cb4b6715eb334b295efa7430dd2",
+   "target/debug/build/rust-strategy-factory/8e021ff0b2e972df/out/market_stop_proof-8e021ff0b2e972df": "ff13e3549bc7b401f53da32f3fb487b7d340e8c26b2ae58c29b72946fe27a716",
+   "target/debug/build/rust-strategy-factory/1c6fe46887532f77/out/mask_prefix-1c6fe46887532f77": "f89dcbe64f5124b60f9f7d770c4170dfaf990dc94776586f3d73b78553b42868",
+   "target/debug/build/rust-strategy-factory/beba45de0931808c/out/native-beba45de0931808c": "88c8e18b9925b9cb20d16309541c7203100b57fbed2af77aef554d0fa47b1ca1",
+   "target/debug/build/rust-strategy-factory/2d7d08da90ee0748/out/neighborhood-2d7d08da90ee0748": "7d703efcf1b5773c675d352083b31c775c975f897a6bc1ffc14201c0beda1e52",
+   "target/debug/build/rust-strategy-factory/e106d32912d44764/out/operators-e106d32912d44764": "9c2d152a0812affdd749a6a631d75d70d12ffbb89e7eb78701fa490ece890f27",
+   "target/debug/build/rust-strategy-factory/a2c8a535cf545eca/out/orders-a2c8a535cf545eca": "4e178a5fbcd3b25d6351d9167e76c09f386c3493070eda1bccb5b96dabb7ba59",
+   "target/debug/build/rust-strategy-factory/fc304e757fbec3f9/out/parquet-fc304e757fbec3f9": "279fd8a28740e922f6e33f3e8fdfc3d65a660bcc2185c01158641b42130d1064",
+   "target/debug/build/rust-strategy-factory/654c2f0aae5de76c/out/pending_replay-654c2f0aae5de76c": "d462215bca6906f2191ba6143ac7180c7ab3652db68d48e3467acb252e9efcbb",
+   "target/debug/build/rust-strategy-factory/af65e3e5bc285be1/out/recovery-af65e3e5bc285be1": "2e025e89d178218e9814cba82fcef8db1cc4dc136c97576ce214865a61364378",
+   "target/debug/build/rust-strategy-factory/c00a234dcc08ef53/out/regimes-c00a234dcc08ef53": "0db370ea2c19e973a5d800a307b2438901eeeaafd32d7d0721b2b0651d404fab",
+   "target/debug/build/rust-strategy-factory/331d2e9e7eb114f0/out/research-331d2e9e7eb114f0": "47470b5ad829a5f6bbcff0ffe41afa6e3b6c6a183c40e557465ad13e980dc4c9",
+   "target/debug/build/rust-strategy-factory/9756ae530ee13155/out/research_cli-9756ae530ee13155": "3eaf6888693f333546c85cc4a9bb8737f3de2bc033f3dea69ee64e42ef81ce64",
+   "target/debug/build/rust-strategy-factory/b856c858577c4c2b/out/risk-b856c858577c4c2b": "339960af06ea850fefd614cca2b22c72acee79dfabf6242774157cf9cc6a1bc1",
+   "target/debug/build/rust-strategy-factory/67d089731c1c98e1/out/robustness-67d089731c1c98e1": "3c793bf7e2ab0c44d00a808a24271120664d12e6807ecc0e78683c3222c31272",
+   "target/debug/build/rust-strategy-factory/511ef67ee7eb3384/out/science-511ef67ee7eb3384": "ff1ef840138a75314fbc640924a3a397beed68f5b909916c5d09f1f0277ce88b",
+   "target/debug/build/rust-strategy-factory/ea9a6d0985372b44/out/screen-ea9a6d0985372b44": "a3e98838959722054a60c5e134323f19cf524968a6bd31eb0bab3ab27effdf83",
+   "target/debug/build/rust-strategy-factory/b156e0333fdcfcd9/out/source_rehash-b156e0333fdcfcd9": "6d1838b079c53f0f4ed2f7f972800e3b93d2c9f57238fe042a64702bea87b4e5",
+   "target/debug/build/rust-strategy-factory/fef1c66174e1c162/out/sparse_mask-fef1c66174e1c162": "9697c2bb5d6d51abc793a057ab5c62f380948cceadb48b8c60c78ba7b5e87c3f",
+   "target/debug/build/rust-strategy-factory/9f1e907a7fbb3fe6/out/storage-9f1e907a7fbb3fe6": "3bebdf7ab00b026e0bb4c9b68e14cfb8e1b9310760dcd9a9cd729e63b90f54d5",
+   "target/debug/build/rust-strategy-factory/5487c1d910e7d697/out/tick_index-5487c1d910e7d697": "b0f1b5e461f4535fbf5b0f8360eccabc8d007a7d1995a7a4277c23ec39577fd0",
+   "target/debug/build/rust-strategy-factory/ced923b889f51915/out/training_diagnostics-ced923b889f51915": "6128c2655908d0b819b3fa0224235626efde045e077fbb17ba726a9308bcc002",
+   "target/debug/build/rust-strategy-factory/d3f97f73209d2ad6/out/uncertainty-d3f97f73209d2ad6": "f096fcb45ca6898f884f52a3510fd42a4f0ba3e8f4c958295b8159062d331b5b",
+   "target/debug/build/rust-strategy-factory/6cf612d20f5ee0cf/out/validation-6cf612d20f5ee0cf": "66a722554dc642580197326af682a11032d15c720aa5784ac8622b48d0b703ee",
+   "target/debug/build/rust-strategy-factory/24a5bbc802fb280e/out/windows-24a5bbc802fb280e": "36a9cee5c40a332f6825c175bd1c10fe0d947a6ef594de8a7c6411b22573c9a3",
+   "target/debug/rust-strategy-factory": "0e0b7ac37f89edd2a7f6fd89feb8915bfc4a672303a8deee090832c64c499be0",
+   "target/release/rust-strategy-factory": "b27078976212d031d1dd9ce18b989c72d60b1c89fe13a5e7eb81365a9594f84d"
+  },
+  "linker_comment_before": "readelf: Error: 'target/debug/build/rust-strategy-factory/cc508c73a14a3352/out/rust_strategy_factory-cc508c73a14a3352': No such file",
+  "linker_comment_gnu_relink": "String dump of section '.comment':\n  [     1]  GCC: (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\n  [    2e]  Linker: LLD 23.1.5 (/checkout/src/llvm-project/llvm 0a5579eb649d3634a9c30ac873300cc2944fa070)\n  [    8c]  rustc version 1.100.0 (0ef1bc386 2026-11-09)",
+  "linker_comment_mold_relink": "String dump of section '.comment':\n  [     0]  mold 2.30.0 (compatible with GNU ld)\n  [    25]  GCC: (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\n  [    52]  rustc version 1.100.0 (0ef1bc386 2026-11-09)\n\n\nString dump of section '.comment':\n  [     1]  GCC: (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\n  [    2e]  Linker: LLD 23.1.5 (/checkout/src/llvm-project/llvm 0a5579eb649d3634a9c30ac873300cc2944fa070)\n  [    8c]  rustc version 1.100.0 (0ef1bc386 2026-11-09)",
+  "executables_relinked": 54,
+  "note": "mold-linked binaries during the mold evaluation; full parity 54/518/148. mold subsequently SKIPped (clean A/B parity with default rust-lld); final adopted config uses the default linker."
+ },
+ "link_ab_clean_rerun": {
+  "status": "L1CLEAN_COMPLETE",
+  "stages": {
+   "L0-build-all": {
+    "rc": 0,
+    "secs": 78.24
+   },
+   "L1clean-relink-default": {
+    "rc": 0,
+    "secs": 6.0
+   },
+   "L2clean-relink-mold": {
+    "rc": 0,
+    "secs": 6.55
+   }
+  },
+  "compiling_count_default": "1",
+  "comment_default": "String dump of section '.comment':\n  [     1]  GCC: (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\n  [    2e]  Linker: LLD 23.1.5 (/checkout/src/llvm-project/llvm 0a5579eb649d3634a9c30ac873300cc2944fa070)\n  [    8c]  rustc version 1.100.0 (0ef1bc386 2026-11-09)",
+  "comment_mold": "String dump of section '.comment':\n  [     0]  mold 2.30.0 (compatible with GNU ld)\n  [    25]  GCC: (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\n  [    52]  rustc version 1.100.0 (0ef1bc386 2026-11-09)",
+  "note": "Concurrency-guarded re-measurement (no other cargo/rustc process on the box): rules out cross-lane artifact recovery inflating the default-linker side. Supersedes L1/L2 if both completed."
+ },
+ "release_stage_local": {
+  "release_build_secs": {
+   "rc": 0,
+   "secs": 124.35
+  },
+  "identity": {
+   "passed": 30,
+   "all_original_bytes_and_identity_restored": true,
+   "baseline_identity": "compute-blake3:47d1658d1f79fdde4f7d248fe747b8637731a217f5520353dde6035aa3b626fd",
+   "class": "SYNTHETIC_DEVELOPMENT_REBUILD_ONLY",
+   "file": "work/throughput-identity-final.json (committed copy: docs/VERIFICATION/throughput-compute-identity-v1.json)"
+  },
+  "operations_log_tail": "{\"synthetic\": true, \"passed\": [\"install\", \"repeat install\", \"update\", \"rollback\", \"explicit activation\", \"checksum tamper refusal\", \"preserved configuration\", \"native verified backup\", \"new-path restore\", \"no-overwrite\", \"invalid registry refusal\", \"unrelated activation file preservation\", \"actual large receipt artifact backup/restore\", \"artifact collision/corruption refusal\"], \"populated_user_units_verified\": true, \"live_systemd_and_vps_execution\": \"NOT_RUN\"}",
+  "horizon_secs": {
+   "rc": 0,
+   "secs": 18.3
+  },
+  "browser_suite_success_lines": 12,
+  "browser_rc": 0
+ },
+ "compute_revision_final": "compute-blake3:47d1658d1f79fdde4f7d248fe747b8637731a217f5520353dde6035aa3b626fd",
+ "compute_revision_baseline": "compute-blake3:3b7b85d91dc6f21db1fd9e9c95dfb32c317856c5b64f23cf0fc9935d55a7fd4d",
+ "hosted_ci": {
+  "baseline_single_job": {
+   "conclusion": "success",
+   "databaseId": 44581603412,
+   "headSha": "ee5d08ad2afca39fa3ba924d48ba1344492debe0",
+   "startedAt": "2026-11-19T17:51:17Z",
+   "status": "completed",
+   "updatedAt": "2026-11-19T18:19:06Z"
+  },
+  "baseline_job_timings": [
+   {
+    "completedAt": "2026-11-19T18:19:05Z",
+    "conclusion": "success",
+    "name": "check",
+    "startedAt": "2026-11-19T17:51:20Z"
+   }
+  ],
+  "pr_run_cold_parallel": {
+   "conclusion": "success",
+   "databaseId": 44656886446,
+   "headSha": "40f571171c005ccd6d8f9640971204c0c10e804a",
+   "jobs": [
+    {
+     "completedAt": "2026-11-20T02:09:05Z",
+     "conclusion": "success",
+     "databaseId": 136025187702,
+     "name": "release-acceptance",
+     "startedAt": "2026-11-20T01:53:43Z",
+     "status": "completed",
+     "steps": [
+      {
+       "conclusion": "success",
+       "name": "Set up job",
+       "number": 1,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Run actions/checkout@v4",
+       "number": 2,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Install mold linker (link-phase acceleration; no rustflag/identity change)",
+       "number": 3,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Install pinned toolchain",
+       "number": 4,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Cache cargo registry and target artifacts",
+       "number": 5,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Run mold -run cargo build --locked",
+       "number": 6,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Verify data compute identity boundaries",
+       "number": 7,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Run mold -run cargo build --locked --release",
+       "number": 8,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Run python3 scripts/check-operations.py",
+       "number": 9,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Verify continuous UTC horizon and declared context ceiling",
+       "number": 10,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Post Cache cargo registry and target artifacts",
+       "number": 19,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Post Run actions/checkout@v4",
+       "number": 20,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Complete job",
+       "number": 21,
+       "status": "completed"
+      }
+     ],
+     "url": "https://github.com/AKYA77/Rust-strategy-factory/actions/runs/44656886446/job/136025187702"
+    },
+    {
+     "completedAt": "2026-11-20T01:57:57Z",
+     "conclusion": "success",
+     "databaseId": 136025188058,
+     "name": "rust-checks",
+     "startedAt": "2026-11-20T01:53:44Z",
+     "status": "completed",
+     "steps": [
+      {
+       "conclusion": "success",
+       "name": "Set up job",
+       "number": 1,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Run actions/checkout@v4",
+       "number": 2,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Install mold linker (link-phase acceleration; no rustflag/identity change)",
+       "number": 3,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Install pinned toolchain",
+       "number": 4,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Cache cargo registry and target artifacts",
+       "number": 5,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Run mold -run sh scripts/check.sh",
+       "number": 6,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Verify trusted inventory cannot deserialize supplied JSON",
+       "number": 7,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Post Cache cargo registry and target artifacts",
+       "number": 13,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Post Run actions/checkout@v4",
+       "number": 14,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Complete job",
+       "number": 15,
+       "status": "completed"
+      }
+     ],
+     "url": "https://github.com/AKYA77/Rust-strategy-factory/actions/runs/44656886446/job/136025188058"
+    },
+    {
+     "completedAt": "2026-11-20T01:59:33Z",
+     "conclusion": "success",
+     "databaseId": 136025188171,
+     "name": "browser",
+     "startedAt": "2026-11-20T01:53:43Z",
+     "status": "completed",
+     "steps": [
+      {
+       "conclusion": "success",
+       "name": "Set up job",
+       "number": 1,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Run actions/checkout@v4",
+       "number": 2,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Install mold linker (link-phase acceleration; no rustflag/identity change)",
+       "number": 3,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Install pinned toolchain",
+       "number": 4,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Cache cargo registry and target artifacts",
+       "number": 5,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Run actions/setup-node@v4",
+       "number": 6,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Run npm ci --ignore-scripts",
+       "number": 7,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Run npx playwright install --with-deps chromium",
+       "number": 8,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Run mold -run cargo build --locked",
+       "number": 9,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Run npm run test:browser",
+       "number": 10,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Post Run actions/setup-node@v4",
+       "number": 18,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Post Cache cargo registry and target artifacts",
+       "number": 19,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Post Run actions/checkout@v4",
+       "number": 20,
+       "status": "completed"
+      },
+      {
+       "conclusion": "success",
+       "name": "Complete job",
+       "number": 21,
+       "status": "completed"
+      }
+     ],
+     "url": "https://github.com/AKYA77/Rust-strategy-factory/actions/runs/44656886446/job/136025188171"
+    }
+   ],
+   "status": "completed"
+  },
+  "push_trigger_run": {
+   "conclusion": "success",
+   "databaseId": 44656880690,
+   "headSha": "40f571171c005ccd6d8f9640971204c0c10e804a",
+   "status": "completed"
+  },
+  "warm_parallel_run": null
+ },
+ "parity": {
+  "expected": {
+   "binaries": 54,
+   "passed": 518,
+   "failed": 0,
+   "ignored": 0,
+   "lib_tests": 148
+  },
+  "profile_parity_gnu_ld_match": true,
+  "final_config_mold_match": true
+ },
+ "limitations": [
+  "Single-host before/after; baseline is the QA sweep re-run on ee5d08a under identical exclusive-flock protocol, not a same-session re-run.",
+  "Link-only A/B removes the 54 test executables and relinks from cached rlibs; compile cost is excluded from both sides.",
+  "Session A3b/B2 relink timings (0.16s/0.18s) are INVALID no-ops (parser bug, documented above); the corrected L1/L2 timings in final_config_mold supersede them.",
+  "mold -run changes the linker only; CARGO_ENCODED_RUSTFLAGS is untouched, so compute identity is unaffected by the linker choice.",
+  "The Cargo.toml profile edit changes compute_revision because build.rs binds Cargo.toml bytes: an honest build-metadata change, not a semantic change.",
+  "Timings are wall-clock on a shared VPS; the heavy lock excludes other cargo jobs but not all host activity.",
+  "No financial, provenance, scientific or security gate was touched; diagnostic execution remains diagnostic_simulation/none.",
+  "Hosted CI skips real-data suites (no corpus on runners); real-data before/after is local-only evidence."
+ ],
+ "mold_decision": "SKIP \u2014 clean concurrency-guarded link-only A/B: default rust-lld 23.1.5 6.00s vs mold 2.30 6.55s for 54 executables (parity). First-pass 77.54s vs 6.29s was contamination-inflated (cold lib recompile on the default side from a concurrent non-flock lane build); retained as documented measurement error. mold removed from ci.yml; no rustflags/apt dependency added.",
+ "adopted": [
+  "dev/test optimization profiles (Cargo.toml)",
+  "CI three parallel required jobs",
+  "per-job Swatinem/rust-cache",
+  "CARGO_INCREMENTAL=0 + CI debug=0"
+ ],
+ "skipped": [
+  "mold (parity with default rust-lld)",
+  "cargo-nextest (process-per-test defeats process-local FLEET_TIMING_LOCK serialization)",
+  "sccache (deferred pending cache-hit telemetry)",
+  "Cranelift (nightly-only)",
+  "test-binary consolidation (invasive)"
+ ]
+}
