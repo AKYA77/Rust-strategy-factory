@@ -1231,7 +1231,7 @@ fn run(args: &[String]) -> Result<()> {
                 let sampler = if let Some(state) = &selection_state {
                     limits.workers = state.current_workers;
                     Some(rust_strategy_factory::resource::spawn_sampler(
-                        "corpus-", 50,
+                        "corpus-", 10,
                     )?)
                 } else {
                     None
