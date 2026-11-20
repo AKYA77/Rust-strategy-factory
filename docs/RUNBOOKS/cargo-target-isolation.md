@@ -87,8 +87,29 @@ No test or gate is weakened to accommodate the protocol.
    whether a clean was forced, log path). On failure it **invalidates** the stamp so the
    next invocation rebuilds. `cargo clean` also invalidates the stamp. Non-build
    commands (`fmt`, `metadata`, …) still take the lock but do not touch the stamp.
+   Bookkeeping is robust to a **full `cargo clean`** (no `-p`), which deletes the target
+   dir itself: the wrapper recreates the target/log dirs before recording, preserves the
+   tee'd log via a temp file outside the target, and still appends the provenance line —
+   reporting **cargo's own exit code**, never a bookkeeping crash (defect D1, review
+   round 1). The stamp is absent afterwards, so the next build-like invocation forces
+   `clean -p`: isolation stays intact.
 
-Every invocation's output is tee'd to `target/.rsf-logs/<ts>-<subcmd>.<pid>.log`.
+Every invocation's output is tee'd to `target/.rsf-logs/<ts>-<subcmd>.<pid>.log`
+(via a temp file outside the target, so even a full `cargo clean` cannot destroy
+the log before it is recorded).
+
+### Mechanics regression suite (light, no heavy builds)
+
+`scripts/test-cargo-locked.sh` exercises the wrapper mechanics against a
+**throwaway target + lock** (never the shared target; nothing compiles, so it
+needs no team heavy lock and can run while a lane holds it): non-build vs
+build-like handling, no-stamp/foreign/stale-HEAD forced cleans, stamp-match
+caching, failure invalidation, and the **D1 regression** — full `clean` → rc=0,
+dirs recreated, stamp absent, provenance (`command="clean"`) + preserved log
+recorded; `clean -p` control; failing clean preserves cargo's rc; post-clean
+isolation. Exit 0 = all assertions pass; on failure the temp dir is kept for
+inspection. Re-runnable from any checkout by any lane (rsf-qa re-runs it in
+review).
 
 ### Verification receipts
 

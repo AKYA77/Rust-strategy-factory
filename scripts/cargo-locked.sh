@@ -17,7 +17,12 @@
 #   3. Run the real cargo command via the rustup proxy (shim dir stripped from PATH).
 #   4. On success record the stamp + a provenance log line; on failure invalidate
 #      the stamp so the next invocation is forced to rebuild. Never reuse uncertain
-#      artifacts.
+#      artifacts. Bookkeeping survives a full `cargo clean` (which deletes the
+#      target dir itself): dirs are recreated and the log preserved via a temp
+#      file, so cargo's own exit code is always reported faithfully (defect D1).
+#
+# Mechanics regression suite (light, throwaway target/lock, no heavy builds):
+#   scripts/test-cargo-locked.sh
 #
 # Usage (identical args to cargo):
 #   scripts/cargo-locked.sh test --locked --lib --bins --tests
@@ -168,6 +173,7 @@ d = {
     "builder": os.environ.get("RSF_BUILDER_PROFILE", os.environ.get("USER", "unknown")),
     "written_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
 }
+os.makedirs(os.path.dirname(os.path.abspath(sys.argv[1])), exist_ok=True)
 with open(sys.argv[1], "w") as fh:
     json.dump(d, fh, indent=2)
     fh.write("\n")
@@ -191,6 +197,7 @@ rec = {
     "log": sys.argv[9],
     "builder": os.environ.get("RSF_BUILDER_PROFILE", os.environ.get("USER", "unknown")),
 }
+os.makedirs(os.path.dirname(os.path.abspath(sys.argv[1])), exist_ok=True)
 with open(sys.argv[1], "a") as fh:
     fh.write(json.dumps(rec) + "\n")
 PY
@@ -223,12 +230,21 @@ if is_build_like "$SUB"; then
 fi
 
 # --- run the requested cargo command, tee to a log, keep cargo's exit code ----
+# Tee through a temp file OUTSIDE the target dir: a full `cargo clean` (no -p)
+# deletes the target dir itself, which would destroy a log file open inside it.
+# The temp file lets the log be restored after the dirs are recreated (D1).
+TMP_LOG=$(mktemp "${TMPDIR:-/tmp}/rsf-cargo-log.XXXXXX")
 set +e
-"$REAL_CARGO" "$@" 2>&1 | tee "$LOG"
+"$REAL_CARGO" "$@" 2>&1 | tee "$TMP_LOG"
 rc=${PIPESTATUS[0]}
 set -e
 
 # --- record provenance / stamp ------------------------------------------------
+# A full `cargo clean` removes the target dir itself; recreate it and the log
+# dir BEFORE any bookkeeping so stamp/provenance/log recording always succeeds
+# and the wrapper reports cargo's own exit code, not a bookkeeping crash (D1).
+mkdir -p "$TARGET_DIR" "$LOG_DIR"
+mv -f "$TMP_LOG" "$LOG"
 if [ "$SUB" = "clean" ]; then
   # artifacts were removed; never let a stale stamp claim they are valid
   rm -f "$STAMP"
