@@ -1004,11 +1004,7 @@ mod thread_cpu_tests {
             for (_, name) in &found {
                 assert!(name.starts_with("rsf-test-w"));
             }
-            assert!(
-                named_worker_threads("rsf-absent-prefix")
-                    .unwrap()
-                    .is_empty()
-            );
+            assert!(named_worker_threads("rsf-absent").unwrap().is_empty());
             done.store(true, std::sync::atomic::Ordering::SeqCst);
         });
         assert!(named_worker_threads("").is_err());
