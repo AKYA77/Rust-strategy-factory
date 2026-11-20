@@ -14,7 +14,7 @@
 #      HEAD SHA + dirty-tree content hash) against the shared target's last
 #      builder. On ANY mismatch/absence run `cargo clean -p rust-strategy-factory`
 #      INSIDE the lock (project artifacts only; the dependency cache stays warm).
-#   3. Run the real cargo command (resolved via `rustup which cargo`, never a shim).
+#   3. Run the real cargo command via the rustup proxy (shim dir stripped from PATH).
 #   4. On success record the stamp + a provenance log line; on failure invalidate
 #      the stamp so the next invocation is forced to rebuild. Never reuse uncertain
 #      artifacts.
@@ -87,10 +87,26 @@ LOG_DIR="$TARGET_DIR/.rsf-logs"
 mkdir -p "$LOG_DIR"
 PKG=rust-strategy-factory
 
-# --- resolve the REAL cargo (toolchain binary; never a PATH shim) -------------
-REAL_CARGO=$(rustup which cargo 2>/dev/null || printf '%s/bin/cargo' "${CARGO_HOME:-$HOME/.cargo}")
+# --- resolve the REAL cargo: the rustup-managed PROXY (never our shim) ---------
+# Use the rustup proxy, NOT a bare toolchain binary from `rustup which cargo`: the
+# proxy exports RUSTUP_TOOLCHAIN so build scripts / proc-macros use the pinned
+# toolchain. A direct toolchain binary can let subprocesses fall back to the
+# runner's DEFAULT toolchain (e.g. a different stable rustc on CI) -> E0514
+# incompatible-crate errors. Strip our own shim dir from PATH to avoid recursion.
+_clean_path=""
+IFS=':' read -ra _path_parts <<< "$PATH"
+for _p in "${_path_parts[@]}"; do
+  case "$_p" in
+    */scripts/shim) ;; # skip the cargo shim dir
+    *) _clean_path="${_clean_path:+$_clean_path:}$_p" ;;
+  esac
+done
+REAL_CARGO=$(PATH="$_clean_path" command -v cargo 2>/dev/null || true)
+if [ -z "$REAL_CARGO" ] && [ -n "${CARGO_HOME:-}" ] && [ -x "$CARGO_HOME/bin/cargo" ]; then
+  REAL_CARGO="$CARGO_HOME/bin/cargo"
+fi
 if [ -z "$REAL_CARGO" ] || [ ! -x "$REAL_CARGO" ]; then
-  echo "cargo-locked: cannot resolve a real cargo binary (rustup which cargo failed)" >&2
+  echo "cargo-locked: cannot resolve the rustup cargo proxy" >&2
   exit 127
 fi
 

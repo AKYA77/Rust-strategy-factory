@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # cargo shim — makes a bare `cargo` invocation route through the locked,
 # provenance-stamped wrapper of the CURRENT git checkout. Activate by placing this
-# directory first on PATH (see scripts/cargo-env.sh). The wrapper resolves the real
-# toolchain cargo via `rustup which cargo`, so there is no shim recursion.
+# directory first on PATH (see scripts/cargo-env.sh). The wrapper resolves the rustup
+# cargo proxy with this shim dir stripped from PATH, so there is no shim recursion.
 set -euo pipefail
 TOP=$(git rev-parse --show-toplevel 2>/dev/null) || {
   echo "cargo-shim: not inside a git checkout; cannot locate scripts/cargo-locked.sh" >&2

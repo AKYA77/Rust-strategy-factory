@@ -76,8 +76,12 @@ No test or gate is weakened to accommodate the protocol.
    the dependency cache stays warm. This preserves within-lane incremental caching
    while guaranteeing no cross-lane reuse. The dirty hash is conservative: any
    uncertainty forces a rebuild, never a reuse.
-3. **Runs the real cargo** command, resolved via `rustup which cargo` (the toolchain
-   binary — never a PATH shim, so there is no recursion).
+3. **Runs the real cargo** command via the rustup **proxy** (the shim dir is stripped
+   from PATH, so there is no recursion). The proxy — not a bare toolchain binary from
+   `rustup which cargo` — exports `RUSTUP_TOOLCHAIN`, so build scripts/proc-macros use
+   the pinned toolchain even when the runner has a different default rustc. (A direct
+   toolchain binary let CI subprocesses fall back to the runner's default stable rustc
+   → `E0514` incompatible-crate errors; the proxy matches bare-`cargo` behavior.)
 4. **Records provenance.** On success it writes the stamp and appends a line to
    `target/.rsf-provenance.jsonl` (checkout, SHA, dirty hash, command, exit code,
    whether a clean was forced, log path). On failure it **invalidates** the stamp so the
