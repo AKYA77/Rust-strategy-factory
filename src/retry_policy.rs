@@ -17,9 +17,7 @@ impl Policy {
     }
 }
 pub(crate) fn initialize(c: &mut Connection, migrate: bool) -> Result<()> {
-    let tx = c
-        .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx_open(c).map_err(|e| e.to_string())?;
     tx.execute_batch("CREATE TABLE IF NOT EXISTS corpus_retry_policies(search_id TEXT PRIMARY KEY REFERENCES corpus_searches(id),body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=4096),hash TEXT NOT NULL CHECK(length(hash)=64));CREATE TRIGGER IF NOT EXISTS retry_policy_no_update BEFORE UPDATE ON corpus_retry_policies BEGIN SELECT RAISE(ABORT,'retry policy immutable');END;CREATE TRIGGER IF NOT EXISTS retry_policy_no_delete BEFORE DELETE ON corpus_retry_policies BEGIN SELECT RAISE(ABORT,'retry policy immutable');END;").map_err(|e|e.to_string())?;
     if migrate {
         tx.execute_batch(
@@ -31,10 +29,7 @@ pub(crate) fn initialize(c: &mut Connection, migrate: bool) -> Result<()> {
 }
 pub fn configure(registry: &mut Registry, id: &str, policy: &Policy) -> Result<String> {
     policy.validate()?;
-    let tx = registry
-        .connection
-        .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx(&registry.connection)?;
     let head = crate::search_control::read(&tx, id)?;
     if !matches!(head.state.as_str(), "running" | "paused") {
         return Err("terminal search cannot install retry policy".into());

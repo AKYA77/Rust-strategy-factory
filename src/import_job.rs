@@ -5,7 +5,7 @@ use crate::{
     data::{self, Tick},
     native,
 };
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},
@@ -168,10 +168,8 @@ pub fn status(root: &Path) -> Result<Progress> {
     if !root.join("normalized-import.sqlite").is_file() {
         return Err("import ledger does not exist".into());
     }
-    let mut c = open(root)?;
-    let tx = c
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(db)?;
+    let c = open(root)?;
+    let tx = crate::storage::writer_tx(&c)?;
     let p = load(&tx)?.ok_or("import not initialized")?;
     verify_chunks(root, &p)?;
     tx.commit().map_err(db)?;
@@ -279,11 +277,9 @@ pub fn step(
         return Err("expected CSV header timestamp_ms,sequence,bid,ask".into());
     }
     let header_end = reader.position().byte();
-    let mut c = open(root)?;
+    let c = open(root)?;
     {
-        let tx = c
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(db)?;
+        let tx = crate::storage::writer_tx(&c)?;
         if let Some(p) = load(&tx)? {
             if p.configuration != config {
                 return Err(
@@ -299,9 +295,7 @@ pub fn step(
             .and_then(|f| f.sync_all())
             .map_err(|e| e.to_string())?;
     }
-    let tx = c
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(db)?;
+    let tx = crate::storage::writer_tx(&c)?;
     let mut p = load(&tx)?.ok_or("import checkpoint missing")?;
     let previous = verify_chunks(root, &p)?;
     if p.complete {

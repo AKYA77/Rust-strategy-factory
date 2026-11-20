@@ -1,6 +1,6 @@
 //! Durable search pause intent and state epochs, with bounded immutable transition detail.
 use crate::{Result, data};
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 const VERSION: &str = "search-control-v1";
 const PER_SEARCH: usize = 128;
@@ -88,9 +88,7 @@ pub(crate) fn initialize(
     c: &mut Connection,
     migrate: bool,
 ) -> std::result::Result<(), crate::corpus_failure::AdmissionFailure> {
-    let tx = c
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(crate::corpus_failure::AdmissionFailure::from)?;
+    let tx = crate::storage::writer_tx_open(c)?;
     tx.execute_batch("CREATE TABLE IF NOT EXISTS corpus_search_runtime(search_id TEXT PRIMARY KEY REFERENCES corpus_searches(id),body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=4096),hash TEXT NOT NULL CHECK(length(hash)=64));
     CREATE TABLE IF NOT EXISTS corpus_search_transitions(event_id INTEGER PRIMARY KEY,search_id TEXT NOT NULL REFERENCES corpus_searches(id),epoch INTEGER NOT NULL CHECK(epoch>0),body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=4096),hash TEXT NOT NULL CHECK(length(hash)=64),UNIQUE(search_id,epoch));
     CREATE TRIGGER IF NOT EXISTS search_runtime_key_immutable BEFORE UPDATE OF search_id ON corpus_search_runtime BEGIN SELECT RAISE(ABORT,'search runtime key immutable');END;

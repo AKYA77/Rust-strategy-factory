@@ -7,7 +7,7 @@ use crate::{
     machine_evidence::{self, hex},
     review_authority::{Authority, Principal},
 };
-use rusqlite::{Connection, TransactionBehavior, params};
+use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -259,10 +259,7 @@ impl Catalog {
         request: Request,
     ) -> Result<Event> {
         validate_request(&request)?;
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(|e| e.to_string())?;
+        let tx = crate::storage::writer_tx(&self.connection)?;
         let a =
             machine_evidence::read(&tx, &request.machine_id)?.ok_or("machine admission missing")?;
         let b = &a.record.binding;

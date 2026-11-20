@@ -322,7 +322,10 @@ pub fn diagnose(registry: &mut Registry, parent_id: &str, options: &Options) -> 
     if json.len() > 1024 * 1024 {
         return Err("diagnosis report budget exceeded".into());
     }
-    let inserted = registry.connection.execute("INSERT OR IGNORE INTO training_diagnoses(id,parent_id,report_json,report_hash) VALUES(?1,?2,?3,?4)", params![report.id, parent_id, json, data::hash(&report)?]).map_err(|e|e.to_string())?;
+    let inserted = {
+        let _guard = crate::storage::writer_guard(&registry.connection)?;
+        registry.connection.execute("INSERT OR IGNORE INTO training_diagnoses(id,parent_id,report_json,report_hash) VALUES(?1,?2,?3,?4)", params![report.id, parent_id, json, data::hash(&report)?]).map_err(|e|e.to_string())?
+    };
     let stored = read_report(registry, &report.id)?.ok_or("diagnosis publication missing")?;
     if data::hash(&stored)? != data::hash(&report)? {
         return Err("conflicting immutable diagnosis".into());
