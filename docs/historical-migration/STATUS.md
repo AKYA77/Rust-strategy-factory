@@ -300,6 +300,14 @@ equivalence checks. `audit` does not re-read the Parquet.
     the canonical corpus holds 22, so a 24-month window is refused with the exact missing input
     (2026-11 and 2026-12 are not completed/available). New `historical-corpus-register-window` CLI.
 
+## Verification throughput branch pointer (2026-11-20)
+
+`hermes/verification-throughput` (PR #21) carries the quality-neutral verification-throughput
+program: dev/test opt profiles + three-job parallel cached CI (mold evaluated, SKIPped —
+default rust-lld already at parity). Evidence:
+docs/VERIFICATION/verification-throughput-v1.json and docs/RUNBOOKS/verification-throughput.md.
+Measurement harness/logs: /root/.hermes/profiles/rsf-commander/cache/scratch/rsf-throughput-2026-11-20/.
+
 ## Safety notes
 
 - Do not modify `/var/lib/hermes-factory` source archives, canonical partitions or receipts.

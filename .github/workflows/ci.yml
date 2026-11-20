@@ -14,28 +14,26 @@ env:
 # Every previous stage/assertion is preserved; ALL three jobs are required for merge
 # (branch protection required status checks + QA verifies the full rollup on the exact SHA).
 # Each job gets its own job-scoped rust-cache (no shared-key -> no parallel save races).
+# mold was evaluated and SKIPped: clean link-only A/B shows the rustc-1.100 default
+# linker (rust-lld 23.1.5) already matches mold 2.30 on this workload (see runbook).
 jobs:
   rust-checks:
     name: rust-checks
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install mold linker (link-phase acceleration; no rustflag/identity change)
-        run: sudo apt-get update && sudo apt-get install -y mold
       - name: Install pinned toolchain
         run: rustup show
       - name: Cache cargo registry and target artifacts
         uses: Swatinem/rust-cache@v2
-      - run: mold -run sh scripts/check.sh
+      - run: sh scripts/check.sh
       - name: Verify trusted inventory cannot deserialize supplied JSON
-        run: mold -run cargo test --locked --doc
+        run: cargo test --locked --doc
   browser:
     name: browser
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install mold linker (link-phase acceleration; no rustflag/identity change)
-        run: sudo apt-get update && sudo apt-get install -y mold
       - name: Install pinned toolchain
         run: rustup show
       - name: Cache cargo registry and target artifacts
@@ -46,25 +44,23 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npx playwright install --with-deps chromium
-      - run: mold -run cargo build --locked
+      - run: cargo build --locked
       - run: npm run test:browser
   release-acceptance:
     name: release-acceptance
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install mold linker (link-phase acceleration; no rustflag/identity change)
-        run: sudo apt-get update && sudo apt-get install -y mold
       - name: Install pinned toolchain
         run: rustup show
       - name: Cache cargo registry and target artifacts
         uses: Swatinem/rust-cache@v2
-      - run: mold -run cargo build --locked
+      - run: cargo build --locked
       - name: Verify data compute identity boundaries
         run: |
           mkdir -p work
-          mold -run python3 scripts/check-data-compute-identity.py work/data-compute-identity.json
-      - run: mold -run cargo build --locked --release
+          python3 scripts/check-data-compute-identity.py work/data-compute-identity.json
+      - run: cargo build --locked --release
       - run: python3 scripts/check-operations.py
       - name: Verify continuous UTC horizon and declared context ceiling
         run: python3 scripts/check-full-horizon.py --binary target/release/rust-strategy-factory --output work/full-horizon-context.json
