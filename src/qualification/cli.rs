@@ -41,7 +41,7 @@ pub fn assess(argc: usize, argv: &[String]) -> Result<()> {
 /// Qualify requires complete gates plus live revalidation; Reject/Revoke only the
 /// authenticated grant and head fencing.
 pub fn decide(argc: usize, argv: &[String]) -> Result<()> {
-    if !((3..=4).contains(&argc)) && false || (7..=11).contains(&argc) {
+    if !(7..=11).contains(&argc) {
         return Err("qualification-decide <store.sqlite> <authority.secret> <reviewer> <request.json> <bundle.json> <policy.json> [registry.sqlite catalog.sqlite archive.csv dataset.json]".into());
     }
     let mut store = Store::open(Path::new(&argv[1]))?;
@@ -98,10 +98,10 @@ pub fn decide(argc: usize, argv: &[String]) -> Result<()> {
 // === qualification-board ===
 
 pub fn board(argc: usize, argv: &[String]) -> Result<()> {
-    if argc < 3 || argc > 4 {
+    if !(3..=4).contains(&argc) {
         return Err("qualification-board <store.sqlite> <authority.secret> [instrument]".into());
     }
-    let mut store = Store::open(Path::new(&argv[1]))?;
+    let store = Store::open(Path::new(&argv[1]))?;
     let authority = Authority::load(Path::new(&argv[2]))?;
     let view = if argc == 3 {
         std::iter::once(store.board(&argv[3], &authority)?)
@@ -116,9 +116,12 @@ pub fn board(argc: usize, argv: &[String]) -> Result<()> {
 
 pub fn scope(argc: usize, argv: &[String]) -> Result<()> {
     if argc != 5 {
-        return Err("qualification-scope <store.sqlite> <authority.secret> <instrument> <concept-id>".into());
+        return Err(
+            "qualification-scope <store.sqlite> <authority.secret> <instrument> <concept-id>"
+                .into(),
+        );
     }
-    let mut store = Store::open(Path::new(&argv[1]))?;
+    let store = Store::open(Path::new(&argv[1]))?;
     let authority = Authority::load(Path::new(&argv[2]))?;
     let state = store
         .scope_state(&argv[3], &argv[4], &authority)
@@ -132,7 +135,7 @@ pub fn history(argc: usize, argv: &[String]) -> Result<()> {
     if argc != 3 {
         return Err("qualification-history <store.sqlite> <filter.json>".into());
     }
-    let mut store = Store::open(Path::new(&argv[1]))?;
+    let store = Store::open(Path::new(&argv[1]))?;
     let filter: qualification::HistoryFilter = read_json(&argv[2])?;
     let page = store.history(&filter).map_err(|e| e.to_string())?;
     print(&page)
@@ -142,9 +145,12 @@ pub fn history(argc: usize, argv: &[String]) -> Result<()> {
 
 pub fn leaders(argc: usize, argv: &[String]) -> Result<()> {
     if !(3..=4).contains(&argc) {
-        return Err("qualification-leaders <store.sqlite> <instrument> [after-sequence-or-- [limit]]".into());
+        return Err(
+            "qualification-leaders <store.sqlite> <instrument> [after-sequence-or-- [limit]]"
+                .into(),
+        );
     }
-    let mut store = Store::open(Path::new(&argv[1]))?;
+    let store = Store::open(Path::new(&argv[1]))?;
     let instrument = &argv[2];
     let (after, limit) = if argc == 3 {
         match &argv[2][..] {
@@ -186,7 +192,7 @@ pub fn backup(argc: usize, argv: &[String]) -> Result<()> {
     if argc != 3 {
         return Err("qualification-backup <store.sqlite> <new-backup.sqlite>".into());
     }
-    let mut store = Store::open(Path::new(&argv[1]))?;
+    let store = Store::open(Path::new(&argv[1]))?;
     store
         .backup(Path::new(&argv[2]))
         .map_err(|e| e.to_string())?;
