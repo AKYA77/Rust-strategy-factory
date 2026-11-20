@@ -296,9 +296,19 @@ equivalence checks. `audit` does not re-read the Parquet.
     cannot feed registered research.
 15. ~~Configurable completed-month research window~~ — `historical_corpus::register_window`
     registers the latest N contiguous completed months and reports the precise shortfall instead of
-    padding. The blueprint's exact 24-completed-month interval is therefore supported in software;
-    the canonical corpus holds 22, so a 24-month window is refused with the exact missing input
-    (2026-11 and 2026-12 are not completed/available). New `historical-corpus-register-window` CLI.
+    padding. The canonical corpus holds 22 completed months, so 23- and 24-month windows are refused
+    with the exact missing input (2026-11 and 2026-12 are not completed/available). New
+    `historical-corpus-register-window` CLI.
+16. ~~Owner-selected 22-month research window pin~~ — `historical_corpus::ResearchWindow::OWNER_SELECTED`
+    pins the active research period to exactly 2025-01..2026-10 (owner decision 2026-11-19;
+    DECISIONS/0056). `register_research_window` resolves exactly those calendar months, refuses
+    missing months with the exact list, and never slides with later data; `EXPECTED_MONTHS` derives
+    from the pin and `verify` requires full-length specs to cover its boundaries. The full-corpus
+    research CLIs register through the pin; new `historical-corpus-register-research-window` and
+    `historical-corpus-register-window-config` CLIs (RUNBOOKS/research-window.md). Real-data tests
+    assert the boundaries for all eight instruments, identity equality with exact-count registration
+    (no reinterpretation of completed results), and exact out-of-range refusals. No eligibility,
+    approval or qualification change.
 
 ## Verification throughput branch pointer (2026-11-20)
 

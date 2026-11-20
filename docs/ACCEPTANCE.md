@@ -669,3 +669,28 @@ passed on the exact combined SHA `eeaad53` (run 44116712842). The 13 superseded 
 closed with their commits verified as ancestors of `main`; no branch was force-pushed or deleted.
 Hosted CI on `main` is verified on the merge commit. The converted legacy corpus remains
 REAL_STRUCTURALLY_VALID only and is not qualification evidence.
+
+## Owner-selected 22-month research window pin (2026-11-19, hermes/research-22m-window)
+
+The owner-selected research period (owner decision 2026-11-19) is now an explicit calendar pin:
+`historical_corpus::ResearchWindow::OWNER_SELECTED` = 2025-01..2026-10, exactly the 22 completed
+months of the structurally verified canonical corpus (8 instruments, 176 partitions).
+`EXPECTED_MONTHS` derives from the pin; `register_research_window` resolves exactly the window's
+months and refuses missing months with the exact list (a 2025-01..2026-12 window reports
+`missing: 2026-11, 2026-12`); partitions outside the window are never selected, so later completed
+months cannot slide the pin. `verify` additionally requires full-length specifications to cover
+the pinned boundaries. The full-corpus research CLIs register through the pin; new
+`historical-corpus-register-research-window` and `historical-corpus-register-window-config` CLIs
+plus RUNBOOKS/research-window.md and DECISIONS/0056 document the configuration surface. The
+count-based `register_window` mechanism (PR #19) is retained; 23- and 24-month windows are refused
+with the exact shortfall. The corpus specification format, identity formula and existing receipts
+are unchanged: the pin binds identical source identities to exact-count registration (asserted),
+so no completed result is reinterpreted. Four new unit tests and two new real-data tests cover the
+pin arithmetic/validation/JSON roundtrip, the verify boundary gate, exact boundaries for all eight
+instruments (one-month diagnostic sample per instrument inside cargo test) and exact out-of-range
+refusals. Local verification under the shared heavy lock with project-artifact cleaning:
+formatting and Clippy -D warnings pass; 524 Rust tests passed / 0 failed across 54 binaries in
+both `cargo test --locked --lib --bins --tests` and `scripts/check.sh`. Hosted CI follows
+publication. REAL_STRUCTURALLY_VALID grants no eligibility; all four review gates remain pending,
+0 instruments research-eligible; diagnostic execution stays diagnostic_simulation/none; no data
+downloaded or generated; financial contracts unchanged.

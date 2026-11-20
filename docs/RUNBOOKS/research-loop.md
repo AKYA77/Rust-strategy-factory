@@ -10,7 +10,7 @@ cargo run --locked -- fixture EURUSD state/fixture.json
 cargo run --locked -- research config/research.example.json state/research.sqlite 10
 ```
 
-The optional final number is a completed-step budget. Omit it to keep researching until stopped or the configured search budget is exhausted. The first output line is compact JSON containing `run_id`; final output is a persisted status. Paths inside the configuration resolve relative to the configuration file. No files are overwritten by `fixture`. These are short artificial 2025/2026 windows, not real coverage or a full 24-month dataset.
+The optional final number is a completed-step budget. Omit it to keep researching until stopped or the configured search budget is exhausted. The first output line is compact JSON containing `run_id`; final output is a persisted status. Paths inside the configuration resolve relative to the configuration file. No files are overwritten by `fixture`. These are short artificial 2025/2026 windows, not real coverage or the full 22-month research corpus.
 
 Use actual verified normalized datasets for real training research. Non-USD quote inputs require an explicit event-aligned conversion JSON file, referenced as `"conversions":"path.json"` alongside `dataset`. Future/stale/missing rates are rejected; no rate is inferred. Source/profile/complete-history approval and independent scientific evaluation remain mandatory before any qualification.
 
