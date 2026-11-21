@@ -1,0 +1,44 @@
+{
+  "acceptance": "vps-live-systemd-2026-11-21",
+  "host": "vmi3658677",
+  "hardware": {"vcpu": 6, "ram_gib": 11.9, "disk_free_gib": 22, "declared_target": "4 vCPU / 8 GB (exceeded)"},
+  "install": {
+    "prefix": "/root/.local/share/rust-strategy-factory",
+    "release_sha256": "8b7c0bdb0c7ef6a53106f17a77830a8c981c32dcb5f3b97db8807e959e7700c5",
+    "activated": true,
+    "method": "scripts/operate.py install target/release/rust-strategy-factory"
+  },
+  "services": {
+    "rust-strategy-factory-research.service": {
+      "enabled": true, "active": true,
+      "kernel_limits": {"cpu_max": "300000 100000", "memory_max": 6442450944, "pids_max": 64},
+      "observed": {"rss_kib": 13280, "cpu_pct": 40.3, "tasks": 2},
+      "tests": ["start ok", "restart ok", "graceful SIGINT stop ok", "auto-restart loop cleared",
+                "SIGKILL -> systemd auto-restart triggered; reset-failed + fresh state required because prior run exhausted the configured state_budget_bytes (operator-action error, not a service defect)"]
+    },
+    "rust-strategy-factory-dashboard.service": {
+      "enabled": true, "active": true,
+      "kernel_limits": {"cpu_max": "50000 100000", "memory_max": 536870912, "pids_max": 32},
+      "observed": {"rss_kib": 8924, "cpu_pct": 0.6, "tasks": 3, "port": 3000},
+      "tests": ["start ok", "unauth /api/overview -> 401", "kill -9 -> auto-recovered new PID, serving again",
+                "restart ok; GET / on 127.0.0.1:3000 -> HTTP 200"]
+    }
+  },
+  "cutover": {
+    "backup": {"operation": "backup", "integrity_verified": true, "counts": {"registered": 25763, "completed": 198}},
+    "restore": {"operation": "restore", "integrity_verified": true, "registry_check_matches_source": true},
+    "update_rollback": {"installed_debug_release": "92fc30486e4a3dd7bc500332138e723c6f6f9eb1b84e8d5b9fa4716389c0dc1d", "rolled_back_to": "8b7c0bdb0c7ef6a53106f17a77830a8c981c32dcb5f3b97db8807e959e7700c5"}
+  },
+  "incidents": [
+    {"what": "transient NAMESPACE start failure while a reclaimed bot worker was concurrently rewriting the same unit files", "resolution": "single-writer restore; both services then started cleanly with full hardening (ProtectSystem=strict verified active)"}
+  ],
+  "preservation": {"dataset": "/var/lib/hermes-factory untouched (archives+catalog)", "webui_8787": "active throughout", "gateway": "untouched"},
+  "reboot_persistence": {
+    "performed": false,
+    "reason": "no disruptive reboot executed; verified by enabled units + active user lingering",
+    "evidence": "is-enabled = enabled for both units; loginctl show-user root -> Linger=yes; /var/lib/systemd/linger/root exists",
+    "risk": "low"
+  },
+  "live_systemd_and_vps_execution": "RUN",
+  "synthetic_only": true
+}

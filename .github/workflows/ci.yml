@@ -31,6 +31,8 @@ jobs:
         run: rustup show
       - name: Cache cargo registry and target artifacts
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-cache-v1
       - run: cargo test --locked --lib --bins --tests
       - name: Verify trusted inventory cannot deserialize supplied JSON
         run: cargo test --locked --doc
@@ -43,6 +45,8 @@ jobs:
         run: rustup show
       - name: Cache cargo registry and target artifacts
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-cache-v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -61,6 +65,8 @@ jobs:
         run: rustup show
       - name: Cache cargo registry and target artifacts
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-cache-v1
       - run: cargo build --locked --release
 
   data-compute-identity:
@@ -73,6 +79,8 @@ jobs:
         run: rustup show
       - name: Cache cargo registry and target artifacts
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-cache-v1
       - run: cargo build --locked
       - name: Verify data compute identity boundaries
         run: |
@@ -89,6 +97,8 @@ jobs:
         run: rustup show
       - name: Cache cargo registry and target artifacts
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-cache-v1
       - run: cargo build --locked
       - run: python3 scripts/check-operations.py
 
@@ -102,6 +112,8 @@ jobs:
         run: rustup show
       - name: Cache cargo registry and target artifacts
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-cache-v1
       - run: cargo build --locked --release
       - name: Verify continuous UTC horizon and declared context ceiling
         run: python3 scripts/check-full-horizon.py --binary target/release/rust-strategy-factory --output work/full-horizon-context.json
