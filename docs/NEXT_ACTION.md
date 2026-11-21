@@ -66,7 +66,11 @@ before fleet/campaign/rotation lease claims and owned-child spawn and pauses the
 before experiment registration. On this VPS the deploy templates' CPUQuota/MemoryMax measure as
 declared-only for the gateway process (no cpu controller, memory.max=max); no hard kernel
 enforcement is claimed. Adaptive `corpus-batch` worker counts provably preserve complete receipt
-hashes. The remaining queue below is unchanged by this branch until it merges.
+hashes. Verified on the exact tree ad46c84 (PR #27): push gate green (fmt,
+clippy -D warnings, 181 lib tests, 232 integration bins), live OS-enforcement
+and resource-allocation evidence, receipt-hash independence from worker count;
+local full check.sh green; hosted CI rust-checks/browser/release-acceptance
+green on the exact SHA. External blockers unchanged.
 
 The highest-priority blockers are external: real/protected/non-USD execution, approved source
 acquisition, broker/calendar/conversion facts and target-VPS acceptance all remain pending (source
