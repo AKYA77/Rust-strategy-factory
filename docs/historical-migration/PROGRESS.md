@@ -58,8 +58,11 @@ are not counted as integrated into `main`.
 
 1. All four review gates (calendar/profile/legal/scientific) remain pending; no instrument is
    research-eligible. External owner determinations are required and must not be invented.
-2. Open PRs not yet integrated: #23 (cargo-target-isolation, t_f368fccb) and #27
-   (scheduler-resource-controls, t_794f2a65). Both are CI-green; merge after QA review.
+2. Open PRs not yet integrated: #23 (cargo-target-isolation, t_f368fccb) is OPEN and
+   mergeable but CI-blocked (checks not green, mergeStateStatus BLOCKED); #27
+   (scheduler-resource-controls, t_794f2a65) is OPEN but CONFLICTING with main
+   (mergeStateStatus DIRTY) and needs a re-merge before any QA review. Neither head is
+   an ancestor of origin/main, so neither is integrated.
 3. Real/FX execution and full-history qualification are unfinished; corpus replay is
    deliberately scoped to synthetic literal-USD inputs.
 4. Live systemd/reboot VPS acceptance and operational runbooks are incomplete.
