@@ -4,7 +4,7 @@ Status: SOFTWARE_INCOMPLETE. Use the existing checkout. Read AGENTS.md, PROJECT_
 
 ## Latest verified local milestone
 
-Both PR #22 and PR #24 are merged into `main` (current HEAD `d71ae48`, PR #24 merge commit).
+Both PR #22 and PR #24 are merged into `main`, along with PR #35 (screening-efficiency, `740b3d1`) and PR #33 (supervised crash/disk-full injection + restore cutover, `5d1de0f`); current HEAD `dcc12f7` is the PR #33 merge commit.
 
 - `hermes/research-22m-window` (PR #22, merged `634734f`): pins the owner-selected research
   window: `historical_corpus::ResearchWindow::OWNER_SELECTED` = 2025-01..2026-10 (exactly 22
@@ -40,8 +40,7 @@ Both PR #22 and PR #24 are merged into `main` (current HEAD `d71ae48`, PR #24 me
   enforcement; no eligibility, approval, qualification, acquisition, live trading or public
   exposure is granted. Software remains incomplete.
 
-Current main CI run `44883200980` on merge commit `d71ae48` is in_progress — await conclusion
-before recording hosted_ci success.
+Current main CI run `44883200980` on merge commit `d71ae48` concluded success (run #305); hosted_ci in PROJECT_STATE.json now records merged-main CI run #333 (`44915269257`) on `dcc12f7`.
 
 Verification throughput landed through PR #21 (`hermes/verification-throughput`):
 quality-neutral dev/test optimization profiles (deps opt2 cached once, test code opt1,
@@ -98,11 +97,9 @@ aborting a healthy child. Software remains incomplete.
 The highest-priority blockers are external: real/protected/non-USD execution, approved source
 acquisition, broker/calendar/conversion facts and target-VPS acceptance all remain pending (source
 access still returns 403 and no legitimate real quote window has been obtained). Continue the
-remaining software queue — full end-to-end acceptance with hardware/resource evidence, writer
-backpressure, supervised crash/disk-full injection and aggregate audit coverage — without weakening
-financial, provenance, scientific or security safeguards. The converted native corpus is
-`REAL_STRUCTURALLY_VALID` only and grants no calendar completeness, profile approval, source
-licensing, scientific eligibility or qualification.
+Continue the remaining software queue — full end-to-end acceptance with hardware/resource evidence, writer backpressure, aggregate audit coverage and the requirement-to-evidence ledger — without weakening financial, provenance, scientific or security safeguards. The converted native corpus is `REAL_STRUCTURALLY_VALID` only and grants no calendar completeness, profile approval, source licensing, scientific eligibility or qualification.
+
+Supervised crash/disk-full injection and restore cutover (PR #33, merged `5d1de0f` into main as part of HEAD `dcc12f7`): `tests/crash_injection.rs` and `tests/restore_cutover.rs` plus provenance receipt `docs/VERIFICATION/crash-injection-cutover-ladder-v1.json`. Disk-full on tmpfs rolls back receipt publication and preserves committed WAL data, resuming once space is freed; SIGKILL during checkpoint write preserves the hash-chained checkpoint chain and resumes past the killed attempt. Restore cutover fences copied actors, refuses corrupt/mismatched snapshots before any destination is created, leaves the original registry untouched, and `registry-check` passes on the restored copy. Local ladder under flock: fmt, clippy `-D warnings`, 6 new tests (3 crash-injection, 3 restore-cutover) and release build all green; hosted CI green on PR #33 head 5d1de0f with run #333 verifying the merged main SHA dcc12f7. Synthetic development evidence only — no real/protected/non-USD execution, no eligibility or qualification.
 
 HAZARD (OPEN): shared CARGO_TARGET_DIR cross-worktree artifact-contamination hazard — a cargo run in one worktree can silently verify another branch's artifacts. Infra fix PR #23 (t_f368fccb, rsf-rust) is open and green but not yet merged. Interim protocol in force: every cargo invocation under `flock -w 3600 /root/workspace/.rsf-heavy.lock`; run `cargo clean -p rust-strategy-factory` before verification if another checkout may have built since your last build; receipts must record per-binary test counts, binary sha256 and source SHA. Runbook: `docs/RUNBOOKS/cargo-target-isolation.md` (created by t_f368fccb). Do not edit scripts/ or the wrapper — that is t_f368fccb's scope.
 
