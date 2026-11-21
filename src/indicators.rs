@@ -85,6 +85,16 @@ impl Mask {
         }
         Self { words, len }
     }
+    /// Rebuild from dense words, validating length and padding.
+    pub fn from_words(len: usize, words: Vec<u64>) -> Result<Self> {
+        let mask = Self { words, len };
+        mask.validate()?;
+        Ok(mask)
+    }
+    /// Dense word backing; logical storage detail, not part of the public contract.
+    pub fn words(&self) -> &[u64] {
+        &self.words
+    }
     pub fn len(&self) -> usize {
         self.len
     }

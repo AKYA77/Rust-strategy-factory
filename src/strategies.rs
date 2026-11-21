@@ -4,6 +4,7 @@ use crate::{
     contracts::Side,
     data::hash,
     indicators::{Mask, sma},
+    sparse_mask::SparseMask,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -335,7 +336,7 @@ pub struct Features<'a> {
     frame_context: Option<(&'a BTreeMap<Timeframe, Vec<Candle>>, Timeframe)>,
     close: Vec<i64>,
     cache: BTreeMap<Feature, Vec<Option<i64>>>,
-    signals: BTreeMap<Rule, Mask>,
+    signals: BTreeMap<Rule, SparseMask>,
     max_cells: usize,
     pub cache_hits: usize,
     pub feature_builds: usize,
@@ -471,7 +472,12 @@ impl<'a> Features<'a> {
         self.feature_builds += 1;
         Ok(())
     }
+    /// Dense shared mask for callers that need the original representation.
     pub fn signal(&mut self, rule: &Rule) -> Result<Mask> {
+        self.signal_sparse(rule)?.to_mask()
+    }
+    /// Density-adaptive cached mask; the shared cache retains sparse backing.
+    pub fn signal_sparse(&mut self, rule: &Rule) -> Result<SparseMask> {
         let canonical = rule.canonical()?;
         if !self.signals.contains_key(&canonical) {
             fn collect(rule: &Rule, out: &mut BTreeSet<Feature>) {
@@ -553,7 +559,7 @@ impl<'a> Features<'a> {
         }
         self.evaluate(&canonical)
     }
-    fn evaluate(&mut self, rule: &Rule) -> Result<Mask> {
+    fn evaluate(&mut self, rule: &Rule) -> Result<SparseMask> {
         if let Some(mask) = self.signals.get(rule) {
             self.cache_hits += 1;
             return Ok(mask.clone());
@@ -568,7 +574,7 @@ impl<'a> Features<'a> {
                 let key = Feature::MacdSign(*fast, *slow, *signal_window);
                 self.ensure(key.clone())?;
                 let values = &self.cache[&key];
-                Mask::from_bools((0..values.len()).map(|i|i>0 && matches!((values[i],values[i-1]),(Some(a),Some(b)) if if *above {a>0 && b<=0}else{a<0 && b>=0})))
+                SparseMask::from_bools((0..values.len()).map(|i|i>0 && matches!((values[i],values[i-1]),(Some(a),Some(b)) if if *above {a>0 && b<=0}else{a<0 && b>=0})))
             }
             Rule::BollingerCross {
                 window,
@@ -578,7 +584,7 @@ impl<'a> Features<'a> {
                 let key = Feature::Band(*window, *multiple_bps, *upper);
                 self.ensure(key.clone())?;
                 let bands = &self.cache[&key];
-                Mask::from_bools((0..bands.len()).map(|i|i>0 && matches!((bands[i],bands[i-1]),(Some(a),Some(b)) if if *upper {self.close[i]>a && self.close[i-1]<=b}else{self.close[i]<a && self.close[i-1]>=b})))
+                SparseMask::from_bools((0..bands.len()).map(|i|i>0 && matches!((bands[i],bands[i-1]),(Some(a),Some(b)) if if *upper {self.close[i]>a && self.close[i-1]<=b}else{self.close[i]<a && self.close[i-1]>=b})))
             }
             Rule::HigherTimeframe { timeframe, rule } => {
                 let base = self
@@ -619,8 +625,8 @@ impl<'a> Features<'a> {
                         *timeframe,
                     )?
                 };
-                let mask = features.signal(rule)?;
-                Mask::from_bools(self.candles.iter().map(|c| {
+                let mask = features.signal_sparse(rule)?;
+                SparseMask::from_bools(self.candles.iter().map(|c| {
                     let n = higher.partition_point(|h| {
                         (h.available_ms, h.publication_sequence)
                             <= (c.available_ms, c.publication_sequence)
@@ -631,7 +637,7 @@ impl<'a> Features<'a> {
             Rule::AboveMean { window } | Rule::BelowMean { window } => {
                 self.ensure(Feature::Mean(*window))?;
                 let above = matches!(rule, Rule::AboveMean { .. });
-                Mask::from_bools(
+                SparseMask::from_bools(
                     self.close
                         .iter()
                         .zip(&self.cache[&Feature::Mean(*window)])
@@ -640,7 +646,7 @@ impl<'a> Features<'a> {
             }
             Rule::Rising { lookback } | Rule::Falling { lookback } => {
                 let rising = matches!(rule, Rule::Rising { .. });
-                Mask::from_bools(self.close.iter().enumerate().map(|(i, v)| {
+                SparseMask::from_bools(self.close.iter().enumerate().map(|(i, v)| {
                     i >= *lookback
                         && if rising {
                             *v > self.close[i - lookback]
@@ -652,7 +658,7 @@ impl<'a> Features<'a> {
             Rule::MeanTrend { fast, slow, above } => {
                 self.ensure(Feature::Mean(*fast))?;
                 self.ensure(Feature::Mean(*slow))?;
-                Mask::from_bools(
+                SparseMask::from_bools(
                     self.cache[&Feature::Mean(*fast)]
                         .iter()
                         .zip(&self.cache[&Feature::Mean(*slow)])
@@ -664,7 +670,7 @@ impl<'a> Features<'a> {
             Rule::CrossMean { window, above } => {
                 self.ensure(Feature::Mean(*window))?;
                 let avg = &self.cache[&Feature::Mean(*window)];
-                Mask::from_bools((0..self.close.len()).map(|i| i>0 && matches!((avg[i-1],avg[i]),(Some(prev),Some(now)) if if *above {self.close[i-1]<=prev && self.close[i]>now}else{self.close[i-1]>=prev && self.close[i]<now})))
+                SparseMask::from_bools((0..self.close.len()).map(|i| i>0 && matches!((avg[i-1],avg[i]),(Some(prev),Some(now)) if if *above {self.close[i-1]<=prev && self.close[i]>now}else{self.close[i-1]>=prev && self.close[i]<now})))
             }
             Rule::RsiThreshold {
                 window,
@@ -680,7 +686,7 @@ impl<'a> Features<'a> {
                 let values = &self.cache[&Feature::Rsi(*window)];
                 let threshold = i64::from(*basis_points);
                 let cross = matches!(rule, Rule::RsiCross { .. });
-                Mask::from_bools((0..values.len()).map(|i| {
+                SparseMask::from_bools((0..values.len()).map(|i| {
                     values[i].is_some_and(|v| if *above { v > threshold } else { v < threshold })
                         && (!cross
                             || i > 0
@@ -700,7 +706,7 @@ impl<'a> Features<'a> {
                     Feature::PriorLow(*window)
                 };
                 self.ensure(key.clone())?;
-                Mask::from_bools(
+                SparseMask::from_bools(
                     self.close
                         .iter()
                         .zip(&self.cache[&key])
@@ -716,7 +722,7 @@ impl<'a> Features<'a> {
                 self.ensure(Feature::PriorLow(*window))?;
                 let high = &self.cache[&Feature::PriorHigh(*window)];
                 let low = &self.cache[&Feature::PriorLow(*window)];
-                Mask::from_bools((0..self.close.len()).map(|i|matches!((high[i],low[i]),(Some(h),Some(l)) if h>l && self.close[i]>=l && self.close[i]<=h && if *upper {i128::from(h-self.close[i])*10000<=i128::from(h-l)*i128::from(*basis_points)}else{i128::from(self.close[i]-l)*10000<=i128::from(h-l)*i128::from(*basis_points)})))
+                SparseMask::from_bools((0..self.close.len()).map(|i|matches!((high[i],low[i]),(Some(h),Some(l)) if h>l && self.close[i]>=l && self.close[i]<=h && if *upper {i128::from(h-self.close[i])*10000<=i128::from(h-l)*i128::from(*basis_points)}else{i128::from(self.close[i]-l)*10000<=i128::from(h-l)*i128::from(*basis_points)})))
             }
             Rule::RangeExpansion {
                 window,
@@ -724,7 +730,7 @@ impl<'a> Features<'a> {
             } => {
                 self.ensure(Feature::TrueRange)?;
                 self.ensure(Feature::PriorRangeMean(*window))?;
-                Mask::from_bools(self.cache[&Feature::TrueRange].iter().zip(&self.cache[&Feature::PriorRangeMean(*window)]).map(|(now,prev)|matches!((now,prev),(Some(a),Some(b)) if *b>0 && i128::from(*a)*10000>=i128::from(*b)*i128::from(*multiple_bps))))
+                SparseMask::from_bools(self.cache[&Feature::TrueRange].iter().zip(&self.cache[&Feature::PriorRangeMean(*window)]).map(|(now,prev)|matches!((now,prev),(Some(a),Some(b)) if *b>0 && i128::from(*a)*10000>=i128::from(*b)*i128::from(*multiple_bps))))
             }
             Rule::UtcSession {
                 start_hour,
@@ -732,7 +738,7 @@ impl<'a> Features<'a> {
                 weekdays,
             } => {
                 use chrono::{Datelike, Timelike};
-                Mask::from_bools(self.candles.iter().map(|c| {
+                SparseMask::from_bools(self.candles.iter().map(|c| {
                     chrono::DateTime::from_timestamp_millis(c.available_ms).is_some_and(|t| {
                         let hour = t.hour() as u8;
                         let session = if start_hour < end_hour {

@@ -181,7 +181,7 @@ pub(crate) fn process_history_ids(
     let next = if more { ids.last().cloned() } else { None };
     Ok((ids, next))
 }
-pub const SCHEMA_VERSION: u32 = 23;
+pub const SCHEMA_VERSION: u32 = 24;
 pub struct Registry {
     pub(crate) connection: Connection,
     pub(crate) writer_gate: std::sync::Arc<WriterGate>,
@@ -749,6 +749,7 @@ impl Registry {
         init_classified(crate::corpus_campaign::initialize_long_ledger(
             &mut connection,
         ))?;
+        crate::research::initialize_recursion(&mut connection, version)?;
         let writer_gate = writer_gate_for(connection.path());
         Ok(Self {
             connection,
@@ -1253,7 +1254,7 @@ impl Registry {
         for id in ids {
             crate::training_review::read_report(self, &id.map_err(db_err)?)?;
         }
-        let inconsistent: bool = self.connection.query_row("SELECT EXISTS(SELECT 1 FROM improvement_jobs j JOIN research_steps s ON s.run_id=j.run_id AND s.cursor=j.parent_cursor LEFT JOIN training_diagnoses d ON d.id=j.diagnosis_id LEFT JOIN training_reviews r ON r.id=j.review_id WHERE s.experiment_id IS NOT j.parent_id OR (j.diagnosis_id IS NOT NULL AND d.parent_id IS NOT j.parent_id) OR (j.review_id IS NOT NULL AND r.diagnosis_id IS NOT j.diagnosis_id) OR (j.state='completed' AND (j.diagnosis_id IS NULL OR (json_array_length(d.report_json,'$.proposals')>0 AND j.review_id IS NULL))))",[],|r|r.get(0)).map_err(db_err)?;
+        let inconsistent: bool = self.connection.query_row("SELECT EXISTS(SELECT 1 FROM improvement_jobs j LEFT JOIN research_steps s ON j.depth=0 AND s.run_id=j.run_id AND s.cursor=j.parent_cursor LEFT JOIN training_diagnoses d ON d.id=j.diagnosis_id LEFT JOIN training_reviews r ON r.id=j.review_id LEFT JOIN improvement_jobs pj ON j.depth>0 AND pj.run_id=j.run_id AND pj.parent_cursor=j.parent_cursor AND pj.depth=j.depth-1 LEFT JOIN training_reviews pr ON pr.id=pj.review_id WHERE (j.depth=0 AND s.experiment_id IS NOT j.parent_id) OR (j.depth>0 AND (j.accepted_edge_id IS NULL OR pr.id IS NULL OR NOT EXISTS(SELECT 1 FROM json_each(pr.report_json,'$.children') c WHERE json_extract(c.value,'$.proposal_edge_id')=j.accepted_edge_id AND json_extract(c.value,'$.evidence.experiment_id')=j.parent_id))) OR (j.depth=0 AND j.accepted_edge_id IS NOT NULL) OR (j.diagnosis_id IS NOT NULL AND d.parent_id IS NOT j.parent_id) OR (j.review_id IS NOT NULL AND r.diagnosis_id IS NOT j.diagnosis_id) OR (j.state='completed' AND (j.diagnosis_id IS NULL OR (json_array_length(d.report_json,'$.proposals')>0 AND j.review_id IS NULL))))",[],|r|r.get(0)).map_err(db_err)?;
         if inconsistent {
             return Err("improvement job lineage mismatch".into());
         }
