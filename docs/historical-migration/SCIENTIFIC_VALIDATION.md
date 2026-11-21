@@ -72,16 +72,16 @@ without changing the registered gate.
 ## Evidence
 
 - `docs/historical-migration/SCIENTIFIC_VALIDATION_RECEIPT.json` — provenance-bound validation
-  receipt, sha256 `d16ff988a75ebcfdf6fabaf455d3232cdcbd05ad7c587d8f75f4aa193734e9b8`.
+  receipt, sha256 `968c323f60a04ff6c5c4eb2cf44dfbe8367c8cf0ee1d8ebd003ca9a09ca08f5e`.
 - `docs/historical-migration/DIAGNOSTIC_EXECUTION_CACHED_RECEIPT.json` — refreshed cached
   diagnostic execution receipt, sha256
-  `e5da021ac77d0cb599258a4c36823b117bcdcba9c12a4906cef123ee95ae71fe`.
+  `f9af850c0e3ece96f9a2dbae7bdc9350dc9ef1a7bff938fc8b3d365e03e390fe`.
 - `docs/historical-migration/diagnostic-cache-v1/*.cold.json` / `*.warm.json` — per-instrument
   month reports, now carrying `outcomes`.
 - `scripts/run-scientific-validation.py` — driver (diagnostic execution + criteria evaluation).
-- Source `f9c2639903811ba15f5cf9895c5920029b0bd1a0` (branch `hermes/scientific-validation`, working
-  tree carrying this card's changes), binary sha256
-  `a7f3411f5719fc18c61a4ef5a64e3c8ead33714daed2356800f592f05071403c`.
+- Source `8e0b7089130dc22cdb67433ae1cf80dc1459ab62` (branch `hermes/scientific-validation`, the
+  merge commit; the working tree additionally carried only the receipt files), binary sha256
+  `71b17d3b84532b6162b110f37d7338bd1d71a33828a1d1517b9b6ef0b88d6ab7`.
 
 ## Checks that back the evaluator
 

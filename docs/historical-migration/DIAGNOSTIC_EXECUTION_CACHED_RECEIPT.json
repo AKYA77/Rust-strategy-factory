@@ -1,7 +1,7 @@
 {
   "kind": "historical-diagnostic-execution-cache-receipt-v1",
   "driver": "diagnostic-execution-cache-driver-v1",
-  "generated_at_utc": "2026-11-21T20:12:13+00:00",
+  "generated_at_utc": "2026-11-21T21:08:08+00:00",
   "host": {
     "node": "vmi3658677",
     "system": "Linux",
@@ -10,47 +10,15 @@
     "cpus": 6
   },
   "source": {
-    "head": "f9c2639903811ba15f5cf9895c5920029b0bd1a0",
-    "head_short": "f9c2639",
+    "head": "8e0b7089130dc22cdb67433ae1cf80dc1459ab62",
+    "head_short": "8e0b708",
     "branch": "hermes/scientific-validation",
-    "dirty_paths": [
-      "M build.rs",
-      " M docs/IMPLEMENTATION_QUEUE.md",
-      " M docs/NEXT_ACTION.md",
-      " M docs/PROJECT_STATE.json",
-      " M docs/historical-migration/DIAGNOSTIC_EXECUTION_CACHED_RECEIPT.json",
-      " M docs/historical-migration/PROGRESS.md",
-      " M docs/historical-migration/diagnostic-cache-v1/AUDUSD.cold.json",
-      " M docs/historical-migration/diagnostic-cache-v1/AUDUSD.warm.json",
-      " M docs/historical-migration/diagnostic-cache-v1/EURUSD.cold.json",
-      " M docs/historical-migration/diagnostic-cache-v1/EURUSD.warm.json",
-      " M docs/historical-migration/diagnostic-cache-v1/GBPUSD.cold.json",
-      " M docs/historical-migration/diagnostic-cache-v1/GBPUSD.warm.json",
-      " M docs/historical-migration/diagnostic-cache-v1/NZDUSD.cold.json",
-      " M docs/historical-migration/diagnostic-cache-v1/NZDUSD.warm.json",
-      " M docs/historical-migration/diagnostic-cache-v1/USDCAD.cold.json",
-      " M docs/historical-migration/diagnostic-cache-v1/USDCAD.warm.json",
-      " M docs/historical-migration/diagnostic-cache-v1/USDCHF.cold.json",
-      " M docs/historical-migration/diagnostic-cache-v1/USDCHF.warm.json",
-      " M docs/historical-migration/diagnostic-cache-v1/USDJPY.cold.json",
-      " M docs/historical-migration/diagnostic-cache-v1/USDJPY.warm.json",
-      " M docs/historical-migration/diagnostic-cache-v1/XAUUSD.cold.json",
-      " M docs/historical-migration/diagnostic-cache-v1/XAUUSD.warm.json",
-      " M src/historical_corpus.rs",
-      " M src/lib.rs",
-      " M src/main.rs",
-      " M tests/historical_pipeline_real.rs",
-      "?? docs/historical-migration/SCIENTIFIC_VALIDATION.md",
-      "?? docs/historical-migration/SCIENTIFIC_VALIDATION_RECEIPT.json",
-      "?? scripts/run-scientific-validation.py",
-      "?? src/scientific_validation.rs",
-      "?? tests/scientific_validation.rs"
-    ]
+    "dirty_paths": []
   },
   "binary": {
     "path": "/root/workspace/Rust-strategy-factory/target/release/rust-strategy-factory",
-    "sha256": "a7f3411f5719fc18c61a4ef5a64e3c8ead33714daed2356800f592f05071403c",
-    "size_bytes": 15492248
+    "sha256": "71b17d3b84532b6162b110f37d7338bd1d71a33828a1d1517b9b6ef0b88d6ab7",
+    "size_bytes": 15526448
   },
   "engine_version": "ordered-l1-v6-frozen-atr-stops",
   "inputs": {
@@ -89,7 +57,7 @@
       "max_receipts": 1000000
     },
     "expected_months": 22,
-    "cache_dir": "/root/workspace/rsf-wt-research/work/scientific-validation-cache-v3"
+    "cache_dir": "/root/workspace/rsf-wt-research/work/scientific-validation-cache-v4"
   },
   "classification": "diagnostic_simulation",
   "eligibility": "none",
@@ -113,8 +81,8 @@
       "cache_misses_cold": 22,
       "cache_hits_warm": 22,
       "cache_misses_warm": 0,
-      "wall_secs_cold": 156.629,
-      "wall_secs_warm": 32.764,
+      "wall_secs_cold": 144.173,
+      "wall_secs_warm": 28.839,
       "reports": {
         "cold": "/root/workspace/rsf-wt-research/docs/historical-migration/diagnostic-cache-v1/EURUSD.cold.json",
         "warm": "/root/workspace/rsf-wt-research/docs/historical-migration/diagnostic-cache-v1/EURUSD.warm.json"
@@ -152,8 +120,8 @@
       "cache_misses_cold": 22,
       "cache_hits_warm": 22,
       "cache_misses_warm": 0,
-      "wall_secs_cold": 182.267,
-      "wall_secs_warm": 35.32,
+      "wall_secs_cold": 168.099,
+      "wall_secs_warm": 33.111,
       "reports": {
         "cold": "/root/workspace/rsf-wt-research/docs/historical-migration/diagnostic-cache-v1/GBPUSD.cold.json",
         "warm": "/root/workspace/rsf-wt-research/docs/historical-migration/diagnostic-cache-v1/GBPUSD.warm.json"
@@ -191,8 +159,8 @@
       "cache_misses_cold": 22,
       "cache_hits_warm": 22,
       "cache_misses_warm": 0,
-      "wall_secs_cold": 212.523,
-      "wall_secs_warm": 39.995,
+      "wall_secs_cold": 234.923,
+      "wall_secs_warm": 45.175,
       "reports": {
         "cold": "/root/workspace/rsf-wt-research/docs/historical-migration/diagnostic-cache-v1/USDJPY.cold.json",
         "warm": "/root/workspace/rsf-wt-research/docs/historical-migration/diagnostic-cache-v1/USDJPY.warm.json"
@@ -230,8 +198,8 @@
       "cache_misses_cold": 22,
       "cache_hits_warm": 22,
       "cache_misses_warm": 0,
-      "wall_secs_cold": 120.96,
-      "wall_secs_warm": 23.307,
+      "wall_secs_cold": 127.114,
+      "wall_secs_warm": 23.645,
       "reports": {
         "cold": "/root/workspace/rsf-wt-research/docs/historical-migration/diagnostic-cache-v1/USDCHF.cold.json",
         "warm": "/root/workspace/rsf-wt-research/docs/historical-migration/diagnostic-cache-v1/USDCHF.warm.json"
@@ -269,8 +237,8 @@
       "cache_misses_cold": 22,
       "cache_hits_warm": 22,
       "cache_misses_warm": 0,
-      "wall_secs_cold": 153.306,
-      "wall_secs_warm": 29.47,
+      "wall_secs_cold": 159.057,
+      "wall_secs_warm": 29.796,
       "reports": {
         "cold": "/root/workspace/rsf-wt-research/docs/historical-migration/diagnostic-cache-v1/USDCAD.cold.json",
         "warm": "/root/workspace/rsf-wt-research/docs/historical-migration/diagnostic-cache-v1/USDCAD.warm.json"
@@ -308,8 +276,8 @@
       "cache_misses_cold": 22,
       "cache_hits_warm": 22,
       "cache_misses_warm": 0,
-      "wall_secs_cold": 127.361,
-      "wall_secs_warm": 25.047,
+      "wall_secs_cold": 129.284,
+      "wall_secs_warm": 25.309,
       "reports": {
         "cold": "/root/workspace/rsf-wt-research/docs/historical-migration/diagnostic-cache-v1/AUDUSD.cold.json",
         "warm": "/root/workspace/rsf-wt-research/docs/historical-migration/diagnostic-cache-v1/AUDUSD.warm.json"
@@ -347,8 +315,8 @@
       "cache_misses_cold": 22,
       "cache_hits_warm": 22,
       "cache_misses_warm": 0,
-      "wall_secs_cold": 109.587,
-      "wall_secs_warm": 21.739,
+      "wall_secs_cold": 109.464,
+      "wall_secs_warm": 21.977,
       "reports": {
         "cold": "/root/workspace/rsf-wt-research/docs/historical-migration/diagnostic-cache-v1/NZDUSD.cold.json",
         "warm": "/root/workspace/rsf-wt-research/docs/historical-migration/diagnostic-cache-v1/NZDUSD.warm.json"
@@ -386,8 +354,8 @@
       "cache_misses_cold": 22,
       "cache_hits_warm": 22,
       "cache_misses_warm": 0,
-      "wall_secs_cold": 598.284,
-      "wall_secs_warm": 105.766,
+      "wall_secs_cold": 562.891,
+      "wall_secs_warm": 100.684,
       "reports": {
         "cold": "/root/workspace/rsf-wt-research/docs/historical-migration/diagnostic-cache-v1/XAUUSD.cold.json",
         "warm": "/root/workspace/rsf-wt-research/docs/historical-migration/diagnostic-cache-v1/XAUUSD.warm.json"
@@ -427,5 +395,5 @@
     "every_executed_month_labelled_diagnostic_none": true,
     "cross_checked_against_prior_receipt": true
   },
-  "receipt_sha256": "cf67173d8dc76b75d0b36fe481815ea6f23c1e4dfb0b474cca9f97e3d4bba1d3"
+  "receipt_sha256": "0a1a625929abe32fa0b9631e933744ccd57d537fa609c47d852d517ad36ace33"
 }

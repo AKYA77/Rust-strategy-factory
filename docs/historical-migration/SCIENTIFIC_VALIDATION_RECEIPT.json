@@ -1,7 +1,7 @@
 {
   "kind": "scientific-validation-receipt-v1",
   "driver": "scientific-validation-driver-v1",
-  "generated_at_utc": "2026-11-21T20:45:07+00:00",
+  "generated_at_utc": "2026-11-21T21:40:32+00:00",
   "host": {
     "node": "vmi3658677",
     "system": "Linux",
@@ -10,47 +10,17 @@
     "cpus": 6
   },
   "source": {
-    "head": "f9c2639903811ba15f5cf9895c5920029b0bd1a0",
-    "head_short": "f9c2639",
+    "head": "8e0b7089130dc22cdb67433ae1cf80dc1459ab62",
+    "head_short": "8e0b708",
     "branch": "hermes/scientific-validation",
     "dirty_paths": [
-      "M build.rs",
-      " M docs/IMPLEMENTATION_QUEUE.md",
-      " M docs/NEXT_ACTION.md",
-      " M docs/PROJECT_STATE.json",
-      " M docs/historical-migration/DIAGNOSTIC_EXECUTION_CACHED_RECEIPT.json",
-      " M docs/historical-migration/PROGRESS.md",
-      " M docs/historical-migration/diagnostic-cache-v1/AUDUSD.cold.json",
-      " M docs/historical-migration/diagnostic-cache-v1/AUDUSD.warm.json",
-      " M docs/historical-migration/diagnostic-cache-v1/EURUSD.cold.json",
-      " M docs/historical-migration/diagnostic-cache-v1/EURUSD.warm.json",
-      " M docs/historical-migration/diagnostic-cache-v1/GBPUSD.cold.json",
-      " M docs/historical-migration/diagnostic-cache-v1/GBPUSD.warm.json",
-      " M docs/historical-migration/diagnostic-cache-v1/NZDUSD.cold.json",
-      " M docs/historical-migration/diagnostic-cache-v1/NZDUSD.warm.json",
-      " M docs/historical-migration/diagnostic-cache-v1/USDCAD.cold.json",
-      " M docs/historical-migration/diagnostic-cache-v1/USDCAD.warm.json",
-      " M docs/historical-migration/diagnostic-cache-v1/USDCHF.cold.json",
-      " M docs/historical-migration/diagnostic-cache-v1/USDCHF.warm.json",
-      " M docs/historical-migration/diagnostic-cache-v1/USDJPY.cold.json",
-      " M docs/historical-migration/diagnostic-cache-v1/USDJPY.warm.json",
-      " M docs/historical-migration/diagnostic-cache-v1/XAUUSD.cold.json",
-      " M docs/historical-migration/diagnostic-cache-v1/XAUUSD.warm.json",
-      " M src/historical_corpus.rs",
-      " M src/lib.rs",
-      " M src/main.rs",
-      " M tests/historical_pipeline_real.rs",
-      "?? docs/historical-migration/SCIENTIFIC_VALIDATION.md",
-      "?? docs/historical-migration/SCIENTIFIC_VALIDATION_RECEIPT.json",
-      "?? scripts/run-scientific-validation.py",
-      "?? src/scientific_validation.rs",
-      "?? tests/scientific_validation.rs"
+      "M docs/historical-migration/DIAGNOSTIC_EXECUTION_CACHED_RECEIPT.json"
     ]
   },
   "binary": {
     "path": "/root/workspace/Rust-strategy-factory/target/release/rust-strategy-factory",
-    "sha256": "a7f3411f5719fc18c61a4ef5a64e3c8ead33714daed2356800f592f05071403c",
-    "size_bytes": 15492248
+    "sha256": "71b17d3b84532b6162b110f37d7338bd1d71a33828a1d1517b9b6ef0b88d6ab7",
+    "size_bytes": 15526448
   },
   "inputs": {
     "catalog_root": "/var/lib/hermes-factory",
@@ -69,11 +39,11 @@
       "max_receipts": 1000000
     },
     "expected_months": 22,
-    "cache_dir": "/root/workspace/rsf-wt-research/work/scientific-validation-cache-v3",
+    "cache_dir": "/root/workspace/rsf-wt-research/work/scientific-validation-cache-v4",
     "report_dir": "/root/workspace/rsf-wt-research/docs/historical-migration/diagnostic-cache-v1",
     "diagnostic_receipt": {
       "path": "/root/workspace/rsf-wt-research/docs/historical-migration/DIAGNOSTIC_EXECUTION_CACHED_RECEIPT.json",
-      "sha256": "e5da021ac77d0cb599258a4c36823b117bcdcba9c12a4906cef123ee95ae71fe"
+      "sha256": "f9af850c0e3ece96f9a2dbae7bdc9350dc9ef1a7bff938fc8b3d365e03e390fe"
     }
   },
   "classification": "diagnostic_simulation",
@@ -882,5 +852,5 @@
     "qualification_granted": false,
     "limitations": "Reset-fold diagnostic summary only. Each diagnostic month starts a fresh account, so these are descriptive observations rather than a continuous single-account full-period result. No independent calendar/profile/legal/scientific approval is established, and no eligibility or qualification is granted or implied. Synthetic or diagnostic evidence can never qualify."
   },
-  "receipt_sha256": "a796ef2cb74529f482aaf25eea2ce91ce6ffe1eb342bb022209bde38003da12e"
+  "receipt_sha256": "6a2324f6f9ce05cfc1988a7277a319276593001e48e5d73b9ac2da2c3291ab45"
 }
