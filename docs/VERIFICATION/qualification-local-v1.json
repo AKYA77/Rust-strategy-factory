@@ -1,0 +1,41 @@
+{
+  "class": "SYNTHETIC_DEVELOPMENT_LOCAL_GATE_RECEIPT",
+  "branch": "hermes/qualification-software",
+  "sha": "e78ba39bf22a034060ce0fb9b537c938f0f17ba4",
+  "toolchain": "Rust 1.100.0 (pinned rust-toolchain.toml)",
+  "date": "2026-11-20T17:48:00.401437Z",
+  "gates": [
+    {
+      "name": "cargo fmt --all -- --check",
+      "cmd": "cargo fmt --all -- --check",
+      "exit": 0
+    },
+    {
+      "name": "cargo clippy --locked --all-targets -- -D warnings",
+      "cmd": "cargo clippy --locked --all-targets -- -D warnings",
+      "exit": 0
+    },
+    {
+      "name": "scripts/check.sh subset (cargo test --locked --lib --bins --tests)",
+      "cmd": "cargo test --locked --lib --bins --tests",
+      "exit": 0,
+      "passed": 529,
+      "failed": 0
+    },
+    {
+      "name": "cargo test --locked (all incl. 2 doc-tests)",
+      "cmd": "cargo test --locked",
+      "exit": 0,
+      "passed": 531,
+      "failed": 0
+    },
+    {
+      "name": "cargo build --locked --release",
+      "cmd": "cargo build --locked --release",
+      "exit": 0
+    }
+  ],
+  "chart": "src/qualification.rs + src/qualification/cli.rs + src/qualification/tests.rs (commit 045c171 + clippy-fix e78ba39)",
+  "boundary": "NO eligibility/approval granted; ZERO strategies qualified (REAL_STRUCTURALLY_VALID only); synthetic/diagnostic evidence never qualifies.",
+  "limitations": "Hosted CI full ladder (browser/release/identity/operations/full-horizon) pending on PR #26; identity boundary probe is synthetic dev-tool artifact (recording the failure verbatim, no mitigation)."
+}
