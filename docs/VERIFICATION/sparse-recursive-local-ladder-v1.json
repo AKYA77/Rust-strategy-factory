@@ -1,0 +1,161 @@
+{
+  "schema": "local-ladder-receipt-v1",
+  "source_sha": "fdf38b9fdf6ea36c53bbe94980a49aa6c0d8c3c2",
+  "branch": "hermes/sparse-recursive",
+  "cargo_target_dir": "worktree-local target-local (private to /root/workspace/rsf-wt-sparse-recursive)",
+  "heavy_lock": "flock -w 3600 /root/workspace/.rsf-heavy.lock held for the whole run",
+  "fmt": "cargo fmt --all -- --check -> exit 0",
+  "clippy": "cargo clippy --locked --all-targets -- -D warnings -> exit 0",
+  "binaries": [
+    {
+      "target": "tests/atr.rs",
+      "binary": "atr-40e2b214425ba8ab",
+      "sha256": "12735f50546253db9cc179fc88d4824620775eb3871b4c8b36339a3575f0b739",
+      "passed": 6,
+      "failed": 0,
+      "result": "ok"
+    },
+    {
+      "target": "tests/candidate_screen.rs",
+      "binary": "candidate_screen-d22f591d5c453809",
+      "sha256": "cae227e2b296f6ad7e3ccd6476b9c4c6b87ad8dcd8199924499f07cbbbe74039",
+      "passed": 15,
+      "failed": 0,
+      "result": "ok"
+    },
+    {
+      "target": "tests/exploration.rs",
+      "binary": "exploration-e9dba2e15f1c3805",
+      "sha256": "a6bf505f91eda7fc98b8e7191294ac4195b37ad9b136d5b9b0eac1021041c8a9",
+      "passed": 2,
+      "failed": 0,
+      "result": "ok"
+    },
+    {
+      "target": "tests/families.rs",
+      "binary": "families-ff7744ed674b69de",
+      "sha256": "92e72625cde293f98ca403f0f669838616d6b0f856b5a0da2b9b6020f6a1443a",
+      "passed": 6,
+      "failed": 0,
+      "result": "ok"
+    },
+    {
+      "target": "tests/higher_timeframe.rs",
+      "binary": "higher_timeframe-6f91cda0e3c1b375",
+      "sha256": "348f36167ff99f072a91da0871777b9d0676e4dee75b203278379b72fc394848",
+      "passed": 5,
+      "failed": 0,
+      "result": "ok"
+    },
+    {
+      "target": "tests/improvement.rs",
+      "binary": "improvement-bd2046f5be12279a",
+      "sha256": "cf32be19238885e7aae41714a5cfc79467e862caca37f0843833aacc233cedc0",
+      "passed": 20,
+      "failed": 0,
+      "result": "ok"
+    },
+    {
+      "target": "tests/mask_prefix.rs",
+      "binary": "mask_prefix-1c6fe46887532f77",
+      "sha256": "f008157252be4b3041207a7654b492c7187cd4ec8989ecbc90bd46e7d52ebe3c",
+      "passed": 2,
+      "failed": 0,
+      "result": "ok"
+    },
+    {
+      "target": "tests/neighborhood.rs",
+      "binary": "neighborhood-2d7d08da90ee0748",
+      "sha256": "ae3c36002471e0672b815a555598909794b933ec91862b9807815611f9c56979",
+      "passed": 4,
+      "failed": 0,
+      "result": "ok"
+    },
+    {
+      "target": "tests/operators.rs",
+      "binary": "operators-e106d32912d44764",
+      "sha256": "ee1947c15d35bcb6cbc128e0b82e2def8318f5d362e5eeebaa1f1af668017b5f",
+      "passed": 4,
+      "failed": 0,
+      "result": "ok"
+    },
+    {
+      "target": "tests/recursive_improvement.rs",
+      "binary": "recursive_improvement-d5fb38fb047a2cb6",
+      "sha256": "f7e20d7f60a972955a9b783615fa1d52881e8cc46125508eb0b707a8d9f50f89",
+      "passed": 5,
+      "failed": 0,
+      "result": "ok"
+    },
+    {
+      "target": "tests/research.rs",
+      "binary": "research-331d2e9e7eb114f0",
+      "sha256": "5040120f43546522026ac0b0aa496ee6d446122882b515f546d9bf6bb041f1a5",
+      "passed": 9,
+      "failed": 0,
+      "result": "ok"
+    },
+    {
+      "target": "tests/research_cli.rs",
+      "binary": "research_cli-9756ae530ee13155",
+      "sha256": "cf4e8a96fa6c1a1f484d95049d3aa7b065ff4078fdb48553e1cd5f46bc704161",
+      "passed": 2,
+      "failed": 0,
+      "result": "ok"
+    },
+    {
+      "target": "tests/sparse_mask.rs",
+      "binary": "sparse_mask-fef1c66174e1c162",
+      "sha256": "01c1a5ab5cca06c31393162f8f107b3a78f9303001b7d6da6090e2d6eebc7628",
+      "passed": 2,
+      "failed": 0,
+      "result": "ok"
+    },
+    {
+      "target": "tests/sparse_mask_storage.rs",
+      "binary": "sparse_mask_storage-d74d6f1d755c8879",
+      "sha256": "276baadcf205b163133989d339b1cc7c24794fb451a2d6833818a915204b58fd",
+      "passed": 6,
+      "failed": 0,
+      "result": "ok"
+    },
+    {
+      "target": "tests/storage.rs",
+      "binary": "storage-9f1e907a7fbb3fe6",
+      "sha256": "e689c796bea4127e0f1af31a88ec19f728c3bbcb70188fd6354e0c9c87b82598",
+      "passed": 27,
+      "failed": 0,
+      "result": "ok"
+    },
+    {
+      "target": "tests/training_diagnostics.rs",
+      "binary": "training_diagnostics-ced923b889f51915",
+      "sha256": "b7ebf91aff7d46f7644e645b1fca300febe7306f4a869078f88808edde7ff63e",
+      "passed": 2,
+      "failed": 0,
+      "result": "ok"
+    },
+    {
+      "target": "tests/windows.rs",
+      "binary": "windows-24a5bbc802fb280e",
+      "sha256": "a0067e01496c03a5bdcf69b3c79ffd932eac4b71af47edc4e90d79cf54b08f41",
+      "passed": 6,
+      "failed": 0,
+      "result": "ok"
+    },
+    {
+      "target": "unittests src/lib.rs",
+      "binary": "rust_strategy_factory-cc508c73a14a3352",
+      "sha256": "5b017e08d1f3785e266b2f5f141fd3c6fcc27cd7ffdb9432b328c6464bf49d10",
+      "passed": 217,
+      "failed": 0,
+      "result": "ok"
+    }
+  ],
+  "totals": {
+    "binaries": 18,
+    "passed": 340,
+    "failed": 0
+  },
+  "note": "Targeted changed-module verification on the merged head (origin/main 51334f3 + sparse-recursive 592efbe). The full hosted-CI ladder runs on the pushed PR head."
+}
