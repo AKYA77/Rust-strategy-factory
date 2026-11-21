@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Thin cargo shim: route EVERY cargo call through the locked isolation wrapper.
+#
+# Invocation convention (ad-hoc cargo): prepend scripts/shim to PATH so `cargo`
+# resolves to this shim, which forwards to scripts/cargo-locked.sh:
+#
+#   PATH="$PWD/scripts/shim:$PATH" cargo test --locked --lib --bins --tests
+#   PATH="$PWD/scripts/shim:$PATH" cargo clippy --locked --all-targets -- -D warnings
+#
+# cargo-locked.sh strips the shim dir from PATH when resolving the real rustup
+# cargo proxy, so there is no recursion. fmt/doc take the lock but are not
+# treated as build-like (no forced clean); build/test/clippy/check/run/bench/doc
+# all enforce the flock + stamp/clean protocol.
+set -euo pipefail
+exec "$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)/cargo-locked.sh" "$@"

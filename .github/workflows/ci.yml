@@ -10,9 +10,13 @@ env:
   CARGO_INCREMENTAL: "0"
   CARGO_PROFILE_DEV_DEBUG: "0"
   CARGO_PROFILE_TEST_DEBUG: "0"
-# Three PARALLEL jobs (admin lever 2026-11-20): wall time = max(jobs), not sum.
-# Every previous stage/assertion is preserved; ALL three jobs are required for merge
+# Four PARALLEL jobs (admin lever 2026-11-20): wall time = max(jobs), not sum.
+# Every previous stage/assertion is preserved; ALL four jobs are required for merge
 # (branch protection required status checks + QA verifies the full rollup on the exact SHA).
+# dependency-audit runs cargo-deny (licenses/bans/sources/advisories per deny.toml) plus
+# cargo-audit (RustSec) as a parallel stage. Documented advisory ignores carry reasons in
+# deny.toml and docs/dependency-audit-automation/FIRST_AUDIT_RECEIPT.md; no advisory
+# affecting a pinned dependency is silently ignored.
 # Each job gets its own job-scoped rust-cache (no shared-key -> no parallel save races).
 # mold was evaluated and SKIPped: clean link-only A/B shows the rustc-1.100 default
 # linker (rust-lld 23.1.5) already matches mold 2.30 on this workload (see runbook).
@@ -64,3 +68,25 @@ jobs:
       - run: python3 scripts/check-operations.py
       - name: Verify continuous UTC horizon and declared context ceiling
         run: python3 scripts/check-full-horizon.py --binary target/release/rust-strategy-factory --output work/full-horizon-context.json
+
+  dependency-audit:
+    name: dependency-audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned toolchain
+        run: rustup show
+      - name: Cache cargo registry and target artifacts
+        uses: Swatinem/rust-cache@v2
+      - name: Install audit tooling (cargo-deny 0.22.0, cargo-audit 0.23.0)
+        run: |
+          cargo install cargo-deny --version 0.22.0
+          cargo install cargo-audit --version 0.23.0
+      - name: Run license/ban/source/advisory audit (cargo-deny)
+        run: cargo deny check
+      - name: Run RustSec advisory audit (cargo-audit)
+        run: |
+          cargo audit \
+            --ignore RUSTSEC-2026-0391 \
+            --ignore RUSTSEC-2026-0459 \
+            --ignore RUSTSEC-2026-0543

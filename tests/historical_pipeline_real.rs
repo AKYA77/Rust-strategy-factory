@@ -113,7 +113,11 @@ fn real_historical_study_report() {
 
 /// Diagnostic bridge from verified historical source data to the authoritative sequential engine.
 /// Structural/diagnostic only: the report is labelled `diagnostic_simulation` with `none`
-/// eligibility and is never registered research evidence.
+/// eligibility and is never registered research evidence. All eight instruments execute in
+/// diagnostic mode: USD-quoted instruments use the identity conversion, and USD-base
+/// non-USD-quote instruments (USDJPY/USDCHF/USDCAD) use the explicit direction-based
+/// reciprocal diagnostic convention (long -> bid, short -> ask; USD per quote currency =
+/// price_scale / price).
 #[test]
 fn real_historical_diagnostic_execution() {
     let catalog_root = Path::new("/var/lib/hermes-factory");
@@ -136,12 +140,13 @@ fn real_historical_diagnostic_execution() {
         feature_cells: 1_000_000,
         max_receipts: 1_000_000,
     };
-    let mut usd_quote = 0usize;
-    let mut refused = 0usize;
-    // Bounded per-month sample (2025-10) across every instrument: proves the bridge and the
-    // refusal classification without replaying all 176 months per instrument. Registration uses
-    // the owner-selected 22-month pin, so every instrument must resolve exactly 2025-01..2026-10.
-    let mut eurusd_sample = None;
+    let mut executed = 0usize;
+    let mut identity = 0usize;
+    let mut reciprocal = 0usize;
+    let mut aggregate = ExecutedAggregate::default();
+    // Bounded per-month sample (2025-10) across every instrument: proves the bridge for all
+    // eight instruments without replaying all 176 months per instrument. Registration uses the
+    // owner-selected 22-month pin, so every instrument must resolve exactly 2025-01..2026-10.
     for instrument in INSTRUMENTS {
         let spec = historical_corpus::register_research_window(
             catalog_root,
@@ -169,45 +174,65 @@ fn real_historical_diagnostic_execution() {
             (2025, 10),
             "{instrument}: sample index must be the pinned 2025-10 month"
         );
-        let sample = historical_corpus::execute_month(&spec, 9, &strategy, &costs, budget);
-        if spec.profile.quote == "USD" {
-            usd_quote += 1;
-            let executed = sample.unwrap_or_else(|e| {
-                panic!("{instrument} 2025-10 diagnostic execution failed: {e}")
-            });
-            assert_eq!(executed.year, 2025);
-            assert_eq!(executed.month, 10);
-            assert_eq!(executed.declared_class, "RealStructurallyValid");
-            assert_eq!(executed.corpus_identity.len(), 64);
-            assert_eq!(executed.receipt_hash.len(), 64);
-            assert!(
-                executed.trades + executed.rejections > 0,
-                "{instrument}: sample month produced no engine activity"
-            );
-            if instrument == "EURUSD" {
-                let repeated =
-                    historical_corpus::execute_month(&spec, 9, &strategy, &costs, budget).unwrap();
-                assert_eq!(
-                    serde_json::to_string(&repeated).unwrap(),
-                    serde_json::to_string(&executed).unwrap(),
-                    "diagnostic execution must be deterministic"
-                );
-                eurusd_sample = Some(executed);
-            }
+        let sample = historical_corpus::execute_month(&spec, 9, &strategy, &costs, budget)
+            .unwrap_or_else(|e| panic!("{instrument} 2025-10 diagnostic execution failed: {e}"));
+        assert_eq!(sample.year, 2025);
+        assert_eq!(sample.month, 10);
+        assert_eq!(sample.declared_class, "RealStructurallyValid");
+        assert_eq!(sample.corpus_identity.len(), 64);
+        assert_eq!(sample.receipt_hash.len(), 64);
+        let again = historical_corpus::execute_month(&spec, 9, &strategy, &costs, budget)
+            .unwrap_or_else(|e| panic!("{instrument} 2025-10 replay failed: {e}"));
+        assert_eq!(
+            serde_json::to_string(&sample).unwrap(),
+            serde_json::to_string(&again).unwrap(),
+            "{instrument}: diagnostic execution must be deterministic"
+        );
+        if sample.conversion_policy == crate::historical_corpus::CONVERSION_POLICY_IDENTITY {
+            identity += 1;
+        } else if sample.conversion_policy == crate::historical_corpus::CONVERSION_POLICY_RECIPROCAL
+        {
+            reciprocal += 1;
         } else {
-            refused += 1;
-            let error = sample.expect_err("{instrument} must refuse a non-USD quote currency");
-            assert!(error.contains("literal-USD"), "{instrument}: {error}");
+            panic!("{instrument}: unexpected conversion policy");
         }
+        assert!(
+            sample.trades + sample.rejections > 0,
+            "{instrument}: sample month must produce engine activity"
+        );
+        executed += 1;
+        aggregate.trades += sample.trades;
+        aggregate.rejections += sample.rejections;
+        aggregate.pnl_micro_usd += sample.final_marked_micro_usd - sample.initial_micro_usd;
+        aggregate.maximum_drawdown_micro_usd = aggregate
+            .maximum_drawdown_micro_usd
+            .max(sample.maximum_drawdown_micro_usd);
     }
-    assert_eq!(usd_quote, 5, "five USD-quoted instruments");
+    // Every instrument now executes; the diagnostic simulation never refuses a real
+    // structurally-valid literal-USD corpus (the old 5/3 split was the pre-change gate).
+    assert_eq!(executed, 8, "all eight instruments must execute");
     assert_eq!(
-        refused, 3,
-        "three non-USD-quote instruments refuse FX conversion"
+        identity, 5,
+        "USD-quoted instruments use the identity conversion"
     );
+    assert_eq!(
+        reciprocal, 3,
+        "USD-base non-USD-quote instruments use the reciprocal convention"
+    );
+    assert!(
+        aggregate.trades > 0,
+        "aggregate must contain engine activity"
+    );
+    assert!(
+        aggregate.rejections > 0,
+        "aggregate must contain engine rejections"
+    );
+}
 
-    // The full-corpus aggregate path is exercised by `historical-corpus-execute` and recorded in
-    // docs/historical-migration/DIAGNOSTIC_EXECUTION_RECEIPT.json; running all 22 months here as
-    // well would dominate the suite's runtime. The aggregate accounting itself is unit-tested.
-    assert!(eurusd_sample.is_some());
+#[derive(Default)]
+struct ExecutedAggregate {
+    trades: usize,
+    rejections: usize,
+    pnl_micro_usd: i128,
+    maximum_drawdown_micro_usd: i128,
 }

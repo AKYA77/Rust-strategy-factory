@@ -719,6 +719,9 @@ pub struct MonthExecution {
     pub replay_dataset_id: String,
     pub declared_class: String,
     pub profile_id: String,
+    /// Explicit USD-account conversion convention used for this month (`identity_usd_v1` or
+    /// `diagnostic_reciprocal_closing_rate_v1_long_bid_short_ask`).
+    pub conversion_policy: String,
     pub initial_micro_usd: i128,
     /// The engine's `realized_micro_usd` field, which is the ending account balance (it starts at
     /// `contracts::INITIAL_EQUITY` and is not a profit figure by itself).
@@ -763,6 +766,8 @@ pub struct ExecutionReport {
     pub classification: String,
     /// Always `none`. No eligibility is granted or implied.
     pub eligibility: String,
+    /// Explicit USD-account conversion convention applied to this instrument.
+    pub conversion_policy: String,
     pub months: Vec<MonthExecution>,
     pub refusals: Vec<MonthRefusal>,
     pub totals: ExecutionTotals,
@@ -775,7 +780,23 @@ pub struct ExecutionReport {
 
 pub const EXECUTION_CLASSIFICATION: &str = "diagnostic_simulation";
 pub const EXECUTION_ELIGIBILITY: &str = "none";
-const EXECUTION_LIMITATIONS: &str = "Diagnostic simulation only. The authoritative sequential engine and frozen financial rules are applied to real structurally-valid literal-USD history using explicit test-convention profiles, so results are not broker-approved execution. No research eligibility, calendar/profile/licensing approval, scientific validity or qualification is granted. Non-USD-quote instruments and eligibility-bearing data classes are refused. Counts and money figures are observations, not performance evidence.";
+/// USD-quoted instruments need no cross-currency conversion.
+pub const CONVERSION_POLICY_IDENTITY: &str = "identity_usd_v1";
+/// USD-base non-USD-quote instruments use the direction-based reciprocal closing rate derived
+/// from the instrument's own verified quote: long -> bid, short -> ask; USD per quote currency is
+/// `price_scale / price`. Explicit unverified research convention, not an approved broker rule.
+pub const CONVERSION_POLICY_RECIPROCAL: &str =
+    "diagnostic_reciprocal_closing_rate_v1_long_bid_short_ask";
+const EXECUTION_LIMITATIONS: &str = "Diagnostic simulation only. The authoritative sequential engine and frozen financial rules are applied to real structurally-valid history using explicit test-convention profiles, so results are not broker-approved execution. USD-quoted instruments use the identity conversion; USD-base non-USD-quote instruments (USDJPY/USDCHF/USDCAD) use a diagnostic direction-based reciprocal closing rate derived from the instrument's own verified quote (long -> bid, short -> ask; USD per quote currency = price_scale / price). That conversion convention is an explicit unverified research assumption, not an approved broker conversion rule; the documented MT5 profitability-based variant is not implemented. Cross-currency pairs and eligibility-bearing data classes are refused. No research eligibility, calendar/profile/licensing approval, scientific validity or qualification is granted. Counts and money figures are observations, not performance evidence.";
+
+/// The explicit USD-account conversion convention applied to an instrument's diagnostic replay.
+pub fn conversion_policy(profile: &Profile) -> &'static str {
+    if profile.quote == "USD" {
+        CONVERSION_POLICY_IDENTITY
+    } else {
+        CONVERSION_POLICY_RECIPROCAL
+    }
+}
 
 /// Execute one month through the authoritative sequential engine.
 ///
@@ -826,6 +847,7 @@ pub fn execute_month(
         replay_dataset_id: replay.dataset_id.clone(),
         declared_class: format!("{:?}", facts.declared_class()),
         profile_id: crate::data::hash(&spec.profile)?,
+        conversion_policy: conversion_policy(&spec.profile).into(),
         initial_micro_usd: replay.initial_micro_usd,
         realized_micro_usd: replay.realized_micro_usd,
         final_marked_micro_usd: replay.final_marked_micro_usd,
@@ -891,7 +913,7 @@ pub struct ExecutionCache {
     dir: std::path::PathBuf,
 }
 
-const EXECUTION_CACHE_VERSION: &str = "historical-diagnostic-execution-cache-v2";
+const EXECUTION_CACHE_VERSION: &str = "historical-diagnostic-execution-cache-v3";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1021,6 +1043,7 @@ pub fn execute_with_cache(
         strategy_identity: strategy.identity()?,
         classification: EXECUTION_CLASSIFICATION.into(),
         eligibility: EXECUTION_ELIGIBILITY.into(),
+        conversion_policy: conversion_policy(&spec.profile).into(),
         months: months.clone(),
         refusals: refusals.clone(),
         totals: aggregate_totals(&months, &refusals)?,
@@ -1094,6 +1117,7 @@ mod tests {
             replay_dataset_id: "e".repeat(64),
             declared_class: "RealStructurallyValid".into(),
             profile_id: "c".repeat(64),
+            conversion_policy: CONVERSION_POLICY_IDENTITY.into(),
             initial_micro_usd: initial,
             realized_micro_usd: marked,
             final_marked_micro_usd: marked,

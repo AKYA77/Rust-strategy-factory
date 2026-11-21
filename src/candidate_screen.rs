@@ -61,6 +61,23 @@ impl ShadowPolicy {
             && (!self.promote_uncertain || e.uncertainties.is_empty())
             && e.estimated_net_wins as u128 * 10000
                 < self.threshold_bps as u128 * e.estimated_closed_trades as u128;
+        // Conservative safe-failure bound: even the most favorable resolution
+        // allowed by the candle model cannot reach the threshold. It holds even
+        // under model uncertainty, so it never gates on promote_uncertain.
+        let bound_proven_failure = e.status == "estimated"
+            && e.estimated_closed_trades >= self.minimum_closed_trades
+            && e.net_bounds.as_ref().is_some_and(|b| {
+                b.optimistic_win_rate_bps
+                    .is_some_and(|r| r < self.threshold_bps)
+            });
+        let classification =
+            if e.status != "estimated" || e.estimated_closed_trades < self.minimum_closed_trades {
+                ScreenClassification::NotScreened
+            } else if bound_proven_failure {
+                ScreenClassification::ProvenScreenFailure
+            } else {
+                ScreenClassification::ScreenUncertain
+            };
         let identity = serde_json::to_vec(&(self, experiment_id)).map_err(|e| e.to_string())?;
         let digest = blake3::hash(&identity);
         let bucket = u64::from_le_bytes(
@@ -70,6 +87,8 @@ impl ShadowPolicy {
         ) % 10000;
         Ok(
             serde_json::json!({"version":self.version,"policy":self,"would_reject":would_reject,
+            "bound_proven_failure":bound_proven_failure,
+            "screen_classification":classification,
             "selected_for_sampled_audit":would_reject && bucket < u64::from(self.audit_sample_bps),
             "execution":"shadow-only-all-candidates-still-replayed", "proven_failure":false}),
         )
@@ -91,17 +110,27 @@ pub struct Estimate {
     pub bar_visits: usize,
     pub uncertainties: BTreeSet<String>,
     pub promotes_to_tick: bool,
+    /// Conservative pessimistic/optimistic net-outcome bounds across the
+    /// estimate's resolved trades, derived from the explicit uncertainty set
+    /// (adverse stop proxy, SL/TP collision order, partial deadline bar).
+    /// `None` when no trade resolved. Diagnostic only: not acceptance.
+    pub net_bounds: Option<NetBounds>,
+    #[serde(skip)]
+    optimistic_net_micro_usd: i128,
+    #[serde(skip)]
+    optimistic_wins: usize,
 }
 impl Estimate {
     fn new() -> Self {
         Self {
             version: VERSION.into(),
-            interpretation: "Hypothetical sequential USD cash model; actual next-quote market entry, adverse OHLC stop proxy, exact requested target, first real deadline quote; whole exit bar reserved. Totals may be partial. Neither candidate bounds nor tick fills; all signaled candidates escalate.".into(),
+            interpretation: "Hypothetical sequential USD cash model; actual next-quote market entry, adverse OHLC stop proxy, exact requested target, first real deadline quote; whole exit bar reserved. Totals may be partial. Pessimistic/optimistic net bounds are computed from the explicit uncertainty set; all signaled candidates still escalate to tick replay.".into(),
             status: "estimated".into(), estimated_closed_trades: 0, estimated_net_wins: 0,
             estimated_net_micro_usd: 0, estimated_net_win_rate_bps: None,
             estimated_sizing_rejections: 0, unavailable_stop_signals: 0,
             overlapping_signals_skipped: 0, bar_visits: 0, uncertainties: BTreeSet::new(),
-            promotes_to_tick: true,
+            promotes_to_tick: true, net_bounds: None, optimistic_net_micro_usd: 0,
+            optimistic_wins: 0,
         }
     }
     fn flag(&mut self, reason: &str) {
@@ -293,6 +322,19 @@ pub fn estimate(
                 out.flag("ask-extrema-correlation-unknown");
             }
             out.flag("whole-exit-bar-reserved-not-exact-overlap");
+            let net_best = optimistic_exit_net(
+                p,
+                costs,
+                entry,
+                reservation.volume,
+                strategy.side,
+                if target_possible { target } else { stop },
+            )?;
+            out.optimistic_net_micro_usd = out
+                .optimistic_net_micro_usd
+                .checked_add(net_best)
+                .ok_or("estimate sum overflow")?;
+            out.optimistic_wins += usize::from(net_best > 0);
             exit = Some((
                 price,
                 c.publication_sequence
@@ -320,6 +362,13 @@ pub fn estimate(
                         Side::Long
                     },
                 )?;
+                let net_best =
+                    optimistic_exit_net(p, costs, entry, reservation.volume, strategy.side, price)?;
+                out.optimistic_net_micro_usd = out
+                    .optimistic_net_micro_usd
+                    .checked_add(net_best)
+                    .ok_or("estimate sum overflow")?;
+                out.optimistic_wins += usize::from(net_best > 0);
                 exit = Some((price, q.sequence));
             }
         }
@@ -357,6 +406,152 @@ pub fn estimate(
 fn finish(mut out: Estimate) -> Estimate {
     out.estimated_net_win_rate_bps =
         (out.estimated_net_wins * 10000).checked_div(out.estimated_closed_trades);
+    let closed = out.estimated_closed_trades;
+    out.net_bounds = (closed > 0).then(|| NetBounds {
+        version: "candidate-net-bounds-v1".into(),
+        closed_trades: closed,
+        pessimistic_net_micro_usd: out.estimated_net_micro_usd,
+        optimistic_net_micro_usd: out.optimistic_net_micro_usd,
+        pessimistic_wins: out.estimated_net_wins,
+        optimistic_wins: out.optimistic_wins,
+        pessimistic_win_rate_bps: (out.estimated_net_wins * 10000).checked_div(closed),
+        optimistic_win_rate_bps: (out.optimistic_wins * 10000).checked_div(closed),
+    });
+    out
+}
+
+/// Best-case net for a resolved exit consistent with the barrier bounds: the
+/// stop or target level itself, with no adverse excursion beyond it. Deadline
+/// exits pass the actual quote, so best == adverse there.
+fn optimistic_exit_net(
+    p: &crate::contracts::Profile,
+    costs: &Costs,
+    entry: i64,
+    volume: i64,
+    side: Side,
+    best_price: i64,
+) -> Result<i128> {
+    let best_movement = best_price
+        .checked_sub(entry)
+        .and_then(|v| v.checked_mul(side.sign()))
+        .ok_or("estimate movement overflow")?;
+    let net_best = contracts::pnl(p, best_movement, volume, Conversion::usd())?
+        .checked_sub(
+            costs
+                .commission(volume)
+                .checked_mul(2)
+                .ok_or("estimate fee overflow")?,
+        )
+        .ok_or("estimate net overflow")?;
+    Ok(net_best)
+}
+
+/// Conservative pessimistic/optimistic net-outcome bounds for one screened
+/// candidate, derived from the candle estimate's explicit uncertainty set.
+/// Diagnostic only: not candidate acceptance, not scientific evidence, and
+/// never by itself a basis for skipping tick replay.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NetBounds {
+    pub version: String,
+    pub closed_trades: usize,
+    pub pessimistic_net_micro_usd: i128,
+    pub optimistic_net_micro_usd: i128,
+    pub pessimistic_wins: usize,
+    pub optimistic_wins: usize,
+    pub pessimistic_win_rate_bps: Option<usize>,
+    pub optimistic_win_rate_bps: Option<usize>,
+}
+
+/// Where a candle-screened candidate lands relative to the promotion threshold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ScreenClassification {
+    /// Even the optimistic bound cannot reach the threshold: failure proven
+    /// from the candle model alone, safe to reject without tick replay.
+    ProvenScreenFailure,
+    /// The bound set straddles the threshold or the sample is too thin:
+    /// uncertainty preserved, escalate to tick verification.
+    ScreenUncertain,
+    /// Not estimable (unsupported, unresolved, or below the minimum count):
+    /// not screened by the candle model.
+    NotScreened,
+}
+
+/// Aggregate screened-candidate audit coverage across a batch or campaign.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct AuditCoverage {
+    pub candidates: usize,
+    pub bound_rejections: usize,
+    pub proven_failures: usize,
+    pub promoted_to_tick: usize,
+    pub sampled_for_audit: usize,
+    pub audited: usize,
+    pub false_negatives: usize,
+    pub false_negative_rate_bps: Option<u32>,
+    pub coverage_bps: u32,
+}
+
+/// Aggregate per-candidate candle-screen audits (the `candidate_screen_audit`
+/// value persisted with each experiment result) into batch coverage.
+/// `candidates` counts audits carrying a shadow decision; rejections are the
+/// `would_reject` set; `audited` counts rejections with a resolved replay
+/// outcome; false negatives are rejected candidates the replayed gate clears.
+pub fn audit_coverage(audits: &[serde_json::Value]) -> AuditCoverage {
+    let mut out = AuditCoverage {
+        candidates: audits.len(),
+        ..Default::default()
+    };
+    for audit in audits {
+        let Some(decision) = audit
+            .get("shadow_decision")
+            .and_then(serde_json::Value::as_object)
+        else {
+            continue;
+        };
+        let would_reject = decision.get("would_reject").and_then(|v| v.as_bool()) == Some(true);
+        if !would_reject {
+            out.promoted_to_tick += 1;
+            continue;
+        }
+        out.bound_rejections += 1;
+        if decision
+            .get("bound_proven_failure")
+            .and_then(|v| v.as_bool())
+            == Some(true)
+        {
+            out.proven_failures += 1;
+        }
+        if decision
+            .get("selected_for_sampled_audit")
+            .and_then(|v| v.as_bool())
+            == Some(true)
+        {
+            out.sampled_for_audit += 1;
+        }
+        let resolved = audit.get("actual_unresolved").and_then(|v| v.as_bool()) != Some(true);
+        if resolved {
+            out.audited += 1;
+            if audit.get("shadow_false_negative").and_then(|v| v.as_bool()) == Some(true) {
+                out.false_negatives += 1;
+            }
+        }
+    }
+    out.false_negative_rate_bps = if out.audited > 0 {
+        out.false_negatives
+            .checked_mul(10000)
+            .and_then(|v| v.checked_div(out.audited))
+            .map(|v| v as u32)
+    } else {
+        None
+    };
+    out.coverage_bps = if out.bound_rejections > 0 {
+        out.audited
+            .checked_mul(10000)
+            .and_then(|v| v.checked_div(out.bound_rejections))
+            .map(|v| v as u32)
+            .unwrap_or(0)
+    } else {
+        0
+    };
     out
 }
 

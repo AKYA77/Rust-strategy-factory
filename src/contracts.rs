@@ -128,7 +128,7 @@ impl Side {
 }
 
 /// Prior-only USD per quote currency. Non-USD quotes require an explicit timestamped rate.
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Conversion {
     pub usd_num: i64,
     pub quote_den: i64,
@@ -155,6 +155,48 @@ impl Conversion {
             return Err("missing, future, stale or invalid currency conversion".into());
         }
         Ok(())
+    }
+}
+
+fn gcd(mut a: i64, mut b: i64) -> i64 {
+    while b != 0 {
+        let remainder = a % b;
+        a = b;
+        b = remainder;
+    }
+    a
+}
+
+impl Conversion {
+    /// Exact USD-account conversion for a USD-base instrument from its own quote.
+    ///
+    /// `price` is the direction-consistent closing price in profile units: the bid for a long
+    /// (buy) position and the ask for a short (sell) position. The stored rate is USD per quote
+    /// currency, `1 / decimal_price`, represented exactly as `price_scale / price` reduced to
+    /// lowest terms. The rate is prior-only: `as_of_ms` is the quote's own event time.
+    ///
+    /// This is an explicit diagnostic research convention derived from the instrument's own
+    /// verified quote, not an approved broker conversion rule. USD-quoted instruments must use
+    /// [`Conversion::usd`] instead.
+    pub fn usd_account_from_usd_base_price(p: &Profile, price: i64, event_ms: i64) -> Result<Self> {
+        p.validate()?;
+        if p.base != "USD" {
+            return Err("USD-account base-quote conversion requires a USD-base instrument".into());
+        }
+        if p.quote == "USD" {
+            return Err("USD-quoted instruments use the identity conversion".into());
+        }
+        if price <= 0 || price % p.tick != 0 {
+            return Err("invalid conversion price".into());
+        }
+        let divisor = gcd(p.price_scale, price);
+        let conversion = Self {
+            usd_num: p.price_scale / divisor,
+            quote_den: price / divisor,
+            as_of_ms: event_ms,
+        };
+        conversion.validate(p, event_ms, 0)?;
+        Ok(conversion)
     }
 }
 

@@ -2428,7 +2428,7 @@ fn run(args: &[String]) -> Result<()> {
             )?;
             print(
                 &serde_json::json!({"new_attempts":report.executions.iter().filter(|e|!e.reused).count(),"reused":report.executions.iter().filter(|e|e.reused).count(),"executions":report.executions,
-                "shared_index_initialized":report.shared_index_initialized,"shared_feature_builds":report.shared_feature_builds,"shared_cache_hits":report.shared_cache_hits,"primary_candles":report.primary_candles,"visible_candles":report.visible_candles}),
+                "shared_index_initialized":report.shared_index_initialized,"shared_feature_builds":report.shared_feature_builds,"shared_cache_hits":report.shared_cache_hits,"primary_candles":report.primary_candles,"visible_candles":report.visible_candles,"audit_coverage":report.audit_coverage}),
             )
         }
         ["research", config, database] | ["research", config, database, _] => {
