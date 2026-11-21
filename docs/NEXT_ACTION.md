@@ -4,6 +4,28 @@ Status: SOFTWARE_INCOMPLETE. Use the existing checkout. Read AGENTS.md, PROJECT_
 
 ## Latest verified local milestone
 
+<<<<<<< HEAD
+Branch `hermes/dashboard-activation-panels` (implementation `de6724f`, spawn-diagnostics fix
+`d4a4325`, this docs reconciliation; PR #24) closes the authenticated dashboard's remaining
+operational gaps from queue item 14: an optional `--operations` serve configuration exposes the
+bounded import/coverage activation lifecycle (inventory/detail re-verify every published chunk;
+explicit activation confirms expected archive hash/event count and registers a local catalog
+observation only — declared class is never approval; explicit refusal retains self-hashed
+append-only decision receipts; corrupt history/tampered chunks refuse without deleting evidence),
+bounded coverage reports, request-time registry integrity audit, exact peak-RSS/CPU-tick resource
+observations and exact owned-visit/member CPU-tick cost charts with measured/unmeasured separation.
+All surfaces stay behind existing host/origin/session/CSRF guards plus a 60/min operations bucket
+and one blocking-work slot; the only non-dashboard source change is 42 lines of serve --operations
+CLI wiring in src/main.rs. Pre-push CI-first verification (one flock hold: clean -p, fmt --check,
+clippy --all-targets -D warnings, 159 lib/bin unit tests incl. 11 new operations tests, explicit
+bin build + --operations provenance gate, four touched Chromium suites) is receipted with binary
+sha256/source SHA. Hosted CI on the exact head `d4a4325` concluded green (PR run `44664583137`,
+push twin `44664562822`; full suite 529 passed / 0 failed across 54 binaries plus 2 doc tests,
+all 13 Chromium suites, release/identity/operations/full-horizon). The docs follow-up's own CI
+run is recorded on PR #24 before merge. Observations are not enforcement; no eligibility,
+approval, qualification, acquisition, live trading or public exposure is granted. Software
+remains incomplete.
+=======
 `hermes/research-22m-window` (branched from `main` @ `ee5d08a`) pins the owner-selected research
 window: `historical_corpus::ResearchWindow::OWNER_SELECTED` = 2025-01..2026-10 (exactly 22
 completed months; owner decision 2026-11-19), `EXPECTED_MONTHS` derives from the pin, and
@@ -21,6 +43,7 @@ ladder on the branch under the shared heavy lock (project artifacts cleaned firs
 --lib --bins --tests` (54 binaries, 524 passed, 0 failed) and `scripts/check.sh` (54 binaries,
 524 passed, 0 failed). Hosted CI follows publication. No eligibility, approval or qualification
 change; the corpus remains REAL_STRUCTURALLY_VALID only.
+>>>>>>> origin/main
 
 Verification throughput landed through PR #21 (`hermes/verification-throughput`):
 quality-neutral dev/test optimization profiles (deps opt2 cached once, test code opt1,
@@ -87,7 +110,7 @@ licensing, scientific eligibility or qualification.
 Current streaming boundary: one authoritative AccountState transition serves materialized and synthetic USD corpus replay. Account checkpoints are hash-chained/lease-fenced; saved prefixes and source artifacts are revalidated before advancement. Bounded parallel corpus rounds now serve both supplied batches and a durable generated queue/coordinator. The materialized Driver remains separate. Real/protected/non-USD execution, fast-seek resume and full-history qualification remain refused/unfinished. See DECISIONS/0010-durable-corpus-backlog.md for implemented boundaries and remaining acceptance.
 
 
-Keep indexed policy experimental. Profile dominant complete-pipeline stages and validate varied/representative workloads before any promotion; engine-only gains or a small noisy median are insufficient. Implement checkpoint-aware shared-index/batch lifecycle, aggregate reference-audit coverage monitoring; metadata lookup scaling now has component evidence. Continue explicit source revision/correction links, catalog approval/coverage lifecycle, import/backup activation dashboard workflows and coordinated multi-component recovery; bounded immutable inventory and continuous export now exist. Preserve declared class versus independent approval and source availability. Continue remaining lifecycle, and the remaining scientific/operations queue rather than treating the performance experiment as software completion. Preserve exact eligibility/fallback, source scope, immutable evidence and reference/proof audit independence.
+Keep indexed policy experimental. Profile dominant complete-pipeline stages and validate varied/representative workloads before any promotion; engine-only gains or a small noisy median are insufficient. Implement checkpoint-aware shared-index/batch lifecycle, aggregate reference-audit coverage monitoring; metadata lookup scaling now has component evidence. Continue explicit source revision/correction links, catalog approval lifecycle and coordinated multi-component recovery; bounded immutable inventory, continuous export and the import/coverage activation dashboard workflow now exist. Preserve declared class versus independent approval and source availability. Continue remaining lifecycle, and the remaining scientific/operations queue rather than treating the performance experiment as software completion. Preserve exact eligibility/fallback, source scope, immutable evidence and reference/proof audit independence.
 
 Continue the full queue: indexed blocks/direct arrays/streaming and justified codecs, resumable sources/imports/coverage, dependence-aware prespecified qualification/evidence gates and real diverse boards, bounded multiworkers/supervision/resources, remaining real dashboard/operations/security workflows and integrated acceptance. Use IMPLEMENTATION_QUEUE.md's source/test reconciliation; do not confuse implemented code with acceptance.
 

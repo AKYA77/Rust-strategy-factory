@@ -214,16 +214,16 @@ byId('generated-search-refresh').addEventListener('click',loadGeneratedSearches)
 byId('generated-search-detail-refresh').addEventListener('click',()=>{if(generatedSelected)loadGeneratedSearchDetail(generatedSelected);});
 byId('generated-search-export').addEventListener('click',()=>{if(!generatedRaw)return;const link=el('a'),url=URL.createObjectURL(new Blob([generatedRaw],{type:'application/json'}));link.href=url;link.download='corpus-search-'+generatedSelected+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 let rotationRequest=0,rotationDetailRequest=0,rotationSelected=null,rotationRaw='';
-function clearRotation(message){rotationRaw='';byId('rotation-export').disabled=true;byId('rotation-controls').replaceChildren();byId('rotation-json').textContent=message;}
+function clearRotation(message){rotationRaw='';byId('rotation-cost-chart').replaceChildren();byId('rotation-export').disabled=true;byId('rotation-controls').replaceChildren();byId('rotation-json').textContent=message;}
 async function loadRotations(){const ticket=++rotationRequest;try{const rows=await api('/api/campaign-rotations').then(r=>r.json());if(ticket!==rotationRequest)return;const host=byId('rotation-cards');host.replaceChildren();byId('rotation-status').textContent=rows.length+' frozen rotations. Observed costs cover linked parents; unknown outcomes are separate. Stored metadata does not verify current input eligibility.';for(const row of rows){const card=el('article');card.className='card';card.dataset.rotationId=row.rotation_id;card.append(el('h3','Rotation '+row.rotation_id.slice(0,12)),el('p',row.state+' · next member '+row.next_member_index+' · '+row.visits+' published visits'),el('p',row.members.length+' frozen members · '+(row.pause_origin||'no pause')),el('p','Synthetic training only · qualification withheld'));for(const member of row.members){card.append(el('p',member.name+' · '+member.last_kind+' · '+member.known_children+' known children · '+member.unknown_outcome_visits+' unknown outcome visits'),el('p','Observed CPU '+member.observed_native_cpu_ticks+' native ticks ('+member.cpu_observed_children+' measured, '+member.cpu_unobserved_children+' unmeasured children) · observed parent elapsed '+member.observed_parent_elapsed_ms+' ms'),el('p',member.current_metadata_available?'Stored member state: '+member.current_state:'Member metadata unavailable'));}const inspect=el('button','Inspect rotation');inspect.addEventListener('click',()=>loadRotationDetail(row.rotation_id));card.append(inspect);host.append(card);}}catch(error){if(ticket===rotationRequest){byId('rotation-cards').replaceChildren();byId('rotation-status').textContent='Rotation inventory unavailable.';++rotationDetailRequest;clearRotation('Verified rotation snapshot unavailable.');failure(error);}}}
-async function loadRotationDetail(id){const ticket=++rotationDetailRequest;rotationSelected=id;byId('rotation-detail').hidden=false;clearRotation('Verifying rotation scope and progress…');try{const raw=await api('/api/campaign-rotations/'+id).then(r=>r.text());if(ticket!==rotationDetailRequest||id!==rotationSelected)return;const snapshot=JSON.parse(raw);rotationRaw=raw;byId('rotation-json').textContent=raw;byId('rotation-export').disabled=false;for(const[label,state]of[['Pause rotation','paused'],['Resume rotation','running'],['Stop rotation permanently','stopped']]){const button=el('button',label);const current=snapshot.state;button.disabled=['stopped','exhausted'].includes(current)||(state==='paused'&&current!=='running'&&!(current==='paused'&&snapshot.pause_origin!=='operator'))||(state==='running'&&current!=='paused');button.addEventListener('click',()=>changeRotation(id,state,snapshot.epoch));byId('rotation-controls').append(button);}}catch(error){if(ticket===rotationDetailRequest&&id===rotationSelected){clearRotation('Verified rotation snapshot unavailable.');failure(error);}}}
+async function loadRotationDetail(id){const ticket=++rotationDetailRequest;rotationSelected=id;byId('rotation-detail').hidden=false;clearRotation('Verifying rotation scope and progress…');try{const raw=await api('/api/campaign-rotations/'+id).then(r=>r.text());if(ticket!==rotationDetailRequest||id!==rotationSelected)return;const snapshot=JSON.parse(raw);rotationRaw=raw;byId('rotation-json').textContent=raw;renderRotationCosts(snapshot);byId('rotation-export').disabled=false;for(const[label,state]of[['Pause rotation','paused'],['Resume rotation','running'],['Stop rotation permanently','stopped']]){const button=el('button',label);const current=snapshot.state;button.disabled=['stopped','exhausted'].includes(current)||(state==='paused'&&current!=='running'&&!(current==='paused'&&snapshot.pause_origin!=='operator'))||(state==='running'&&current!=='paused');button.addEventListener('click',()=>changeRotation(id,state,snapshot.epoch));byId('rotation-controls').append(button);}}catch(error){if(ticket===rotationDetailRequest&&id===rotationSelected){clearRotation('Verified rotation snapshot unavailable.');failure(error);}}}
 async function changeRotation(id,state,epoch){if(id!==rotationSelected||!rotationRaw)return;const ticket=++rotationDetailRequest;clearRotation('Applying rotation control…');try{await api('/api/campaign-rotations/'+id+'/control',{state,expected_epoch:epoch});if(ticket!==rotationDetailRequest||id!==rotationSelected)return;await loadRotationDetail(id);await loadRotations();}catch(error){if(ticket===rotationDetailRequest&&id===rotationSelected){clearRotation('Rotation control refused; refresh the snapshot before trying again.');failure(error);}}}
 byId('rotation-refresh').addEventListener('click',loadRotations);byId('rotation-detail-refresh').addEventListener('click',()=>{if(rotationSelected)loadRotationDetail(rotationSelected);});byId('rotation-export').addEventListener('click',()=>{if(!rotationRaw)return;const link=el('a'),url=URL.createObjectURL(new Blob([rotationRaw],{type:'application/json'}));link.href=url;link.download='corpus-rotation-'+rotationSelected+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 
 let campaignRequest=0,campaignDetailRequest=0,campaignSelected=null,campaignRaw='';
-function clearCampaign(message){clearCampaignLedger();campaignRaw='';byId('campaign-export').disabled=true;byId('campaign-controls').replaceChildren();byId('campaign-json').textContent=message;}
+function clearCampaign(message){clearCampaignLedger();clearCampaignVerify();campaignRaw='';byId('campaign-export').disabled=true;byId('campaign-controls').replaceChildren();byId('campaign-json').textContent=message;}
 async function loadCampaigns(){const ticket=++campaignRequest;try{const rows=await api('/api/campaigns').then(r=>r.json());if(ticket!==campaignRequest)return;const host=byId('campaign-cards');host.replaceChildren();byId('campaign-status').textContent=rows.length+' frozen campaigns. Metadata inspection does not verify current source eligibility.';for(const row of rows){const card=el('article');card.className='card';card.dataset.campaignId=row.campaign_id;card.append(el('h3','Campaign '+row.campaign_id.slice(0,12)),el('p',row.execution.state+' · '+row.execution.next_region+' of '+row.regions.length+' regions complete'),el('p',row.declared_slots+' declared slots · '+row.distinct_experiments+' distinct experiment identities'),el('p','Synthetic training only · qualification withheld'));const inspect=el('button','Inspect campaign');inspect.addEventListener('click',()=>loadCampaignDetail(row.campaign_id));card.append(inspect);host.append(card);}}catch(error){if(ticket===campaignRequest){byId('campaign-cards').replaceChildren();byId('campaign-status').textContent='Campaign inventory unavailable.';++campaignDetailRequest;clearCampaign('Verified campaign snapshot unavailable.');failure(error);}}}
-async function loadCampaignDetail(id){const ticket=++campaignDetailRequest;campaignSelected=id;byId('campaign-detail').hidden=false;clearCampaign('Verifying campaign scope and progress…');try{const raw=await api('/api/campaigns/'+id).then(r=>r.text());if(ticket!==campaignDetailRequest||id!==campaignSelected)return;const snapshot=JSON.parse(raw);campaignRaw=raw;byId('campaign-owned-open').disabled=false;byId('campaign-json').textContent=raw;byId('campaign-export').disabled=false;for(const[label,state]of[['Pause campaign','paused'],['Resume campaign','running'],['Stop campaign permanently','stopped']]){const button=el('button',label);const current=snapshot.execution.state;button.disabled=['stopped','exhausted'].includes(current)||(state==='paused'&&current!=='running')||(state==='running'&&current!=='paused');button.addEventListener('click',()=>changeCampaign(id,state,snapshot.execution.epoch));byId('campaign-controls').append(button);}}catch(error){if(ticket===campaignDetailRequest&&id===campaignSelected){clearCampaign('Verified campaign snapshot unavailable.');failure(error);}}}
+async function loadCampaignDetail(id){const ticket=++campaignDetailRequest;campaignSelected=id;byId('campaign-detail').hidden=false;clearCampaign('Verifying campaign scope and progress…');try{const raw=await api('/api/campaigns/'+id).then(r=>r.text());if(ticket!==campaignDetailRequest||id!==campaignSelected)return;const snapshot=JSON.parse(raw);campaignRaw=raw;byId('campaign-owned-open').disabled=false;byId('campaign-verify-inputs').disabled=false;byId('campaign-json').textContent=raw;byId('campaign-export').disabled=false;for(const[label,state]of[['Pause campaign','paused'],['Resume campaign','running'],['Stop campaign permanently','stopped']]){const button=el('button',label);const current=snapshot.execution.state;button.disabled=['stopped','exhausted'].includes(current)||(state==='paused'&&current!=='running')||(state==='running'&&current!=='paused');button.addEventListener('click',()=>changeCampaign(id,state,snapshot.execution.epoch));byId('campaign-controls').append(button);}}catch(error){if(ticket===campaignDetailRequest&&id===campaignSelected){clearCampaign('Verified campaign snapshot unavailable.');failure(error);}}}
 let campaignOwnedRequest=0,campaignOwnedId=null,campaignOwnedAfter=null,campaignOwnedNext=null,campaignOwnedStack=[],campaignOwnedRaw='';
 function clearCampaignLedger(){++campaignOwnedRequest;campaignOwnedRaw='';byId('campaign-owned-export').disabled=true;byId('campaign-owned-open').disabled=true;byId('campaign-owned-detail').hidden=true;}
 async function loadCampaignOwned(after=campaignOwnedAfter,stack=campaignOwnedStack){
@@ -250,10 +250,10 @@ async function loadFleets(){const request=++fleetRequest;try{const rows=await ap
  const controls=el('div');controls.className='controls';for(const [label,state]of [['Pause input rotation','paused'],['Resume input rotation','running'],['Stop input rotation permanently','stopped']]){const button=el('button',label);button.disabled=['stopped','exhausted'].includes(fleet.state)||(state==='paused'&&fleet.state!=='running'&&!(fleet.state==='paused'&&fleet.control?.pause_origin!=='operator'))||(state==='running'&&fleet.state!=='paused');button.addEventListener('click',async()=>{button.disabled=true;try{await api('/api/corpus-fleets/'+fleet.fleet_id+'/control',{state});await loadFleets();if(fleetSelected===fleet.fleet_id)await loadFleetDetail(fleet.fleet_id);}catch(error){await loadFleets();failure(error);}});controls.append(button);}const inspect=el('button','Inspect input rotation');inspect.addEventListener('click',()=>loadFleetDetail(fleet.fleet_id));controls.append(inspect);card.append(controls);host.append(card);}
  }catch(error){if(request===fleetRequest){byId('fleet-cards').replaceChildren();byId('fleet-status').textContent='Verified input rotation inventory unavailable.';failure(error);}}
 }
-async function loadFleetDetail(id){const request=++fleetDetailRequest;fleetSelected=id;fleetRaw='';byId('fleet-export').disabled=true;byId('fleet-detail').hidden=false;byId('fleet-json').textContent='Verifying input rotation snapshot…';try{const raw=await api('/api/corpus-fleets/'+id).then(r=>r.text());if(request!==fleetDetailRequest)return;fleetRaw=raw;byId('fleet-json').textContent=raw;byId('fleet-export').disabled=false;}catch(error){if(request===fleetDetailRequest){byId('fleet-json').textContent='Verified input rotation snapshot unavailable.';failure(error);}}}
+async function loadFleetDetail(id){const request=++fleetDetailRequest;fleetSelected=id;fleetRaw='';byId('fleet-cost-chart').replaceChildren();byId('fleet-export').disabled=true;byId('fleet-detail').hidden=false;byId('fleet-json').textContent='Verifying input rotation snapshot…';try{const raw=await api('/api/corpus-fleets/'+id).then(r=>r.text());if(request!==fleetDetailRequest)return;fleetRaw=raw;byId('fleet-json').textContent=raw;renderFleetCosts(JSON.parse(raw));byId('fleet-export').disabled=false;}catch(error){if(request===fleetDetailRequest){byId('fleet-json').textContent='Verified input rotation snapshot unavailable.';byId('fleet-cost-chart').replaceChildren();failure(error);}}}
 byId('fleet-refresh').addEventListener('click',loadFleets);byId('fleet-detail-refresh').addEventListener('click',()=>{if(fleetSelected)loadFleetDetail(fleetSelected);});byId('fleet-export').addEventListener('click',()=>{if(!fleetRaw)return;const link=el('a'),url=URL.createObjectURL(new Blob([fleetRaw],{type:'application/json'}));link.href=url;link.download='corpus-fleet-'+fleetSelected+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 async function loadResources(){
- try {const data=await api('/api/resources').then(r=>r.json());const panel=byId('resources');panel.replaceChildren();for(const [label,value]of [['Dashboard service RSS',data.process_rss_bytes+' bytes'],['Host available memory',data.host_available_memory_bytes+' bytes'],['Available parallelism',data.available_parallelism]]){const card=el('article');card.className='card';card.append(el('h3',label),el('p',value));panel.append(card);}byId('resource-status').textContent='Current dashboard process and host observations. Standalone research processes have separate memory use; these observations do not enforce OS limits.';}
+ try {const data=await api('/api/resources').then(r=>r.json());const panel=byId('resources');panel.replaceChildren();for(const [label,value]of [['Dashboard service RSS',data.process_rss_bytes+' bytes'],['Host available memory',data.host_available_memory_bytes+' bytes'],['Available parallelism',data.available_parallelism],['Dashboard peak RSS (high-water)',data.peak_rss_bytes+' bytes'],['Dashboard CPU ticks (user + system)',(BigInt(data.process_user_ticks)+BigInt(data.process_system_ticks)).toString()+' ticks'],['Dashboard start ticks',data.process_start_ticks+' ticks']]){const card=el('article');card.className='card';card.append(el('h3',label),el('p',value));panel.append(card);}byId('resource-status').textContent='Current dashboard process and host observations. '+data.cpu_scope+' Standalone research processes have separate memory use; these observations do not enforce OS limits.';}
  catch(_error){byId('resources').replaceChildren();byId('resource-status').textContent='Runtime resource observations unavailable.';}
 }
 async function loadArtifacts(){
@@ -262,9 +262,9 @@ async function loadArtifacts(){
 async function loadDisk(){
  const panel=byId('disk');try{const data=await api('/api/disk').then(r=>r.json());panel.replaceChildren();for(const [label,value]of [['Available to service user',data.available_bytes+' bytes'],['Filesystem capacity',data.total_bytes+' bytes']]){const card=el('article');card.className='card';card.append(el('h3',label),el('p',value));panel.append(card);}byId('disk-status').textContent=data.scope;}catch{panel.replaceChildren();byId('disk-status').textContent='Filesystem observations unavailable; no zero capacity is inferred.';}
 }
-async function refresh(){const [overview]=await Promise.all([api("/api/overview?runs=false").then(r=>r.json()),protocolPager.load(),runPager.load(),loadHistory(),loadCatalog(),loadResources(),loadRecovery(),loadOwned(),loadSupervision(),loadGeneratedSearches(),loadCampaigns(),loadRotations(),loadFleets(),loadArtifacts(),loadDisk()]);renderAuditHealth(overview.audit_health);currentEngine=overview.engine;byId('readiness').textContent=overview.software_status+' · '+overview.historical_readiness;byId('qualification').textContent=overview.qualification;byId('metrics').replaceChildren();for(const [label,value]of Object.entries(overview.counts)){const card=el('div');card.className='card';card.append(el('span',({registered:'Registered experiments',completed:'Committed tick results',running:'Running experiment records',attempts:'Lease acquisitions'})[label]||label),Object.assign(el('strong',value),{className:'metric'}));byId('metrics').append(card);}renderResults();}
+async function refresh(){const [overview]=await Promise.all([api("/api/overview?runs=false").then(r=>r.json()),protocolPager.load(),runPager.load(),loadHistory(),loadCatalog(),loadResources(),loadRecovery(),loadOwned(),loadSupervision(),loadGeneratedSearches(),loadCampaigns(),loadRotations(),loadFleets(),loadArtifacts(),loadDisk(),loadCoverageTargets()]);renderAuditHealth(overview.audit_health);currentEngine=overview.engine;byId('readiness').textContent=overview.software_status+' · '+overview.historical_readiness;byId('qualification').textContent=overview.qualification;byId('metrics').replaceChildren();for(const [label,value]of Object.entries(overview.counts)){const card=el('div');card.className='card';card.append(el('span',({registered:'Registered experiments',completed:'Committed tick results',running:'Running experiment records',attempts:'Lease acquisitions'})[label]||label),Object.assign(el('strong',value),{className:'metric'}));byId('metrics').append(card);}renderResults();}
 function renderDatasets(){const seen=new Set();byId('datasets').replaceChildren();for(const row of rows){const m=row.manifest;if(!m)continue;const key=JSON.stringify([m.content_hash,m.profile_hash,m.archive_hash,m.class,m.source,m.parser_version]);if(seen.has(key))continue;seen.add(key);const card=el('article');card.className='card';card.append(el('h3',m.symbol),el('p',m.class),el('p',m.events+' quote events'),el('p',new Date(m.first_ms).toISOString()+' → '+new Date(m.last_ms).toISOString()),el('p',m.source),el('p','Content '+m.content_hash));byId('datasets').append(card);}if(!seen.size)byId('datasets').append(el('p','No provenance manifests in this experiment page.'));}
-(async()=>{csrf=(await api('/api/session').then(r=>r.json())).csrf;await refresh();setInterval(()=>refresh().catch(failure),10000);})().catch(failure);
+(async()=>{csrf=(await api('/api/session').then(r=>r.json())).csrf;await refresh();await loadImports();setInterval(()=>refresh().catch(failure),10000);})().catch(failure);
 
 let reviewRequest=0,reviewAfter=null,reviewNext=null,reviewHead=null,reviewRaw='',reviewIdentity='';
 function clearLiveReview(){byId('review-live').hidden=true;byId('review-live').textContent='';byId('review-live-status').textContent='Current artifacts have not been revalidated in this view.';}
@@ -295,4 +295,127 @@ byId('review-form').addEventListener('submit',async event=>{
  try{await api('/api/data-review',body);if(id===catalogSelected){await loadDataReview(id);byId('data-review-status').textContent='Independent decision recorded. '+byId('data-review-status').textContent;}}catch(error){if(id===catalogSelected){await loadDataReview(id);failure(error);}}finally{if(id===catalogSelected)byId('review-submit').disabled=reviewAfter!==null;}
 });
 
+
+let importsRequest=0,importsRaw='',importDetailRequest=0,importSelected='',importRaw='';
+async function loadImports(){
+ const ticket=++importsRequest;importsRaw='';byId('imports-export').disabled=true;
+ byId('imports-status').textContent='Verifying import checkpoints…';
+ try{
+  const raw=await api('/api/imports').then(r=>r.text());if(ticket!==importsRequest)return;
+  const data=JSON.parse(raw);importsRaw=raw;byId('imports-export').disabled=false;
+  const host=byId('import-cards');host.replaceChildren();
+  if(!data.configured){byId('imports-status').textContent=data.limitations;return;}
+  byId('imports-status').textContent=data.imports.length+' configured import directories · at most '+data.maximum_imports+'. '+data.limitations;
+  for(const row of data.imports){const card=el('article');card.className='card';card.dataset.importName=row.name;card.append(el('h3',row.name),el('p','State: '+row.state));
+   if(row.state==='complete'||row.state==='in_progress')card.append(el('p','Verified events '+row.events+' · chunks '+row.chunks),el('p','Source archive '+row.archive_hash.slice(0,12)+' · '+row.archive_bytes+' bytes · '+(row.synthetic?'synthetic declared':'real declared')),el('p','Started '+row.started_at));
+   if(row.state==='refused')card.append(el('p','Verification refused: '+row.reason));
+   if(row.state==='not_initialized')card.append(el('p',row.limitations));
+   if(row.decision_history==='corrupt')card.append(el('p','Decision history corrupt: '+row.decision_history_reason));
+   else if(row.last_decision)card.append(el('p','Last decision: '+row.last_decision.kind+' · '+row.decision_count+' retained'));
+   const inspect=el('button','Inspect import receipt');inspect.disabled=row.state==='not_initialized';inspect.addEventListener('click',()=>loadImportDetail(row.name).catch(failure));card.append(inspect);host.append(card);}
+ }catch(error){if(ticket===importsRequest){byId('import-cards').replaceChildren();byId('imports-status').textContent='Import inventory unavailable; no verified state established.';failure(error);}}
+}
+async function loadImportDetail(name){
+ const ticket=++importDetailRequest;importSelected=name;importRaw='';
+ byId('import-detail').hidden=false;byId('import-export').disabled=true;byId('import-activate-form').hidden=true;byId('import-refuse-form').hidden=true;
+ byId('import-json').textContent='Verifying import receipt…';byId('import-detail-label').textContent=name;byId('import-decision-status').textContent='';
+ try{
+  const raw=await api('/api/imports/'+encodeURIComponent(name)).then(r=>r.text());
+  if(ticket!==importDetailRequest||name!==importSelected)return;
+  const data=JSON.parse(raw);importRaw=raw;byId('import-json').textContent=raw;byId('import-export').disabled=false;
+  byId('import-detail-label').textContent=name+' · '+data.state+' · every published chunk re-verified; declared class is not approval';
+  const p=data.progress;
+  byId('import-activate-hash').value=p.configuration.archive_hash;byId('import-activate-events').value=String(p.events);byId('import-refuse-hash').value=p.configuration.archive_hash;
+  byId('import-activate-form').hidden=data.state!=='complete';byId('import-refuse-form').hidden=false;
+  byId('import-decision-status').textContent=data.decisions.length+' retained decisions · activation registers a catalog observation only';
+ }catch(error){if(ticket===importDetailRequest&&name===importSelected){byId('import-json').textContent='Verified import receipt unavailable.';byId('import-detail-label').textContent=name+' · verification refused';byId('import-refuse-hash').value='';byId('import-refuse-form').hidden=false;failure(error);}}
+}
+async function importAction(path,body){
+ const name=importSelected;if(!name)return;
+ const ticket=++importDetailRequest;
+ byId('import-activate-submit').disabled=true;byId('import-refuse-submit').disabled=true;
+ byId('import-decision-status').textContent='Applying operator decision…';
+ try{
+  const raw=await api(path,body).then(r=>r.text());
+  if(ticket!==importDetailRequest||name!==importSelected)return;
+  const kind=JSON.parse(raw).decision.kind;
+  await loadImportDetail(name);await loadImports();
+  if(importSelected===name)byId('import-decision-status').textContent='Decision recorded: '+kind+' · no approval, eligibility or qualification granted';
+ }catch(error){
+  if(ticket===importDetailRequest&&name===importSelected){failure(error);await loadImportDetail(name).catch(()=>{});if(importSelected===name)byId('import-decision-status').textContent='Decision refused; existing artifacts and evidence are preserved.';}
+ }finally{byId('import-activate-submit').disabled=false;byId('import-refuse-submit').disabled=false;}
+}
+byId('imports-refresh').addEventListener('click',loadImports);
+byId('imports-export').addEventListener('click',()=>{if(!importsRaw)return;const link=el('a'),url=URL.createObjectURL(new Blob([importsRaw],{type:'application/json'}));link.href=url;link.download='import-inventory.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+byId('import-detail-refresh').addEventListener('click',()=>{if(importSelected)loadImportDetail(importSelected).catch(failure);});
+byId('import-export').addEventListener('click',()=>{if(!importRaw)return;const link=el('a'),url=URL.createObjectURL(new Blob([importRaw],{type:'application/json'}));link.href=url;link.download='import-'+importSelected+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+byId('import-activate-form').addEventListener('submit',e=>{e.preventDefault();if(!importSelected)return;importAction('/api/imports/'+encodeURIComponent(importSelected)+'/activate',{expected_archive_hash:byId('import-activate-hash').value,expected_events:byId('import-activate-events').value}).catch(failure);});
+byId('import-refuse-form').addEventListener('submit',e=>{e.preventDefault();if(!importSelected)return;importAction('/api/imports/'+encodeURIComponent(importSelected)+'/refuse',{expected_archive_hash:byId('import-refuse-hash').value,reason:byId('import-refuse-reason').value}).catch(failure);});
+let coverageRequest=0,coverageDetailRequest=0,coverageSelected='',coverageRaw='';
+async function loadCoverageTargets(){
+ const ticket=++coverageRequest;
+ try{const data=await api('/api/coverage').then(r=>r.json());if(ticket!==coverageRequest)return;
+  const host=byId('coverage-cards');host.replaceChildren();
+  byId('coverage-status').textContent=data.configured?data.targets.length+' configured coverage windows · at most '+data.maximum_targets+'. '+data.limitations:data.limitations;
+  for(const t of data.targets){const card=el('article');card.className='card';card.dataset.coverageName=t.name;
+   card.append(el('h3',t.name),el('p','Window '+t.start_ms+' … '+t.end_exclusive_ms+' (epoch ms)'),el('p','Gap threshold '+t.gap_threshold_ms+' ms · detail limit '+t.detail_limit));
+   const verify=el('button','Verify coverage');verify.addEventListener('click',()=>loadCoverageReport(t.name).catch(failure));card.append(verify);host.append(card);}
+ }catch(error){if(ticket===coverageRequest){byId('coverage-cards').replaceChildren();byId('coverage-status').textContent='Coverage configuration unavailable.';failure(error);}}
+}
+async function loadCoverageReport(name){
+ const ticket=++coverageDetailRequest;coverageSelected=name;coverageRaw='';
+ byId('coverage-detail').hidden=false;byId('coverage-export').disabled=true;byId('coverage-json').textContent='Verifying coverage report…';byId('coverage-detail-label').textContent=name;
+ try{const raw=await api('/api/coverage/'+encodeURIComponent(name)).then(r=>r.text());
+  if(ticket!==coverageDetailRequest||name!==coverageSelected)return;
+  const data=JSON.parse(raw);coverageRaw=raw;byId('coverage-json').textContent=raw;byId('coverage-export').disabled=false;
+  byId('coverage-detail-label').textContent=name+' · '+data.events+' observed events · '+data.months.length+' UTC months · '+data.gap_count+' gaps over threshold · observations only, no approval';
+ }catch(error){if(ticket===coverageDetailRequest&&name===coverageSelected){byId('coverage-json').textContent='Verified coverage report unavailable.';byId('coverage-detail-label').textContent=name+' · verification refused';failure(error);}}
+}
+byId('coverage-refresh').addEventListener('click',loadCoverageTargets);
+byId('coverage-detail-refresh').addEventListener('click',()=>{if(coverageSelected)loadCoverageReport(coverageSelected).catch(failure);});
+byId('coverage-export').addEventListener('click',()=>{if(!coverageRaw)return;const link=el('a'),url=URL.createObjectURL(new Blob([coverageRaw],{type:'application/json'}));link.href=url;link.download='coverage-'+coverageSelected+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+let auditRequest=0,auditRaw='';
+byId('registry-audit-verify').addEventListener('click',async()=>{
+ const ticket=++auditRequest;auditRaw='';byId('registry-audit-export').disabled=true;byId('registry-audit-json').textContent='Verifying registry integrity…';byId('registry-audit-status').textContent='Verification in progress';
+ try{const raw=await api('/api/registry-audit').then(r=>r.text());if(ticket!==auditRequest)return;
+  auditRaw=raw;const data=JSON.parse(raw);byId('registry-audit-json').textContent=raw;
+  byId('registry-audit-status').textContent='Integrity '+data.integrity+' · registered '+data.counts.registered+' · completed '+data.counts.completed+' · request-time observation only';
+  byId('registry-audit-export').disabled=false;
+ }catch(error){if(ticket===auditRequest){byId('registry-audit-json').textContent='Registry integrity verification refused; preserve evidence.';byId('registry-audit-status').textContent='Refused';failure(error);}}
+});
+byId('registry-audit-export').addEventListener('click',()=>{if(!auditRaw)return;const link=el('a'),url=URL.createObjectURL(new Blob([auditRaw],{type:'application/json'}));link.href=url;link.download='registry-audit.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+let campaignVerifyRequest=0,campaignVerifyRaw='';
+function clearCampaignVerify(){++campaignVerifyRequest;campaignVerifyRaw='';byId('campaign-verify-export').disabled=true;byId('campaign-verify-inputs').disabled=true;byId('campaign-verify-json').hidden=true;byId('campaign-verify-json').textContent='';byId('campaign-verify-status').textContent='';}
+byId('campaign-verify-inputs').addEventListener('click',async()=>{
+ const id=campaignSelected;if(!id||!campaignRaw)return;
+ const ticket=++campaignVerifyRequest;campaignVerifyRaw='';byId('campaign-verify-export').disabled=true;byId('campaign-verify-json').hidden=false;byId('campaign-verify-json').textContent='Verifying frozen campaign inputs…';byId('campaign-verify-status').textContent='Verification in progress';
+ try{const raw=await api('/api/campaigns/'+id+'/verify-inputs').then(r=>r.text());
+  if(ticket!==campaignVerifyRequest||id!==campaignSelected)return;
+  campaignVerifyRaw=raw;byId('campaign-verify-json').textContent=raw;
+  byId('campaign-verify-status').textContent=id+' · frozen inputs re-verified against the current plan file; no execution';
+  byId('campaign-verify-export').disabled=false;
+ }catch(error){if(ticket===campaignVerifyRequest&&id===campaignSelected){byId('campaign-verify-json').textContent='Frozen input verification refused.';byId('campaign-verify-status').textContent='Refused; the frozen plan, build or trial scope changed or is unavailable';failure(error);}}
+});
+byId('campaign-verify-export').addEventListener('click',()=>{if(!campaignVerifyRaw||!campaignSelected)return;const link=el('a'),url=URL.createObjectURL(new Blob([campaignVerifyRaw],{type:'application/json'}));link.href=url;link.download='campaign-verify-'+campaignSelected+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+function costChart(host,entries){
+ host.replaceChildren();
+ if(!entries.length){host.append(el('p','No owned cost observations recorded yet.'));return;}
+ const rows=entries.map(e=>({label:e.label,cpu:BigInt(e.cpu)}));
+ const maxCpu=rows.reduce((m,r)=>r.cpu>m?r.cpu:m,0n);
+ if(maxCpu===0n){host.append(el('p','Owned visits recorded; no CPU ticks observed yet. Unobserved visits remain separate.'));return;}
+ const height=rows.length*46+30;
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+ svg.setAttribute('viewBox','0 0 1000 '+height);svg.style.height=height+'px';
+ svg.setAttribute('role','img');svg.setAttribute('aria-label','Observed owned-visit CPU ticks; exact integers, not equal allocation');
+ rows.forEach((r,i)=>{const y=10+i*46;
+  const rect=document.createElementNS(svg.namespaceURI,'rect');
+  rect.setAttribute('x','10');rect.setAttribute('y',String(y+16));rect.setAttribute('width',String(Math.max(1,Number(r.cpu*900n/maxCpu))));rect.setAttribute('height','18');rect.setAttribute('fill','#9ed7c7');
+  const text=document.createElementNS(svg.namespaceURI,'text');
+  text.setAttribute('x','10');text.setAttribute('y',String(y+10));text.setAttribute('fill','#dee8ed');text.setAttribute('font-size','12');
+  text.textContent=r.label+' · '+r.cpu.toString()+' ticks';
+  svg.append(rect,text);});
+ host.append(svg,el('p','Observed CPU in raw kernel accounting ticks, not milliseconds. Sampled owned visits only; unobserved visits and other processes are separate. Observations, not enforcement or equal allocation.'));
+}
+function renderFleetCosts(snapshot){const host=byId('fleet-cost-chart');host.replaceChildren();const obs=snapshot.owned_observations??[];costChart(host,obs.map(o=>({label:'Input '+o.source_index+' · '+o.owned_visits+' owned visits · '+o.cpu_unobserved_visits+' unobserved',cpu:o.observed_cpu_ticks})));for(const o of obs)host.append(el('p','Input '+o.source_index+' · observed parent elapsed '+o.observed_parent_elapsed_ms+' ms · CPU measured on '+o.cpu_observed_visits+' visits'));}
+function renderRotationCosts(snapshot){const host=byId('rotation-cost-chart');host.replaceChildren();const members=snapshot.members??[];costChart(host,members.map(m=>({label:m.name+' · '+m.cpu_observed_children+' measured · '+m.cpu_unobserved_children+' unmeasured children',cpu:m.observed_native_cpu_ticks})));for(const m of members)host.append(el('p',m.name+' · observed parent elapsed '+m.observed_parent_elapsed_ms+' ms'));}
 }
