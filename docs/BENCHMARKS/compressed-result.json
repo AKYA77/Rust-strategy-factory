@@ -1,0 +1,55 @@
+{
+  "class": "SYNTHETIC_CODEC_COMPONENT_NOT_RESEARCH_THROUGHPUT",
+  "codec": "zstd0.13.3 level3/window23 native wrapper v1",
+  "compute_revision": "compute-blake3:11e0114e6f10efe2bde619c8147a7007e2a5517c83a47b3fd83ab30cbc985f60",
+  "dataset_hash": "2e3e7f4a8b03f2695a88c6863243fd77ceb2383a7c3c72812a7302a51f07ca27",
+  "events": 20000,
+  "limitations": "Warm local files, validation/allocation and encode/restore atomic publication included in timers; fixture generation excluded. No cold-I/O, Parquet comparison, full-history streaming or real market data; no selected production codec or end-to-end replay speed claim.",
+  "measurements": [
+    {
+      "compressed_bytes": 76649,
+      "decode_validate_ns": 4907291,
+      "encode_validate_publish_ns": 33499151,
+      "native_bytes": 640965,
+      "native_decode_validate_ns": 3890938,
+      "repetition": 0,
+      "restore_validate_publish_ns": 12297240
+    },
+    {
+      "compressed_bytes": 76649,
+      "decode_validate_ns": 4816095,
+      "encode_validate_publish_ns": 8690447,
+      "native_bytes": 640965,
+      "native_decode_validate_ns": 3802105,
+      "repetition": 1,
+      "restore_validate_publish_ns": 8064620
+    },
+    {
+      "compressed_bytes": 76649,
+      "decode_validate_ns": 4619150,
+      "encode_validate_publish_ns": 7927184,
+      "native_bytes": 640965,
+      "native_decode_validate_ns": 2805603,
+      "repetition": 2,
+      "restore_validate_publish_ns": 8148647
+    },
+    {
+      "compressed_bytes": 76649,
+      "decode_validate_ns": 3529046,
+      "encode_validate_publish_ns": 18083078,
+      "native_bytes": 640965,
+      "native_decode_validate_ns": 3201376,
+      "repetition": 3,
+      "restore_validate_publish_ns": 10893117
+    },
+    {
+      "compressed_bytes": 76649,
+      "decode_validate_ns": 2936740,
+      "encode_validate_publish_ns": 6838093,
+      "native_bytes": 640965,
+      "native_decode_validate_ns": 3078031,
+      "repetition": 4,
+      "restore_validate_publish_ns": 8053504
+    }
+  ]
+}
