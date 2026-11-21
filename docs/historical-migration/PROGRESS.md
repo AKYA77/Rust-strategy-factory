@@ -18,16 +18,20 @@ are not counted as integrated into `main`.
 
 ## Accounting
 
-- **Software implementation completeness (Metric A): ~76%.**
-- **Verified end-to-end completion (Metric B): ~63%.**
-- **Progress added this milestone: +3 points.** A genuine VPS-data structural pipeline
-  (corpus → observed source facts → closed M1 candles → causal signals) runs for all eight
-  instruments; a deterministic per-instrument **study report** is now produced; and
-  `historical-corpus-verify-bound` confirmed full source-byte equivalence for **all 421,078,937
-  events** across all eight instruments. The whole-project gap assessment, storage report and
-  Codex compatibility notes are recorded. The gain is bounded because real/FX execution, the
-  merged Codex stack, live VPS acceptance and external approvals did not move.
-- **Remaining: ~38% software, ~38% verified. Target gap to 95%: 19 points software, 33 points
+- **Software implementation completeness (Metric A): ~81%.**
+- **Verified end-to-end completion (Metric B): ~68%.** This milestone adds a verified
+  **cached full-corpus diagnostic execution** (queue item 14): for all eight instruments over
+  the configured 22 completed months (2025-01..2026-10) the authoritative sequential engine
+  runs once from source (110 months) and once from the content-addressed cache (110 hits /
+  66 refused-month misses), with every instrument's cold and warm reports byte-identical
+  apart from cache counters and totals equal to the earlier non-cached receipt. Evidence:
+  `scripts/run-diagnostic-execution-cached.py`, configs in
+  `configs/historical-migration/{strategies,costs}`, per-instrument reports under
+  `docs/historical-migration/diagnostic-cache-v1/` and receipt
+  `docs/historical-migration/DIAGNOSTIC_EXECUTION_CACHED_RECEIPT.json`.
+  The gain is bounded because real/FX execution, broker/calendar facts and the external
+  gates did not move.
+- **Remaining: ~35% software, ~28% verified. Target gap to 95: 16 points software, 28 points
   verified.**
 - Baseline used: external provisional estimates (software 74%, verified 60%). The rubric and
   weights are unchanged.

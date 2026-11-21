@@ -1,0 +1,12 @@
+{
+  "timeframe": "M1",
+  "side": "Long",
+  "stop_ticks": 100,
+  "rule": {
+    "AboveMean": {
+      "window": 2
+    }
+  },
+  "entry": null,
+  "stop_policy": null
+}

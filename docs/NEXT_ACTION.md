@@ -82,3 +82,27 @@ Fresh Dukascopy/HistData info requests returned403; no real quotes/terms obtaine
 Exact executable bid/ask,2-pip spread floor plus separate2-pip adverse market/stop slippage,10% intended risk/$20 initial/3R/24h; frozen pending distance/quantity; no fabricated gaps/fills/depth; no protected OOS/final adaptation; synthetic never qualifies. Qualification needs independent approved complete evidence, not a high test count or tiny benchmark. Registry-local protection cannot cover external tools/copied registries. No execution continues after a session ends unless an actual supported mechanism exists.
 
 Latest continuation: persisted machine bindings and scoped independent authority are implemented; no genuine quotes or broker approvals exist. Alternative source findings and exact blockers are in REAL_DATA_MATRIX.json. Zero acquired bytes; no accounts/emails/purchases. Full historical qualification and target-VPS acceptance remain pending.
+
+## Cached diagnostic full-corpus execution (card t_9623c913) — COMPLETE
+
+- Deliverable: `scripts/run-diagnostic-execution-cached.py` + configs
+  `configs/historical-migration/strategies/m1-long-above-mean-v1.json` and
+  `configs/historical-migration/costs/bid-anchored-floor-v1-default.json`;
+  per-instrument reports in `docs/historical-migration/diagnostic-cache-v1/`;
+  aggregate `docs/historical-migration/DIAGNOSTIC_EXECUTION_CACHED_RECEIPT.json`
+  (sha256 `02be66677cd4b719f3e6e5bf34e4d31560dc0e41b92f473cc08e326964ae0ca0`).
+- What was verified:
+  - 8 instruments x 22 months (2025-01..2026-10): 110 executed months, 66 refused months
+    (USDJPY/USDCHF/USDCAD refused on the literal-USD gate; not a supported class).
+  - Cold pass: 0 cache hits, 110+66 misses; warm pass: 110 hits, 66 misses; all 110 executed
+    months served from cache on the second pass.
+  - Every instrument cold == warm byte-identical apart from cache counters (no financial drift
+    from resume).
+  - Totals match the earlier non-cached full-corpus receipt exactly: 11,584 trades,
+    694,984 rejections, P&L -1,759,377,176 µUSD, worst month drawdown 47,783,390 µUSD.
+  - Full corpus: 26.4 min cold -> 10.0 min warm (3.2x with 6 cores), with per-instrument wall
+    times recorded in the receipt; the warm pass serves all 110 executed months from the
+    content-addressed cache.
+- Not research evidence: every month is `diagnostic_simulation`/`none`; no eligibility,
+  approval or qualification.
+

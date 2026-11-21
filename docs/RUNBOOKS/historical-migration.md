@@ -129,9 +129,29 @@ produced:
   quote stream from the legacy file) passed for sampled partitions including USDCAD 2026-07,
   XAUUSD 2026-09, AUDUSD 2025-01 and EURUSD 2026-10.
 
-Every partition's `quote_stream_sha256` was recomputed during conversion and matched its
-trusted manifest. Conversion remains a format operation: it does not establish calendar
-completeness, profile approval, source licensing or research eligibility.
+## Resumable diagnostic execution (cached full corpus)
+
+The `historical-corpus-execute-cached` CLI (queue item 14 successor) replays every verified
+month through the unchanged authoritative sequential engine, resuming identical months from a
+caller-supplied content-addressed cache instead of replaying them.
+
+Reproducible harness: `scripts/run-diagnostic-execution-cached.py` (stdlib only):
+
+- cold pass into an empty cache (0 hits, 110+66 misses), then warm pass into the same cache
+  (110 hits, 66 misses);
+- asserts every instrument's cold and warm reports are byte-identical apart from the cache
+  counters, every instrument has 22 registered months, and every executed month is
+  `diagnostic_simulation` / `none`;
+- cross-checks identities, executed months, trades, rejections, P&L and worst-month drawdown
+  against the earlier non-cached receipt `docs/historical-migration/DIAGNOSTIC_EXECUTION_RECEIPT.json`.
+
+Full-corpus result (2026-11-20 run; 6 cores): 8 instruments x 22 months; 110 executed months,
+66 refused months (USDJPY/USDCHF/USDCAD refuse the literal-USD gate), 11,584 trades,
+694,984 rejections, P&L -1,759,377,176 uUSD, worst monthly drawdown 47,783,390 uUSD, cold
+26.4 min -> warm 10.4 min. All per-instrument reports and the aggregate receipt with
+provenance are committed under `docs/historical-migration/`. Diagnostic only: it permits no
+calendar/profile/licensing approval, scientific validity or qualification; no diagnostic
+result may feed a registered experiment, improvement or the scientific gates.
 
 ## Integrity guarantees
 
