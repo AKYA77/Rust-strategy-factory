@@ -14,9 +14,17 @@ are not counted as integrated into `main`.
 | Operational usability and recovery | 10 | ~75% | ~60% | Migration/corpus/catalog/audit CLIs and real-data tests; dashboard historical views and live VPS recovery incomplete. `--operations` serve configuration with import/coverage activation lifecycle implemented and tested (PR #24). |
 | Performance | 5 | ~78% | ~68% | Measured bounded conversion, windowed decode, receipt-only catalog scan, 12-min full-corpus audit. |
 | Scientific/data eligibility and acceptance | 10 | ~28% | ~8% | Four gates implemented, all pending; 0 instruments eligible; declarations and machine evidence only. |
-| Integration and deployment readiness | 5 | ~50% | ~35% | PR #6 open and green; not merged; VPS-only data path; no systemd/reboot acceptance. |
+| Integration and deployment readiness | 5 | ~50% | ~35% | Live systemd research+dashboard services with kernel-enforced limits, restart/graceful/kill-9 recovery and backup/restore/update/rollback verified on the target VPS 2026-11-21 (`docs/VERIFICATION/vps-live-acceptance-2026-11-21.json`); reboot-persistence test armed — verified % moves only when that evidence lands. |
 
 ## Accounting
+
+- **Live VPS acceptance (2026-11-21, non-reboot portion):** executed and receipted in
+  `docs/VERIFICATION/vps-live-acceptance-2026-11-21.json` — user services installed/enabled/active
+  with kernel-enforced cgroup limits (research 300% CPU / 6 GB / 64 tasks; dashboard 50% / 512 MB /
+  32), restart + graceful SIGINT stop + kill-9 auto-recovery, live backup/restore with identical
+  registry checks (25,763 registered / 198 completed), release update + rollback. No rubric points
+  are added by this note alone: the deployment/readiness rows move only when the reboot-persistence
+  half of target-VPS acceptance is also performed and recorded (armed 2026-11-21).
 
 - **Software implementation completeness (Metric A): ~82%.** (supersedes the ~81% estimate
   recorded after PR #22/24 integration; PR #28's cached diagnostic full-corpus execution adds
