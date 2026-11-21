@@ -1,5 +1,7 @@
 # Synthetic baseline — 2026-11-12
 
+**Current hardware/resource evidence (2026-11-21): [all 15 benchmark receipts](2026-11-21-hardware-evidence-summary.md)** — per-child CPU ticks, peak RSS, block I/O, wall time, source and binary hashes. The historical baselines below are retained for provenance; their numbers come from older source revisions and are not directly comparable to that run.
+
 Rust 1.100.0, release thin LTO, one codegen unit. This baseline is SYNTHETIC_TEST_ONLY, warm resident fixtures, 20,000 events per instrument, eight instruments. Candles/features and receipt identities are rebuilt each trial. It is not evidence of genuine-data, compression, full-history, index acceleration or target-VPS performance.
 
 | Workers | Median wall seconds / eight replays | Max minus min seconds | Resolved trades / batch |

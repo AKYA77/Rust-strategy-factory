@@ -1,0 +1,210 @@
+{
+  "exit_code": 0,
+  "recorded_at_utc": "2026-11-13T17:50:40.846354+00:00",
+  "source_fingerprint_version": 2,
+  "source_manifest": [
+    {
+      "path": "Cargo.lock",
+      "sha256": "d6a244857aabf550ea6850c8428bed5a8b36e2b50509a31e7b6e25ba465d156f"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "ef1244bcc1508e2b25c5dcbb6fcbff08f1d59ba00c382309aff446cc3c875b05"
+    },
+    {
+      "path": "benches/batch.rs",
+      "sha256": "c145cb05afc8edd50e7f1cef2e5d905e0a59321cc0463a0186b8f03cd85eed3a"
+    },
+    {
+      "path": "benches/candidate_screen.rs",
+      "sha256": "2a712200dc4f8c40ff84c3b5c2bb7f52899418cafe0ae3e5a99c677b78c0a786"
+    },
+    {
+      "path": "benches/compressed.rs",
+      "sha256": "0b288a2e70fc3a90107efe918c887b91e9a924443f07e2b76dabe2b8fb0b83b3"
+    },
+    {
+      "path": "benches/exploration.rs",
+      "sha256": "6161971b8a5ef5fd7cb8cae5ff783cb2c03eff40e1c0f16708e59f170e724132"
+    },
+    {
+      "path": "benches/mask_prefix.rs",
+      "sha256": "b5f595ad8d299941a6d8822ef41df8b6a150aaa7c9b733158186ce108afc71d9"
+    },
+    {
+      "path": "benches/proof_screen.rs",
+      "sha256": "14871368ff63a4915b90016fff6fd28b1b105735728bba583d0b3ed5a6bb2f9f"
+    },
+    {
+      "path": "benches/replay.rs",
+      "sha256": "89d83308cd0449a643fbe075be3321aa6d2fe8fc9df5ee91a8ed6802cb50dd72"
+    },
+    {
+      "path": "benches/sparse_mask.rs",
+      "sha256": "80c38f9d349047abec904a9b91a335cc8365371d2d631fb2e5c850c7fbfdf132"
+    },
+    {
+      "path": "benches/storage_pipeline.rs",
+      "sha256": "97211507ad7e2234a5293929f55913426d4c91d2a656bc4636edd548d9eb6fc9"
+    },
+    {
+      "path": "build.rs",
+      "sha256": "317b35f22814baa4646e859aec7f8d9ae3f60d15750c2c75a607afd45fb347c7"
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "sha256": "6b1cf8341d9a08d76c6deb1e9df90a0b208d0ef0d00ee05e0173e9cd4f0f425d"
+    },
+    {
+      "path": "src/candidate_screen.rs",
+      "sha256": "78e1c584dab3820a15042515e105b8af07e407b2f6e869698882e892479b4154"
+    },
+    {
+      "path": "src/candles.rs",
+      "sha256": "65a1c8743ddbf52b26418a0fc56aa261bbbdc56299e8aee805f320f7c1d25519"
+    },
+    {
+      "path": "src/compressed.rs",
+      "sha256": "f40cb7055ba513d0d1ed4dc6294b5606278409b27bc19a424c1ca4ae3f998a19"
+    },
+    {
+      "path": "src/contracts.rs",
+      "sha256": "fa758839f646f724f9d1dba79fdfab59cfb785e073b50c7415671dfad07e919a"
+    },
+    {
+      "path": "src/dashboard.rs",
+      "sha256": "52edc3e351bc970b71f76528f78920e79fea36f5ded6faac07fb1bb57ec98a20"
+    },
+    {
+      "path": "src/data.rs",
+      "sha256": "d45098609bec90737e3e8052ac76e6e84febb0e6a50175a0031db4da914d894f"
+    },
+    {
+      "path": "src/diagnostics.rs",
+      "sha256": "b7f88560d541044d2a1df4b506d6f33a66df2001273c2cab96c6a2b7675dbbda"
+    },
+    {
+      "path": "src/exploration.rs",
+      "sha256": "136060adc7f88bb1463586c5537764e235eb427f616671a33873c7cbdd66d99a"
+    },
+    {
+      "path": "src/improvement.rs",
+      "sha256": "a835f00e3c76ccdc673a99fd49314bae6e6f0c29dce3f018edbb8a9661cfe78e"
+    },
+    {
+      "path": "src/indicators.rs",
+      "sha256": "976328ff05106e322dc577616c99fe354f4210a67e7048515f04f7bc0c5ee7bf"
+    },
+    {
+      "path": "src/lib.rs",
+      "sha256": "7ad97f9acf0f8fc2be6af00ea45a965159d607786b08138a2cb0cb2ad1cd3db3"
+    },
+    {
+      "path": "src/main.rs",
+      "sha256": "fa226c66d9bcbef3f2fbc4f78cc1d52b598216bac2f09b29f53a1ac76e59486e"
+    },
+    {
+      "path": "src/native.rs",
+      "sha256": "5cef0810c9efb08f3dfcca58e14ced8756237dc538277651dd0dc3ffe2ce5a2c"
+    },
+    {
+      "path": "src/neighborhood.rs",
+      "sha256": "573763ee2fd9152f834d21342cd1e133fe71bbc8c86950631c011050aac8553e"
+    },
+    {
+      "path": "src/orders.rs",
+      "sha256": "c4ac379cba45b4a36a9b8ce57211a38da5311600140c5f8176a01506360ee11b"
+    },
+    {
+      "path": "src/parquet_guard.rs",
+      "sha256": "2a161530c621cc2dab2a0d83ad32d478c24d9a6f4ec2fcd157662a8bb07df50f"
+    },
+    {
+      "path": "src/parquet_store.rs",
+      "sha256": "39ea78a24eeb74a00b1e36ec857334da2d2f54a7c113fdb3fe5e78a5db8edcea"
+    },
+    {
+      "path": "src/proof_screen.rs",
+      "sha256": "2e31ee41e2fbc7484b7df8a76ebd67da82f8542f13e0f1bc44d38add48a4a947"
+    },
+    {
+      "path": "src/regimes.rs",
+      "sha256": "6c313c2e38829ba1d6444264fe11fcdd0f93a70f6f1040ffdf1dc2b89060f5ae"
+    },
+    {
+      "path": "src/research.rs",
+      "sha256": "122e7bf5e7fc827efd99444d6fc0783a1d850b57a394de4e9dbc6ce5db2f1f54"
+    },
+    {
+      "path": "src/risk.rs",
+      "sha256": "d45a12bb784a823ee86793bae920bd5dc7a0b6eab5ecf483332eb180a116a8d1"
+    },
+    {
+      "path": "src/robustness.rs",
+      "sha256": "41fc84d9f8df97d801b7ee31a250e10883183c8e74fc877de8061da2adde82f7"
+    },
+    {
+      "path": "src/science.rs",
+      "sha256": "5e81fd45377c431852118dfb7bb308f38cded57db90bf640da8a54e121f0f0d1"
+    },
+    {
+      "path": "src/screen.rs",
+      "sha256": "fe54e8de406fbe2d8aff39cea72e16ed3aab7da4647e027fb5855f820a09aae1"
+    },
+    {
+      "path": "src/stops.rs",
+      "sha256": "c6ea9066fa4132732b32925a30f0cca8db28c933d11e7461966c53419a06e17b"
+    },
+    {
+      "path": "src/storage.rs",
+      "sha256": "92a1bbe61f2722b3d53e8cc048f894a1122e805cdbda86359bc2e32cb2b45639"
+    },
+    {
+      "path": "src/strategies.rs",
+      "sha256": "4ce733312975f2cea0fadee3b6765922565d86fc552c00a356fbc92b88740d41"
+    },
+    {
+      "path": "src/tick_engine.rs",
+      "sha256": "214f63b11cbccffffefe2a2c7fe60d43bf6957ec418ed18540c5c75d2ab2ed9f"
+    },
+    {
+      "path": "src/tick_index.rs",
+      "sha256": "4d06d187c2d625dcb1aaf4e022ebea6d6517f4a269cb29a67e1a3f6a16562cd3"
+    },
+    {
+      "path": "src/training_diagnostics.rs",
+      "sha256": "ae2478fa304cc0e3a3522172aad8c6a2a24b473a887783d6ad99adf02c1e2c21"
+    },
+    {
+      "path": "src/training_review.rs",
+      "sha256": "f5c20a633dd956956b54a2b8e228619a1521cc0937b3334bf72f5b18f3d29aba"
+    },
+    {
+      "path": "src/uncertainty.rs",
+      "sha256": "13104823df04a04d03048b1071c98ff49afa8703b35713ffc76f8cd4d7a0caf9"
+    },
+    {
+      "path": "src/validation.rs",
+      "sha256": "ffe2fedebdb7bbceb42d10299fed149cb3b355ce3a4efb34d97478446dc04f33"
+    }
+  ],
+  "git_base_revision": "652ac6a3cefc7a00966764ef344144b1cae034e1",
+  "source_dirty_at_measurement": true,
+  "measurement_script_sha256": "355f5dbe5a8a52c195b0314bf5f327916e8f080d3d4e8b4463dfb0555a732541",
+  "rustc_vv_probe": "rustc 1.100.0 (0ef1bc386 2026-11-09)\nbinary: rustc\ncommit-hash: 0ef1bc386059596dada8fb65b50425aab2ea637a\ncommit-date: 2026-11-09\nhost: x86_64-unknown-linux-gnu\nrelease: 1.100.0\nLLVM version: 23.1.5",
+  "cpu_model": "INTEL(R) XEON(R) PLATINUM 8573C",
+  "cpu_features": "fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 arat avx512vbmi umip waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid cldemote movdiri movdir64b fsrm serialize tsxldtrk avx512_fp16 arch_capabilities",
+  "affinity_cpu_count": 5,
+  "cgroup_cpu_max": "400000 100000",
+  "cgroup_memory_max": "34359738368",
+  "host_mem_available": "MemAvailable:   33825844 kB",
+  "source_inputs_sha256": "70cf6071c3fe2c18953d277e6b1c48c0482d11984338cf3f206c66c3f03dfe13",
+  "executable_sha256": "ad67a8d04702ff44eb11a4d7d7b54f826d60629994ced93418a498397f560d0b",
+  "wall_seconds_whole_benchmark": 15.047494242000539,
+  "user_cpu_seconds": 11.626027,
+  "system_cpu_seconds": 1.438782,
+  "peak_rss_kib_linux": 142332,
+  "filesystem_input_blocks": 0,
+  "filesystem_output_blocks": 609392,
+  "limitations": "Read the benchmark result class: component masks and synthetic replays are different workloads. CPU/RSS/I/O cover this entire child process, excluding compilation, not individual trials. The child report defines which storage/decoding/replay operations were measured; this wrapper supplies no real/full-history acceptance. Source fingerprint v2 covers build.rs, toolchain, Cargo manifests, src and benches; per-file digests are authoritative when the checkout is dirty. The rustc probe describes this measurement environment; compiled compute identity is in the result."
+}

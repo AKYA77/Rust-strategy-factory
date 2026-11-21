@@ -1,0 +1,174 @@
+{
+  "exit_code": 0,
+  "recorded_at_utc": "2026-11-13T13:27:50.498421+00:00",
+  "source_fingerprint_version": 2,
+  "source_manifest": [
+    {
+      "path": "Cargo.lock",
+      "sha256": "40ccd74653a486bd7fe153b48252cb7d122c7ae2a1d88f28d1b41019ff7d21cd"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "b7f0dadb2022055a078d3c595087d0cd01aa9f60ad39f417d11e4c2d3f73c549"
+    },
+    {
+      "path": "benches/compressed.rs",
+      "sha256": "0b288a2e70fc3a90107efe918c887b91e9a924443f07e2b76dabe2b8fb0b83b3"
+    },
+    {
+      "path": "benches/exploration.rs",
+      "sha256": "6161971b8a5ef5fd7cb8cae5ff783cb2c03eff40e1c0f16708e59f170e724132"
+    },
+    {
+      "path": "benches/mask_prefix.rs",
+      "sha256": "b5f595ad8d299941a6d8822ef41df8b6a150aaa7c9b733158186ce108afc71d9"
+    },
+    {
+      "path": "benches/replay.rs",
+      "sha256": "89d83308cd0449a643fbe075be3321aa6d2fe8fc9df5ee91a8ed6802cb50dd72"
+    },
+    {
+      "path": "build.rs",
+      "sha256": "b7a37e3dfac87f934717700b13a16665e7233ef61f7db37384ebe7e5c5e0617f"
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "sha256": "6b1cf8341d9a08d76c6deb1e9df90a0b208d0ef0d00ee05e0173e9cd4f0f425d"
+    },
+    {
+      "path": "src/candles.rs",
+      "sha256": "65a1c8743ddbf52b26418a0fc56aa261bbbdc56299e8aee805f320f7c1d25519"
+    },
+    {
+      "path": "src/compressed.rs",
+      "sha256": "f40cb7055ba513d0d1ed4dc6294b5606278409b27bc19a424c1ca4ae3f998a19"
+    },
+    {
+      "path": "src/contracts.rs",
+      "sha256": "fa758839f646f724f9d1dba79fdfab59cfb785e073b50c7415671dfad07e919a"
+    },
+    {
+      "path": "src/dashboard.rs",
+      "sha256": "bf1c6e8339b38ea94fe4592f46de057e96eddd4014ecd8ffae15d0370b4b24da"
+    },
+    {
+      "path": "src/data.rs",
+      "sha256": "d45098609bec90737e3e8052ac76e6e84febb0e6a50175a0031db4da914d894f"
+    },
+    {
+      "path": "src/diagnostics.rs",
+      "sha256": "b7f88560d541044d2a1df4b506d6f33a66df2001273c2cab96c6a2b7675dbbda"
+    },
+    {
+      "path": "src/exploration.rs",
+      "sha256": "136060adc7f88bb1463586c5537764e235eb427f616671a33873c7cbdd66d99a"
+    },
+    {
+      "path": "src/improvement.rs",
+      "sha256": "4b9661cae06649309bec25ebfbd1200872ede99874bffa9632ce12b3ce95c3c7"
+    },
+    {
+      "path": "src/indicators.rs",
+      "sha256": "b69ee9d6f829263da7bb72a9a934b39f80487a433fc93ad385dd52fb99eb167d"
+    },
+    {
+      "path": "src/lib.rs",
+      "sha256": "13642f961cb6caf88e889ce1e23574057a512c4a66238668e6f0c34c3d54ba1b"
+    },
+    {
+      "path": "src/main.rs",
+      "sha256": "f58049a807e156a5b9c99004a8f2d362fd92ac4118f0d1310d5cc26844fad353"
+    },
+    {
+      "path": "src/native.rs",
+      "sha256": "5cef0810c9efb08f3dfcca58e14ced8756237dc538277651dd0dc3ffe2ce5a2c"
+    },
+    {
+      "path": "src/neighborhood.rs",
+      "sha256": "573763ee2fd9152f834d21342cd1e133fe71bbc8c86950631c011050aac8553e"
+    },
+    {
+      "path": "src/orders.rs",
+      "sha256": "c4ac379cba45b4a36a9b8ce57211a38da5311600140c5f8176a01506360ee11b"
+    },
+    {
+      "path": "src/regimes.rs",
+      "sha256": "6c313c2e38829ba1d6444264fe11fcdd0f93a70f6f1040ffdf1dc2b89060f5ae"
+    },
+    {
+      "path": "src/research.rs",
+      "sha256": "9ae0440d13422814fe0c41678fcc95353ad6625dd5decf25e3a7fe7332ee2545"
+    },
+    {
+      "path": "src/risk.rs",
+      "sha256": "d45a12bb784a823ee86793bae920bd5dc7a0b6eab5ecf483332eb180a116a8d1"
+    },
+    {
+      "path": "src/robustness.rs",
+      "sha256": "41fc84d9f8df97d801b7ee31a250e10883183c8e74fc877de8061da2adde82f7"
+    },
+    {
+      "path": "src/science.rs",
+      "sha256": "5e81fd45377c431852118dfb7bb308f38cded57db90bf640da8a54e121f0f0d1"
+    },
+    {
+      "path": "src/screen.rs",
+      "sha256": "351727d62c148a62acc75df031bdf271c6d364d1aa394632d40c27b0c6d8664c"
+    },
+    {
+      "path": "src/stops.rs",
+      "sha256": "c6ea9066fa4132732b32925a30f0cca8db28c933d11e7461966c53419a06e17b"
+    },
+    {
+      "path": "src/storage.rs",
+      "sha256": "05c9b860f0c0d5027768fc2f712b455af64ba04f3e3ae25cdc64d966675cc8d4"
+    },
+    {
+      "path": "src/strategies.rs",
+      "sha256": "d1998792971eb6bb451f3f304f8c162f758f5ab3eae326bfbf67cabe3efaafee"
+    },
+    {
+      "path": "src/tick_engine.rs",
+      "sha256": "3617d1a53f67368d72828a98adea4630aa9d7022f66d3c94c3e12b812be490b3"
+    },
+    {
+      "path": "src/tick_index.rs",
+      "sha256": "4d06d187c2d625dcb1aaf4e022ebea6d6517f4a269cb29a67e1a3f6a16562cd3"
+    },
+    {
+      "path": "src/training_diagnostics.rs",
+      "sha256": "ae2478fa304cc0e3a3522172aad8c6a2a24b473a887783d6ad99adf02c1e2c21"
+    },
+    {
+      "path": "src/training_review.rs",
+      "sha256": "d46bc3bcdc368e6d40ce6bb6d1a8692b188cdabedbfd16f0817fe6e3c9c0e97a"
+    },
+    {
+      "path": "src/uncertainty.rs",
+      "sha256": "13104823df04a04d03048b1071c98ff49afa8703b35713ffc76f8cd4d7a0caf9"
+    },
+    {
+      "path": "src/validation.rs",
+      "sha256": "ffe2fedebdb7bbceb42d10299fed149cb3b355ce3a4efb34d97478446dc04f33"
+    }
+  ],
+  "git_base_revision": "cd7099a83813fed897fd1de5cc5fdcadb9bfaf8d",
+  "source_dirty_at_measurement": true,
+  "measurement_script_sha256": "c0b72ce769e646aaa3c86f6890464a7c46586a082b5921b88ae24f199f5bd418",
+  "rustc_vv_probe": "rustc 1.100.0 (0ef1bc386 2026-11-09)\nbinary: rustc\ncommit-hash: 0ef1bc386059596dada8fb65b50425aab2ea637a\ncommit-date: 2026-11-09\nhost: x86_64-unknown-linux-gnu\nrelease: 1.100.0\nLLVM version: 23.1.5",
+  "cpu_model": "INTEL(R) XEON(R) PLATINUM 8573C",
+  "cpu_features": "fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 arat avx512vbmi umip waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid cldemote movdiri movdir64b fsrm serialize tsxldtrk avx512_fp16 arch_capabilities",
+  "affinity_cpu_count": 5,
+  "cgroup_cpu_max": "400000 100000",
+  "cgroup_memory_max": "34359738368",
+  "host_mem_available": "MemAvailable:   33874648 kB",
+  "source_inputs_sha256": "69529a5ead42eb5f61cd603f8452c602af58864497cce53a5e7c3cdf052c6e03",
+  "executable_sha256": "226e467091b51571b1d671baca4f96b7283b321868706ec60ccec0a6fa1c5880",
+  "wall_seconds_whole_benchmark": 0.1757582889999867,
+  "user_cpu_seconds": 0.12025599999999999,
+  "system_cpu_seconds": 0.033271999999999996,
+  "peak_rss_kib_linux": 10496,
+  "filesystem_input_blocks": 0,
+  "filesystem_output_blocks": 8312,
+  "limitations": "Read the benchmark result class: component masks and synthetic replays are different workloads. CPU/RSS/I/O cover this entire child process, excluding compilation, not individual trials. No real/full-history or decode/compression measured. Source fingerprint v2 covers build.rs, toolchain, Cargo manifests, src and benches; per-file digests are authoritative when the checkout is dirty. The rustc probe describes this measurement environment; compiled compute identity is in the result."
+}
