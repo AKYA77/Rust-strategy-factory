@@ -1,5 +1,5 @@
 use rust_strategy_factory::{
-    candidate_screen,
+    candidate_screen::{self, AuditCoverage, NetBounds},
     candles::{self, Timeframe},
     contracts::{Profile, Side},
     data::{self, Dataset, Tick},
@@ -316,4 +316,168 @@ fn real_tick_target_before_same_bar_stop_is_a_detected_shadow_false_negative() {
     assert_eq!(audit["shadow_false_negative"], true);
     assert_eq!(audit["shadow_decision"]["selected_for_sampled_audit"], true);
     assert_eq!(audit["candidate_rejected"], false);
+}
+
+#[test]
+fn net_bounds_bracket_the_adverse_resolution() {
+    // Collision: both stop and target are possible in the exit bar, so the
+    // adverse stop proxy is pessimistic and the requested target is optimistic.
+    let ticks = [
+        (0, 99900),
+        (60000, 100000),
+        (120000, 100000),
+        (120001, 100000),
+        (121000, 100350),
+        (122000, 99000),
+        (180000, 99000),
+    ]
+    .into_iter()
+    .enumerate()
+    .map(|(i, (timestamp_ms, bid))| Tick {
+        timestamp_ms,
+        sequence: i as u64,
+        bid,
+        ask: bid + 20,
+    })
+    .collect();
+    let d = data::dataset(
+        Profile::synthetic("EURUSD").unwrap(),
+        ticks,
+        "SYNTHETIC_TEST_ONLY net bounds",
+        "generated".into(),
+        true,
+    )
+    .unwrap();
+    let e = estimate(&d, &strategy(), &Costs::default());
+    let bounds = e.net_bounds.expect("collision estimate resolves one trade");
+    assert_eq!(bounds.closed_trades, 1);
+    assert_eq!(bounds.pessimistic_net_micro_usd, e.estimated_net_micro_usd);
+    assert_eq!(bounds.pessimistic_wins, e.estimated_net_wins);
+    assert!(bounds.pessimistic_net_micro_usd < 0);
+    assert_eq!(bounds.pessimistic_win_rate_bps, Some(0));
+    // Best case assumes the target fills first; it must dominate the adverse proxy.
+    assert!(bounds.optimistic_net_micro_usd > bounds.pessimistic_net_micro_usd);
+    assert_eq!(bounds.optimistic_wins, 1);
+    assert_eq!(bounds.optimistic_win_rate_bps, Some(10000));
+    assert_eq!(
+        bounds,
+        NetBounds {
+            version: "candidate-net-bounds-v1".into(),
+            ..bounds.clone()
+        }
+    );
+}
+
+#[test]
+fn net_bounds_stop_only_resolution_dominates_adverse_proxy() {
+    let d = dataset(99000);
+    let e = estimate(&d, &strategy(), &Costs::default());
+    let bounds = e.net_bounds.expect("stop resolution closes one trade");
+    assert_eq!(bounds.closed_trades, 1);
+    assert!(bounds.pessimistic_net_micro_usd < 0);
+    assert!(bounds.optimistic_net_micro_usd > bounds.pessimistic_net_micro_usd);
+    assert!(bounds.optimistic_net_micro_usd < 0); // even the best case loses
+    assert_eq!(bounds.pessimistic_wins, 0);
+    assert_eq!(bounds.optimistic_wins, 0);
+    assert_eq!(bounds.pessimistic_win_rate_bps, Some(0));
+    assert_eq!(bounds.optimistic_win_rate_bps, Some(0));
+}
+
+#[test]
+fn unresolved_estimate_has_no_net_bounds() {
+    let d = dataset(100000);
+    let e = estimate(&d, &strategy(), &Costs::default());
+    assert_eq!(e.status, "unresolved-partial");
+    assert_eq!(e.estimated_closed_trades, 0);
+    assert_eq!(e.net_bounds, None);
+}
+
+#[test]
+fn bound_proven_failure_uses_optimistic_bound_not_point_estimate() {
+    let costs = Costs::default();
+    let strict = candidate_screen::ShadowPolicy {
+        promote_uncertain: false,
+        minimum_closed_trades: 1,
+        ..Default::default()
+    };
+
+    // Collision: point estimate loses (would_reject) but the optimistic bound
+    // reaches the threshold, so failure is not proven and the candidate stays
+    // uncertain/escalates to tick verification.
+    let ticks = [
+        (0, 99900),
+        (60000, 100000),
+        (120000, 100000),
+        (120001, 100000),
+        (121000, 100350),
+        (122000, 99000),
+        (180000, 99000),
+    ]
+    .into_iter()
+    .enumerate()
+    .map(|(i, (timestamp_ms, bid))| Tick {
+        timestamp_ms,
+        sequence: i as u64,
+        bid,
+        ask: bid + 20,
+    })
+    .collect();
+    let d = data::dataset(
+        Profile::synthetic("EURUSD").unwrap(),
+        ticks,
+        "SYNTHETIC_TEST_ONLY collision",
+        "generated".into(),
+        true,
+    )
+    .unwrap();
+    let e = estimate(&d, &strategy(), &costs);
+    let dec = strict.decision(&e, "collision").unwrap();
+    assert_eq!(dec["would_reject"], true);
+    assert_eq!(dec["bound_proven_failure"], false);
+    assert_eq!(dec["screen_classification"], "ScreenUncertain");
+
+    // Stop-only with an adverse gap: even the optimistic bound misses the threshold.
+    let d = dataset(99000);
+    let e = estimate(&d, &strategy(), &costs);
+    let dec = strict.decision(&e, "gap").unwrap();
+    assert_eq!(dec["would_reject"], true);
+    assert_eq!(dec["bound_proven_failure"], true);
+    assert_eq!(dec["screen_classification"], "ProvenScreenFailure");
+}
+
+#[test]
+fn audit_coverage_aggregates_bound_rejections_and_false_negatives() {
+    let audit = |would_reject, proven, sampled, unresolved, negative| {
+        serde_json::json!({
+            "shadow_decision": {
+                "would_reject": would_reject,
+                "bound_proven_failure": proven,
+                "selected_for_sampled_audit": sampled,
+            },
+            "actual_unresolved": unresolved,
+            "shadow_false_negative": negative,
+        })
+    };
+    let empty: AuditCoverage = candidate_screen::audit_coverage(&[]);
+    assert_eq!(empty.candidates, 0);
+    assert_eq!(empty.bound_rejections, 0);
+    assert_eq!(empty.coverage_bps, 0);
+    assert!(empty.false_negative_rate_bps.is_none());
+
+    let batch = [
+        audit(true, false, true, false, true), // rejected, sampled, audited, false negative
+        audit(true, true, false, false, false), // proven failure, audited, not a false negative
+        audit(false, false, false, false, false), // promoted to tick
+        audit(true, false, false, true, false), // rejected but unresolved: not audited
+    ];
+    let c = candidate_screen::audit_coverage(&batch);
+    assert_eq!(c.candidates, 4);
+    assert_eq!(c.bound_rejections, 3);
+    assert_eq!(c.proven_failures, 1);
+    assert_eq!(c.promoted_to_tick, 1);
+    assert_eq!(c.sampled_for_audit, 1);
+    assert_eq!(c.audited, 2);
+    assert_eq!(c.false_negatives, 1);
+    assert_eq!(c.false_negative_rate_bps, Some(5000));
+    assert_eq!(c.coverage_bps, 2 * 10000 / 3);
 }
