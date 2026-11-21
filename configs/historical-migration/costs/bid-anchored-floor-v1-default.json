@@ -1,0 +1,7 @@
+{
+  "version": "bid-anchored-floor-v1",
+  "spread_floor_pips": 2,
+  "slippage_pips": 2,
+  "commission_micro_usd_per_lot_per_fill": 0,
+  "max_conversion_age_ms": 60000
+}

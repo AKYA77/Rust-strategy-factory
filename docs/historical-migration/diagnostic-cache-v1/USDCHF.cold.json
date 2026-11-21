@@ -1,0 +1,132 @@
+{
+  "instrument": "USDCHF",
+  "identity": "e763051d077e31332c8b9b0398df5a39e6bdab676ba26cabc95b043621f7bfad",
+  "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2",
+  "classification": "diagnostic_simulation",
+  "eligibility": "none",
+  "months": [],
+  "refusals": [
+    {
+      "year": 2025,
+      "month": 1,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2025,
+      "month": 2,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2025,
+      "month": 3,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2025,
+      "month": 4,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2025,
+      "month": 5,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2025,
+      "month": 6,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2025,
+      "month": 7,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2025,
+      "month": 8,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2025,
+      "month": 9,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2025,
+      "month": 10,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2025,
+      "month": 11,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2025,
+      "month": 12,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2026,
+      "month": 1,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2026,
+      "month": 2,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2026,
+      "month": 3,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2026,
+      "month": 4,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2026,
+      "month": 5,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2026,
+      "month": 6,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2026,
+      "month": 7,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2026,
+      "month": 8,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2026,
+      "month": 9,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    },
+    {
+      "year": 2026,
+      "month": 10,
+      "reason": "diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused"
+    }
+  ],
+  "totals": {
+    "months_executed": 0,
+    "months_refused": 22,
+    "trades": 0,
+    "rejections": 0,
+    "initial_micro_usd": 0,
+    "pnl_micro_usd": 0,
+    "maximum_drawdown_micro_usd": 0
+  },
+  "cache_hits": 0,
+  "cache_misses": 22,
+  "limitations": "Diagnostic simulation only. The authoritative sequential engine and frozen financial rules are applied to real structurally-valid literal-USD history using explicit test-convention profiles, so results are not broker-approved execution. No research eligibility, calendar/profile/licensing approval, scientific validity or qualification is granted. Non-USD-quote instruments and eligibility-bearing data classes are refused. Counts and money figures are observations, not performance evidence."
+}

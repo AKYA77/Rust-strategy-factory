@@ -9,7 +9,7 @@ are not counted as integrated into `main`.
 |---|---|---|---|---|
 | Core Rust implementation | 20 | ~87% | ~72% | Engine, corpus, campaign/fleet, checkpoint modules exist and are tested; Codex stack #8–#13 unmerged. |
 | Data ingestion and provenance | 15 | ~90% | ~80% | Legacy Parquet → native conversion with source binding, receipt identity, restart safety; corpus/catalog/audit CLIs. |
-| Multi-instrument historical integration | 15 | ~88% | ~70% | 8/8 instruments converted and registered; real corpus → source facts → candles → causal signals verified on genuine data. Replay/execution remains synthetic literal-USD scoped. |
+| Multi-instrument historical integration | 15 | ~89% | ~71% | 8/8 instruments converted and registered; real corpus → source facts → candles → causal signals verified on genuine data; owner-selected 22-month window explicitly pinned and verified (boundaries/refusals/identity preservation, all 8 instruments). Replay/execution remains synthetic literal-USD scoped. |
 | Engine correctness and verification | 20 | ~82% | ~68% | CI green, adversarial review, regression tests; full unmerged stack not jointly accepted. |
 | Operational usability and recovery | 10 | ~70% | ~55% | Migration/corpus/catalog/audit CLIs and real-data tests; dashboard historical views and live VPS recovery incomplete. |
 | Performance | 5 | ~78% | ~68% | Measured bounded conversion, windowed decode, receipt-only catalog scan, 12-min full-corpus audit. |
@@ -18,20 +18,34 @@ are not counted as integrated into `main`.
 
 ## Accounting
 
-- **Software implementation completeness (Metric A): ~76%.**
-- **Verified end-to-end completion (Metric B): ~63%.**
-- **Progress added this milestone: +3 points.** A genuine VPS-data structural pipeline
-  (corpus → observed source facts → closed M1 candles → causal signals) runs for all eight
-  instruments; a deterministic per-instrument **study report** is now produced; and
-  `historical-corpus-verify-bound` confirmed full source-byte equivalence for **all 421,078,937
-  events** across all eight instruments. The whole-project gap assessment, storage report and
-  Codex compatibility notes are recorded. The gain is bounded because real/FX execution, the
-  merged Codex stack, live VPS acceptance and external approvals did not move.
-- **Remaining: ~38% software, ~38% verified. Target gap to 95%: 19 points software, 33 points
+- **Software implementation completeness (Metric A): ~81%.** (supersedes the ~76% estimate
+  recorded in the PR #22 calendar-pinning milestone; this run's full-corpus diagnostic
+  evidence adds the multi-instrument, engine-correctness and performance measurement rows.)
+- **Verified end-to-end completion (Metric B): ~68%.**
+- **Cached diagnostic full-corpus execution (card t_9623c913):** verified end-to-end for all
+  eight instruments over the owner-selected 22-month pin (2025-01..2026-10) through the
+  unchanged authoritative sequential engine: 110 executed months, 66 refused months, 11,584
+  trades, 694,984 rejections, P&L -1,759,377,176 uUSD, worst-month drawdown 47,783,390 uUSD;
+  cache ratio cold 0 hits / 110+66 misses then warm 110 hits / 66 misses; every instrument's
+  cold and warm reports byte-identical apart from cache counters. Evidence:
+  `scripts/run-diagnostic-execution-cached.py`, configs
+  `configs/historical-migration/{strategies,costs}/*.json`,
+  `docs/historical-migration/diagnostic-cache-v1/`, aggregate receipt
+  `docs/historical-migration/DIAGNOSTIC_EXECUTION_CACHED_RECEIPT.json` (sha256
+  02be66677cd4b719f3e6e5bf34e4d31560dc0e41b92f473cc08e326964ae0ca0).
+- **Progress added this milestone: +0.15 weighted points (each metric).** The owner-selected
+  22-month research window (2025-01..2026-10) is now an explicit, tested calendar pin rather
+  than a count-coincidence default: exact boundaries for all eight instruments, exact
+  out-of-range refusals, and identity preservation versus exact-count registration are
+  verified on the real corpus (+1 implementation / +1 verified point on the 15%-weighted
+  historical-integration row; unchanged at whole-percent granularity). The gain is bounded
+  because this closes a configuration requirement, not a new execution capability: real/FX
+  execution, external approvals and full-corpus diagnostic execution over the pin (next card)
+  did not move.
+- **Remaining: ~35% software, ~28% verified. Target gap to 95: 16 points software, 28 points
   verified.**
 - Baseline used: external provisional estimates (software 74%, verified 60%). The rubric and
   weights are unchanged.
-
 ## Main blockers
 
 1. All four review gates (calendar/profile/legal/scientific) remain pending; no instrument is

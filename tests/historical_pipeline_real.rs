@@ -2,15 +2,13 @@
 //!
 //! Path: verified native corpus → observed source facts → closed M1 candles → causal
 //! signals, for all eight instruments on genuine VPS data. This is structural/diagnostic
-//! only: it does not execute registered research or grant eligibility. Diagnostic replay runs
-//! the unchanged sequential engine over the real structurally-valid corpus; USD-quoted
-//! instruments use the identity conversion and USD-base non-USD-quote instruments use the
-//! explicit direction-based reciprocal diagnostic convention.
+//! only: it does not execute replay or grant eligibility. Corpus replay remains scoped to
+//! synthetic literal-USD inputs; real/FX conversion streams are not integrated.
 
 use rust_strategy_factory::candles::Timeframe;
 use rust_strategy_factory::contracts::Side;
 use rust_strategy_factory::corpus::{self};
-use rust_strategy_factory::historical_corpus::{self, EXPECTED_MONTHS};
+use rust_strategy_factory::historical_corpus::{self, EXPECTED_MONTHS, ResearchWindow};
 use rust_strategy_factory::strategies::{Rule, Strategy};
 use rust_strategy_factory::tick_engine::{CorpusBudget, Costs};
 use std::path::{Path, PathBuf};
@@ -75,8 +73,13 @@ fn real_historical_study_report() {
         eprintln!("skipping real historical study: data absent");
         return;
     }
-    let spec =
-        historical_corpus::register(catalog_root, output, "EURUSD", EXPECTED_MONTHS).unwrap();
+    let spec = historical_corpus::register_research_window(
+        catalog_root,
+        output,
+        "EURUSD",
+        &ResearchWindow::OWNER_SELECTED,
+    )
+    .unwrap();
     let strategy = Strategy {
         timeframe: Timeframe::M1,
         side: Side::Long,
@@ -87,6 +90,14 @@ fn real_historical_study_report() {
     };
     let study = historical_corpus::study(&spec, &strategy, 1_000_000, 1_000_000).unwrap();
     assert_eq!(study.months.len(), EXPECTED_MONTHS);
+    assert_eq!((study.months[0].year, study.months[0].month), (2025, 1));
+    assert_eq!(
+        (
+            study.months[study.months.len() - 1].year,
+            study.months[study.months.len() - 1].month
+        ),
+        (2026, 10)
+    );
     assert_eq!(
         study.events,
         spec.months.iter().map(|month| month.rows).sum::<u64>()
@@ -133,9 +144,36 @@ fn real_historical_diagnostic_execution() {
     let mut identity = 0usize;
     let mut reciprocal = 0usize;
     let mut aggregate = ExecutedAggregate::default();
+    // Bounded per-month sample (2025-10) across every instrument: proves the bridge for all
+    // eight instruments without replaying all 176 months per instrument. Registration uses the
+    // owner-selected 22-month pin, so every instrument must resolve exactly 2025-01..2026-10.
     for instrument in INSTRUMENTS {
-        let spec =
-            historical_corpus::register(catalog_root, output, instrument, EXPECTED_MONTHS).unwrap();
+        let spec = historical_corpus::register_research_window(
+            catalog_root,
+            output,
+            instrument,
+            &ResearchWindow::OWNER_SELECTED,
+        )
+        .unwrap();
+        assert_eq!(spec.months.len(), EXPECTED_MONTHS, "{instrument}");
+        assert_eq!(
+            (spec.months[0].year, spec.months[0].month),
+            (2025, 1),
+            "{instrument}"
+        );
+        assert_eq!(
+            (
+                spec.months[spec.months.len() - 1].year,
+                spec.months[spec.months.len() - 1].month
+            ),
+            (2026, 10),
+            "{instrument}"
+        );
+        assert_eq!(
+            (spec.months[9].year, spec.months[9].month),
+            (2025, 10),
+            "{instrument}: sample index must be the pinned 2025-10 month"
+        );
         let sample = historical_corpus::execute_month(&spec, 9, &strategy, &costs, budget)
             .unwrap_or_else(|e| panic!("{instrument} 2025-10 diagnostic execution failed: {e}"));
         assert_eq!(sample.year, 2025);
@@ -190,6 +228,7 @@ fn real_historical_diagnostic_execution() {
         "aggregate must contain engine rejections"
     );
 }
+
 #[derive(Default)]
 struct ExecutedAggregate {
     trades: usize,
