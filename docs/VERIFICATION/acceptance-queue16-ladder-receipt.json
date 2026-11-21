@@ -1,0 +1,131 @@
+{
+  "class": "LADDER_FULL_ACCEPTANCE_V1",
+  "card": "t_7cbc5f8f",
+  "queue_item": 16,
+  "title": "Full end-to-end acceptance with hardware/resource evidence",
+  "generated_at": "2026-11-21T14:15:47Z",
+  "assignee": "rsf-rust",
+  "branch": "hermes/acceptance-queue16",
+  "source_sha": "553865110b0e9df7a859d025ff6575257468ca18",
+  "source_sha_note": "branch created from origin/main; no source changes — acceptance-only card",
+  "tree_clean_at_run": true,
+  "toolchain": {
+    "cargo": "1.100.0 (3acc79c0c 2026-11-05)",
+    "rustc": "1.100.0 (0ef1bc386 2026-11-09)",
+    "cargo_home": "/workspace/.cargo",
+    "rustup_home": "/workspace/.rustup",
+    "target_dir": "/root/workspace/Rust-strategy-factory/target (shared, CARGO_TARGET_DIR)"
+  },
+  "protocol": {
+    "flock": "/root/workspace/.rsf-heavy.lock -w 3600 (exclusive, every cargo invocation)",
+    "clean_before_verify": "cargo clean -p rust-strategy-factory under flock before first verification build",
+    "flags": "--locked; clippy --all-targets -D warnings; fmt --all --check"
+  },
+  "release_binary": {
+    "path": "/root/workspace/Rust-strategy-factory/target/release/rust-strategy-factory",
+    "sha256": "7b15f62e62ecd0bb8e5385c29935bf8d92816a951d0b08c2e0e8c4e267791f6b",
+    "compute_revision": "compute-blake3:d0c81f0c25f02a96ddc39c2b7c50cc7fd53db544692eb6f4a190b58b82c9b8f2",
+    "engine": "ordered-l1-v6-frozen-atr-stops",
+    "software_status": "SOFTWARE_INCOMPLETE"
+  },
+  "tests": {
+    "command": "cargo test --locked --lib --bins --tests",
+    "binaries": 54,
+    "passed": 563,
+    "failed": 0,
+    "ignored": 0,
+    "all_ok": true,
+    "lib_tests": 181,
+    "main_tests": 0,
+    "integration_binaries": 52,
+    "integration_passed": 382
+  },
+  "doc_tests": {
+    "command": "cargo test --locked --doc",
+    "passed": 2,
+    "failed": 0
+  },
+  "check_data_compute_identity": {
+    "command": "python3 scripts/check-data-compute-identity.py work/data-compute-identity.json",
+    "checks": 31,
+    "all_original_bytes_and_identity_restored": true,
+    "evidence": "work/data-compute-identity.json (gitignored scratch, retained locally)"
+  },
+  "check_operations": {
+    "command": "python3 scripts/check-operations.py --release /root/workspace/Rust-strategy-factory/target/release/rust-strategy-factory",
+    "passed": [
+      "install", "repeat install", "update", "rollback", "explicit activation", "checksum tamper refusal",
+      "preserved configuration", "native verified backup", "new-path restore", "no-overwrite",
+      "invalid registry refusal", "unrelated activation file preservation",
+      "actual large receipt artifact backup/restore", "artifact collision/corruption refusal"
+    ],
+    "live_systemd_and_vps_execution": "NOT_RUN",
+    "evidence": "work/ (scratch)"
+  },
+  "check_full_horizon": {
+    "command": "python3 scripts/check-full-horizon.py --binary target/release/rust-strategy-factory --output work/full-horizon-context.json",
+    "class": "SYNTHETIC_CONTINUOUS_UTC_HORIZON_ONLY",
+    "quotes": 1051200,
+    "artifacts": 33,
+    "aggregate_closed_candles": 1389183,
+    "declared_candle_ceiling": 2000000,
+    "exact_receipts": true,
+    "per_role_observations_wall_ms_peak_rss_kib": [
+      {"role": "inventory", "elapsed_ms": 2972.23, "peak_pipeline_child_rss_kib": 17664},
+      {"role": "source-facts", "elapsed_ms": 600.78, "peak_pipeline_child_rss_kib": 17664},
+      {"role": "aggregate-refusal", "elapsed_ms": 3096.88, "peak_pipeline_child_rss_kib": 146412},
+      {"role": "scalar", "elapsed_ms": 3683.91, "peak_pipeline_child_rss_kib": 171160},
+      {"role": "resumed", "elapsed_ms": 4863.80, "peak_pipeline_child_rss_kib": 183608},
+      {"role": "cached", "elapsed_ms": 650.19, "peak_pipeline_child_rss_kib": 17792}
+    ],
+    "evidence": "work/full-horizon-context.json (gitignored scratch, retained locally)"
+  },
+  "browser_acceptance": {
+    "command": "npm run test:browser (13 Chromium suites)",
+    "suites": 13,
+    "passed": 13,
+    "failed": 0,
+    "exit_code": 0,
+    "suites_list": [
+      "browser-check.cjs", "browser-review-check.cjs", "browser-corpus-check.cjs",
+      "browser-ledger-check.cjs", "browser-trades-check.cjs", "browser-search-check.cjs",
+      "browser-fleet-check.cjs", "browser-recovery-check.cjs", "browser-campaign-check.cjs",
+      "browser-rotation-check.cjs", "browser-history-check.cjs", "browser-long-ledger-check.cjs",
+      "browser-operations-check.cjs"
+    ]
+  },
+  "hardware_resource_evidence": {
+    "note": "Scoped Linux child-process observations (peak RSS via ru_maxrss, user/system CPU via rusage, wall clock), not production guarantees. Synthetic workloads only.",
+    "measure_py_observations": [
+      {"workload": "candidate_screen", "wall_seconds": 1.70, "user_cpu_seconds": 1.69, "system_cpu_seconds": 0.01, "peak_rss_kib": 16512},
+      {"workload": "indexed_replay", "wall_seconds": 12.33, "user_cpu_seconds": 12.28, "system_cpu_seconds": 0.05, "peak_rss_kib": 44028},
+      {"workload": "replay", "wall_seconds": 1.04, "user_cpu_seconds": 1.81, "system_cpu_seconds": 0.05, "peak_rss_kib": 22588},
+      {"workload": "batch", "wall_seconds": 19.37, "user_cpu_seconds": 13.32, "system_cpu_seconds": 1.84, "peak_rss_kib": 144124}
+    ],
+    "full_horizon_observations": "see check_full_horizon.per_role_observations_wall_ms_peak_rss_kib"
+  },
+  "recovery_acceptance": {
+    "backup_restore_round_trip": ["tests/recovery.rs::actual_cli_backup_verify_restore_and_path_keep_primary_inactive_and_private", "tests/storage.rs::restart_backup_and_restore_preserve_committed_wal_and_results", "tests/research.rs::backup_restores_cursor_and_controls_with_fenced_lease_recovery"],
+    "crash_recovery_injection_points": [
+      "tests/import_job.rs::actual_sigkill_after_checkpoint_initialization_recovers_the_exact_source",
+      "tests/import_job.rs::crash_window_orphan_is_reused_exactly_and_conflicts_or_missing_artifacts_refuse",
+      "tests/import_job.rs::checkpoint_corruption_and_unrelated_ledger_are_preserved_and_refused",
+      "tests/corpus.rs::killed_corpus_process_waiting_for_writer_preserves_committed_checkpoint",
+      "tests/corpus.rs::killed_search_process_waiting_for_writer_preserves_generated_queue_and_checkpoints",
+      "tests/corpus.rs::batch_cli_sigterm_finishes_one_bounded_round_and_remains_resumable",
+      "tests/corpus.rs::generated_search_sigterm_exits_at_a_round_boundary_and_restarts",
+      "tests/corpus.rs::foreground_supervision_sigterm_reaps_its_foreground_session_at_wait_boundary"
+    ],
+    "sigint_sigterm_graceful_shutdown": [
+      "tests/research_cli.rs::signals_release_the_coordinator_and_restart_running_or_paused_state_immediately",
+      "tests/corpus.rs::foreground_supervision_sigterm_interrupts_wait_without_fabricating_progress",
+      "tests/corpus.rs::rotation_wait_operator_and_sigterm_intervention_leave_retries_held"
+    ],
+    "all_passed": true
+  },
+  "scope_and_boundaries": {
+    "data_class": "synthetic literal-USD and REAL_STRUCTURALLY_VALID converted corpus only; no market-data changes, no live trading, no real/protected/non-USD execution",
+    "diagnostic_boundary": "diagnostic_simulation/none results never registered, never research evidence; Registered gate unchanged",
+    "gates": "calendar/profile/legal/scientific gates remain pending; 0 instruments research-eligible"
+  }
+}
