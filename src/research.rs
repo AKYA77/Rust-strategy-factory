@@ -634,6 +634,9 @@ pub struct BatchReport {
     pub shared_feature_builds: usize,
     pub shared_cache_hits: usize,
     pub shared_index_initialized: bool,
+    /// Aggregate screened-candidate audit coverage across the batch: bound
+    /// rejections, proven failures, sampled audits, false negatives.
+    pub audit_coverage: crate::candidate_screen::AuditCoverage,
 }
 pub fn evaluate_batch(
     registry: &mut Registry,
@@ -722,6 +725,11 @@ pub fn evaluate_batch_report(
             }),
         )?);
     }
+    let audits: Vec<serde_json::Value> = results
+        .iter()
+        .filter_map(|e| e.result.get("candidate_screen_audit").cloned())
+        .collect();
+    let audit_coverage = crate::candidate_screen::audit_coverage(&audits);
     Ok(BatchReport {
         executions: results,
         primary_candles: c.len(),
@@ -729,6 +737,7 @@ pub fn evaluate_batch_report(
         shared_feature_builds: features.feature_builds,
         shared_cache_hits: features.cache_hits,
         shared_index_initialized: indexed.as_ref().is_some_and(|cell| cell.get().is_some()),
+        audit_coverage,
     })
 }
 /// Bounded novel parameter regions; no cycling through already completed template ranges.
