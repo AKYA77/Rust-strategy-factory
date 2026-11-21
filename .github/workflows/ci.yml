@@ -10,8 +10,9 @@ env:
   CARGO_INCREMENTAL: "0"
   CARGO_PROFILE_DEV_DEBUG: "0"
   CARGO_PROFILE_TEST_DEBUG: "0"
-# Four PARALLEL jobs (admin lever 2026-11-20): wall time = max(jobs), not sum.
-# Every previous stage/assertion is preserved; ALL four jobs are required for merge
+# Six PARALLEL jobs (admin lever 2026-11-21): wall time = max(jobs), not sum.
+# Release jobs only run on push to main to save CI minutes on PRs.
+# Every previous stage/assertion is preserved; ALL six jobs are required for merge
 # (branch protection required status checks + QA verifies the full rollup on the exact SHA).
 # dependency-audit runs cargo-deny (licenses/bans/sources/advisories per deny.toml) plus
 # cargo-audit (RustSec) as a parallel stage. Documented advisory ignores carry reasons in
@@ -30,7 +31,7 @@ jobs:
         run: rustup show
       - name: Cache cargo registry and target artifacts
         uses: Swatinem/rust-cache@v2
-      - run: sh scripts/check.sh
+      - run: cargo test --locked --lib --bins --tests
       - name: Verify trusted inventory cannot deserialize supplied JSON
         run: cargo test --locked --doc
   browser:
@@ -50,9 +51,22 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: cargo build --locked
       - run: npm run test:browser
-  release-acceptance:
-    name: release-acceptance
+  release-build:
+    name: release-build
     runs-on: ubuntu-24.04
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned toolchain
+        run: rustup show
+      - name: Cache cargo registry and target artifacts
+        uses: Swatinem/rust-cache@v2
+      - run: cargo build --locked --release
+
+  data-compute-identity:
+    name: data-compute-identity
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
       - name: Install pinned toolchain
@@ -64,8 +78,31 @@ jobs:
         run: |
           mkdir -p work
           python3 scripts/check-data-compute-identity.py work/data-compute-identity.json
-      - run: cargo build --locked --release
+
+  check-operations:
+    name: check-operations
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned toolchain
+        run: rustup show
+      - name: Cache cargo registry and target artifacts
+        uses: Swatinem/rust-cache@v2
+      - run: cargo build --locked
       - run: python3 scripts/check-operations.py
+
+  full-horizon:
+    name: full-horizon
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned toolchain
+        run: rustup show
+      - name: Cache cargo registry and target artifacts
+        uses: Swatinem/rust-cache@v2
+      - run: cargo build --locked --release
       - name: Verify continuous UTC horizon and declared context ceiling
         run: python3 scripts/check-full-horizon.py --binary target/release/rust-strategy-factory --output work/full-horizon-context.json
 

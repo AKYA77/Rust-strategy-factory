@@ -210,10 +210,16 @@
     "pr24_sha": "d4a432508a406c1fd5945fb0d926487136493699",
     "pr24_conclusion": "success",
     "current_main_ci": {
-      "run_id": 44915269257,
-      "sha": "dcc12f7e16f2192ec11759834091d618393f0ae5",
+      "sha": "52ce73e1913c9fe421fd4099e0b45c43bc7c9f26",
       "status": "completed",
-      "conclusion": "success"
+      "conclusion": "success",
+      "note": "All four required hosted-CI jobs green on origin/main == local main 52ce73e (merge of PR #37 qualification-receipt-evidence), verified via gh check-runs on the exact SHA 2026-11-21 between 17:04 and 17:18 UTC: dependency-audit run 136918280252 (cargo-deny 0.22.0 + cargo-audit 0.23.0; advisories/licenses/bans/sources exit 0), rust-checks run 136918280140 (scripts/check.sh: fmt, clippy --all-targets -D warnings, 529 Rust tests 0 failed, plus doc tests), browser run 136918280107 (Chromium acceptance suites), release-acceptance run 136918279878 (cargo build --release, check-data-compute-identity, check-operations, check-full-horizon).",
+      "jobs": [
+        {"name": "dependency-audit", "run_id": 136918280252, "conclusion": "success", "completed_at": "2026-11-21T17:04:42Z"},
+        {"name": "rust-checks", "run_id": 136918280140, "conclusion": "success", "completed_at": "2026-11-21T17:07:47Z"},
+        {"name": "browser", "run_id": 136918280107, "conclusion": "success", "completed_at": "2026-11-21T17:08:07Z"},
+        {"name": "release-acceptance", "run_id": 136918279878, "conclusion": "success", "completed_at": "2026-11-21T17:18:51Z"}
+      ]
     }
   },
   "historical_acceptance": "FULL_HISTORICAL_DATA_PENDING",
