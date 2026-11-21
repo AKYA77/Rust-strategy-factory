@@ -43,6 +43,8 @@ struct File {
     coordinator_lease_ms: i64,
     #[serde(default)]
     resource_guard: Option<crate::resource::Guard>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cpu_guard: Option<crate::resource::CpuGuard>,
     #[serde(default)]
     disk_guard: Option<crate::disk::Guard>,
 }
@@ -53,6 +55,8 @@ struct Definition {
     campaigns: Vec<Member>,
     coordinator_lease_ms: i64,
     resource_guard: Option<crate::resource::Guard>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cpu_guard: Option<crate::resource::CpuGuard>,
     disk_guard: Option<crate::disk::Guard>,
 }
 #[derive(Serialize, Deserialize)]
@@ -113,6 +117,9 @@ fn validate_definition(d: &Definition) -> Result<()> {
     if let Some(g) = &d.resource_guard {
         g.validate()?;
     }
+    if let Some(g) = &d.cpu_guard {
+        g.validate()?;
+    }
     if let Some(g) = &d.disk_guard {
         g.validate()?;
     }
@@ -137,6 +144,7 @@ pub fn register_file(path: &Path, database: &Path) -> Result<String> {
         campaigns: file.campaigns,
         coordinator_lease_ms: file.coordinator_lease_ms,
         resource_guard: file.resource_guard,
+        cpu_guard: file.cpu_guard,
         disk_guard: file.disk_guard,
     };
     validate_definition(&definition)?;
@@ -575,9 +583,18 @@ pub fn step(
         .as_ref()
         .map(|g| g.check())
         .transpose()?;
-    if disk.as_ref().is_some_and(|d| !d.allowed) || resource.as_ref().is_some_and(|d| !d.allowed) {
+    let cpu = s
+        .definition
+        .cpu_guard
+        .as_ref()
+        .map(|g| g.check())
+        .transpose()?;
+    if disk.as_ref().is_some_and(|d| !d.allowed)
+        || resource.as_ref().is_some_and(|d| !d.allowed)
+        || cpu.as_ref().is_some_and(|d| !d.allowed)
+    {
         return Ok(
-            serde_json::json!({"kind":"pressure","disk_admission":disk,"resource_admission":resource,"status":status(&registry,id)?}),
+            serde_json::json!({"kind":"pressure","disk_admission":disk,"resource_admission":resource,"cpu_admission":cpu,"status":status(&registry,id)?}),
         );
     }
     let Some(lease) = crate::coordinator::claim(
@@ -943,6 +960,7 @@ mod tests {
             ],
             coordinator_lease_ms: 60000,
             resource_guard: None,
+            cpu_guard: None,
             disk_guard: None,
         };
         let id = data::hash(&definition).unwrap();

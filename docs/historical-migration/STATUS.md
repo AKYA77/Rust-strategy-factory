@@ -3,6 +3,51 @@
 Checkpoint for the next Hermes conversation. This file is branch-specific and is not a
 shared progress file.
 
+## Branch checkpoint — `hermes/scheduler-resource-controls` (rsf-rust2, 2026-11-20)
+
+- Worktree `/root/workspace/rsf-wt-rust2`, branched from `origin/main` @ `ee5d08a`.
+- Implemented (queue item 10, scheduler/resource controls):
+  - `src/resource.rs`: `HostCpu`/`observe_host_cpu` (strict aggregate /proc/stat parsing,
+    checked busy/total sums), `HostCpuWindow` monotonic deltas, `ThreadCpu`/
+    `observe_thread_cpu`/`named_worker_threads` (per-thread /proc/self/task counters,
+    double-read identity, bounded enumeration), `AllocationSample`/`AllocationWindow`
+    (exact per-worker native-tick deltas and tick-ratio shares; vanished, identity-changed,
+    regressed or unobserved workers stay unknown; shares never equalised; window brackets
+    first/last samples that saw live workers), bounded `spawn_sampler`, and `CpuGuard`
+    sampled host-busy-share admission (exact u128 cross-products, fail-closed on empty or
+    regressed windows).
+  - `src/worker_selection.rs`: pure deterministic bounded adaptive policy — mandatory dead
+    band between exact-ratio up/down thresholds, hysteresis streaks, floor >= 1, caps at
+    min(policy maximum, declared workers, observed parallelism on upscale); unknown/empty
+    observations hold and never upscale; memory pressure floors. Tests prove no oscillation
+    under alternating windows and no starvation under sustained pressure.
+  - `src/os_enforcement.rs`: unit-template parsing (MemoryMax/CPUQuota/TasksMax/LimitNOFILE)
+    versus this process's actual cgroup-v2 cpu.max/memory.max/pids.max and open-file rlimit;
+    verdicts enforced/weaker-than-declared/declared-only/not-declared/unknown; v1 or
+    unreadable state is unknown; `enforced` requires a readable finite kernel limit at or
+    below the declaration and is still not observed throttling. `cpu.stat` throttle counters
+    parse with monotonic deltas.
+  - Admission wiring: optional `cpu_guard` refuses BEFORE coordinator claims in
+    `corpus_fleet` (definition-level and per-source), `corpus_campaign` and
+    `campaign_rotation`, before owned-child spawn in `owned_process`, and pauses the
+    research `Driver` before experiment registration. All new schema fields are opt-in and
+    skip serialization when absent, preserving legacy identity bytes (existing legacy-byte
+    tests unchanged and passing).
+  - `corpus-batch` accepts optional `worker_policy`; each round samples live `corpus-`
+    worker threads, records measured allocation + selection evidence, and adapts the next
+    round's worker count within declared caps. Integration test proves complete receipt
+    hashes are identical between fixed-1-worker and adaptive 4→1 runs.
+  - CLI: `resource-enforcement <unit-file>`, `resource-allocation <prefix> <window-ms>`.
+- Honest OS-enforcement finding on this VPS: the gateway cgroup exposes controllers
+  `memory pids` only (no cpu.max) and `memory.max=max`; the deploy templates' CPUQuota=300%
+  and MemoryMax=6G are therefore declared-only for this process, not enforced.
+- Verification: CI-first protocol — local fmt/clippy/targeted tests under the shared heavy
+  lock with provenance receipts, then hosted CI full ladder on the exact PR SHA; full local
+  check.sh at the acceptance milestone. Counts/CI recorded in PROJECT_STATE.json after the
+  runs conclude.
+- No edits to src/tick_engine.rs, src/historical_corpus.rs or src/storage.rs. No market-data
+  changes, no eligibility/qualification claims, no hard-enforcement claims.
+
 ## Recovered state
 
 - Repository: `/root/workspace/Rust-strategy-factory`, branch `hermes/real-data-migration`.

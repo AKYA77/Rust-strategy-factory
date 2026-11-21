@@ -670,6 +670,38 @@ closed with their commits verified as ancestors of `main`; no branch was force-p
 Hosted CI on `main` is verified on the merge commit. The converted legacy corpus remains
 REAL_STRUCTURALLY_VALID only and is not qualification evidence.
 
+## Scheduler/resource controls — measured allocation, adaptive selection, OS-enforcement evidence (branch `hermes/scheduler-resource-controls`, 2026-11-20)
+
+Queue item 10's measured-CPU-allocation/adaptive-worker-selection/OS-enforcement remainder is
+implemented on this branch from `main` @ `ee5d08a`. Acceptance boundaries:
+
+- CPU allocation is measured, not assumed: per-thread `/proc/self/task` user+system tick deltas
+  over sampled windows, exact tick-ratio shares of host total/busy, identity and monotonicity
+  checks, and explicit unknown for vanished/changed/regressed/unobserved workers. No
+  tick-to-time conversion, no equalisation, no cgroup-aggregate claim.
+- Adaptive worker selection is a pure bounded deterministic policy: mandatory dead band,
+  hysteresis streaks (tests prove no oscillation under alternating windows), floor >= 1 (no
+  starvation under sustained pressure), caps at min(policy maximum, declared workers, observed
+  parallelism on upscale); unknown/empty observations hold and never upscale. Declared caps
+  remain declared caps, not OS guarantees.
+- OS-enforcement evidence is reproducible (`resource-enforcement <unit-file>`): unit declarations
+  are compared with this process's actual cgroup-v2 cpu.max/memory.max/pids.max and open-file
+  rlimit. Verdicts: enforced (readable finite kernel limit at or below the declaration),
+  weaker-than-declared, declared-only, not-declared, unknown (v1/unreadable). `enforced` describes
+  the configured kernel limit, not observed throttling. Measured on this VPS: the gateway cgroup
+  has controllers `memory pids` only and memory.max=max, so the research template's CPUQuota=300%
+  and MemoryMax=6G are declared-only for this process — no hard cgroup enforcement is claimed.
+- Admission ordering is preserved and tested: disk -> RSS/memory -> sampled CPU share ->
+  coordinator claim, in fleets (definition and per-source), campaigns and rotations; owned
+  children refuse before spawn; the research Driver pauses before experiment registration.
+  Refusal tests assert zero lease attempts/tokens/visits.
+- All new operator/definition/config fields are opt-in and skip serialization when absent;
+  legacy identity-byte tests pass unchanged. `corpus-batch` adaptive runs preserve complete
+  receipt hashes versus fixed-worker runs (integration test).
+- No financial contract, provenance rule, scientific safeguard or eligibility boundary changed;
+  no market-data changes; synthetic fixtures only. Verification follows the CI-first protocol:
+  local fmt/clippy/targeted tests with provenance receipts under the shared heavy lock, hosted
+  CI full ladder on the exact PR SHA, and a full local check.sh at the acceptance milestone.
 ## Owner-selected 22-month research window pin (2026-11-19, hermes/research-22m-window)
 
 The owner-selected research period (owner decision 2026-11-19) is now an explicit calendar pin:
