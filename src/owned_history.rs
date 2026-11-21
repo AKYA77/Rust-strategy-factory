@@ -1,6 +1,6 @@
 //! Bounded observations of the parent invocation. Stored PIDs never grant process ownership.
 use crate::{Result, data, owned_process::Limits, storage::Registry};
-use rusqlite::{Connection, TransactionBehavior, params};
+use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 #[derive(Clone)]
 pub struct Owner {
@@ -36,9 +36,7 @@ fn time(n: i64) -> bool {
     chrono::DateTime::from_timestamp_millis(n).is_some()
 }
 pub(crate) fn initialize(c: &mut Connection, migrate: bool) -> Result<()> {
-    let tx = c
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx_open(c).map_err(|e| e.to_string())?;
     tx.execute_batch("CREATE TABLE IF NOT EXISTS corpus_owned_invocations(id TEXT PRIMARY KEY,search_id TEXT NOT NULL REFERENCES corpus_searches(id),token TEXT,body TEXT NOT NULL CHECK(length(CAST(body AS BLOB))<=8192),hash TEXT NOT NULL CHECK(length(hash)=64));CREATE TRIGGER IF NOT EXISTS owned_invocation_no_delete BEFORE DELETE ON corpus_owned_invocations BEGIN SELECT RAISE(ABORT,'owned invocation retained');END;CREATE TRIGGER IF NOT EXISTS owned_invocation_identity BEFORE UPDATE OF id,search_id ON corpus_owned_invocations BEGIN SELECT RAISE(ABORT,'owned identity immutable');END;CREATE TRIGGER IF NOT EXISTS owned_invocation_terminal BEFORE UPDATE ON corpus_owned_invocations WHEN json_extract(OLD.body,'$.finished_at_ms') IS NOT NULL BEGIN SELECT RAISE(ABORT,'owned terminal immutable');END;").map_err(|e|e.to_string())?;
     tx.execute_batch("CREATE INDEX IF NOT EXISTS owned_unclosed_owners ON corpus_owned_invocations(id) WHERE token IS NOT NULL;").map_err(|e|e.to_string())?;
     if migrate {
@@ -116,10 +114,7 @@ pub fn start(
     {
         return Err("invalid owned metadata admission".into());
     }
-    let tx = reg
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx_supervised(&reg.connection)?;
     crate::search_control::read(&tx, source)?;
     let n: usize = tx
         .query_row("SELECT count(*) FROM (SELECT id FROM corpus_owned_invocations WHERE token IS NOT NULL LIMIT 128)", [], |r| {
@@ -168,10 +163,7 @@ pub fn start(
     Ok(Owner { id, token })
 }
 pub fn attach(reg: &mut Registry, owner: &Owner, pid: u32) -> Result<()> {
-    let tx = reg
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx_supervised(&reg.connection)?;
     let (mut b, token, _) = read(&tx, &owner.id)?;
     if token.as_deref() != Some(&owner.token) || b.child_pid.is_some() || pid == 0 {
         return Err("owned child attachment fenced".into());
@@ -186,10 +178,7 @@ pub fn observe_resources(
     observation: &crate::resource::ProcessObservation,
 ) -> Result<()> {
     observation.validate()?;
-    let tx = reg
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx_supervised(&reg.connection)?;
     let (mut b, token, _) = read(&tx, &owner.id)?;
     if token.as_deref() != Some(&owner.token)
         || b.child_pid.is_none()
@@ -244,10 +233,7 @@ pub fn finish(
     owner: &Owner,
     report: &serde_json::Value,
 ) -> Result<serde_json::Value> {
-    let tx = reg
-        .connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
+    let tx = crate::storage::writer_tx_supervised(&reg.connection)?;
     let (mut b, token, _) = read(&tx, &owner.id)?;
     if token.as_deref() != Some(&owner.token) {
         return Err("owned terminal owner fenced".into());

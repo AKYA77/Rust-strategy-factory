@@ -7,7 +7,7 @@ use crate::{
     strategies::{self, EntryPlan, Features, Rule, Strategy},
     tick_engine::{self, Costs},
 };
-use rusqlite::{OptionalExtension, TransactionBehavior, params};
+use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -924,13 +924,16 @@ pub fn control(registry: &Registry, id: &str, state: &str) -> Result<()> {
     if !["running", "paused", "stopped"].contains(&state) {
         return Err("invalid research control state".into());
     }
-    let n = registry
-        .connection
-        .execute(
-            "UPDATE research_runs SET state=?2 WHERE id=?1",
-            params![id, state],
-        )
-        .map_err(|e| e.to_string())?;
+    let n = {
+        let _guard = crate::storage::writer_guard(&registry.connection)?;
+        registry
+            .connection
+            .execute(
+                "UPDATE research_runs SET state=?2 WHERE id=?1",
+                params![id, state],
+            )
+            .map_err(|e| e.to_string())?
+    };
     if n != 1 {
         return Err("unknown research run".into());
     }
@@ -1046,13 +1049,16 @@ impl Driver {
                 .map_err(|e| e.to_string())?;
         let id = data::hash(&configuration)?;
         let registry = Registry::open(path)?;
-        registry
-            .connection
-            .execute(
-                "INSERT OR IGNORE INTO research_runs(id,configuration) VALUES (?1,?2)",
-                params![id, configuration],
-            )
-            .map_err(|e| e.to_string())?;
+        {
+            let _guard = crate::storage::writer_guard(&registry.connection)?;
+            registry
+                .connection
+                .execute(
+                    "INSERT OR IGNORE INTO research_runs(id,configuration) VALUES (?1,?2)",
+                    params![id, configuration],
+                )
+                .map_err(|e| e.to_string())?;
+        }
         let old: String = registry
             .connection
             .query_row(
@@ -1077,11 +1083,7 @@ impl Driver {
         let expires = now
             .checked_add(self.config.lease_ms)
             .ok_or("lease overflow")?;
-        let tx = self
-            .registry
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(|e| e.to_string())?;
+        let tx = crate::storage::writer_tx(&self.registry.connection)?;
         let token: String = tx
             .query_row("SELECT lower(hex(randomblob(32)))", [], |r| r.get(0))
             .map_err(|e| e.to_string())?;
@@ -1095,6 +1097,7 @@ impl Driver {
     }
     pub fn release(&mut self) -> Result<()> {
         if let Some(token) = self.token.take() {
+            let _guard = crate::storage::writer_guard(&self.registry.connection)?;
             self.registry.connection.execute("UPDATE research_runs SET token=NULL,expires_ms=NULL,active=0 WHERE id=?1 AND token=?2",params![self.id,token]).map_err(|e|e.to_string())?;
         }
         Ok(())
@@ -1114,7 +1117,10 @@ impl Driver {
         let expires = now
             .checked_add(self.config.lease_ms)
             .ok_or("lease overflow")?;
-        let n=self.registry.connection.execute("UPDATE research_runs SET expires_ms=?3,active=?4 WHERE id=?1 AND token=?2 AND expires_ms>?5",params![self.id,token,expires,i64::from(s.state=="running" && (s.cursor<limit || pending.is_some())),now]).map_err(|e|e.to_string())?;
+        let n = {
+            let _guard = crate::storage::writer_guard(&self.registry.connection)?;
+            self.registry.connection.execute("UPDATE research_runs SET expires_ms=?3,active=?4 WHERE id=?1 AND token=?2 AND expires_ms>?5",params![self.id,token,expires,i64::from(s.state=="running" && (s.cursor<limit || pending.is_some())),now]).map_err(|e|e.to_string())?
+        };
         if n != 1 {
             return Err("coordinator lease expired or fenced".into());
         }
@@ -1122,6 +1128,7 @@ impl Driver {
             return Ok(false);
         }
         if let Err(error) = check_state_budget(&self.registry, self.config.state_budget_bytes) {
+            let _guard = crate::storage::writer_guard(&self.registry.connection)?;
             self.registry.connection.execute("UPDATE research_runs SET state='paused',active=0,last_error=?3 WHERE id=?1 AND token=?2",params![self.id,token,error]).map_err(|e|e.to_string())?;
             return Ok(false);
         }
@@ -1198,11 +1205,7 @@ impl Driver {
                     .map_err(|_| "elapsed time overflow")?,
             )
             .ok_or("checkpoint time overflow")?;
-        let tx = self
-            .registry
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(|e| e.to_string())?;
+        let tx = crate::storage::writer_tx(&self.registry.connection)?;
         let n=tx.execute("UPDATE research_runs SET cursor=cursor+1,active=0,executed=executed+?4,reused=reused+?5,rejected=rejected+?6,failed=failed+?7,latest=?8,last_error=?9 WHERE id=?1 AND token=?2 AND expires_ms>?3 AND cursor=?10",params![self.id,token,finished,i64::from(!reused && outcome=="completed"),i64::from(reused),i64::from(!reused && outcome=="rejected"),i64::from(!reused && outcome=="failed"),id,error,s.cursor as i64]).map_err(|e|e.to_string())?;
         if n != 1 {
             return Err(
@@ -1281,11 +1284,7 @@ impl Driver {
                     .map_err(|_| "elapsed time overflow")?,
             )
             .ok_or("checkpoint time overflow")?;
-        let tx = self
-            .registry
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(|e| e.to_string())?;
+        let tx = crate::storage::writer_tx(&self.registry.connection)?;
         let n=tx.execute("UPDATE research_runs SET active=0,last_error=?4,state=CASE WHEN ?5 THEN 'paused' ELSE state END WHERE id=?1 AND token=?2 AND expires_ms>?3",params![self.id,token,finished,error,pressure]).map_err(|e|e.to_string())?;
         if n != 1 {
             return Err(

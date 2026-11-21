@@ -4,6 +4,44 @@ Status: SOFTWARE_INCOMPLETE. Use the existing checkout. Read AGENTS.md, PROJECT_
 
 ## Latest verified local milestone
 
+Branch `hermes/dashboard-activation-panels` (implementation `de6724f`, spawn-diagnostics fix
+`d4a4325`, this docs reconciliation; PR #24) closes the authenticated dashboard's remaining
+operational gaps from queue item 14: an optional `--operations` serve configuration exposes the
+bounded import/coverage activation lifecycle (inventory/detail re-verify every published chunk;
+explicit activation confirms expected archive hash/event count and registers a local catalog
+observation only — declared class is never approval; explicit refusal retains self-hashed
+append-only decision receipts; corrupt history/tampered chunks refuse without deleting evidence),
+bounded coverage reports, request-time registry integrity audit, exact peak-RSS/CPU-tick resource
+observations and exact owned-visit/member CPU-tick cost charts with measured/unmeasured separation.
+All surfaces stay behind existing host/origin/session/CSRF guards plus a 60/min operations bucket
+and one blocking-work slot; the only non-dashboard source change is 42 lines of serve --operations
+CLI wiring in src/main.rs. Pre-push CI-first verification (one flock hold: clean -p, fmt --check,
+clippy --all-targets -D warnings, 159 lib/bin unit tests incl. 11 new operations tests, explicit
+bin build + --operations provenance gate, four touched Chromium suites) is receipted with binary
+sha256/source SHA. Hosted CI on the exact head `d4a4325` concluded green (PR run `44664583137`,
+push twin `44664562822`; full suite 529 passed / 0 failed across 54 binaries plus 2 doc tests,
+all 13 Chromium suites, release/identity/operations/full-horizon). The docs follow-up's own CI
+run is recorded on PR #24 before merge. Observations are not enforcement; no eligibility,
+approval, qualification, acquisition, live trading or public exposure is granted. Software
+remains incomplete.
+`hermes/research-22m-window` (branched from `main` @ `ee5d08a`) pins the owner-selected research
+window: `historical_corpus::ResearchWindow::OWNER_SELECTED` = 2025-01..2026-10 (exactly 22
+completed months; owner decision 2026-11-19), `EXPECTED_MONTHS` derives from the pin, and
+`register_research_window` resolves exactly those calendar months from the canonical corpus,
+refusing any window with missing months by exact list (2026-11/2026-12 are not
+completed/available; no padding, backfill or silent truncation). `verify` requires full-length
+specifications to cover the pinned boundaries. The full-corpus research CLIs
+(register/study/execute/execute-cached/audit) register through the pin; new
+`historical-corpus-register-research-window` and `historical-corpus-register-window-config` CLIs
+expose the configuration surface (RUNBOOKS/research-window.md, DECISIONS/0056). Real-data tests
+assert the 22-month boundaries for all eight instruments, identity equality with exact-count
+registration (no reinterpretation of completed results), and exact out-of-range refusals. Local
+ladder on the branch under the shared heavy lock (project artifacts cleaned first): `cargo fmt
+--all -- --check`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo test --locked
+--lib --bins --tests` (54 binaries, 524 passed, 0 failed) and `scripts/check.sh` (54 binaries,
+524 passed, 0 failed). Hosted CI follows publication. No eligibility, approval or qualification
+change; the corpus remains REAL_STRUCTURALLY_VALID only.
+
 Verification throughput landed through PR #21 (`hermes/verification-throughput`):
 quality-neutral dev/test optimization profiles (deps opt2 cached once, test code opt1,
 line-tables-only debug, workspace build script opt3) and a three-job parallel hosted CI
@@ -85,7 +123,7 @@ licensing, scientific eligibility or qualification.
 Current streaming boundary: one authoritative AccountState transition serves materialized and synthetic USD corpus replay. Account checkpoints are hash-chained/lease-fenced; saved prefixes and source artifacts are revalidated before advancement. Bounded parallel corpus rounds now serve both supplied batches and a durable generated queue/coordinator. The materialized Driver remains separate. Real/protected/non-USD execution, fast-seek resume and full-history qualification remain refused/unfinished. See DECISIONS/0010-durable-corpus-backlog.md for implemented boundaries and remaining acceptance.
 
 
-Keep indexed policy experimental. Profile dominant complete-pipeline stages and validate varied/representative workloads before any promotion; engine-only gains or a small noisy median are insufficient. Implement checkpoint-aware shared-index/batch lifecycle, aggregate reference-audit coverage monitoring; metadata lookup scaling now has component evidence. Continue explicit source revision/correction links, catalog approval/coverage lifecycle, import/backup activation dashboard workflows and coordinated multi-component recovery; bounded immutable inventory and continuous export now exist. Preserve declared class versus independent approval and source availability. Continue remaining lifecycle, and the remaining scientific/operations queue rather than treating the performance experiment as software completion. Preserve exact eligibility/fallback, source scope, immutable evidence and reference/proof audit independence.
+Keep indexed policy experimental. Profile dominant complete-pipeline stages and validate varied/representative workloads before any promotion; engine-only gains or a small noisy median are insufficient. Implement checkpoint-aware shared-index/batch lifecycle, aggregate reference-audit coverage monitoring; metadata lookup scaling now has component evidence. Continue explicit source revision/correction links, catalog approval lifecycle and coordinated multi-component recovery; bounded immutable inventory, continuous export and the import/coverage activation dashboard workflow now exist. Preserve declared class versus independent approval and source availability. Continue remaining lifecycle, and the remaining scientific/operations queue rather than treating the performance experiment as software completion. Preserve exact eligibility/fallback, source scope, immutable evidence and reference/proof audit independence.
 
 Continue the full queue: indexed blocks/direct arrays/streaming and justified codecs, resumable sources/imports/coverage, dependence-aware prespecified qualification/evidence gates and real diverse boards, bounded multiworkers/supervision/resources, remaining real dashboard/operations/security workflows and integrated acceptance. Use IMPLEMENTATION_QUEUE.md's source/test reconciliation; do not confuse implemented code with acceptance.
 
@@ -98,3 +136,27 @@ Fresh Dukascopy/HistData info requests returned403; no real quotes/terms obtaine
 Exact executable bid/ask,2-pip spread floor plus separate2-pip adverse market/stop slippage,10% intended risk/$20 initial/3R/24h; frozen pending distance/quantity; no fabricated gaps/fills/depth; no protected OOS/final adaptation; synthetic never qualifies. Qualification needs independent approved complete evidence, not a high test count or tiny benchmark. Registry-local protection cannot cover external tools/copied registries. No execution continues after a session ends unless an actual supported mechanism exists.
 
 Latest continuation: persisted machine bindings and scoped independent authority are implemented; no genuine quotes or broker approvals exist. Alternative source findings and exact blockers are in REAL_DATA_MATRIX.json. Zero acquired bytes; no accounts/emails/purchases. Full historical qualification and target-VPS acceptance remain pending.
+
+## Cached diagnostic full-corpus execution (card t_9623c913) — COMPLETE
+
+- Deliverable: `scripts/run-diagnostic-execution-cached.py` + configs
+  `configs/historical-migration/strategies/m1-long-above-mean-v1.json` and
+  `configs/historical-migration/costs/bid-anchored-floor-v1-default.json`;
+  per-instrument reports in `docs/historical-migration/diagnostic-cache-v1/`;
+  aggregate `docs/historical-migration/DIAGNOSTIC_EXECUTION_CACHED_RECEIPT.json`
+  (sha256 `02be66677cd4b719f3e6e5bf34e4d31560dc0e41b92f473cc08e326964ae0ca0`).
+- What was verified:
+  - 8 instruments x 22 months (2025-01..2026-10): 110 executed months, 66 refused months
+    (USDJPY/USDCHF/USDCAD refused on the literal-USD gate; not a supported class).
+  - Cold pass: 0 cache hits, 110+66 misses; warm pass: 110 hits, 66 misses; all 110 executed
+    months served from cache on the second pass.
+  - Every instrument cold == warm byte-identical apart from cache counters (no financial drift
+    from resume).
+  - Totals match the earlier non-cached full-corpus receipt exactly: 11,584 trades,
+    694,984 rejections, P&L -1,759,377,176 µUSD, worst month drawdown 47,783,390 µUSD.
+  - Full corpus: 26.4 min cold -> 10.0 min warm (3.2x with 6 cores), with per-instrument wall
+    times recorded in the receipt; the warm pass serves all 110 executed months from the
+    content-addressed cache.
+- Not research evidence: every month is `diagnostic_simulation`/`none`; no eligibility,
+  approval or qualification.
+

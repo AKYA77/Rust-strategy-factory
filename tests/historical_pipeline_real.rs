@@ -8,7 +8,7 @@
 use rust_strategy_factory::candles::Timeframe;
 use rust_strategy_factory::contracts::Side;
 use rust_strategy_factory::corpus::{self};
-use rust_strategy_factory::historical_corpus::{self, EXPECTED_MONTHS};
+use rust_strategy_factory::historical_corpus::{self, EXPECTED_MONTHS, ResearchWindow};
 use rust_strategy_factory::strategies::{Rule, Strategy};
 use rust_strategy_factory::tick_engine::{CorpusBudget, Costs};
 use std::path::{Path, PathBuf};
@@ -73,8 +73,13 @@ fn real_historical_study_report() {
         eprintln!("skipping real historical study: data absent");
         return;
     }
-    let spec =
-        historical_corpus::register(catalog_root, output, "EURUSD", EXPECTED_MONTHS).unwrap();
+    let spec = historical_corpus::register_research_window(
+        catalog_root,
+        output,
+        "EURUSD",
+        &ResearchWindow::OWNER_SELECTED,
+    )
+    .unwrap();
     let strategy = Strategy {
         timeframe: Timeframe::M1,
         side: Side::Long,
@@ -85,6 +90,14 @@ fn real_historical_study_report() {
     };
     let study = historical_corpus::study(&spec, &strategy, 1_000_000, 1_000_000).unwrap();
     assert_eq!(study.months.len(), EXPECTED_MONTHS);
+    assert_eq!((study.months[0].year, study.months[0].month), (2025, 1));
+    assert_eq!(
+        (
+            study.months[study.months.len() - 1].year,
+            study.months[study.months.len() - 1].month
+        ),
+        (2026, 10)
+    );
     assert_eq!(
         study.events,
         spec.months.iter().map(|month| month.rows).sum::<u64>()
@@ -126,11 +139,36 @@ fn real_historical_diagnostic_execution() {
     let mut usd_quote = 0usize;
     let mut refused = 0usize;
     // Bounded per-month sample (2025-10) across every instrument: proves the bridge and the
-    // refusal classification without replaying all 176 months per instrument.
+    // refusal classification without replaying all 176 months per instrument. Registration uses
+    // the owner-selected 22-month pin, so every instrument must resolve exactly 2025-01..2026-10.
     let mut eurusd_sample = None;
     for instrument in INSTRUMENTS {
-        let spec =
-            historical_corpus::register(catalog_root, output, instrument, EXPECTED_MONTHS).unwrap();
+        let spec = historical_corpus::register_research_window(
+            catalog_root,
+            output,
+            instrument,
+            &ResearchWindow::OWNER_SELECTED,
+        )
+        .unwrap();
+        assert_eq!(spec.months.len(), EXPECTED_MONTHS, "{instrument}");
+        assert_eq!(
+            (spec.months[0].year, spec.months[0].month),
+            (2025, 1),
+            "{instrument}"
+        );
+        assert_eq!(
+            (
+                spec.months[spec.months.len() - 1].year,
+                spec.months[spec.months.len() - 1].month
+            ),
+            (2026, 10),
+            "{instrument}"
+        );
+        assert_eq!(
+            (spec.months[9].year, spec.months[9].month),
+            (2025, 10),
+            "{instrument}: sample index must be the pinned 2025-10 month"
+        );
         let sample = historical_corpus::execute_month(&spec, 9, &strategy, &costs, budget);
         if spec.profile.quote == "USD" {
             usd_quote += 1;

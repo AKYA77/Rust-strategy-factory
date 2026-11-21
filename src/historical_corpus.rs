@@ -16,8 +16,10 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 pub const VERSION: &str = "historical-monthly-corpus-v2";
-/// 2025-01 through 2026-10 for the eight canonical instruments.
-pub const EXPECTED_MONTHS: usize = 22;
+/// The owner-selected active research period: exactly the 22 completed months 2025-01 through
+/// 2026-10 for the eight canonical instruments (owner decision 2026-11-19). Derived from
+/// [`ResearchWindow::OWNER_SELECTED`] so the month count and the calendar pin cannot drift apart.
+pub const EXPECTED_MONTHS: usize = ResearchWindow::OWNER_SELECTED.span() as usize;
 const LIMITATIONS: &str = "Aggregate multi-month corpus over independently verified monthly native sources. Aggregate identity is not source approval: no calendar completeness, broker/profile approval, licensing or scientific eligibility is established. Month boundaries are explicit; per-month source identities and provenance remain distinct. Sequence numbers restart at each month and are not globally increasing across months.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,8 +51,106 @@ pub struct HistoricalCorpus {
     pub limitations: String,
 }
 
-fn month_index(year: u32, month: u32) -> u64 {
+const fn month_index(year: u32, month: u32) -> u64 {
     year as u64 * 12 + month as u64
+}
+
+/// An explicit inclusive window of completed calendar months.
+///
+/// This is the configuration surface for the historical research period. The owner-selected
+/// active window is [`ResearchWindow::OWNER_SELECTED`]; any other exact interval can be supplied
+/// as JSON through the `historical-corpus-register-window-config` CLI. A window is a calendar
+/// pin, not a sliding "latest N months" selection: registration resolves exactly these months
+/// from the canonical corpus and refuses with the exact missing months when any of them is not
+/// a completed verified partition. No window is ever padded, silently truncated or backfilled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ResearchWindow {
+    pub start_year: u32,
+    pub start_month: u32,
+    pub end_year: u32,
+    pub end_month: u32,
+}
+
+impl ResearchWindow {
+    /// Owner-selected active research period (owner decision 2026-11-19, final for the current
+    /// research configuration): exactly 2025-01-01 through 2026-10-31, the 22 completed months
+    /// present in the structurally verified canonical corpus (8 instruments, 176 partitions).
+    /// 2026-11 and 2026-12 are not completed/available and are not part of the active window;
+    /// no download or backfill is performed to extend it.
+    pub const OWNER_SELECTED: Self = Self {
+        start_year: 2025,
+        start_month: 1,
+        end_year: 2026,
+        end_month: 10,
+    };
+
+    /// Reject invalid calendar fields and reversed windows before any selection arithmetic.
+    pub fn validate(&self) -> Result<()> {
+        for (year, month) in [
+            (self.start_year, self.start_month),
+            (self.end_year, self.end_month),
+        ] {
+            if !(2000..=2200).contains(&year) || !(1..=12).contains(&month) {
+                return Err(format!(
+                    "invalid research window calendar month {year:04}-{month:02}"
+                ));
+            }
+        }
+        if month_index(self.start_year, self.start_month)
+            > month_index(self.end_year, self.end_month)
+        {
+            return Err("research window start must not be after its end".into());
+        }
+        Ok(())
+    }
+
+    /// Inclusive month count as raw arithmetic. Only meaningful for a validated window (start
+    /// not after end); the owner-selected constant is valid by construction.
+    pub const fn span(&self) -> u64 {
+        month_index(self.end_year, self.end_month) - month_index(self.start_year, self.start_month)
+            + 1
+    }
+
+    /// Validated inclusive month count.
+    pub fn month_count(&self) -> Result<usize> {
+        self.validate()?;
+        Ok(self.span() as usize)
+    }
+
+    /// Whether a calendar month lies inside the inclusive window.
+    pub fn contains(&self, year: u32, month: u32) -> bool {
+        let index = month_index(year, month);
+        month_index(self.start_year, self.start_month) <= index
+            && index <= month_index(self.end_year, self.end_month)
+    }
+
+    /// Every calendar month of the window in chronological order, validated.
+    pub fn months(&self) -> Result<Vec<(u32, u32)>> {
+        self.validate()?;
+        let mut months = Vec::with_capacity(self.span() as usize);
+        let (mut year, mut month) = (self.start_year, self.start_month);
+        loop {
+            months.push((year, month));
+            if (year, month) == (self.end_year, self.end_month) {
+                break;
+            }
+            month += 1;
+            if month > 12 {
+                month = 1;
+                year += 1;
+            }
+        }
+        Ok(months)
+    }
+
+    /// Human-readable label for receipts and refusal messages.
+    pub fn label(&self) -> String {
+        format!(
+            "{}-{:02}..{}-{:02}",
+            self.start_year, self.start_month, self.end_year, self.end_month
+        )
+    }
 }
 
 /// Exact source binding: the chunk's source description must contain the month's dataset
@@ -152,10 +252,13 @@ pub fn register(
 
 /// Register the most recent `months` contiguous completed monthly partitions for one instrument.
 ///
-/// The master blueprint asks for a configurable exact 24-completed-month research window. The
-/// canonical corpus currently holds fewer completed months, so this reports the precise shortfall
-/// instead of padding, truncating silently or fabricating periods. The selection is the latest
-/// contiguous run, so a window never spans a gap.
+/// This is the configurable completed-month mechanism required by the master blueprint: an
+/// exact interval is expressible without padding or fabrication, and a window longer than the
+/// available completed months reports the precise shortfall. The owner-selected active research
+/// period is the explicit calendar pin [`ResearchWindow::OWNER_SELECTED`] (22 months,
+/// 2025-01..2026-10; owner decision 2026-11-19), registered by [`register_research_window`];
+/// a 24-month window is refused while 2026-11 and 2026-12 are not completed/available. The
+/// selection here is the latest contiguous run, so a window never spans a gap.
 pub fn register_window(
     root: &Path,
     output_root: &Path,
@@ -174,6 +277,47 @@ pub fn register_window(
     }
     let start = partitions.len() - months;
     register_partitions(output_root, instrument, &partitions[start..])
+}
+
+/// Register exactly the months of an explicit research window for one instrument.
+///
+/// Every calendar month of the window must exist as a canonical completed partition; missing
+/// months are refused with the exact list instead of padding, silent truncation or fabrication.
+/// Canonical partitions outside the window are not selected, so later completed months never
+/// slide an explicit pin. The owner-selected active period is [`ResearchWindow::OWNER_SELECTED`]
+/// (2025-01..2026-10, 22 completed months); a window extending into 2026-11/2026-12 is refused
+/// because those months are not completed/available, and no data is downloaded to satisfy it.
+pub fn register_research_window(
+    root: &Path,
+    output_root: &Path,
+    instrument: &str,
+    window: &ResearchWindow,
+) -> Result<HistoricalCorpus> {
+    let required = window.months()?;
+    let partitions = plan_instrument(root, instrument)?;
+    let selected: Vec<Partition> = partitions
+        .into_iter()
+        .filter(|partition| window.contains(partition.year, partition.month))
+        .collect();
+    let missing: Vec<String> = required
+        .iter()
+        .filter(|(year, month)| {
+            !selected
+                .iter()
+                .any(|partition| partition.year == *year && partition.month == *month)
+        })
+        .map(|(year, month)| format!("{year:04}-{month:02}"))
+        .collect();
+    if !missing.is_empty() {
+        return Err(format!(
+            "research window {} requires {} completed months for {instrument}; only {} available; missing: {}",
+            window.label(),
+            required.len(),
+            selected.len(),
+            missing.join(", ")
+        ));
+    }
+    register_partitions(output_root, instrument, &selected)
 }
 
 fn register_partitions(
@@ -248,6 +392,19 @@ pub fn verify(spec: &HistoricalCorpus) -> Result<()> {
         return Err("invalid historical corpus specification".into());
     }
     validate_months(&spec.months, EXPECTED_MONTHS)?;
+    // A full-length specification must cover exactly the owner-selected research window, not
+    // merely any contiguous run of the same length.
+    let window = ResearchWindow::OWNER_SELECTED;
+    let first = &spec.months[0];
+    let last = &spec.months[spec.months.len() - 1];
+    if (first.year, first.month) != (window.start_year, window.start_month)
+        || (last.year, last.month) != (window.end_year, window.end_month)
+    {
+        return Err(format!(
+            "historical corpus does not cover the owner-selected research window {}",
+            window.label()
+        ));
+    }
     for month in &spec.months {
         if month.instrument != spec.instrument {
             return Err("historical corpus month instrument mismatch".into());
@@ -1097,6 +1254,135 @@ mod tests {
         alias[1].year = 2025;
         alias[1].month = 13; // month_index aliases as 2026-01
         assert!(validate_months(&alias, 2).is_err());
+    }
+
+    #[test]
+    fn owner_selected_window_is_exactly_22_months_2025_01_to_2026_10() {
+        let window = ResearchWindow::OWNER_SELECTED;
+        window.validate().unwrap();
+        assert_eq!(window.span(), 22);
+        assert_eq!(window.month_count().unwrap(), 22);
+        assert_eq!(EXPECTED_MONTHS, 22);
+        assert_eq!(EXPECTED_MONTHS, window.month_count().unwrap());
+        let months = window.months().unwrap();
+        assert_eq!(months.len(), 22);
+        assert_eq!(months[0], (2025, 1));
+        assert_eq!(months[11], (2025, 12));
+        assert_eq!(months[12], (2026, 1));
+        assert_eq!(months[21], (2026, 10));
+        assert_eq!(window.label(), "2025-01..2026-10");
+        assert!(window.contains(2025, 1));
+        assert!(window.contains(2026, 10));
+        assert!(!window.contains(2024, 12));
+        assert!(!window.contains(2026, 11));
+        assert!(!window.contains(2026, 12));
+    }
+
+    #[test]
+    fn research_window_refuses_invalid_calendar_and_reversed_order() {
+        for window in [
+            ResearchWindow {
+                start_year: 2025,
+                start_month: 0,
+                end_year: 2026,
+                end_month: 10,
+            },
+            ResearchWindow {
+                start_year: 2025,
+                start_month: 1,
+                end_year: 2026,
+                end_month: 13,
+            },
+            ResearchWindow {
+                start_year: 1999,
+                start_month: 1,
+                end_year: 2026,
+                end_month: 10,
+            },
+            ResearchWindow {
+                start_year: 2025,
+                start_month: 1,
+                end_year: 2201,
+                end_month: 10,
+            },
+            ResearchWindow {
+                start_year: 2026,
+                start_month: 10,
+                end_year: 2025,
+                end_month: 1,
+            },
+        ] {
+            assert!(window.validate().is_err(), "{window:?}");
+            assert!(window.month_count().is_err(), "{window:?}");
+            assert!(window.months().is_err(), "{window:?}");
+        }
+    }
+
+    #[test]
+    fn research_window_enumerates_subwindows_and_roundtrips_json() {
+        let window = ResearchWindow {
+            start_year: 2025,
+            start_month: 11,
+            end_year: 2026,
+            end_month: 2,
+        };
+        assert_eq!(
+            window.months().unwrap(),
+            vec![(2025, 11), (2025, 12), (2026, 1), (2026, 2)]
+        );
+        assert_eq!(window.month_count().unwrap(), 4);
+        let single = ResearchWindow {
+            start_year: 2026,
+            start_month: 10,
+            end_year: 2026,
+            end_month: 10,
+        };
+        assert_eq!(single.months().unwrap(), vec![(2026, 10)]);
+        assert_eq!(single.month_count().unwrap(), 1);
+        let json = serde_json::to_string(&ResearchWindow::OWNER_SELECTED).unwrap();
+        let back: ResearchWindow = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, ResearchWindow::OWNER_SELECTED);
+        assert!(
+            serde_json::from_str::<ResearchWindow>(
+                r#"{"start_year":2025,"start_month":1,"end_year":2026,"end_month":10,"extra":1}"#
+            )
+            .is_err(),
+            "unknown window config fields must be refused"
+        );
+    }
+
+    #[test]
+    fn verify_refuses_full_length_specs_outside_the_owner_window() {
+        // A contiguous 22-month run shifted one month earlier (2024-12..2026-09) is not the
+        // owner-selected window even though its length matches.
+        let profile = Profile::synthetic("EURUSD").unwrap();
+        let mut shifted = contiguous();
+        for source in &mut shifted {
+            if source.month == 1 {
+                source.year -= 1;
+                source.month = 12;
+            } else {
+                source.month -= 1;
+            }
+        }
+        let identity = identity("EURUSD", &profile, &shifted).unwrap();
+        let spec = HistoricalCorpus {
+            version: VERSION.into(),
+            instrument: "EURUSD".into(),
+            profile,
+            months: shifted,
+            identity,
+            limitations: LIMITATIONS.into(),
+        };
+        let error = verify(&spec)
+            .expect_err("a shifted 22-month run must not verify as the owner-selected window");
+        assert!(error.contains("owner-selected research window"), "{error}");
+        assert!(error.contains("2025-01..2026-10"), "{error}");
+        // The canonical-boundary spec passes the window gate and only fails later on the absent
+        // synthetic receipts, proving the gate accepts exactly the owner window.
+        let canonical = cache_spec();
+        let error = verify(&canonical).expect_err("synthetic receipts are absent on disk");
+        assert!(!error.contains("owner-selected research window"), "{error}");
     }
 
     #[test]

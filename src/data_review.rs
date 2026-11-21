@@ -8,6 +8,9 @@ pub enum Area {
     Calendar,
     Quality,
     Coverage,
+    /// Independent scientific qualification of one strategy on one instrument/source scope.
+    /// Distinct from the five data-review areas: it never approves data by itself.
+    ScientificQualification,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Decision {

@@ -332,18 +332,37 @@ equivalence checks. `audit` does not re-read the Parquet.
     refused because approved account/currency conversion semantics are unavailable.
     `DIAGNOSTIC_EXECUTION_RECEIPT.json` records the full-corpus run. Diagnostic only: no
     eligibility, approval or qualification.
-14. ~~Resumable diagnostic execution~~ — `historical_corpus::ExecutionCache` is a caller-supplied,
+14. Resumable diagnostic execution — `historical_corpus::ExecutionCache` is a caller-supplied,
     content-addressed month cache (key binds corpus identity, month, chunk inventory, strategy,
     costs, budgets and engine version; entries carry a self-hash and unreadable or mismatched
     entries are refused). `historical-corpus-execute-cached` resumes identical months instead of
     replaying them: on real EURUSD the first run is 22 misses / 216 s and the second is 22 hits /
-    46 s with identical results. A local performance aid only — it grants no eligibility and
-    cannot feed registered research.
+    46 s with identical results.
+    FULL-CORPUS RESULT (this run, 8 instruments, 22 months each): 110 executed months, 66
+    refused months, 11,584 trades, 694,984 rejections, P&L -1,759,377,176 µUSD, worst monthly
+    drawdown 47,783,390 µUSD, cache ratio cold 0 hits / 110+66 misses then warm 110 hits / 66
+    misses, and every instrument's cold and warm reports are byte-identical apart from the cache
+    counters. Evidence: `scripts/run-diagnostic-execution-cached.py` + configs
+    `configs/historical-migration/{strategies/costs}/*.json` + per-instrument reports under
+    `docs/historical-migration/diagnostic-cache-v1/` and aggregate
+    `docs/historical-migration/DIAGNOSTIC_EXECUTION_CACHED_RECEIPT.json`. Non-USD-quote
+    instruments USDJPY/USDCHF/USDCAD are refused by the engine on every pass. Diagnostic only:
+    no eligibility, approval or qualification; synthetic must never qualify.
 15. ~~Configurable completed-month research window~~ — `historical_corpus::register_window`
     registers the latest N contiguous completed months and reports the precise shortfall instead of
-    padding. The blueprint's exact 24-completed-month interval is therefore supported in software;
-    the canonical corpus holds 22, so a 24-month window is refused with the exact missing input
-    (2026-11 and 2026-12 are not completed/available). New `historical-corpus-register-window` CLI.
+    padding. The canonical corpus holds 22 completed months, so 23- and 24-month windows are refused
+    with the exact missing input (2026-11 and 2026-12 are not completed/available). New
+    `historical-corpus-register-window` CLI.
+16. ~~Owner-selected 22-month research window pin~~ — `historical_corpus::ResearchWindow::OWNER_SELECTED`
+    pins the active research period to exactly 2025-01..2026-10 (owner decision 2026-11-19;
+    DECISIONS/0056). `register_research_window` resolves exactly those calendar months, refuses
+    missing months with the exact list, and never slides with later data; `EXPECTED_MONTHS` derives
+    from the pin and `verify` requires full-length specs to cover its boundaries. The full-corpus
+    research CLIs register through the pin; new `historical-corpus-register-research-window` and
+    `historical-corpus-register-window-config` CLIs (RUNBOOKS/research-window.md). Real-data tests
+    assert the boundaries for all eight instruments, identity equality with exact-count registration
+    (no reinterpretation of completed results), and exact out-of-range refusals. No eligibility,
+    approval or qualification change.
 
 ## Verification throughput branch pointer (2026-11-20)
 
