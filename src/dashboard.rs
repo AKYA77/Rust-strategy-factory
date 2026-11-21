@@ -2553,6 +2553,43 @@ async fn registry_audit(State(app): State<Arc<App>>) -> Response {
         ),
     }
 }
+async fn audit_coverage(State(app): State<Arc<App>>) -> Response {
+    let Some(config) = app.operations.clone() else {
+        return api_error(
+            StatusCode::NOT_FOUND,
+            "audit coverage operations not configured",
+        );
+    };
+    if !bucket(&app.operations_bucket, 60) {
+        return api_error(StatusCode::TOO_MANY_REQUESTS, "operations rate limit");
+    }
+    let Ok(permit) = app.operations_slots.clone().try_acquire_owned() else {
+        return api_error(StatusCode::TOO_MANY_REQUESTS, "operations work busy");
+    };
+    let result = tokio::task::spawn_blocking(move || -> Result<serde_json::Value> {
+        let _permit = permit;
+        let paths = config.redaction_paths();
+        let fail = |e: String| redact(&e, &paths);
+        let Ok(registry) = app.registry.lock() else {
+            return Err("database unavailable".into());
+        };
+        let coverage = crate::candidate_screen::registry_coverage(
+            &registry,
+            crate::candidate_screen::REGISTRY_COVERAGE_SCAN_LIMIT,
+        )
+        .map_err(fail)?;
+        serde_json::to_value(coverage).map_err(|e| e.to_string())
+    })
+    .await;
+    match result {
+        Ok(Ok(value)) => Json(value).into_response(),
+        Ok(Err(reason)) => api_error(StatusCode::INTERNAL_SERVER_ERROR, &reason),
+        _ => api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "registry audit coverage unavailable",
+        ),
+    }
+}
 async fn campaign_verify_inputs(State(app): State<Arc<App>>, Param(id): Param<String>) -> Response {
     if !catalog_id(&id) {
         return api_error(StatusCode::BAD_REQUEST, "invalid campaign identity");
@@ -2736,6 +2773,7 @@ pub async fn serve_with_operations(
         .route("/api/coverage", get(coverage_inventory))
         .route("/api/coverage/{name}", get(coverage_report))
         .route("/api/registry-audit", get(registry_audit))
+        .route("/api/audit-coverage", get(audit_coverage))
         .route("/api/corpus-fleets", get(corpus_fleets))
         .route("/api/corpus-fleets/{id}", get(corpus_fleet_status))
         .route(
