@@ -481,3 +481,139 @@ fn audit_coverage_aggregates_bound_rejections_and_false_negatives() {
     assert_eq!(c.false_negative_rate_bps, Some(5000));
     assert_eq!(c.coverage_bps, 2 * 10000 / 3);
 }
+
+use rust_strategy_factory::storage::{Claim, ExperimentKey, Outcome, Registry, Stage};
+
+fn registry_key(concept: &str) -> ExperimentKey {
+    ExperimentKey {
+        concept_hash: concept.into(),
+        instrument: "EURUSD".into(),
+        dataset_hash: "quotes".into(),
+        start_ms: 0,
+        end_exclusive_ms: 1000,
+        signal_version: "s1".into(),
+        indicator_version: "i1".into(),
+        cost_hash: "cost".into(),
+        fill_policy: "fill".into(),
+        profile_hash: "profile".into(),
+        engine_version: "e1".into(),
+        protocol_hash: "protocol".into(),
+        code_revision: "revision".into(),
+        configuration_hash: "config".into(),
+        stage: Stage::TickVerification,
+    }
+}
+
+fn publish(registry: &mut Registry, concept: &str, result: serde_json::Value) {
+    let id = registry.register(&registry_key(concept)).unwrap();
+    let lease = match registry.claim(&id, 0, 60_000).unwrap() {
+        Claim::Acquired(lease) => lease,
+        other => panic!("expected an acquired lease, got {other:?}"),
+    };
+    assert!(
+        registry
+            .finish(&lease, 1, Outcome::Completed, &result)
+            .unwrap()
+    );
+}
+
+fn marker(
+    would_reject: bool,
+    sampled: bool,
+    unresolved: bool,
+    negative: bool,
+) -> serde_json::Value {
+    serde_json::json!({
+        "shadow_decision": {
+            "would_reject": would_reject,
+            "bound_proven_failure": false,
+            "selected_for_sampled_audit": sampled,
+        },
+        "actual_unresolved": unresolved,
+        "shadow_false_negative": negative,
+    })
+}
+
+#[test]
+fn registry_coverage_reports_marker_absence_as_never_covered() {
+    let dir = std::env::temp_dir().join(format!("factory-audit-coverage-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("state.sqlite");
+    let mut registry = Registry::open(&path).unwrap();
+    publish(
+        &mut registry,
+        "no-marker",
+        serde_json::json!({"kind": "synthetic-corpus-replay-v1"}),
+    );
+    publish(
+        &mut registry,
+        "rejected-false-negative",
+        serde_json::json!({"candidate_screen_audit": marker(true, true, false, true)}),
+    );
+    publish(
+        &mut registry,
+        "promoted",
+        serde_json::json!({"candidate_screen_audit": marker(false, false, false, false)}),
+    );
+    let coverage = candidate_screen::registry_coverage(
+        &registry,
+        candidate_screen::REGISTRY_COVERAGE_SCAN_LIMIT,
+    )
+    .unwrap();
+    assert_eq!(coverage.version, "registry-audit-coverage-v1");
+    assert_eq!(coverage.results_total, 3);
+    assert_eq!(coverage.results_with_marker, 2);
+    assert_eq!(coverage.results_without_marker, 1);
+    assert_eq!(coverage.scanned_audits, 2);
+    assert!(!coverage.truncated);
+    assert_eq!(coverage.coverage.candidates, 2);
+    assert_eq!(coverage.coverage.bound_rejections, 1);
+    assert_eq!(coverage.coverage.promoted_to_tick, 1);
+    assert_eq!(coverage.coverage.audited, 1);
+    assert_eq!(coverage.coverage.false_negatives, 1);
+    assert_eq!(coverage.coverage.false_negative_rate_bps, Some(10000));
+    assert_eq!(coverage.coverage.coverage_bps, 10000);
+    assert!(coverage.limitations.contains("never treated as coverage"));
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn registry_coverage_bound_is_explicit_and_corrupt_registry_refuses() {
+    let dir = std::env::temp_dir().join(format!(
+        "factory-audit-coverage-bound-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("state.sqlite");
+    let mut registry = Registry::open(&path).unwrap();
+    for concept in ["a", "b", "c"] {
+        publish(
+            &mut registry,
+            concept,
+            serde_json::json!({"candidate_screen_audit": marker(true, false, false, false)}),
+        );
+    }
+    assert!(candidate_screen::registry_coverage(&registry, 0).is_err());
+    assert!(
+        candidate_screen::registry_coverage(
+            &registry,
+            candidate_screen::REGISTRY_COVERAGE_SCAN_LIMIT + 1
+        )
+        .is_err()
+    );
+    let bounded = candidate_screen::registry_coverage(&registry, 2).unwrap();
+    assert!(bounded.truncated);
+    assert_eq!(bounded.scanned_audits, 2);
+    assert_eq!(bounded.results_with_marker, 3);
+    assert_eq!(bounded.coverage.candidates, 2);
+    let id = registry_key("a").identity().unwrap();
+    let raw = rusqlite::Connection::open(&path).unwrap();
+    raw.execute(
+        "UPDATE experiments SET key_json=?1 WHERE id=?2",
+        ("{}", &id),
+    )
+    .unwrap();
+    drop(raw);
+    assert!(candidate_screen::registry_coverage(&registry, 2).is_err());
+    std::fs::remove_dir_all(&dir).ok();
+}

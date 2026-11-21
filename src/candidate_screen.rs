@@ -555,6 +555,87 @@ pub fn audit_coverage(audits: &[serde_json::Value]) -> AuditCoverage {
     out
 }
 
+/// Maximum persisted `candidate_screen_audit` markers aggregated by one registry
+/// coverage read. The bound keeps the inspection explicit: a larger registry is
+/// reported as truncated rather than silently sampled.
+pub const REGISTRY_COVERAGE_SCAN_LIMIT: usize = 10_000;
+
+/// Registry-wide aggregate of persisted candidate-screen audit markers.
+/// `results_without_marker` is reported explicitly and is never coverage: a
+/// result that never carried an audit marker is not counted as audited, so
+/// marker absence cannot inflate coverage.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct RegistryAuditCoverage {
+    pub version: &'static str,
+    /// Completed experiments with a stored result.
+    pub results_total: usize,
+    /// Results carrying a `candidate_screen_audit` marker.
+    pub results_with_marker: usize,
+    /// Results without the marker. Never coverage.
+    pub results_without_marker: usize,
+    /// Marker values actually aggregated (<= `scan_limit`).
+    pub scanned_audits: usize,
+    pub scan_limit: usize,
+    /// True when more markers exist than `scan_limit`.
+    pub truncated: bool,
+    /// Aggregate over the scanned markers.
+    pub coverage: AuditCoverage,
+    pub limitations: &'static str,
+}
+
+/// Aggregate every persisted candidate-screen audit marker in the registry.
+/// Request-time `Registry::integrity` refusal protects against a corrupt
+/// registry and each result is hash-verified by `Registry::result`. Read-only
+/// and diagnostic: no execution, no acceptance, no hard OS/worker enforcement.
+pub fn registry_coverage(
+    registry: &crate::storage::Registry,
+    scan_limit: usize,
+) -> Result<RegistryAuditCoverage> {
+    if scan_limit == 0 || scan_limit > REGISTRY_COVERAGE_SCAN_LIMIT {
+        return Err("registry audit coverage scan limit outside 1..=10000".into());
+    }
+    registry.integrity()?;
+    let mut statement = registry
+        .connection
+        .prepare("SELECT id FROM experiments WHERE result_json IS NOT NULL ORDER BY rowid")
+        .map_err(|e| e.to_string())?;
+    let rows = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|e| e.to_string())?;
+    let mut results_total = 0_usize;
+    let mut results_with_marker = 0_usize;
+    let mut audits: Vec<serde_json::Value> = Vec::new();
+    let mut truncated = false;
+    for row in rows {
+        let id = row.map_err(|e| e.to_string())?;
+        let Some(stored) = registry.result(&id)? else {
+            continue;
+        };
+        results_total += 1;
+        let Some(audit) = stored.result.get("candidate_screen_audit") else {
+            continue;
+        };
+        results_with_marker += 1;
+        if audits.len() < scan_limit {
+            audits.push(audit.clone());
+        } else {
+            truncated = true;
+        }
+    }
+    let coverage = audit_coverage(&audits);
+    Ok(RegistryAuditCoverage {
+        version: "registry-audit-coverage-v1",
+        results_total,
+        results_with_marker,
+        results_without_marker: results_total - results_with_marker,
+        scanned_audits: audits.len(),
+        scan_limit,
+        truncated,
+        coverage,
+        limitations: "Registry-local persisted candidate-screen audit markers only. Results without a marker are reported, never treated as coverage. coverage_bps is the share of bound rejections with a resolved replay audit; it is diagnostic, not acceptance, not a hard OS/worker control and not qualification evidence. Marker absence does not establish audit coverage, completeness or correctness.",
+    })
+}
+
 pub fn compare(
     estimate: &Estimate,
     replay: &Replay,
