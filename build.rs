@@ -73,6 +73,8 @@ fn main() {
         "src/recovery.rs",
         "src/result_artifact.rs",
         "src/qualification.rs",
+        "src/historical_corpus.rs",
+        "src/scientific_validation.rs",
     ] {
         println!("cargo:rerun-if-changed={path}");
         hasher.update(path.as_bytes());

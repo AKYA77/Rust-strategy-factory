@@ -94,6 +94,17 @@ aborting a healthy child. Software remains incomplete.
 
 ## Implement next
 
+Scientific validation over the 22-month corpus (branch `hermes/scientific-validation`): the
+owner-approved criteria are now evaluated per instrument from diagnostic execution evidence
+(`scientific_validation` module + `scientific-validation` CLI; per-month closed-trade outcome
+statistics in `historical_corpus`). Refreshed cached diagnostic execution: 8/8 instruments, 176
+executed months, 0 refused, 21,104 trades, 1,094,379 rejections, P&L -3,077,229,124 uUSD;
+every instrument's cold and warm reports byte-identical apart from cache counters. Every
+instrument is REJECTED (diagnostic class plus failing numerical floors) and 0 qualify.
+Reset-fold per-month accounts cannot establish continuous full-period accounting, which stays
+unknown. Evidence: `docs/historical-migration/SCIENTIFIC_VALIDATION.md` and
+`SCIENTIFIC_VALIDATION_RECEIPT.json`; full Rust suite 58 binaries / 619 passed / 0 failed.
+
 The highest-priority blockers are external: real/protected/non-USD execution, approved source
 acquisition, broker/calendar/conversion facts and target-VPS acceptance all remain pending (source
 access still returns 403 and no legitimate real quote window has been obtained). Continue the

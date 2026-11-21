@@ -4,6 +4,7 @@
   "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2",
   "classification": "diagnostic_simulation",
   "eligibility": "none",
+  "conversion_policy": "identity_usd_v1",
   "months": [
     {
       "year": 2025,
@@ -15,13 +16,25 @@
       "replay_dataset_id": "18d03b6302ba3eab62fa0539d724f9eaa441707ac9474b2990eecbdec020c51a",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 10920,
       "final_marked_micro_usd": 10920,
       "maximum_drawdown_micro_usd": 21454880,
       "trades": 146,
       "rejections": 6850,
-      "receipt_hash": "b83e30b09fc2e18ef6ef0230eaefd78e90b3adbe6f2b1e6417e84fb889bde7e7"
+      "receipt_hash": "b83e30b09fc2e18ef6ef0230eaefd78e90b3adbe6f2b1e6417e84fb889bde7e7",
+      "outcomes": {
+        "resolved": 146,
+        "wins": 22,
+        "losses": 124,
+        "breakevens": 0,
+        "max_losing_streak": 20,
+        "gross_win_micro_usd": 15825000,
+        "gross_loss_micro_usd": 35814080,
+        "net_micro_usd": -19989080,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -33,13 +46,25 @@
       "replay_dataset_id": "f1feba691fa545153452171e32204d4527f14316f307d2c84e621a6e5fb04c4d",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 10840,
       "final_marked_micro_usd": 10840,
       "maximum_drawdown_micro_usd": 21268900,
       "trades": 178,
       "rejections": 3117,
-      "receipt_hash": "9fcfd7a848df3b5a6ad88e61cc6ca0e2809e21ab65a35355205c980e666b8273"
+      "receipt_hash": "9fcfd7a848df3b5a6ad88e61cc6ca0e2809e21ab65a35355205c980e666b8273",
+      "outcomes": {
+        "resolved": 178,
+        "wins": 34,
+        "losses": 144,
+        "breakevens": 0,
+        "max_losing_streak": 18,
+        "gross_win_micro_usd": 16993360,
+        "gross_loss_micro_usd": 36982520,
+        "net_micro_usd": -19989160,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -51,13 +76,25 @@
       "replay_dataset_id": "5e26600a3a9ca8f9265eb139b80c7f3d51c69f5fc0d13b8d32d4c81b5d2e4ff3",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 11910,
       "final_marked_micro_usd": 11910,
       "maximum_drawdown_micro_usd": 47783390,
       "trades": 213,
       "rejections": 5952,
-      "receipt_hash": "9d92553cceaaf6198f249fb3c7be9241566500ef5befeaf438f0c3f120fe0161"
+      "receipt_hash": "9d92553cceaaf6198f249fb3c7be9241566500ef5befeaf438f0c3f120fe0161",
+      "outcomes": {
+        "resolved": 213,
+        "wins": 45,
+        "losses": 168,
+        "breakevens": 0,
+        "max_losing_streak": 13,
+        "gross_win_micro_usd": 130038100,
+        "gross_loss_micro_usd": 150026190,
+        "net_micro_usd": -19988090,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -69,13 +106,25 @@
       "replay_dataset_id": "6596cc0b8da8369e2ce69c8d306beb8f1546243bc61e21e60540323dfc8ef581",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 11280,
       "final_marked_micro_usd": 11280,
       "maximum_drawdown_micro_usd": 19988720,
       "trades": 158,
       "rejections": 12989,
-      "receipt_hash": "0e02e7300af3ac4cfdf395e71aa8f271512295fc11dca9cc5c36402456835860"
+      "receipt_hash": "0e02e7300af3ac4cfdf395e71aa8f271512295fc11dca9cc5c36402456835860",
+      "outcomes": {
+        "resolved": 158,
+        "wins": 27,
+        "losses": 131,
+        "breakevens": 0,
+        "max_losing_streak": 19,
+        "gross_win_micro_usd": 18049200,
+        "gross_loss_micro_usd": 38037920,
+        "net_micro_usd": -19988720,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -87,13 +136,25 @@
       "replay_dataset_id": "067357cfaa3be11412d133642c4cb1e929f87602bcebf2d619e790c21da2b4b6",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 8400,
       "final_marked_micro_usd": 8400,
       "maximum_drawdown_micro_usd": 20845590,
       "trades": 122,
       "rejections": 10369,
-      "receipt_hash": "2e8f9bd58a80f6f04d88da1ee793570b51f980900e7231ec39cde6cd5b8e564a"
+      "receipt_hash": "2e8f9bd58a80f6f04d88da1ee793570b51f980900e7231ec39cde6cd5b8e564a",
+      "outcomes": {
+        "resolved": 122,
+        "wins": 15,
+        "losses": 107,
+        "breakevens": 0,
+        "max_losing_streak": 19,
+        "gross_win_micro_usd": 10800000,
+        "gross_loss_micro_usd": 30791600,
+        "net_micro_usd": -19991600,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -105,13 +166,25 @@
       "replay_dataset_id": "8e0a5f3e6f97222d0d4c03d2b0650a4993fef6bd01278661507dbb12fdb7ba6e",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 11140,
       "final_marked_micro_usd": 11140,
       "maximum_drawdown_micro_usd": 25650990,
       "trades": 163,
       "rejections": 7737,
-      "receipt_hash": "61409a5ec0876c34d5581862b59395ee1fead9152ae828bbc6a55c64a00fe929"
+      "receipt_hash": "61409a5ec0876c34d5581862b59395ee1fead9152ae828bbc6a55c64a00fe929",
+      "outcomes": {
+        "resolved": 163,
+        "wins": 29,
+        "losses": 134,
+        "breakevens": 0,
+        "max_losing_streak": 19,
+        "gross_win_micro_usd": 24524680,
+        "gross_loss_micro_usd": 44513540,
+        "net_micro_usd": -19988860,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -123,13 +196,25 @@
       "replay_dataset_id": "992f73675545a97106133b4c5549e9c1c16f9d12bd69c2e739e127f99aa1f0e4",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 11490,
       "final_marked_micro_usd": 11490,
       "maximum_drawdown_micro_usd": 20103310,
       "trades": 119,
       "rejections": 7927,
-      "receipt_hash": "9d0d45ddb92ac1f38e68addf534518798accf9e09ea85978f55a681919015dd8"
+      "receipt_hash": "9d0d45ddb92ac1f38e68addf534518798accf9e09ea85978f55a681919015dd8",
+      "outcomes": {
+        "resolved": 119,
+        "wins": 15,
+        "losses": 104,
+        "breakevens": 0,
+        "max_losing_streak": 14,
+        "gross_win_micro_usd": 9152660,
+        "gross_loss_micro_usd": 29141170,
+        "net_micro_usd": -19988510,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -141,13 +226,25 @@
       "replay_dataset_id": "bfa59960a16748890bd0b237f9c571247ad61310d1286cfa19985ad09bb80e54",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 10940,
       "final_marked_micro_usd": 10940,
       "maximum_drawdown_micro_usd": 31962820,
       "trades": 154,
       "rejections": 4395,
-      "receipt_hash": "e999e82289d92e034730507b74545c84de926b92ba62840ed2b0024cb963b50e"
+      "receipt_hash": "e999e82289d92e034730507b74545c84de926b92ba62840ed2b0024cb963b50e",
+      "outcomes": {
+        "resolved": 154,
+        "wins": 25,
+        "losses": 129,
+        "breakevens": 0,
+        "max_losing_streak": 16,
+        "gross_win_micro_usd": 36100650,
+        "gross_loss_micro_usd": 56089710,
+        "net_micro_usd": -19989060,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -159,13 +256,25 @@
       "replay_dataset_id": "f14e5bfc779a2543ae6f06738b4296217a0e42f0fbf786e18d5726a0ad490bf3",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 11060,
       "final_marked_micro_usd": 11060,
       "maximum_drawdown_micro_usd": 23967850,
       "trades": 140,
       "rejections": 6247,
-      "receipt_hash": "1616df38cc51078036e78328583ce29c8944887bb79be4a79746733ddd4f8711"
+      "receipt_hash": "1616df38cc51078036e78328583ce29c8944887bb79be4a79746733ddd4f8711",
+      "outcomes": {
+        "resolved": 140,
+        "wins": 20,
+        "losses": 120,
+        "breakevens": 0,
+        "max_losing_streak": 15,
+        "gross_win_micro_usd": 4587000,
+        "gross_loss_micro_usd": 24575940,
+        "net_micro_usd": -19988940,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -177,13 +286,25 @@
       "replay_dataset_id": "9e7d29a061b3547bc55abebfac0cef318defe4177030464d7249c8bf4f88fcd2",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 11280,
       "final_marked_micro_usd": 11280,
       "maximum_drawdown_micro_usd": 24926720,
       "trades": 132,
       "rejections": 6828,
-      "receipt_hash": "0f2bc7eec778198a545e73652fc9378eda3a1828631fa4a8c07e1e4301bfae42"
+      "receipt_hash": "0f2bc7eec778198a545e73652fc9378eda3a1828631fa4a8c07e1e4301bfae42",
+      "outcomes": {
+        "resolved": 132,
+        "wins": 18,
+        "losses": 114,
+        "breakevens": 0,
+        "max_losing_streak": 20,
+        "gross_win_micro_usd": 11306500,
+        "gross_loss_micro_usd": 31295220,
+        "net_micro_usd": -19988720,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -195,13 +316,25 @@
       "replay_dataset_id": "57adb92f0d6bf573d1b147b158dea58976bd4a5b115bb1fdded58b820f47a750",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 64680,
       "final_marked_micro_usd": 64680,
       "maximum_drawdown_micro_usd": 20131330,
       "trades": 110,
       "rejections": 3,
-      "receipt_hash": "c5a9561b81b7dae5d1136edd0f037a4e76cf3b7085d02131460d9461658dccd4"
+      "receipt_hash": "c5a9561b81b7dae5d1136edd0f037a4e76cf3b7085d02131460d9461658dccd4",
+      "outcomes": {
+        "resolved": 110,
+        "wins": 18,
+        "losses": 92,
+        "breakevens": 0,
+        "max_losing_streak": 19,
+        "gross_win_micro_usd": 15227930,
+        "gross_loss_micro_usd": 35163250,
+        "net_micro_usd": -19935320,
+        "unresolved_positions": 1
+      }
     },
     {
       "year": 2025,
@@ -213,13 +346,25 @@
       "replay_dataset_id": "3ab6f93b3463b2d98430b0872604cf90d05fe56a9a010b83215a91f286f50c0d",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 12040,
       "final_marked_micro_usd": 12040,
       "maximum_drawdown_micro_usd": 24683460,
       "trades": 140,
       "rejections": 261,
-      "receipt_hash": "7b997d5da177751fb43fa4b611519784a7ebce1e7c030dddc412dafa69ee248a"
+      "receipt_hash": "7b997d5da177751fb43fa4b611519784a7ebce1e7c030dddc412dafa69ee248a",
+      "outcomes": {
+        "resolved": 140,
+        "wins": 23,
+        "losses": 117,
+        "breakevens": 0,
+        "max_losing_streak": 24,
+        "gross_win_micro_usd": 20889560,
+        "gross_loss_micro_usd": 40877520,
+        "net_micro_usd": -19987960,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -231,13 +376,25 @@
       "replay_dataset_id": "a06ec493e4909a391570328a3b03e14e9b8d9f4d6cbea5a1a72e6262396c0660",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 11230,
       "final_marked_micro_usd": 11230,
       "maximum_drawdown_micro_usd": 21768450,
       "trades": 172,
       "rejections": 1604,
-      "receipt_hash": "b44ffcb73673cb278d97788e0e91a0aacd3687d52df88d57d75bcc137491ceab"
+      "receipt_hash": "b44ffcb73673cb278d97788e0e91a0aacd3687d52df88d57d75bcc137491ceab",
+      "outcomes": {
+        "resolved": 172,
+        "wins": 31,
+        "losses": 141,
+        "breakevens": 0,
+        "max_losing_streak": 23,
+        "gross_win_micro_usd": 5322200,
+        "gross_loss_micro_usd": 25310970,
+        "net_micro_usd": -19988770,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -249,13 +406,25 @@
       "replay_dataset_id": "8bb52fa397b9c20dc956c66a41b162f33aa181f41c083a75e844442ed08838c8",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 11800,
       "final_marked_micro_usd": 11800,
       "maximum_drawdown_micro_usd": 20188200,
       "trades": 135,
       "rejections": 3085,
-      "receipt_hash": "b83bb5663d98ef61837b1fe8949bd7513462954b2247100b5962c9f0adf18f16"
+      "receipt_hash": "b83bb5663d98ef61837b1fe8949bd7513462954b2247100b5962c9f0adf18f16",
+      "outcomes": {
+        "resolved": 135,
+        "wins": 20,
+        "losses": 115,
+        "breakevens": 0,
+        "max_losing_streak": 16,
+        "gross_win_micro_usd": 5184190,
+        "gross_loss_micro_usd": 25172390,
+        "net_micro_usd": -19988200,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -267,13 +436,25 @@
       "replay_dataset_id": "8809a0d8cc8fc7d46b3d1ee8f54c775b0502c5c32fe836fa0e2b51b3fcb80dbb",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 8240,
       "final_marked_micro_usd": 8240,
       "maximum_drawdown_micro_usd": 22344760,
       "trades": 117,
       "rejections": 11680,
-      "receipt_hash": "5175b1df97b436c8d89cab79f8545c08fccc21fd5bd2a43ac49a8bc5317c018e"
+      "receipt_hash": "5175b1df97b436c8d89cab79f8545c08fccc21fd5bd2a43ac49a8bc5317c018e",
+      "outcomes": {
+        "resolved": 117,
+        "wins": 13,
+        "losses": 104,
+        "breakevens": 0,
+        "max_losing_streak": 26,
+        "gross_win_micro_usd": 6450000,
+        "gross_loss_micro_usd": 26441760,
+        "net_micro_usd": -19991760,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -285,13 +466,25 @@
       "replay_dataset_id": "cf3eaf5cc69c1279d6fa31f7bf3ecf5e971b87b2daddb43914ee6d4314c38361",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 10890,
       "final_marked_micro_usd": 10890,
       "maximum_drawdown_micro_usd": 28222300,
       "trades": 167,
       "rejections": 1129,
-      "receipt_hash": "e12bd113ed205965f40f8f449c84db22a35a747a0a004d1bd6f24922a78c89b1"
+      "receipt_hash": "e12bd113ed205965f40f8f449c84db22a35a747a0a004d1bd6f24922a78c89b1",
+      "outcomes": {
+        "resolved": 167,
+        "wins": 31,
+        "losses": 136,
+        "breakevens": 0,
+        "max_losing_streak": 16,
+        "gross_win_micro_usd": 20106310,
+        "gross_loss_micro_usd": 40095420,
+        "net_micro_usd": -19989110,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -303,13 +496,25 @@
       "replay_dataset_id": "e09b84c354136a8b1828dcaefe96ba53b213627f369f6eaafc59ac48627e0145",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 11400,
       "final_marked_micro_usd": 11400,
       "maximum_drawdown_micro_usd": 22500500,
       "trades": 119,
       "rejections": 3714,
-      "receipt_hash": "d40e74970f5cddda3c57b422d4f779b3bec4484b84a355ac0105d63060c44e04"
+      "receipt_hash": "d40e74970f5cddda3c57b422d4f779b3bec4484b84a355ac0105d63060c44e04",
+      "outcomes": {
+        "resolved": 119,
+        "wins": 15,
+        "losses": 104,
+        "breakevens": 0,
+        "max_losing_streak": 16,
+        "gross_win_micro_usd": 11426280,
+        "gross_loss_micro_usd": 31414880,
+        "net_micro_usd": -19988600,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -321,13 +526,25 @@
       "replay_dataset_id": "45bacec65fe20e98334e6068100d44b399ac2faa31ea3aaa353cb31d4f35e8a2",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 11750,
       "final_marked_micro_usd": 11750,
       "maximum_drawdown_micro_usd": 22675830,
       "trades": 111,
       "rejections": 5231,
-      "receipt_hash": "afe3166987c647a21efe5b925e7b65f931b87e90405bc0df5cc728ce4505a2b9"
+      "receipt_hash": "afe3166987c647a21efe5b925e7b65f931b87e90405bc0df5cc728ce4505a2b9",
+      "outcomes": {
+        "resolved": 111,
+        "wins": 12,
+        "losses": 99,
+        "breakevens": 0,
+        "max_losing_streak": 21,
+        "gross_win_micro_usd": 7182900,
+        "gross_loss_micro_usd": 27171150,
+        "net_micro_usd": -19988250,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -339,13 +556,25 @@
       "replay_dataset_id": "c75277e2afc725ddc9cd69789f9ec5cabb488739200cf4f0d762c969ef1f76f2",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 11310,
       "final_marked_micro_usd": 11310,
       "maximum_drawdown_micro_usd": 20405190,
       "trades": 123,
       "rejections": 1427,
-      "receipt_hash": "1d9dd88ca883b4e8d70087085134b08bf29490ebba66117316320f027865b3fb"
+      "receipt_hash": "1d9dd88ca883b4e8d70087085134b08bf29490ebba66117316320f027865b3fb",
+      "outcomes": {
+        "resolved": 123,
+        "wins": 16,
+        "losses": 107,
+        "breakevens": 0,
+        "max_losing_streak": 18,
+        "gross_win_micro_usd": 9719480,
+        "gross_loss_micro_usd": 29708170,
+        "net_micro_usd": -19988690,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -357,13 +586,25 @@
       "replay_dataset_id": "dbc95dffbc3de5c59ce185a5f990809b722b498d5c895ea46ea2335f46e7c1ed",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 206250,
       "final_marked_micro_usd": 191460,
       "maximum_drawdown_micro_usd": 19826060,
       "trades": 84,
       "rejections": 1,
-      "receipt_hash": "3c5dc1843ed7348620876dc0d5dc903e5cc60b3115869c411e7658059c736d61"
+      "receipt_hash": "3c5dc1843ed7348620876dc0d5dc903e5cc60b3115869c411e7658059c736d61",
+      "outcomes": {
+        "resolved": 84,
+        "wins": 14,
+        "losses": 70,
+        "breakevens": 0,
+        "max_losing_streak": 15,
+        "gross_win_micro_usd": 7642020,
+        "gross_loss_micro_usd": 27435770,
+        "net_micro_usd": -19793750,
+        "unresolved_positions": 1
+      }
     },
     {
       "year": 2026,
@@ -375,13 +616,25 @@
       "replay_dataset_id": "66f7d8f0a19c689bbd092ec5aa656a57202c69dfa7b6e71005f552066944dab6",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 11970,
       "final_marked_micro_usd": 11970,
       "maximum_drawdown_micro_usd": 19988030,
       "trades": 108,
       "rejections": 994,
-      "receipt_hash": "4e45d235ffe856edfb409f78a76838ad724f50cfa3e6a97fdcc88ce15da11f51"
+      "receipt_hash": "4e45d235ffe856edfb409f78a76838ad724f50cfa3e6a97fdcc88ce15da11f51",
+      "outcomes": {
+        "resolved": 108,
+        "wins": 13,
+        "losses": 95,
+        "breakevens": 0,
+        "max_losing_streak": 20,
+        "gross_win_micro_usd": 11886370,
+        "gross_loss_micro_usd": 31874400,
+        "net_micro_usd": -19988030,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -393,13 +646,25 @@
       "replay_dataset_id": "9e3cd75fff227bc4bf645699f7818fe9a5259226630a4680067969e0db4fb553",
       "declared_class": "RealStructurallyValid",
       "profile_id": "be6e212cdb15ec7078fce02bd16f229d3b88b3cc63f8bcd554fee4c74b5b7c59",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 10840,
       "final_marked_micro_usd": 10840,
       "maximum_drawdown_micro_usd": 19989160,
       "trades": 149,
       "rejections": 4246,
-      "receipt_hash": "36a8db5f81323086737af3db14a80a4883a30d2a6f8dbf078360b9ee77fb7979"
+      "receipt_hash": "36a8db5f81323086737af3db14a80a4883a30d2a6f8dbf078360b9ee77fb7979",
+      "outcomes": {
+        "resolved": 149,
+        "wins": 24,
+        "losses": 125,
+        "breakevens": 0,
+        "max_losing_streak": 14,
+        "gross_win_micro_usd": 5414990,
+        "gross_loss_micro_usd": 25404150,
+        "net_micro_usd": -19989160,
+        "unresolved_positions": 0
+      }
     }
   ],
   "refusals": [],
@@ -410,9 +675,17 @@
     "rejections": 105786,
     "initial_micro_usd": 440000000,
     "pnl_micro_usd": -439523130,
-    "maximum_drawdown_micro_usd": 47783390
+    "maximum_drawdown_micro_usd": 47783390,
+    "wins": 480,
+    "losses": 2580,
+    "breakevens": 0,
+    "max_losing_streak": 26,
+    "gross_win_micro_usd": 403829380,
+    "gross_loss_micro_usd": 843337720,
+    "net_micro_usd": -439508340,
+    "unresolved_positions": 2
   },
   "cache_hits": 22,
   "cache_misses": 0,
-  "limitations": "Diagnostic simulation only. The authoritative sequential engine and frozen financial rules are applied to real structurally-valid literal-USD history using explicit test-convention profiles, so results are not broker-approved execution. No research eligibility, calendar/profile/licensing approval, scientific validity or qualification is granted. Non-USD-quote instruments and eligibility-bearing data classes are refused. Counts and money figures are observations, not performance evidence."
+  "limitations": "Diagnostic simulation only. The authoritative sequential engine and frozen financial rules are applied to real structurally-valid history using explicit test-convention profiles, so results are not broker-approved execution. USD-quoted instruments use the identity conversion; USD-base non-USD-quote instruments (USDJPY/USDCHF/USDCAD) use a diagnostic direction-based reciprocal closing rate derived from the instrument's own verified quote (long -> bid, short -> ask; USD per quote currency = price_scale / price). That conversion convention is an explicit unverified research assumption, not an approved broker conversion rule; the documented MT5 profitability-based variant is not implemented. Cross-currency pairs and eligibility-bearing data classes are refused. No research eligibility, calendar/profile/licensing approval, scientific validity or qualification is granted. Counts and money figures are observations, not performance evidence."
 }
