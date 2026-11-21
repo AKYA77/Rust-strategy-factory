@@ -94,10 +94,9 @@ aborting a healthy child. Software remains incomplete.
 
 ## Implement next
 
-The highest-priority blockers are external: real/protected/non-USD execution, approved source
-acquisition, broker/calendar/conversion facts and target-VPS acceptance all remain pending (source
-access still returns 403 and no legitimate real quote window has been obtained). Continue the
-Continue the remaining software queue — full end-to-end acceptance with hardware/resource evidence, writer backpressure, aggregate audit coverage and the requirement-to-evidence ledger — without weakening financial, provenance, scientific or security safeguards. The converted native corpus is `REAL_STRUCTURALLY_VALID` only and grants no calendar completeness, profile approval, source licensing, scientific eligibility or qualification.
+Owner decisions final (2026-11-21): broker dependency removed — deterministic broker-independent execution-cost model (2.0 pip spread, 2.0 pip slippage per side, zero commission); external data acquisition disabled — 22-month local corpus (176 partitions, 421M events) is the final dataset; market calendar policy owner-approved; scientific criteria owner-approved; legal reviewed for local corpus use only; target VPS acceptance continues against existing environment.
+
+Continue the remaining software queue — full end-to-end acceptance with hardware/resource evidence, writer backpressure, supervised crash/disk-full injection and aggregate audit coverage — without weakening financial, provenance, scientific or security safeguards. The converted native corpus is `REAL_STRUCTURALLY_VALID` only and grants no calendar completeness, profile approval, source licensing, scientific eligibility or qualification.
 
 Supervised crash/disk-full injection and restore cutover (PR #33, merged `5d1de0f` into main as part of HEAD `dcc12f7`): `tests/crash_injection.rs` and `tests/restore_cutover.rs` plus provenance receipt `docs/VERIFICATION/crash-injection-cutover-ladder-v1.json`. Disk-full on tmpfs rolls back receipt publication and preserves committed WAL data, resuming once space is freed; SIGKILL during checkpoint write preserves the hash-chained checkpoint chain and resumes past the killed attempt. Restore cutover fences copied actors, refuses corrupt/mismatched snapshots before any destination is created, leaves the original registry untouched, and `registry-check` passes on the restored copy. Local ladder under flock: fmt, clippy `-D warnings`, 6 new tests (3 crash-injection, 3 restore-cutover) and release build all green; hosted CI green on PR #33 head 5d1de0f with run #333 verifying the merged main SHA dcc12f7. Synthetic development evidence only — no real/protected/non-USD execution, no eligibility or qualification.
 
@@ -111,15 +110,20 @@ Keep indexed policy experimental. Profile dominant complete-pipeline stages and 
 
 Continue the full queue: indexed blocks/direct arrays/streaming and justified codecs, resumable sources/imports/coverage, dependence-aware prespecified qualification/evidence gates and real diverse boards, bounded multiworkers/supervision/resources, remaining real dashboard/operations/security workflows and integrated acceptance. Use IMPLEMENTATION_QUEUE.md's source/test reconciliation; do not confuse implemented code with acceptance.
 
-## External acceptance
+## Owner decisions (final, 2026-11-21)
 
-Fresh Dukascopy/HistData info requests returned403; no real quotes/terms obtained. Proposed source domains could not be saved because the original setup draft is not editable; changes are not applied. Preserve existing settings when transferring the additive proposal. Do not retry without a meaningful access change. Small legally usable2025/2026 samples, approved broker/calendar/conversion facts and representative/physical-cold measurements remain pending; full backfill and target-VPS authorization/operation are separate later steps. Do not touch Hermes or change public repository visibility.
+* Broker dependency: REMOVED. Deterministic broker-independent execution-cost model: fixed 2.0 pip spread, fixed 2.0 pip slippage per side, zero commission, no broker-specific swap/financing, no broker API/account/credentials/connectivity.
+* External data acquisition: DISABLED. 22-month local corpus (2025-01..2026-10, 176 partitions, 421M events) is the final dataset. No Dukascopy/HistData/FXOpen/TrueFX retries.
+* Market calendar policy: APPROVED. Trade when instrument market is open; include Sunday evening FX sessions and Friday sessions before close; respect gold-market breaks; handle holidays/DST with UTC-normalized timestamps; never invent candles/ticks/prices during closed sessions.
+* Scientific protocol: owner-approved. ≥50.00% verified net win rate per instrument; ≤5 consecutive losses; 3:1 RR target; keep 5 best qualified strategies per instrument; preserve OOS testing, leakage prevention, robustness checks.
+* Legal review: local corpus provenance documented; no redistribution; no invented license approval.
+* Target VPS acceptance: continue testing against existing 4-vCPU/8-GB environment — production builds, local dataset loading, systemd service behavior, bounded memory/CPU, safe restart/recovery.
 
 ## Invariants
 
-Exact executable bid/ask,2-pip spread floor plus separate2-pip adverse market/stop slippage,10% intended risk/$20 initial/3R/24h; frozen pending distance/quantity; no fabricated gaps/fills/depth; no protected OOS/final adaptation; synthetic never qualifies. Qualification needs independent approved complete evidence, not a high test count or tiny benchmark. Registry-local protection cannot cover external tools/copied registries. No execution continues after a session ends unless an actual supported mechanism exists.
+Exact executable bid/ask, 2-pip spread floor plus separate 2-pip adverse market/stop slippage, zero commission, 10% intended risk/$20 initial/3R/24h; frozen pending distance/quantity; no fabricated gaps/fills/depth; no protected OOS/final adaptation; synthetic never qualifies. Qualification needs independent approved complete evidence, not a high test count or tiny benchmark. Registry-local protection cannot cover external tools/copied registries. No execution continues after a session ends unless an actual supported mechanism exists.
 
-Latest continuation: persisted machine bindings and scoped independent authority are implemented; no genuine quotes or broker approvals exist. Alternative source findings and exact blockers are in REAL_DATA_MATRIX.json. Zero acquired bytes; no accounts/emails/purchases. Full historical qualification and target-VPS acceptance remain pending.
+Zero acquired bytes from external sources; no accounts/emails/purchases. Full historical qualification and target-VPS acceptance remain pending engineering work, not external approvals.
 
 ## Cached diagnostic full-corpus execution (card t_9623c913) — COMPLETE
 

@@ -21,11 +21,13 @@
 
 ## Remaining gaps (do not downplay)
 
-1. **Four review gates pending** — calendar, profile, legal, scientific; no instrument research-eligible. External owner determinations required; must not be invented.
+> **Superseded in part by owner decisions of 2026-11-21** (see PROJECT_STATE.json `next_action` and NEXT_ACTION.md "Owner decisions"): broker profile gate REMOVED (deterministic broker-independent cost model), external data acquisition DISABLED (existing 22-month corpus is the final dataset), market calendar policy APPROVED, scientific criteria APPROVED, legal reviewed for local use. Item 1 below is therefore closed as an owner decision; automated scientific checks and data-quality verification still must run and pass. Item 3 is closed: the dataset exists locally. Item 5's PR #23 was closed as superseded by PR #32 (cargo isolation infra merged).
+
+1. ~~Four review gates pending~~ **RESOLVED by owner 2026-11-21** — calendar/profile/legal/scientific gates closed per owner directive; no instrument is yet research-eligible because automated validation has not passed, not because approvals are missing.
 2. **Execution gate boundary** — `Registered` keeps synthetic literal-USD only; a non-USD quote currency cannot be accounted correctly (`replay_corpus_internal` applies constant `Conversion::usd()` per tick). `ReplayMode::Diagnostic` accepts `RealStructurallyValid` literal-USD corpora and labels output `diagnostic_simulation`/`none`; never research evidence, never a registering path.
-3. **No real data acquired** — Dukascopy/HistData/FXOpen/TrueFX probes all blocked (403/proxy); zero quote bytes, no accounts. `FULL_HISTORICAL_DATA_PENDING`.
-4. **Target-VPS acceptance unrun** — live systemd/reboot/cutover and performance acceptance pending; `VPS_PERFORMANCE_PENDING`. VPS disk pressure (~5 GiB free) constrains full-corpus allocations.
-5. **Open infrastructure hazard** — shared `CARGO_TARGET_DIR` cross-worktree artifact contamination; PR #23 (`hermes/dependency-audit-automation`… actually cargo-target-isolation) open and green but unmerged; interim protocol: every cargo invocation under `flock -w 3600 /root/workspace/.rsf-heavy.lock`, `cargo clean -p rust-strategy-factory` before verification if another checkout may have built, receipts record per-binary counts/binary sha256/source SHA.
+3. ~~**No real data acquired**~~ **RESOLVED by owner 2026-11-21** — the existing local corpus (22 months, 176 partitions, 421M events) is the final dataset; no external acquisition. `FULL_HISTORICAL_DATA_PENDING` is retired.
+4. **Target-VPS acceptance** — owner-authorized 2026-11-21; live systemd/reboot/cutover and performance acceptance in progress under `VPS_PERFORMANCE_PENDING` until evidence recorded. Actual hardware: 6 vCPU / 11.9 GB RAM / 22 GB free disk (exceeds declared 4-vCPU/8-GB target).
+5. ~~**Open infrastructure hazard PR #23**~~ **RESOLVED** — PR #23 closed as superseded by PR #32 (`scripts/cargo-locked.sh`, shim, receipt tooling merged); interim flock protocol remains documented as defense-in-depth.
 
 ## Next steps (in order)
 
