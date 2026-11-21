@@ -103,7 +103,7 @@ pub struct OpenPosition {
     pub mfe: i64,
     pub mae: i64,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Rejection {
     pub event: u64,
     pub reason: String,
@@ -813,9 +813,11 @@ pub struct CorpusBudget {
 pub enum ReplayMode {
     /// Registered research replay: synthetic literal-USD inputs only.
     Registered,
-    /// Explicitly non-eligible diagnostic simulation over real structurally-valid literal-USD
-    /// corpora. Runs the identical engine and accounting as `Registered`; the result must never
-    /// be presented as research evidence, eligibility or qualification.
+    /// Explicitly non-eligible diagnostic simulation over real structurally-valid corpora.
+    /// USD-quoted instruments use the identity conversion; USD-base non-USD-quote instruments
+    /// use a direction-based reciprocal closing rate derived from their own quote. Runs the
+    /// identical engine and accounting as `Registered`; the result must never be presented as
+    /// research evidence, eligibility or qualification.
     Diagnostic,
 }
 pub(crate) fn corpus_configuration_hash(
@@ -981,13 +983,16 @@ pub fn replay_corpus(
     )?
     .ok_or_else(|| "unexpected incomplete corpus replay".into())
 }
-/// Diagnostic-only corpus replay over real structurally-valid literal-USD inputs.
+/// Diagnostic-only corpus replay over real structurally-valid inputs.
 ///
-/// This is the same sequential engine and accounting as [`replay_corpus`]; the only difference is
-/// the accepted input class. It exists so the converted historical corpus can be exercised
-/// end-to-end for diagnosis. The result is **not** research evidence: it must never be
-/// registered as an experiment, presented as eligibility, or used for qualification. FX
-/// conversion streams and eligibility-bearing data classes are refused.
+/// This is the same sequential engine and accounting as [`replay_corpus`]; the differences are
+/// the accepted input class and the USD-account conversion semantics. It exists so the converted
+/// historical corpus can be exercised end-to-end for diagnosis. The result is **not** research
+/// evidence: it must never be registered as an experiment, presented as eligibility, or used for
+/// qualification. USD-quoted instruments use the identity conversion; USD-base non-USD-quote
+/// instruments use the direction-based reciprocal closing rate derived from their own quote
+/// (long -> bid, short -> ask). Cross-currency conversion streams and eligibility-bearing data
+/// classes are refused.
 pub(crate) fn replay_corpus_diagnostic(
     base: &std::path::Path,
     spec: &crate::corpus::Specification,
@@ -1009,6 +1014,22 @@ pub(crate) fn replay_corpus_diagnostic(
         ReplayMode::Diagnostic,
     )?
     .ok_or_else(|| "unexpected incomplete corpus replay".into())
+}
+/// Diagnostic USD-account conversion for one corpus event.
+///
+/// USD-quoted instruments use the identity conversion. USD-base non-USD-quote instruments use
+/// the direction-based reciprocal closing rate derived from the instrument's own quote: the bid
+/// for a long and the ask for a short. This is an explicit, unverified research convention, not
+/// an approved broker conversion rule.
+fn diagnostic_conversion(p: &Profile, tick: &Tick, side: Side) -> Result<Conversion> {
+    if p.quote == "USD" {
+        return Ok(Conversion::usd());
+    }
+    let price = match side {
+        Side::Long => tick.bid,
+        Side::Short => tick.ask,
+    };
+    Conversion::usd_account_from_usd_base_price(p, price, tick.timestamp_ms)
 }
 fn replay_corpus_internal(
     run: CorpusRun<'_>,
@@ -1062,10 +1083,11 @@ fn replay_corpus_internal(
             }
         }
         ReplayMode::Diagnostic => {
-            if observed.declared_class != crate::data::DataClass::RealStructurallyValid
-                || observed.profile.quote != "USD"
-            {
-                return Err("diagnostic corpus replay supports only real structurally-valid literal-USD inputs; eligibility-bearing classes, protected exposure and FX conversion streams are refused".into());
+            if observed.declared_class != crate::data::DataClass::RealStructurallyValid {
+                return Err("diagnostic corpus replay supports only real structurally-valid inputs; eligibility-bearing classes, protected exposure and quarantined data are refused".into());
+            }
+            if observed.profile.quote != "USD" && observed.profile.base != "USD" {
+                return Err("diagnostic corpus replay supports USD-quote instruments and USD-base instruments with a USD-account reciprocal conversion; cross-currency conversion is unavailable".into());
             }
         }
     }
@@ -1142,7 +1164,12 @@ fn replay_corpus_internal(
             return Ok(());
         }
         for tick in dataset.ticks {
-            let fx = Conversion::usd();
+            let fx = match mode {
+                ReplayMode::Registered => Conversion::usd(),
+                ReplayMode::Diagnostic => {
+                    diagnostic_conversion(&observed.profile, tick, strategy.side)?
+                }
+            };
             state.advance(tick, fx, previous, &context)?;
             if state
                 .trades
@@ -2029,6 +2056,32 @@ mod worker_preparation_tests {
             fs::remove_dir_all(&self.root).unwrap();
         }
     }
+    /// Real-class corpus fixture for the diagnostic input-class gate. The tick content is the
+    /// deterministic synthetic fixture; only the declared class is promoted so the diagnostic path
+    /// can be exercised without the multi-gigabyte historical corpus.
+    struct RealSource {
+        root: PathBuf,
+        spec: corpus::Specification,
+        data: data::Dataset,
+    }
+    impl RealSource {
+        fn new(name: &str, symbol: &str) -> Self {
+            let root =
+                std::env::temp_dir().join(format!("prepared-real-{name}-{}", std::process::id()));
+            fs::create_dir(&root).unwrap();
+            let mut data = data::synthetic_fixture(symbol).unwrap();
+            data.manifest.class = data::DataClass::RealStructurallyValid;
+            let path = root.join("source.rsf");
+            native::write(&path, &data).unwrap();
+            let spec = corpus::describe(&[path], 100000).unwrap();
+            Self { root, spec, data }
+        }
+    }
+    impl Drop for RealSource {
+        fn drop(&mut self) {
+            fs::remove_dir_all(&self.root).unwrap();
+        }
+    }
     fn strategy() -> Strategy {
         Strategy {
             timeframe: Timeframe::M1,
@@ -2058,6 +2111,127 @@ mod worker_preparation_tests {
         )
         .expect_err("diagnostic replay must not accept synthetic test-only inputs");
         assert!(error.contains("real structurally-valid"), "{error}");
+    }
+    #[test]
+    fn diagnostic_conversion_is_direction_based_reciprocal() {
+        let jpy = Profile::synthetic("USDJPY").unwrap();
+        let tick = Tick {
+            timestamp_ms: 5_000,
+            sequence: 1,
+            bid: 150_000,
+            ask: 150_100,
+        };
+        let long = diagnostic_conversion(&jpy, &tick, Side::Long).unwrap();
+        assert_eq!(
+            (long.usd_num, long.quote_den, long.as_of_ms),
+            (1, 150, 5_000)
+        );
+        let short = diagnostic_conversion(&jpy, &tick, Side::Short).unwrap();
+        assert_eq!((short.usd_num, short.quote_den), (10, 1_501));
+        // The rate is exactly USD per quote currency: 1 / 150.1.
+        assert_eq!(
+            i128::from(short.usd_num) * 150_100,
+            i128::from(short.quote_den) * 1_000
+        );
+        let eur = Profile::synthetic("EURUSD").unwrap();
+        assert_eq!(
+            diagnostic_conversion(&eur, &tick, Side::Long).unwrap(),
+            Conversion::usd()
+        );
+        assert!(Conversion::usd_account_from_usd_base_price(&eur, 100_000, 0).is_err());
+    }
+    #[test]
+    fn diagnostic_replay_executes_usd_base_non_usd_quote_with_exact_reciprocal_conversions() {
+        for side in [Side::Long, Side::Short] {
+            let source = RealSource::new("usdjpy-conversion", "USDJPY");
+            let mut direction = strategy();
+            direction.side = side;
+            let costs = Costs::default();
+            let budget = budget();
+            let replay_report =
+                replay_corpus_diagnostic(&source.root, &source.spec, &direction, &costs, budget)
+                    .expect("USD-base non-USD-quote corpus must execute in diagnostic mode");
+            let mut expected = crate::corpus::SequenceHash::new();
+            for tick in &source.data.ticks {
+                expected
+                    .push(&diagnostic_conversion(&source.data.profile, tick, side).unwrap())
+                    .unwrap();
+            }
+            assert_eq!(
+                replay_report.conversion_id,
+                expected.finish(),
+                "diagnostic replay must use the exact direction-based conversion sequence"
+            );
+            // The corpus path must match the materialized explicit-conversion engine exactly.
+            let candles = crate::candles::build(&source.data, direction.timeframe).unwrap();
+            let mut features = crate::strategies::Features::with_context(
+                &candles,
+                candles.len().saturating_mul(128),
+                &source.data,
+                direction.timeframe,
+            )
+            .unwrap();
+            let mask = features.signal(&direction.rule).unwrap();
+            let conversions: Vec<Conversion> = source
+                .data
+                .ticks
+                .iter()
+                .map(|tick| diagnostic_conversion(&source.data.profile, tick, side).unwrap())
+                .collect();
+            let materialized = replay(
+                &source.data,
+                &candles,
+                &mask,
+                &direction,
+                &costs,
+                &conversions,
+            )
+            .expect("materialized explicit-conversion replay must succeed");
+            assert_eq!(
+                replay_report.realized_micro_usd,
+                materialized.realized_micro_usd
+            );
+            assert_eq!(
+                replay_report.final_marked_micro_usd,
+                materialized.final_marked_micro_usd
+            );
+            assert_eq!(
+                replay_report.maximum_drawdown_micro_usd,
+                materialized.maximum_drawdown_micro_usd
+            );
+            assert_eq!(replay_report.trades, materialized.trades);
+            assert_eq!(replay_report.rejections, materialized.rejections);
+            assert!(
+                !replay_report.trades.is_empty(),
+                "{side:?}: fixture must produce engine activity"
+            );
+        }
+    }
+    #[test]
+    fn diagnostic_replay_usd_quote_uses_identity_conversion() {
+        // Every canonical profile is either USD-quoted or USD-base, so the cross-currency
+        // refusal is a defensive gate. A USD-quoted profile must take the identity path.
+        let eur = RealSource::new("eurusd-gate", "EURUSD");
+        let direction = strategy();
+        let replay = replay_corpus_diagnostic(
+            &eur.root,
+            &eur.spec,
+            &direction,
+            &Costs::default(),
+            budget(),
+        )
+        .expect("USD-quoted real-class corpus must execute");
+        let mut expected = crate::corpus::SequenceHash::new();
+        for tick in &eur.data.ticks {
+            expected
+                .push(&diagnostic_conversion(&eur.data.profile, tick, direction.side).unwrap())
+                .unwrap();
+        }
+        assert_eq!(replay.conversion_id, expected.finish());
+        assert!(eur.data.ticks.iter().all(|tick| {
+            diagnostic_conversion(&eur.data.profile, tick, direction.side).unwrap()
+                == Conversion::usd()
+        }));
     }
     #[test]
     fn saturated_writer_gate_refuses_batch_typed_and_recovers_after_pressure() {

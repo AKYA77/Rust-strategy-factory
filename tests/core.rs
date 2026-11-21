@@ -3,6 +3,7 @@ use rust_strategy_factory::{
     contracts::{self, Conversion, Profile, Side},
     data::{self, DataClass, Tick},
     indicators::{self, Mask},
+    risk,
     strategies::{self, Features, Rule, Strategy},
     tick_engine::{self, Costs, ExitReason},
 };
@@ -112,6 +113,39 @@ fn conversion_never_uses_future_or_stale_quotes() {
     assert_eq!(contracts::pnl(&p, 150, 1_000_000, fx).unwrap(), 100_000_000);
     fx.quote_den = 0;
     assert!(fx.validate(&p, 1000, 1000).is_err());
+}
+#[test]
+fn usd_account_reciprocal_conversion_is_exact_and_direction_based() {
+    let jpy = Profile::synthetic("USDJPY").unwrap();
+    let long = Conversion::usd_account_from_usd_base_price(&jpy, 150_000, 1_000).unwrap();
+    assert_eq!(
+        (long.usd_num, long.quote_den, long.as_of_ms),
+        (1, 150, 1_000)
+    );
+    let short = Conversion::usd_account_from_usd_base_price(&jpy, 151_000, 1_000).unwrap();
+    assert_eq!((short.usd_num, short.quote_den), (1, 151));
+    // 1 lot moving 1.0 JPY/USD at 150 is 100,000 JPY = 666.666... USD.
+    assert_eq!(
+        contracts::pnl(&jpy, 1_000, 1_000_000, long).unwrap(),
+        666_666_666
+    );
+    // Initial margin for 1 lot at 150 with 100:1 leverage is exactly $1,000.
+    assert_eq!(
+        risk::margin(&jpy, 150_000, 1_000_000, long).unwrap(),
+        1_000_000_000
+    );
+    let chf_profile = Profile::synthetic("USDCHF").unwrap();
+    let chf = Conversion::usd_account_from_usd_base_price(&chf_profile, 90_000, 2_000).unwrap();
+    assert_eq!((chf.usd_num, chf.quote_den), (10, 9));
+    assert_eq!(
+        contracts::pnl(&chf_profile, 1_000, 1_000_000, chf).unwrap(),
+        1_111_111_111
+    );
+    // USD-quoted instruments, zero USD, and USD-base prices above one billion USD are refused.
+    let eur = Profile::synthetic("EURUSD").unwrap();
+    assert!(Conversion::usd_account_from_usd_base_price(&eur, 100_000, 0).is_err());
+    assert!(Conversion::usd_account_from_usd_base_price(&jpy, 0, 0).is_err());
+    assert!(Conversion::usd_account_from_usd_base_price(&jpy, 1_000_000_001, 0).is_err());
 }
 #[test]
 fn quarantine_preserves_bad_events_and_timestamp_ties() {
