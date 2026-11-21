@@ -1,0 +1,40 @@
+{
+  "task": "t_69c8be6e",
+  "title": "Supervised crash/disk-full injection + restore cutover (rsf-rust)",
+  "branch": "wt/t_69c8be6e",
+  "source_sha": "c8d28345734bbd3a323b63b7bdb6eb711dafef17",
+  "source_sha_ref": "origin/main",
+  "binary_sha256": {
+    "release": "50a834cbab592699d645995282f99f4bfad3fc3f8d2cbbd6bd8da26260b4aa4e",
+    "debug": "ef35e2a75af2a88f5c2d679dd717d171e22010c55c768d0eaba828f3f48cbc4e"
+  },
+  "binary_path": {
+    "release": "/root/workspace/Rust-strategy-factory/target/release/rust-strategy-factory",
+    "debug": "/root/workspace/Rust-strategy-factory/target/debug/rust-strategy-factory"
+  },
+  "cargo_target_dir": "/root/workspace/Rust-strategy-factory/target",
+  "flock": "/root/workspace/.rsf-heavy.lock",
+  "ladder": [
+    { "step": "cargo fmt --all -- --check", "passed": true },
+    { "step": "cargo clippy --locked --all-targets -- -D warnings", "passed": true },
+    { "step": "cargo test --locked --lib --bins --tests", "passed": true },
+    { "step": "flock -w 3600 /root/workspace/.rsf-heavy.lock sh scripts/check.sh", "passed": true }
+  ],
+  "test_counts": {
+    "full_suite": { "passed": 277, "failed": 0, "ignored": 0, "binaries": 48 },
+    "crash_injection": { "passed": 3, "failed": 0 },
+    "restore_cutover": { "passed": 3, "failed": 0 }
+  },
+  "crash_injection_tests": [
+    "disk_full_receipt_publication_rolls_back_and_resumes_after_space_freed",
+    "disk_full_wal_growth_preserves_committed_data_and_resumes",
+    "sigkill_during_checkpoint_write_preserves_chain_and_resumes"
+  ],
+  "restore_cutover_tests": [
+    "restore_cutover_fences_copied_actors_and_revives_on_restored_copy",
+    "restore_cutover_rollback_on_failure_leaves_original_untouched",
+    "cli_restore_cutover_registry_check_passes_on_restored_copy"
+  ],
+  "classification": "synthetic_development_only",
+  "limitations": "Historical research and paper simulation only; no real/protected/non-USD execution; no market-data changes; no live trading. Diagnostic/synthetic results are not research evidence and grant no eligibility or qualification. Disk-full tests use a small tmpfs mount and skip if mounting is unavailable."
+}
