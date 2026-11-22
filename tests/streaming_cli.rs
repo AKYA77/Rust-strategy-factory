@@ -241,7 +241,7 @@ fn decode_state_persists_across_process_restarts() {
     );
     assert!(out.status.success());
     let progress: streaming::StreamProgress =
-        serde_json::from_slice(&fs::read(&dir.join("state.json")).unwrap()).unwrap();
+        serde_json::from_slice(&fs::read(dir.join("state.json")).unwrap()).unwrap();
     assert_eq!(progress.consumed_chunks, 1);
     assert_eq!(progress.consumed_events, 2);
     assert!(!progress.complete);
@@ -258,7 +258,7 @@ fn decode_state_persists_across_process_restarts() {
     );
     assert!(out2.status.success());
     let progress: streaming::StreamProgress =
-        serde_json::from_slice(&fs::read(&dir.join("state2.json")).unwrap()).unwrap();
+        serde_json::from_slice(&fs::read(dir.join("state2.json")).unwrap()).unwrap();
     assert_eq!(progress.consumed_chunks, 2);
     assert_eq!(progress.consumed_events, 5);
     assert!(progress.complete);
@@ -275,7 +275,7 @@ fn decode_state_persists_across_process_restarts() {
     );
     assert!(out3.status.success());
     let progress: streaming::StreamProgress =
-        serde_json::from_slice(&fs::read(&dir.join("state3.json")).unwrap()).unwrap();
+        serde_json::from_slice(&fs::read(dir.join("state3.json")).unwrap()).unwrap();
     assert_eq!(progress.consumed_chunks, 2);
     assert_eq!(progress.consumed_events, 5);
     assert!(progress.complete);
@@ -318,7 +318,7 @@ fn decode_refuses_tampered_consumed_artifact_and_prefix() {
     );
     assert!(out.status.success());
     let progress: streaming::StreamProgress =
-        serde_json::from_slice(&fs::read(&dir.join("state.json")).unwrap()).unwrap();
+        serde_json::from_slice(&fs::read(dir.join("state.json")).unwrap()).unwrap();
     assert_eq!(progress.consumed_chunks, 1);
 
     // Tamper the consumed artifact: the guarded resume refuses.
