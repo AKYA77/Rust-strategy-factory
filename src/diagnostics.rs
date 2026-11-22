@@ -3,7 +3,7 @@ use crate::{Result, contracts::INITIAL_EQUITY, tick_engine::Trade};
 use chrono::{Datelike, Timelike};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-pub const VERSION: &str = "oos-exit-year-entry-utc-session-realized-cash-v1";
+pub const VERSION: &str = "oos-exit-year-entry-utc-session-regime-momentum-v2";
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Bucket {
     pub resolved: usize,
@@ -78,11 +78,14 @@ pub struct Breakdown {
     pub folds: Vec<FoldRisk>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub entry_regimes: BTreeMap<String, Bucket>,
+    /// Fixed descriptive prior-window displacement bins; orthogonal to `entry_regimes`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub entry_momentum: BTreeMap<String, Bucket>,
     pub warnings: Vec<String>,
 }
 impl Default for Breakdown {
     fn default() -> Self {
-        Self{method:VERSION.into(),exit_years:BTreeMap::new(),entry_utc_six_hour_bins:BTreeMap::new(),folds:Vec::new(),entry_regimes:BTreeMap::new(),warnings:vec!["OOS-only reset-fold receipt breakdown; no full-period coverage or qualification".into(),"UTC entry bins are not approved broker/DST sessions".into(),"Realized cash drawdown excludes intratrade marks, MFE/MAE and unresolved positions".into(),"Exact net expectancy per bucket is sum_net_micro_usd / resolved; empty buckets have no estimate".into()]}
+        Self{method:VERSION.into(),exit_years:BTreeMap::new(),entry_utc_six_hour_bins:BTreeMap::new(),folds:Vec::new(),entry_regimes:BTreeMap::new(),entry_momentum:BTreeMap::new(),warnings:vec!["OOS-only reset-fold receipt breakdown; no full-period coverage or qualification".into(),"UTC entry bins are not approved broker/DST sessions".into(),"Realized cash drawdown excludes intratrade marks, MFE/MAE and unresolved positions".into(),"Exact net expectancy per bucket is sum_net_micro_usd / resolved; empty buckets have no estimate".into(),"Regime and momentum bins are fixed descriptive prior-window definitions, not fitted regimes, broker sessions or eligibility evidence".into()]}
     }
 }
 impl Breakdown {
@@ -90,6 +93,12 @@ impl Breakdown {
         let mut next = self.entry_regimes.get(label).cloned().unwrap_or_default();
         next.add(net)?;
         self.entry_regimes.insert(label.into(), next);
+        Ok(())
+    }
+    pub fn record_momentum(&mut self, label: &str, net: i128) -> Result<()> {
+        let mut next = self.entry_momentum.get(label).cloned().unwrap_or_default();
+        next.add(net)?;
+        self.entry_momentum.insert(label.into(), next);
         Ok(())
     }
     pub fn record(&mut self, trade: &Trade, fold: &mut FoldRisk) -> Result<()> {

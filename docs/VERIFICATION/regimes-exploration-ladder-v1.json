@@ -1,0 +1,85 @@
+{
+ "version": "regimes-exploration-ladder-v1",
+ "date": "2026-11-22",
+ "branch": "hermes/regimes-exploration",
+ "base_sha": "51334f3ab19265f87cf59fa77dda9f8b87ede4c7",
+ "workspace": "/root/workspace/rsf-wt-regimes",
+ "protocol": "CI-first pre-push gate: cargo fmt --all -- --check; cargo clippy --locked --all-targets -- -D warnings; targeted tests under scripts/cargo-locked.sh (flock + cargo clean -p provenance)",
+ "cargo_env": {
+  "CARGO_HOME": "/workspace/.cargo",
+  "RUSTUP_HOME": "/workspace/.rustup",
+  "CARGO_TARGET_DIR": "/root/workspace/Rust-strategy-factory/target"
+ },
+ "tests": {
+  "binaries": [
+   {
+    "name": "behavior",
+    "passed": 4,
+    "failed": 0,
+    "sha256": "2517960c7eb410334f4f3543aeb9f2ff8984614b65e8537535c715a8a9c32bdc"
+   },
+   {
+    "name": "corpus",
+    "passed": 96,
+    "failed": 0,
+    "sha256": "81a28c48d00bfef26f64397d42134840f462a77fabc74eb68f6ce9d88edcabed"
+   },
+   {
+    "name": "diagnostics",
+    "passed": 2,
+    "failed": 0,
+    "sha256": "e45987f03de8ec01e008eb899991bec63e8201a4331c8e98604297ff7319480c"
+   },
+   {
+    "name": "exploration",
+    "passed": 3,
+    "failed": 0,
+    "sha256": "dba190674298a1c3add2f97c559fbf0dfec1d4afd1c233554252fd0f242bff3d"
+   },
+   {
+    "name": "regimes",
+    "passed": 3,
+    "failed": 0,
+    "sha256": "581f40b39800da78e261d5941e111e9dcf7485fb43e7894af3c8fc51b8baa80a"
+   },
+   {
+    "name": "science",
+    "passed": 15,
+    "failed": 0,
+    "sha256": "89924c8a6dff1641a57793d10d11e4fc31629c02a168f554b85d11a5bd8db80d"
+   }
+  ],
+  "total_passed": 123,
+  "total_failed": 0,
+  "command": "scripts/cargo-locked.sh test --locked --test behavior --test regimes --test exploration --test science --test corpus --test diagnostics",
+  "log": "/root/workspace/rsf-ops/regimes-exploration/tests.log"
+ },
+ "new_methods": {
+  "regime_method": "prior-21-closed-m1-trend-range-momentum-v2",
+  "breakdown_method": "oos-exit-year-entry-utc-session-regime-momentum-v2",
+  "exploration_method": "bounded-seeded-rule-structure-v2",
+  "behavior_method": "signal-vector-population-diversity-v1"
+ },
+ "corpus_evidence": {
+  "command": "historical-corpus-diversity EURUSD-corpus.json 60000 4000000 population.json corpus-diversity-EURUSD.json",
+  "instrument": "EURUSD",
+  "corpus_identity": "520e7141cb4abb7adc35caa1d410e2869ccef79e15290fe2e8eb58613840d256",
+  "months": 22,
+  "events": 39341710,
+  "members": 9,
+  "bars": 681141,
+  "mean_distance_bps": 1940,
+  "max_distance_bps": 4672,
+  "zero_distance_pairs": 0,
+  "report_sha256": "9eabea5388a0e2a12831fc1dc46b511db7af213f24950ef468d839609ae2c06e",
+  "wall_clock": "7m54s"
+ },
+ "synthetic_evidence": {
+  "command": "behavior-diversity synthetic-eurusd.json population.json 20000",
+  "bars": 333,
+  "members": 9,
+  "mean_distance_bps": 1292,
+  "report_sha256": "c31630f28c3a35ddc92dd55ac70550ca359d10ced4404f5d86840cc7ebfb335a"
+ },
+ "scope": "Descriptive training-only regimes/exploration/diversity evidence. No eligibility, qualification, performance or acquisition claim; corpus remains REAL_STRUCTURALLY_VALID."
+}

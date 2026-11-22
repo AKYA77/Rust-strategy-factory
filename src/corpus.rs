@@ -9,6 +9,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::BTreeMap,
     fs::File,
     io::{Read, Write},
     path::Path,
@@ -714,25 +715,20 @@ pub fn signals_window(
         Some(window),
     )
 }
-fn signals_internal(
+fn build_frames(
     base: &Path,
     spec: &Specification,
-    strategy: &crate::strategies::Strategy,
+    timeframe: Timeframe,
     max_candles: usize,
-    feature_cells: usize,
     window: Option<&crate::validation::Interval>,
-) -> Result<crate::indicators::Mask> {
-    let strategy = strategy.canonical()?;
-    if max_candles == 0 || max_candles > MAX_RETAINED_CANDLES {
-        return Err("invalid aggregate corpus candle budget".into());
-    }
-    let mut frames = std::collections::BTreeMap::new();
+) -> Result<BTreeMap<Timeframe, Vec<candles::Candle>>> {
+    let mut frames = BTreeMap::new();
     let mut streams = Vec::new();
     let mut total = 0;
     visit_blocks(base, spec, |dataset| {
         if streams.is_empty() {
             for tf in Timeframe::ALL {
-                if tf.millis() >= strategy.timeframe.millis() {
+                if tf.millis() >= timeframe.millis() {
                     streams.push((tf, candles::Stream::new(dataset.profile.clone(), tf)?));
                     frames.insert(tf, Vec::new());
                 }
@@ -754,11 +750,67 @@ fn signals_internal(
         }
         Ok(())
     })?;
+    Ok(frames)
+}
+fn signal_frames(
+    frames: &BTreeMap<Timeframe, Vec<candles::Candle>>,
+    strategy: &crate::strategies::Strategy,
+    feature_cells: usize,
+) -> Result<crate::indicators::Mask> {
     let candles = frames
         .get(&strategy.timeframe)
         .ok_or("primary frame missing")?;
-    crate::strategies::Features::with_frames(candles, feature_cells, &frames, strategy.timeframe)?
+    crate::strategies::Features::with_frames(candles, feature_cells, frames, strategy.timeframe)?
         .signal(&strategy.rule)
+}
+fn signals_internal(
+    base: &Path,
+    spec: &Specification,
+    strategy: &crate::strategies::Strategy,
+    max_candles: usize,
+    feature_cells: usize,
+    window: Option<&crate::validation::Interval>,
+) -> Result<crate::indicators::Mask> {
+    let strategy = strategy.canonical()?;
+    if max_candles == 0 || max_candles > MAX_RETAINED_CANDLES {
+        return Err("invalid aggregate corpus candle budget".into());
+    }
+    let frames = build_frames(base, spec, strategy.timeframe, max_candles, window)?;
+    signal_frames(&frames, &strategy, feature_cells)
+}
+/// Causal signal masks for a bounded strategy population over one verified month, sharing a
+/// single frame build. The candle budget applies once to the shared build, and the
+/// population is refused above the behavioral membership bound.
+pub fn signals_many(
+    base: &Path,
+    spec: &Specification,
+    strategies: &[crate::strategies::Strategy],
+    max_candles: usize,
+    feature_cells: usize,
+) -> Result<Vec<crate::indicators::Mask>> {
+    if strategies.is_empty() {
+        return Err("no strategies supplied".into());
+    }
+    if strategies.len() > crate::behavior::MAX_MEMBERS {
+        return Err("behavioral population budget exceeded".into());
+    }
+    if max_candles == 0 || max_candles > MAX_RETAINED_CANDLES {
+        return Err("invalid aggregate corpus candle budget".into());
+    }
+    let canonical = strategies
+        .iter()
+        .map(|strategy| strategy.canonical())
+        .collect::<Result<Vec<_>>>()?;
+    let primary = canonical
+        .iter()
+        .map(|strategy| strategy.timeframe)
+        .min()
+        .ok_or("no strategies")?;
+    let frames = build_frames(base, spec, primary, max_candles, None)?;
+    canonical
+        .iter()
+        .map(|strategy| signal_frames(&frames, strategy, feature_cells))
+        .collect()
 }
 
 /// A verified quote block; its manifest describes the complete source artifact, not a partial Dataset.

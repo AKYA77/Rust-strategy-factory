@@ -1,0 +1,113 @@
+{
+  "method": "signal-vector-population-diversity",
+  "version": "signal-vector-population-diversity-v1",
+  "bars": 333,
+  "members": 9,
+  "unique_concepts": 9,
+  "pairs": 36,
+  "mean_distance_bps": 1292,
+  "min_distance_bps": 0,
+  "max_distance_bps": 4174,
+  "zero_distance_pairs": 15,
+  "signals_total": 203,
+  "distances_bps": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1891,
+    1891,
+    1891,
+    1891,
+    1891,
+    1891,
+    1921,
+    1921,
+    1921,
+    1921,
+    1921,
+    1921,
+    1981,
+    2282,
+    2282,
+    2282,
+    2282,
+    2282,
+    2282,
+    3813,
+    4174
+  ],
+  "population": [
+    {
+      "concept_id": "1c3a9c158b7c847301de59f508f9d4f641c9dc687a61aa1e3912c16beaabd80b",
+      "timeframe": "M1",
+      "bars": 333,
+      "signals": 0
+    },
+    {
+      "concept_id": "35a6aff60e95315123cc1d5d77c39baa445b3a5162529ec31b989fd3c597e518",
+      "timeframe": "M1",
+      "bars": 333,
+      "signals": 76
+    },
+    {
+      "concept_id": "3d1060acd295e3a48d79145a3acf6b1b51dd9269d0f630bc193c7865b5d06f49",
+      "timeframe": "M1",
+      "bars": 333,
+      "signals": 0
+    },
+    {
+      "concept_id": "5422015286d4f11832fa896615c5f1cd31c9a503dbf191cef5bdcd55338a9868",
+      "timeframe": "M1",
+      "bars": 333,
+      "signals": 0
+    },
+    {
+      "concept_id": "8eb23460aae305f4acfec155d5342b42cde79ec104d08d26eb51914b2ad4e216",
+      "timeframe": "M1",
+      "bars": 333,
+      "signals": 0
+    },
+    {
+      "concept_id": "a68a8816bed5e069fa53e69272d2198f06ffb3baa036e29ad8d89244bd64b90e",
+      "timeframe": "M1",
+      "bars": 333,
+      "signals": 0
+    },
+    {
+      "concept_id": "bb4d4cc2c77c5383eb42b804548876a8461810a3117d05f689052b49c82804bf",
+      "timeframe": "M1",
+      "bars": 333,
+      "signals": 0
+    },
+    {
+      "concept_id": "df3cdbafd7c06715fd64acdaaf2ebad061fdd0250ce536e1b7354dbd49034598",
+      "timeframe": "M1",
+      "bars": 333,
+      "signals": 63
+    },
+    {
+      "concept_id": "ea423ed9c60c23d1723fb1cbfee89765f06a89ba3a624538aa79fc4bf76aadf4",
+      "timeframe": "M1",
+      "bars": 333,
+      "signals": 64
+    }
+  ],
+  "warnings": [
+    "Behavioral distance is a descriptive signal-vector Hamming distance over a bounded causal prefix; it is not performance, robustness, novelty or eligibility evidence.",
+    "Members with different candle counts are compared on their common prefix only; later bars are excluded.",
+    "Duplicate concept identities are reported in unique_concepts, not deduplicated or ranked."
+  ],
+  "scope": "Descriptive training-only behavioral diversity; no eligibility, qualification or performance claim."
+}
