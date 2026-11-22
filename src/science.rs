@@ -459,6 +459,10 @@ pub fn execute(
                             regimes.at(trade.entry_event, trade.entry_ms),
                             trade.net_micro_usd,
                         )?;
+                        breakdown.record_momentum(
+                            regimes.state(trade.entry_event, trade.entry_ms),
+                            trade.net_micro_usd,
+                        )?;
                         observations.push(Observation {
                             exit_ms: trade.exit_ms,
                             net_micro_usd: trade.net_micro_usd,

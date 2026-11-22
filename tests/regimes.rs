@@ -83,3 +83,49 @@ fn gaps_reset_history_and_expanded_ranges_are_closed_prior_evidence() {
         "DOWN_EQUAL_RANGE"
     );
 }
+#[test]
+fn momentum_bins_are_prior_only_and_share_the_freshness_gate() {
+    let original = ticks();
+    let full = Classifier::new(&dataset(original.clone())).unwrap();
+    let profile = full.profile(22, 22 * 60000);
+    assert_eq!(profile.trend_range, "UP_EQUAL_RANGE");
+    assert_eq!(profile.momentum, "UP_IMPULSE");
+    assert_eq!(full.state(22, 22 * 60000), "UP_IMPULSE");
+    for entry in 22..60 {
+        let mut prefix = original[..=entry].to_vec();
+        prefix[entry].bid += 100000;
+        prefix[entry].ask += 100000;
+        let truncated = Classifier::new(&dataset(prefix)).unwrap();
+        assert_eq!(
+            full.profile(entry as u64, entry as i64 * 60000),
+            truncated.profile(entry as u64, entry as i64 * 60000)
+        );
+    }
+    assert_eq!(full.state(21, 21 * 60000), "UNKNOWN_WARMUP");
+    assert_eq!(full.state(22, 23 * 60000 + 1), "UNKNOWN_STALE");
+    let mut low = ticks();
+    for t in &mut low {
+        t.bid = 200000 - t.bid;
+        t.ask = t.bid + 20;
+    }
+    assert_eq!(
+        Classifier::new(&dataset(low))
+            .unwrap()
+            .state(22, 22 * 60000),
+        "DOWN_IMPULSE"
+    );
+    let flat = (0..60)
+        .map(|i| Tick {
+            timestamp_ms: i * 60000,
+            sequence: i as u64,
+            bid: 100000,
+            ask: 100020,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        Classifier::new(&dataset(flat))
+            .unwrap()
+            .state(22, 22 * 60000),
+        "FLAT_CHOP"
+    );
+}
