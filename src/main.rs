@@ -227,7 +227,6 @@ fn checkpoint_shutdown() -> Result<(
 }
 
 fn run(args: &[String]) -> Result<()> {
-    eprintln!("DEBUG ARGS: {:?}", args);
     match args
         .iter()
         .map(String::as_str)
