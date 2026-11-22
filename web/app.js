@@ -384,6 +384,16 @@ byId('registry-audit-verify').addEventListener('click',async()=>{
  }catch(error){if(ticket===auditRequest){byId('registry-audit-json').textContent='Registry integrity verification refused; preserve evidence.';byId('registry-audit-status').textContent='Refused';failure(error);}}
 });
 byId('registry-audit-export').addEventListener('click',()=>{if(!auditRaw)return;const link=el('a'),url=URL.createObjectURL(new Blob([auditRaw],{type:'application/json'}));link.href=url;link.download='registry-audit.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+let auditCoverageRequest=0,auditCoverageRaw='';
+byId('audit-coverage-verify').addEventListener('click',async()=>{
+ const ticket=++auditCoverageRequest;auditCoverageRaw='';byId('audit-coverage-export').disabled=true;byId('audit-coverage-json').textContent='Verifying aggregate audit coverage…';byId('audit-coverage-status').textContent='Verification in progress';
+ try{const raw=await api('/api/audit-coverage').then(r=>r.text());if(ticket!==auditCoverageRequest)return;
+  auditCoverageRaw=raw;const data=JSON.parse(raw);byId('audit-coverage-json').textContent=raw;
+  byId('audit-coverage-status').textContent=data.results_total+' results · '+data.results_with_marker+' with audit marker · '+data.results_without_marker+' without (never coverage) · coverage '+data.coverage.coverage_bps+' bps · diagnostic only';
+  byId('audit-coverage-export').disabled=false;
+ }catch(error){if(ticket===auditCoverageRequest){byId('audit-coverage-json').textContent='Aggregate audit coverage unavailable.';byId('audit-coverage-status').textContent='Refused';failure(error);}}
+});
+byId('audit-coverage-export').addEventListener('click',()=>{if(!auditCoverageRaw)return;const link=el('a'),url=URL.createObjectURL(new Blob([auditCoverageRaw],{type:'application/json'}));link.href=url;link.download='audit-coverage.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 let campaignVerifyRequest=0,campaignVerifyRaw='';
 function clearCampaignVerify(){++campaignVerifyRequest;campaignVerifyRaw='';byId('campaign-verify-export').disabled=true;byId('campaign-verify-inputs').disabled=true;byId('campaign-verify-json').hidden=true;byId('campaign-verify-json').textContent='';byId('campaign-verify-status').textContent='';}
 byId('campaign-verify-inputs').addEventListener('click',async()=>{

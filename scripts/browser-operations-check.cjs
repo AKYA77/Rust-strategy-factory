@@ -36,7 +36,7 @@ async function stop(){if(!server||server.exitCode!==null)return;const child=serv
  const context=await browser.newContext({viewport:{width:1280,height:900},acceptDownloads:true});const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const importCard=name=>page.locator('#import-cards [data-import-name="'+name+'"]');
  const coverageCard=name=>page.locator('#coverage-cards [data-coverage-name="'+name+'"]');
- for(const endpoint of ['/api/imports','/api/imports/import-complete','/api/coverage','/api/coverage/month-window','/api/registry-audit'])assert.equal((await context.request.get(base+endpoint)).status(),401,endpoint);
+ for(const endpoint of ['/api/imports','/api/imports/import-complete','/api/coverage','/api/coverage/month-window','/api/registry-audit','/api/audit-coverage'])assert.equal((await context.request.get(base+endpoint)).status(),401,endpoint);
  assert.equal((await context.request.post(base+'/api/imports/import-complete/activate',{data:{expected_archive_hash:'0'.repeat(64),expected_events:'8'}})).status(),401);
  assert.equal((await context.request.post(base+'/api/imports/import-complete/refuse',{data:{expected_archive_hash:'0'.repeat(64),reason:'unauthorized'}})).status(),401);
  async function login(){await page.goto(base);await page.getByLabel('Password').fill(password);await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Sign in',exact:true}).click()]);await page.locator('#imports-status').filter({hasText:'configured import directories'}).waitFor();}
@@ -47,6 +47,7 @@ async function stop(){if(!server||server.exitCode!==null)return;const child=serv
  assert.equal((await context.request.post(base+'/api/imports/import-complete/refuse',{headers,data:{expected_archive_hash:completeStatus.configuration.archive_hash,reason:'x'.repeat(9000)}})).status(),413);
  assert.equal((await context.request.post(base+'/api/imports',{headers,data:{}})).status(),405);
  assert.equal((await context.request.post(base+'/api/registry-audit',{headers,data:{}})).status(),405);
+assert.equal((await context.request.post(base+'/api/audit-coverage',{headers,data:{}})).status(),405);
  assert.equal((await context.request.post(base+'/api/coverage/month-window',{headers,data:{}})).status(),405);
  assert.equal((await context.request.get(base+'/api/imports/not-configured')).status(),404);
  assert.equal((await context.request.get(base+'/api/coverage/not-configured')).status(),404);
@@ -144,6 +145,16 @@ async function stop(){if(!server||server.exitCode!==null)return;const child=serv
  const auditRaw=await page.locator('#registry-audit-json').textContent();const audit=JSON.parse(auditRaw);
  assert.equal(audit.integrity,'ok');assert.equal(audit.counts.registered,overview.counts.registered);assert(audit.scope.includes('Not a continuous audit'));
  const auditDownload=page.waitForEvent('download');await page.getByRole('button',{name:'Export registry audit',exact:true}).click();assert.equal(fs.readFileSync(await(await auditDownload).path(),'utf8'),auditRaw);
+ // Aggregate audited-result coverage: marker absence is reported explicitly, never coverage.
+ await page.getByRole('button',{name:'Verify aggregate coverage',exact:true}).click();
+ await page.locator('#audit-coverage-status').filter({hasText:'with audit marker'}).waitFor();
+ const coverageRaw=await page.locator('#audit-coverage-json').textContent();const coverage=JSON.parse(coverageRaw);
+ assert.equal(coverage.version,'registry-audit-coverage-v1');
+ assert.equal(coverage.results_with_marker+coverage.results_without_marker,coverage.results_total);
+ assert(coverage.results_total>=1);assert(coverage.results_with_marker>=1);
+ assert.equal(coverage.coverage.candidates,coverage.results_with_marker);
+ assert(coverage.limitations.includes('never treated as coverage'));
+ const coverageDownload=page.waitForEvent('download');await page.getByRole('button',{name:'Export aggregate coverage',exact:true}).click();assert.equal(fs.readFileSync(await(await coverageDownload).path(),'utf8'),coverageRaw);
  const resources=await(await context.request.get(base+'/api/resources')).json();
  for(const field of ['peak_rss_bytes','process_user_ticks','process_system_ticks','process_start_ticks'])assert.equal(typeof resources[field],'string',field);
  assert(BigInt(resources.peak_rss_bytes)>0n);assert(resources.cpu_scope.includes('not milliseconds'));
@@ -171,6 +182,11 @@ async function stop(){if(!server||server.exitCode!==null)return;const child=serv
  await page.locator('#registry-audit-status').filter({hasText:'Refused'}).waitFor();
  assert((await page.locator('#registry-audit-json').textContent()).includes('preserve evidence'));
  assert(await page.getByRole('button',{name:'Export registry audit',exact:true}).isDisabled());
+ // The aggregate coverage read refuses the same corrupt registry instead of fabricating a pass.
+ assert.equal((await context.request.get(base+'/api/audit-coverage')).status(),500);
+ await page.getByRole('button',{name:'Verify aggregate coverage',exact:true}).click();
+ await page.locator('#audit-coverage-status').filter({hasText:'Refused'}).waitFor();
+ assert(await page.getByRole('button',{name:'Export aggregate coverage',exact:true}).isDisabled());
  assert.deepEqual(errors,[]);
- console.log(JSON.stringify({browser:'Chromium',synthetic:true,passed:['authenticated bounded import inventory with exact verified states','auth/CSRF/origin/body/unknown-field/read-only enforcement','byte-exact inventory/receipt/coverage/audit exports without local paths','stale-confirmation activation refusal and explicit catalog-observation activation','declared class never approval; idempotent reuse','explicit operator refusal retains evidence and preserves artifacts','tampered chunk refuses inventory/detail/activation; unverified refusal retained','corrupt decision history refuses actions','exact bounded coverage months/events/gaps and stale-response ownership','request-time registry integrity audit and corrupt-registry refusal','exact peak-RSS/CPU-tick resource observations','desktop/mobile/restart persistence']}));
+ console.log(JSON.stringify({browser:'Chromium',synthetic:true,passed:['authenticated bounded import inventory with exact verified states','auth/CSRF/origin/body/unknown-field/read-only enforcement','byte-exact inventory/receipt/coverage/audit exports without local paths','stale-confirmation activation refusal and explicit catalog-observation activation','declared class never approval; idempotent reuse','explicit operator refusal retains evidence and preserves artifacts','tampered chunk refuses inventory/detail/activation; unverified refusal retained','corrupt decision history refuses actions','exact bounded coverage months/events/gaps and stale-response ownership','request-time registry integrity audit and corrupt-registry refusal','aggregate audited-result coverage with explicit marker-absence accounting and corrupt-registry refusal','exact peak-RSS/CPU-tick resource observations','desktop/mobile/restart persistence']}));
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{if(browser)await browser.close();try{await stop();}catch(e){console.error(e);process.exitCode=1;}fs.rmSync(dir,{recursive:true,force:true});});

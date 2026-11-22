@@ -31,6 +31,8 @@ jobs:
         run: rustup show
       - name: Cache cargo registry and target artifacts
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-cache-v1
       - run: cargo test --locked --lib --bins --tests
   browser:
     name: browser
@@ -41,6 +43,8 @@ jobs:
         run: rustup show
       - name: Cache cargo registry and target artifacts
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-cache-v1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -49,6 +53,72 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: cargo build --locked
       - run: npm run test:browser
+<<<<<<< HEAD
+=======
+  release-build:
+    name: release-build
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned toolchain
+        run: rustup show
+      - name: Cache cargo registry and target artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-cache-v1
+      - run: cargo build --locked --release
+
+  data-compute-identity:
+    name: data-compute-identity
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned toolchain
+        run: rustup show
+      - name: Cache cargo registry and target artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-cache-v1
+      - run: cargo build --locked
+      - name: Verify data compute identity boundaries
+        run: |
+          mkdir -p work
+          python3 scripts/check-data-compute-identity.py work/data-compute-identity.json
+
+  check-operations:
+    name: check-operations
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned toolchain
+        run: rustup show
+      - name: Cache cargo registry and target artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-cache-v1
+      - run: cargo build --locked
+      - run: python3 scripts/check-operations.py
+
+  full-horizon:
+    name: full-horizon
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned toolchain
+        run: rustup show
+      - name: Cache cargo registry and target artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: rust-cache-v1
+      - run: cargo build --locked --release
+      - name: Verify continuous UTC horizon and declared context ceiling
+        run: python3 scripts/check-full-horizon.py --binary target/release/rust-strategy-factory --output work/full-horizon-context.json
+
+>>>>>>> origin/main
   dependency-audit:
     name: dependency-audit
     runs-on: ubuntu-24.04
