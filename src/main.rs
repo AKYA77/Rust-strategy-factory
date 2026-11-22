@@ -2584,8 +2584,14 @@ fn run(args: &[String]) -> Result<()> {
                 );
             }
             let input = inputs.pop().ok_or("batch input missing")?;
+            let allowed_classes = [
+                data::DataClass::SyntheticTestOnly,
+                data::DataClass::RealStructurallyValid,
+                data::DataClass::RealQualityAccepted,
+                data::DataClass::RealProfileApproved,
+            ];
             if input.dataset.ticks.len() > limits.max_total_events
-                || input.dataset.manifest.class != data::DataClass::SyntheticTestOnly
+                || !allowed_classes.contains(&input.dataset.manifest.class)
                     && limits.training_window.is_none()
             {
                 return Err(

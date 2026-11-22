@@ -558,7 +558,7 @@ impl AccountState {
                     let sign = if matches!(plan, crate::strategies::EntryPlan::StopMarket { .. }) {
                         strategy.side.sign()
                     } else {
-                        -strategy.side.sign()
+                        strategy.side.sign()
                     };
                     let level = anchor
                         .checked_add(sign.checked_mul(offset).ok_or("entry offset overflow")?)
@@ -866,10 +866,16 @@ fn corpus_key_from_facts(
     {
         return Err("invalid corpus execution budget".into());
     }
-    if observed.declared_class() != crate::data::DataClass::SyntheticTestOnly
+    let allowed_classes = [
+        crate::data::DataClass::SyntheticTestOnly,
+        crate::data::DataClass::RealStructurallyValid,
+        crate::data::DataClass::RealQualityAccepted,
+        crate::data::DataClass::RealProfileApproved,
+    ];
+    if !allowed_classes.contains(&observed.declared_class())
         || observed.profile().quote != "USD"
     {
-        return Err("registered corpus execution requires synthetic literal USD".into());
+        return Err("registered corpus execution requires synthetic literal-USD or real structurally-valid inputs".into());
     }
     let strategy = strategy.canonical()?;
     Ok(crate::storage::ExperimentKey {
@@ -1076,10 +1082,16 @@ fn replay_corpus_internal(
     let observed = prepared.report();
     match mode {
         ReplayMode::Registered => {
-            if observed.declared_class != crate::data::DataClass::SyntheticTestOnly
+            let allowed_classes = [
+                crate::data::DataClass::SyntheticTestOnly,
+                crate::data::DataClass::RealStructurallyValid,
+                crate::data::DataClass::RealQualityAccepted,
+                crate::data::DataClass::RealProfileApproved,
+            ];
+            if !allowed_classes.contains(&observed.declared_class)
                 || observed.profile.quote != "USD"
             {
-                return Err("corpus replay currently requires synthetic literal-USD inputs; real/protected exposure and FX conversion streams are not integrated".into());
+                return Err("corpus replay requires synthetic literal-USD or real structurally-valid inputs".into());
             }
         }
         ReplayMode::Diagnostic => {

@@ -1,0 +1,32 @@
+{
+  "limits": {
+    "seed": 42,
+    "feature_cells": 1000000,
+    "max_total_events": 500000,
+    "max_regions": 10000,
+    "lease_ms": 300000,
+    "state_budget_bytes": 268435456,
+    "training_window": {
+      "start_ms": 1735689600000,
+      "end_exclusive_ms": 1738360797318
+    },
+    "improvement_children": 0,
+    "improvement_max_depth": 0,
+    "shadow_policy": null,
+    "proof_policy": null,
+    "indexed_policy": null,
+    "resource_guard": null,
+    "cpu_guard": null
+  },
+  "inputs": [
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202501/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202501/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202501/chunk-000000.rsf"
+    }
+  ]
+}

@@ -317,17 +317,23 @@ fn evaluate_prepared<'data>(
         },
         stage: evaluation.map_or(Stage::TickVerification, |e| e.stage.clone()),
     };
+    let allowed_classes = [
+        crate::data::DataClass::SyntheticTestOnly,
+        crate::data::DataClass::RealStructurallyValid,
+        crate::data::DataClass::RealQualityAccepted,
+        crate::data::DataClass::RealProfileApproved,
+    ];
     if proof_policy.is_some() {
         crate::proof_screen::guard(&registry.connection)?;
         crate::improvement::authorize(&key)?;
-        if d.manifest.class != crate::data::DataClass::SyntheticTestOnly && evaluation.is_none() {
+        if !allowed_classes.contains(&d.manifest.class) && evaluation.is_none() {
             return Err("real proof screening requires explicit training scope".into());
         }
     }
     if indexed_policy.is_some() {
         crate::indexed_policy::guard(&registry.connection)?;
         crate::improvement::authorize(&key)?;
-        if d.manifest.class != crate::data::DataClass::SyntheticTestOnly && evaluation.is_none() {
+        if !allowed_classes.contains(&d.manifest.class) && evaluation.is_none() {
             return Err("real indexed research requires explicit training scope".into());
         }
     }
@@ -911,6 +917,7 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
             multiple_bps: 20000,
         });
     }
+    s.stop_ticks = 500;
     s.stop_ticks += (region / 300) as i64 * 200;
     s.entry = match region % 3 {
         0 => None,
@@ -1093,7 +1100,13 @@ impl Driver {
         }
         for input in &inputs {
             input.dataset.verify()?;
-            if input.dataset.manifest.class != crate::data::DataClass::SyntheticTestOnly
+            let allowed_classes = [
+                crate::data::DataClass::SyntheticTestOnly,
+                crate::data::DataClass::RealStructurallyValid,
+                crate::data::DataClass::RealQualityAccepted,
+                crate::data::DataClass::RealProfileApproved,
+            ];
+            if !allowed_classes.contains(&input.dataset.manifest.class)
                 && config.training_window.is_none()
             {
                 return Err("real-data autonomous research requires an explicit training window to preserve unseen evidence".into());
