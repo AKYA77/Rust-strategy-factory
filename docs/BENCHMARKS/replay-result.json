@@ -1,0 +1,112 @@
+{
+  "available_parallelism": 6,
+  "build": "release thin LTO, codegen-units=1",
+  "cache": "resident fixtures; warm process; derived candles/features rebuilt each repetition",
+  "cgroup_cpu_max": "unavailable",
+  "cgroup_memory_max": "unavailable",
+  "class": "SYNTHETIC_TEST_ONLY",
+  "compute_revision": "compute-blake3:11e0114e6f10efe2bde619c8147a7007e2a5517c83a47b3fd83ab30cbc985f60",
+  "coverage": "20000 events per instrument, eight instruments; NOT genuine quote data, not full historical coverage",
+  "cpu": "model name\t: AMD EPYC Processor (with IBPB)\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm rep_good nopl cpuid extd_apicid tsc_known_freq pni pclmulqdq ssse3 fma cx16 sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext ssbd ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 rdseed adx smap clflushopt sha_ni xsaveopt xsavec xgetbv1 arat",
+  "dataset_hashes": [
+    [
+      "EURUSD",
+      "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+    ],
+    [
+      "GBPUSD",
+      "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+    ],
+    [
+      "USDJPY",
+      "44e42dddb51ec4cb363f635c55d508292913cd449c9c754590da77fb140eff8d"
+    ],
+    [
+      "USDCHF",
+      "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+    ],
+    [
+      "USDCAD",
+      "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+    ],
+    [
+      "AUDUSD",
+      "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+    ],
+    [
+      "NZDUSD",
+      "ea6f9cf402dca4947cc9016370193305c1439e16ae340686ec45976468ede241"
+    ],
+    [
+      "XAUUSD",
+      "f3100585b3b718b3e8e242d509011cf9a7979957affec4aa1b38694130bf6101"
+    ]
+  ],
+  "engine": "ordered-l1-v6-frozen-atr-stops",
+  "measurements": [
+    {
+      "completed_synthetic_replays_per_repetition": 8,
+      "dispersion_max_minus_min": 0.07159011700000001,
+      "median_seconds": 0.09110442,
+      "repetitions": 5,
+      "replays_per_second_median": 87.81132682695306,
+      "trades_per_repetition": 6997,
+      "wall_seconds": [
+        0.076994705,
+        0.087216105,
+        0.09110442,
+        0.125905982,
+        0.148584822
+      ],
+      "workers": 1
+    },
+    {
+      "completed_synthetic_replays_per_repetition": 8,
+      "dispersion_max_minus_min": 0.016670612,
+      "median_seconds": 0.063894741,
+      "repetitions": 5,
+      "replays_per_second_median": 125.20592265958163,
+      "trades_per_repetition": 6997,
+      "wall_seconds": [
+        0.050296732,
+        0.058121813,
+        0.063894741,
+        0.065962799,
+        0.066967344
+      ],
+      "workers": 2
+    },
+    {
+      "completed_synthetic_replays_per_repetition": 8,
+      "dispersion_max_minus_min": 0.07208873600000001,
+      "median_seconds": 0.079757102,
+      "repetitions": 5,
+      "replays_per_second_median": 100.3045471737426,
+      "trades_per_repetition": 6997,
+      "wall_seconds": [
+        0.051979062,
+        0.069123905,
+        0.079757102,
+        0.108176232,
+        0.124067798
+      ],
+      "workers": 3
+    },
+    {
+      "completed_synthetic_replays_per_repetition": 8,
+      "dispersion_max_minus_min": 0.032093793999999995,
+      "median_seconds": 0.027454445,
+      "repetitions": 5,
+      "replays_per_second_median": 291.3917946620301,
+      "trades_per_repetition": 6997,
+      "wall_seconds": [
+        0.024215524,
+        0.025231736,
+        0.027454445,
+        0.035099518,
+        0.056309318
+      ],
+      "workers": 4
+    }
+  ]
+}
