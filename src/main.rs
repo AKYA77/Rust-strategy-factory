@@ -2359,6 +2359,19 @@ fn run(args: &[String]) -> Result<()> {
                 &rust_strategy_factory::corpus::load(path)?,
             )?)
         }
+        ["corpus-context", specification] => {
+            let path = Path::new(specification);
+            let base = path.parent().unwrap_or(Path::new("."));
+            let spec = rust_strategy_factory::corpus::load(path)?;
+            let prepared = rust_strategy_factory::corpus::verified_inventory(base, &spec)?;
+            let report = prepared.report();
+            print(&serde_json::json!({
+                "report": report,
+                "ordered_events_hash": report.ordered_events_hash,
+                "events": report.events,
+            }))?;
+            Ok(())
+        }
         ["coverage", path, start, end, threshold] => {
             let interval = rust_strategy_factory::validation::Interval {
                 start_ms: start.parse().map_err(|_| "invalid start milliseconds")?,
