@@ -1,0 +1,79 @@
+{
+  "schema": "multiworker-supervision-ledger-v1",
+  "card": "t_7859819b",
+  "card_title": "Bounded multiworker supervision + resource admission controls",
+  "branch": "hermes/multiworker-supervision",
+  "base_sha": "51334f3ab19265f87cf59fa77dda9f8b87ede4c7",
+  "finding": "The card's engine scope is already implemented and merged: PR #27 hermes/scheduler-resource-controls (head 4a20055, merge 52ce73e) carries implementation commit 9f4e1db (measured CPU allocation, adaptive worker selection, cgroup-v2 OS-enforcement evidence, pre-claim cpu_guard/resource_guard/disk_guard admission) plus the schema11-22 bounded foreground fleet waiting and owned-parent child RSS/CPU-tick supervision. 9f4e1db is an ancestor of origin/main.",
+  "hosted_ci_evidence": {
+    "merge_sha": "52ce73e1913c9fe421fd4099e0b45c43bc7c9f26",
+    "checks": [
+      "dependency-audit success",
+      "rust-checks success",
+      "browser success",
+      "release-acceptance success"
+    ],
+    "note": "gh api commits/52ce73e.../check-runs on 2026-11-22: all four required jobs success (two runs each)."
+  },
+  "root_cause": "Merge conflict resolution on main reverted 9f4e1db's IMPLEMENTATION_QUEUE item-10 update, so the ledger still listed 'measured CPU allocation/adaptive worker selection, OS enforcement' as Remaining; the commander's completion loop regenerated this card from that stale text.",
+  "local_ladder": {
+    "tool": "scripts/cargo-locked.sh",
+    "cargo_build_jobs": 4,
+    "shared_target_dir": "/root/workspace/Rust-strategy-factory/target",
+    "fmt": "cargo fmt --all -- --check clean",
+    "clippy": "cargo clippy --locked --all-targets -- -D warnings clean (forced clean -p on stamp mismatch)",
+    "binaries": [
+      {
+        "binary": "corpus",
+        "kind": "bin",
+        "tests_run": 96,
+        "passed": 96,
+        "failed": 0,
+        "sha256": "d94be1b5084511cf6475c323c2c1d8b60077dbf15cfc9eb5664b25feac18f28d",
+        "path": "/root/workspace/Rust-strategy-factory/target/debug/build/rust-strategy-factory/c0179138e04dcc9b/out/corpus-c0179138e04dcc9b"
+      },
+      {
+        "binary": "lib",
+        "kind": "bin",
+        "tests_run": 217,
+        "passed": 217,
+        "failed": 0,
+        "sha256": "3e9709626397c0b130d40a99d2a2010b175a705ab4e2edf94bcde0d1b7f8da26",
+        "path": "/root/workspace/Rust-strategy-factory/target/debug/build/rust-strategy-factory/cc508c73a14a3352/out/rust_strategy_factory-cc508c73a14a3352"
+      },
+      {
+        "binary": "research",
+        "kind": "bin",
+        "tests_run": 9,
+        "passed": 9,
+        "failed": 0,
+        "sha256": "248010ee606a20e2207b5cf2bc4824c0ce8c33995e8e6d398e76c8a0987f12f5",
+        "path": "/root/workspace/Rust-strategy-factory/target/debug/build/rust-strategy-factory/331d2e9e7eb114f0/out/research-331d2e9e7eb114f0"
+      },
+      {
+        "binary": "research_cli",
+        "kind": "bin",
+        "tests_run": 2,
+        "passed": 2,
+        "failed": 0,
+        "sha256": "f0b4e0f511725a5957d6a874a96ddf525ae8fb778bd5574a53e07363c441cac8",
+        "path": "/root/workspace/Rust-strategy-factory/target/debug/build/rust-strategy-factory/9756ae530ee13155/out/research_cli-9756ae530ee13155"
+      },
+      {
+        "binary": "scheduler_resources",
+        "kind": "bin",
+        "tests_run": 6,
+        "passed": 6,
+        "failed": 0,
+        "sha256": "022a86913d14dc30830a0d3b08d189437bd86a419ef3d32b41261382ab70dc35",
+        "path": "/root/workspace/Rust-strategy-factory/target/debug/build/rust-strategy-factory/bcb488c574d74431/out/scheduler_resources-bcb488c574d74431"
+      }
+    ]
+  },
+  "ledger_changes": [
+    "docs/IMPLEMENTATION_QUEUE.md item 10 Remaining corrected; Scheduler/resources reconciliation row updated",
+    "docs/PROJECT_STATE.json implemented entry for scheduler/resource controls restored; next_action remaining list corrected",
+    "docs/NEXT_ACTION.md milestone entry added; stale queue remainder and cargo-isolation hazard text corrected"
+  ],
+  "claims": "No new engine code. No eligibility, approval, qualification, acquisition or hard-OS-enforcement claim. No financial or scientific contract changed."
+}
