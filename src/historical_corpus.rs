@@ -702,6 +702,81 @@ pub fn study(
     })
 }
 
+/// Derived, diagnostic-only trade outcome statistics for one executed month.
+///
+/// These are descriptive observations computed from the same closed-trade list the engine
+/// already produced. They change no financial rule, grant no eligibility and are never
+/// research evidence. They exist so the owner-approved numerical criteria (net win rate,
+/// consecutive-loss streak, achieved reward/risk) can be reported alongside the execution
+/// totals instead of being uncomputable.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TradeOutcomeStats {
+    /// Closed trades; equals the engine's `trades` length for the month.
+    pub resolved: usize,
+    pub wins: usize,
+    pub losses: usize,
+    pub breakevens: usize,
+    /// Longest run of consecutive net-losing closed trades inside this month. A net winner
+    /// resets the streak and a breakeven does not, matching `validation::assess`. A diagnostic
+    /// month starts a fresh account, so this streak resets at every month boundary and is a
+    /// reset-fold streak, not a continuous full-period streak.
+    pub max_losing_streak: usize,
+    /// Sum of positive closed-trade net P&L. Additive.
+    pub gross_win_micro_usd: i128,
+    /// Sum of the magnitudes of negative closed-trade net P&L. Additive; never negative.
+    pub gross_loss_micro_usd: i128,
+    /// Sum of closed-trade net P&L. Excludes any unresolved end-of-month position.
+    pub net_micro_usd: i128,
+    /// `1` when the month ended holding an unresolved position, else `0`. Unresolved positions
+    /// are not closed trades and are never counted as wins or losses.
+    pub unresolved_positions: usize,
+}
+
+/// Compute [`TradeOutcomeStats`] from a month's closed trades. Checked arithmetic: an
+/// overflowing aggregate is an error, never a wrapped or silent value.
+pub fn trade_outcome_stats(
+    trades: &[crate::tick_engine::Trade],
+    unresolved: bool,
+) -> Result<TradeOutcomeStats> {
+    let mut stats = TradeOutcomeStats {
+        resolved: trades.len(),
+        unresolved_positions: usize::from(unresolved),
+        ..TradeOutcomeStats::default()
+    };
+    let mut streak = 0usize;
+    for trade in trades {
+        if trade.net_micro_usd > 0 {
+            stats.wins += 1;
+            streak = 0;
+            stats.gross_win_micro_usd = stats
+                .gross_win_micro_usd
+                .checked_add(trade.net_micro_usd)
+                .ok_or("trade outcome gross win overflow")?;
+        } else if trade.net_micro_usd < 0 {
+            stats.losses += 1;
+            streak += 1;
+            stats.max_losing_streak = stats.max_losing_streak.max(streak);
+            stats.gross_loss_micro_usd = stats
+                .gross_loss_micro_usd
+                .checked_add(
+                    trade
+                        .net_micro_usd
+                        .checked_neg()
+                        .ok_or("trade outcome loss magnitude overflow")?,
+                )
+                .ok_or("trade outcome gross loss overflow")?;
+        } else {
+            stats.breakevens += 1;
+        }
+        stats.net_micro_usd = stats
+            .net_micro_usd
+            .checked_add(trade.net_micro_usd)
+            .ok_or("trade outcome net overflow")?;
+    }
+    Ok(stats)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CorpusGroup {
     pub timeframe: crate::candles::Timeframe,
@@ -830,6 +905,9 @@ pub struct MonthExecution {
     pub trades: usize,
     pub rejections: usize,
     pub receipt_hash: String,
+    /// Diagnostic-only derived outcome statistics for this month's closed trades. Never used
+    /// as a financial result and never sufficient for eligibility or qualification.
+    pub outcomes: TradeOutcomeStats,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -853,6 +931,19 @@ pub struct ExecutionTotals {
     pub pnl_micro_usd: i128,
     /// Maximum single-month drawdown, not a sum of per-month drawdowns.
     pub maximum_drawdown_micro_usd: i128,
+    /// Closed-trade outcome sums, aggregated over executed months. Diagnostic only.
+    pub wins: usize,
+    pub losses: usize,
+    pub breakevens: usize,
+    /// Worst per-month losing streak. Months reset their account, so this is a reset-fold
+    /// maximum and not a continuous full-period streak.
+    pub max_losing_streak: usize,
+    pub gross_win_micro_usd: i128,
+    pub gross_loss_micro_usd: i128,
+    /// Sum over months of closed-trade net P&L. Additive; excludes unresolved positions.
+    pub net_micro_usd: i128,
+    /// Months that ended holding an unresolved position.
+    pub unresolved_positions: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -936,6 +1027,7 @@ pub fn execute_month(
     let facts = crate::corpus::source_facts(dir, &corpus_spec)?;
     let replay =
         crate::tick_engine::replay_corpus_diagnostic(dir, &corpus_spec, strategy, costs, budget)?;
+    let outcomes = trade_outcome_stats(&replay.trades, replay.unresolved.is_some())?;
     Ok(MonthExecution {
         year: month.year,
         month: month.month,
@@ -954,6 +1046,7 @@ pub fn execute_month(
         trades: replay.trades.len(),
         rejections: replay.rejections.len(),
         receipt_hash: crate::data::hash(&replay)?,
+        outcomes,
     })
 }
 
@@ -971,8 +1064,46 @@ fn aggregate_totals(
         initial_micro_usd: 0,
         pnl_micro_usd: 0,
         maximum_drawdown_micro_usd: 0,
+        wins: 0,
+        losses: 0,
+        breakevens: 0,
+        max_losing_streak: 0,
+        gross_win_micro_usd: 0,
+        gross_loss_micro_usd: 0,
+        net_micro_usd: 0,
+        unresolved_positions: 0,
     };
     for executed in months {
+        let outcomes = &executed.outcomes;
+        totals.wins = totals
+            .wins
+            .checked_add(outcomes.wins)
+            .ok_or("diagnostic execution win total overflow")?;
+        totals.losses = totals
+            .losses
+            .checked_add(outcomes.losses)
+            .ok_or("diagnostic execution loss total overflow")?;
+        totals.breakevens = totals
+            .breakevens
+            .checked_add(outcomes.breakevens)
+            .ok_or("diagnostic execution breakeven total overflow")?;
+        totals.max_losing_streak = totals.max_losing_streak.max(outcomes.max_losing_streak);
+        totals.gross_win_micro_usd = totals
+            .gross_win_micro_usd
+            .checked_add(outcomes.gross_win_micro_usd)
+            .ok_or("diagnostic execution gross win overflow")?;
+        totals.gross_loss_micro_usd = totals
+            .gross_loss_micro_usd
+            .checked_add(outcomes.gross_loss_micro_usd)
+            .ok_or("diagnostic execution gross loss overflow")?;
+        totals.net_micro_usd = totals
+            .net_micro_usd
+            .checked_add(outcomes.net_micro_usd)
+            .ok_or("diagnostic execution trade net overflow")?;
+        totals.unresolved_positions = totals
+            .unresolved_positions
+            .checked_add(outcomes.unresolved_positions)
+            .ok_or("diagnostic execution unresolved total overflow")?;
         totals.trades = totals
             .trades
             .checked_add(executed.trades)
@@ -1012,7 +1143,7 @@ pub struct ExecutionCache {
     dir: std::path::PathBuf,
 }
 
-const EXECUTION_CACHE_VERSION: &str = "historical-diagnostic-execution-cache-v3";
+const EXECUTION_CACHE_VERSION: &str = "historical-diagnostic-execution-cache-v4";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1224,6 +1355,34 @@ mod tests {
             trades,
             rejections,
             receipt_hash: "d".repeat(64),
+            outcomes: TradeOutcomeStats::default(),
+        }
+    }
+
+    fn execution_with_outcomes(
+        year: u32,
+        month: u32,
+        outcomes: TradeOutcomeStats,
+    ) -> MonthExecution {
+        MonthExecution {
+            year,
+            month,
+            classification: EXECUTION_CLASSIFICATION.into(),
+            eligibility: EXECUTION_ELIGIBILITY.into(),
+            corpus_identity: "a".repeat(64),
+            source_dataset_hash: "b".repeat(64),
+            replay_dataset_id: "e".repeat(64),
+            declared_class: "RealStructurallyValid".into(),
+            profile_id: "c".repeat(64),
+            conversion_policy: CONVERSION_POLICY_IDENTITY.into(),
+            initial_micro_usd: 20_000_000,
+            realized_micro_usd: 20_000_000,
+            final_marked_micro_usd: 20_000_000,
+            maximum_drawdown_micro_usd: 0,
+            trades: outcomes.resolved,
+            rejections: 0,
+            receipt_hash: "d".repeat(64),
+            outcomes,
         }
     }
 
@@ -1246,6 +1405,129 @@ mod tests {
         assert_eq!(totals.initial_micro_usd, 40_000_000);
         assert_eq!(totals.pnl_micro_usd, -500_000);
         assert_eq!(totals.maximum_drawdown_micro_usd, 3_000_000);
+    }
+
+    fn trade(net_micro_usd: i128) -> crate::tick_engine::Trade {
+        crate::tick_engine::Trade {
+            entry_event: 0,
+            exit_event: 1,
+            entry_ms: 0,
+            exit_ms: 1,
+            side: crate::contracts::Side::Long,
+            entry: 1_000_000,
+            exit: 1_000_000,
+            stop: 900_000,
+            target: 1_300_000,
+            volume_micro_lots: 1,
+            net_micro_usd,
+            commission_micro_usd: 0,
+            reason: crate::tick_engine::ExitReason::StopMarket,
+            mfe_price_units: 0,
+            mae_price_units: 0,
+            crossed_gap_ms: 0,
+        }
+    }
+
+    #[test]
+    fn trade_outcome_stats_counts_wins_losses_breakevens_and_streak() {
+        let stats = trade_outcome_stats(
+            &[
+                trade(3_000_000),
+                trade(-1_000_000),
+                trade(-1_000_000),
+                trade(0),
+                trade(-1_000_000),
+                trade(3_000_000),
+            ],
+            true,
+        )
+        .unwrap();
+        assert_eq!(
+            (stats.resolved, stats.wins, stats.losses, stats.breakevens),
+            (6, 2, 3, 1)
+        );
+        // The breakeven between the two-loss runs does not reset the streak, matching
+        // `validation::assess`.
+        assert_eq!(stats.max_losing_streak, 3);
+        assert_eq!(stats.gross_win_micro_usd, 6_000_000);
+        assert_eq!(stats.gross_loss_micro_usd, 3_000_000);
+        assert_eq!(stats.net_micro_usd, 3_000_000);
+        assert_eq!(stats.unresolved_positions, 1);
+    }
+
+    #[test]
+    fn trade_outcome_stats_streak_counts_consecutive_net_losses_only() {
+        let stats = trade_outcome_stats(
+            &[
+                trade(-1),
+                trade(-1),
+                trade(0),
+                trade(-1),
+                trade(1),
+                trade(-1),
+            ],
+            false,
+        )
+        .unwrap();
+        assert_eq!(stats.max_losing_streak, 3);
+        assert_eq!(stats.unresolved_positions, 0);
+        assert_eq!(stats.net_micro_usd, -3);
+    }
+
+    #[test]
+    fn trade_outcome_stats_refuses_overflow() {
+        let error = trade_outcome_stats(&[trade(i128::MAX), trade(1)], false)
+            .expect_err("an overflowing gross win total must be refused");
+        assert!(error.contains("overflow"), "{error}");
+        let error = trade_outcome_stats(&[trade(i128::MIN)], false)
+            .expect_err("a minimum-value loss magnitude must be refused");
+        assert!(error.contains("overflow"), "{error}");
+    }
+
+    #[test]
+    fn aggregate_totals_sums_outcome_statistics() {
+        let months = vec![
+            execution_with_outcomes(
+                2025,
+                1,
+                TradeOutcomeStats {
+                    resolved: 4,
+                    wins: 3,
+                    losses: 1,
+                    breakevens: 0,
+                    max_losing_streak: 1,
+                    gross_win_micro_usd: 9_000_000,
+                    gross_loss_micro_usd: 1_000_000,
+                    net_micro_usd: 8_000_000,
+                    unresolved_positions: 1,
+                },
+            ),
+            execution_with_outcomes(
+                2026,
+                2,
+                TradeOutcomeStats {
+                    resolved: 2,
+                    wins: 1,
+                    losses: 1,
+                    breakevens: 0,
+                    max_losing_streak: 2,
+                    gross_win_micro_usd: 3_000_000,
+                    gross_loss_micro_usd: 2_000_000,
+                    net_micro_usd: 1_000_000,
+                    unresolved_positions: 0,
+                },
+            ),
+        ];
+        let totals = aggregate_totals(&months, &[]).unwrap();
+        assert_eq!(
+            (totals.trades, totals.wins, totals.losses, totals.breakevens),
+            (6, 4, 2, 0)
+        );
+        assert_eq!(totals.max_losing_streak, 2);
+        assert_eq!(totals.gross_win_micro_usd, 12_000_000);
+        assert_eq!(totals.gross_loss_micro_usd, 3_000_000);
+        assert_eq!(totals.net_micro_usd, 9_000_000);
+        assert_eq!(totals.unresolved_positions, 1);
     }
 
     #[test]
