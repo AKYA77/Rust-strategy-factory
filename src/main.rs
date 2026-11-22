@@ -18,7 +18,7 @@ use rust_strategy_factory::{
 use std::{
     fs::{self, OpenOptions},
     io::Write,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 #[path = "qualification/cli.rs"]
@@ -961,6 +961,74 @@ fn run(args: &[String]) -> Result<()> {
                 None,
             )?;
             print(&report)
+        }
+        ["historical-stream-describe", root, paths_file, spec_out] => {
+            let paths: Vec<String> = read_json(paths_file)?;
+            let paths: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+            let spec = rust_strategy_factory::streaming::describe(Path::new(root), &paths)?;
+            save_replace(spec_out, &spec)?;
+            print(&serde_json::json!({
+                "identity": rust_strategy_factory::streaming::identity(&spec)?,
+                "instrument": spec.instrument,
+                "chunks": spec.chunks.len(),
+                "events": spec.events,
+                "first_ms": spec.first_ms,
+                "last_ms": spec.last_ms,
+            }))
+        }
+        [
+            "historical-stream-decode",
+            root,
+            spec_file,
+            checkpoint_dir,
+            max_events,
+            report_out,
+        ] => {
+            let spec: rust_strategy_factory::streaming::StreamSpec = read_json(spec_file)?;
+            let max_events: u64 = max_events.parse().map_err(|_| "invalid max events")?;
+            let store =
+                rust_strategy_factory::streaming::CheckpointStore::open(Path::new(checkpoint_dir))?;
+            let mut driver = rust_strategy_factory::streaming::StreamDriver::open(
+                Path::new(root),
+                &spec,
+                &store,
+            )?;
+            let (_decoded, complete) = driver.step(max_events)?;
+            let progress = driver.progress();
+            save_replace(report_out, &progress)?;
+            print(&serde_json::json!({
+                "identity": progress.spec_identity,
+                "instrument": progress.instrument,
+                "consumed_chunks": progress.consumed_chunks,
+                "total_chunks": progress.total_chunks,
+                "consumed_events": progress.consumed_events,
+                "total_events": progress.total_events,
+                "complete": complete,
+                "last_timestamp_ms": progress.last_timestamp_ms,
+                "last_sequence": progress.last_sequence,
+            }))
+        }
+        ["historical-stream-status", root, spec_file, checkpoint_dir] => {
+            let spec: rust_strategy_factory::streaming::StreamSpec = read_json(spec_file)?;
+            let store =
+                rust_strategy_factory::streaming::CheckpointStore::open(Path::new(checkpoint_dir))?;
+            let driver = rust_strategy_factory::streaming::StreamDriver::open(
+                Path::new(root),
+                &spec,
+                &store,
+            )?;
+            let progress = driver.progress();
+            print(&serde_json::json!({
+                "identity": progress.spec_identity,
+                "instrument": progress.instrument,
+                "consumed_chunks": progress.consumed_chunks,
+                "total_chunks": progress.total_chunks,
+                "consumed_events": progress.consumed_events,
+                "total_events": progress.total_events,
+                "complete": progress.complete,
+                "last_timestamp_ms": progress.last_timestamp_ms,
+                "last_sequence": progress.last_sequence,
+            }))
         }
         ["pack-parquet", input, output] => {
             rust_strategy_factory::parquet_store::write(Path::new(output), &read_dataset(input)?)
@@ -2290,6 +2358,19 @@ fn run(args: &[String]) -> Result<()> {
                 path.parent().unwrap_or(Path::new(".")),
                 &rust_strategy_factory::corpus::load(path)?,
             )?)
+        }
+        ["corpus-context", specification] => {
+            let path = Path::new(specification);
+            let base = path.parent().unwrap_or(Path::new("."));
+            let spec = rust_strategy_factory::corpus::load(path)?;
+            let prepared = rust_strategy_factory::corpus::verified_inventory(base, &spec)?;
+            let report = prepared.report();
+            print(&serde_json::json!({
+                "report": report,
+                "ordered_events_hash": report.ordered_events_hash,
+                "events": report.events,
+            }))?;
+            Ok(())
         }
         ["coverage", path, start, end, threshold] => {
             let interval = rust_strategy_factory::validation::Interval {

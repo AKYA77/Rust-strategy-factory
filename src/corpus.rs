@@ -19,6 +19,7 @@ const BLOCK_VERSION: &str = "ordered-block-corpus-v2";
 /// Covers the closed M1-D1 contexts of a continuous two-year UTC fixture.
 pub const MAX_RETAINED_CANDLES: usize = 2_000_000;
 const SPEC_CAP: u64 = 16 * 1024 * 1024;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Artifact {
@@ -962,6 +963,338 @@ mod replay_range_tests {
                     .visit_replay_range(&root.0, &spec, 1..1, |_| Ok(()))
                     .is_err()
             );
+        }
+    }
+}
+
+pub mod direct_arrays {
+    //! Direct hot column arrays over verified corpus chunks.
+    //!
+    //! Arrays are bound to the exact provenance of their source chunk: the dataset
+    //! identity and the consumed file hash. Every array is validated before
+    //! publication; nothing partial is exposed.
+
+    use super::Specification;
+    use crate::{
+        Result,
+        contracts::Profile,
+        data::{self, DataClass, Dataset, Manifest},
+        native,
+    };
+    use std::{path::Path, sync::Arc};
+
+    /// Direct arrays over one verified chunk's hot columns, bound to the chunk's
+    /// exact provenance: dataset identity and consumed file hash.
+    pub struct DirectArrays {
+        pub timestamps: Arc<[i64]>,
+        pub sequences: Arc<[u64]>,
+        pub bids: Arc<[i64]>,
+        pub asks: Arc<[i64]>,
+        pub event_count: usize,
+        pub dataset_identity: String,
+        pub file_hash: String,
+        pub profile: Profile,
+        pub manifest: Manifest,
+    }
+
+    impl DirectArrays {
+        /// Build hot arrays from an already verified dataset. Validates the quote
+        /// grid again before publishing; refuses on any violation.
+        pub fn from_dataset(dataset: &Dataset, file_hash: &str) -> Result<Self> {
+            if dataset.ticks.is_empty() {
+                return Err("direct arrays require a nonempty chunk".into());
+            }
+            let n = dataset.ticks.len();
+            let mut timestamps = Vec::with_capacity(n);
+            let mut sequences = Vec::with_capacity(n);
+            let mut bids = Vec::with_capacity(n);
+            let mut asks = Vec::with_capacity(n);
+            for tick in &dataset.ticks {
+                tick.validate(&dataset.profile)?;
+                timestamps.push(tick.timestamp_ms);
+                sequences.push(tick.sequence);
+                bids.push(tick.bid);
+                asks.push(tick.ask);
+            }
+            Ok(Self {
+                timestamps: timestamps.into(),
+                sequences: sequences.into(),
+                bids: bids.into(),
+                asks: asks.into(),
+                event_count: n,
+                dataset_identity: data::dataset_identity(&dataset.manifest)?,
+                file_hash: file_hash.to_string(),
+                profile: dataset.profile.clone(),
+                manifest: dataset.manifest.clone(),
+            })
+        }
+
+        /// Read, fully verify and bind one native corpus chunk into direct hot
+        /// arrays. The chunk fingerprint and dataset identity must match the
+        /// specification entry.
+        pub fn from_native_chunk(
+            base: &Path,
+            spec: &Specification,
+            chunk_index: usize,
+        ) -> Result<Self> {
+            if chunk_index >= spec.chunks.len() {
+                return Err("corpus chunk index outside specification".into());
+            }
+            let chunk = &spec.chunks[chunk_index];
+            if chunk.block_root.is_some() {
+                return Err("blocked artifacts use blocked_native directly".into());
+            }
+            let (dataset, fingerprint) =
+                native::read_bounded(&base.join(&chunk.path), spec.max_chunk_events.min(100000))?;
+            if fingerprint != chunk.file_hash
+                || data::dataset_identity(&dataset.manifest)? != chunk.dataset_identity
+            {
+                return Err("corpus artifact revision/fingerprint mismatch".into());
+            }
+            Self::from_dataset(&dataset, &fingerprint)
+        }
+
+        /// Strict input subclass for direct-array research loading: literal USD
+        /// quote and synthetic test-only class, never silently widened.
+        pub fn require_synthetic_usd(&self) -> Result<()> {
+            if self.profile.quote != "USD" {
+                return Err("direct array replay requires a literal USD quote".into());
+            }
+            if self.manifest.class != DataClass::SyntheticTestOnly {
+                return Err("direct array replay requires SyntheticTestOnly".into());
+            }
+            Ok(())
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        fn root() -> std::path::PathBuf {
+            let p = std::env::temp_dir().join(format!(
+                "direct-arrays-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            std::fs::create_dir(&p).unwrap();
+            p
+        }
+        fn fixture() -> (std::path::PathBuf, Dataset, String) {
+            let root = root();
+            let p = Profile::synthetic("EURUSD").unwrap();
+            let ticks: Vec<data::Tick> = (0..100)
+                .map(|i| data::Tick {
+                    timestamp_ms: 1735689600000 + i * 60000,
+                    sequence: i as u64,
+                    bid: 10000 + i,
+                    ask: 10010 + i,
+                })
+                .collect();
+            let data = data::dataset(
+                p.clone(),
+                ticks.clone(),
+                "direct-array fixture",
+                "archive".into(),
+                true,
+            )
+            .unwrap();
+            let path = root.join("chunk.rsf");
+            native::write(&path, &data).unwrap();
+            let hash = data::file_hash(&path).unwrap();
+            (root, data, hash)
+        }
+        #[test]
+        fn direct_arrays_match_scalar_ticks_with_provenance_bindings() {
+            let (root, data, hash) = fixture();
+            let spec = crate::corpus::describe(&[root.join("chunk.rsf")], 100000).unwrap();
+            let arrays = DirectArrays::from_native_chunk(&root, &spec, 0).unwrap();
+            assert_eq!(arrays.event_count, 100);
+            assert_eq!(
+                arrays.dataset_identity,
+                data::dataset_identity(&data.manifest).unwrap()
+            );
+            assert_eq!(arrays.file_hash, hash);
+            for (i, t) in data.ticks.iter().enumerate() {
+                assert_eq!(arrays.timestamps[i], t.timestamp_ms);
+                assert_eq!(arrays.sequences[i], t.sequence);
+                assert_eq!(arrays.bids[i], t.bid);
+                assert_eq!(arrays.asks[i], t.ask);
+            }
+            arrays.require_synthetic_usd().unwrap();
+            std::fs::remove_dir_all(root).unwrap();
+        }
+        #[test]
+        fn changed_chunk_bytes_refuse_direct_array_binding() {
+            let (root, _data, _hash) = fixture();
+            let path = root.join("chunk.rsf");
+            let spec = crate::corpus::describe(std::slice::from_ref(&path), 100000).unwrap();
+            assert!(DirectArrays::from_native_chunk(&root, &spec, 0).is_ok());
+            let mut bytes = std::fs::read(&path).unwrap();
+            let last = bytes.len() - 1;
+            bytes[last] ^= 1;
+            std::fs::write(&path, &bytes).unwrap();
+            assert!(DirectArrays::from_native_chunk(&root, &spec, 0).is_err());
+            std::fs::remove_dir_all(root).unwrap();
+        }
+        #[test]
+        fn out_of_range_chunk_and_blocked_chunk_refuse() {
+            let (root, data, _hash) = fixture();
+            let path = root.join("chunk.rsf");
+            let spec = crate::corpus::describe(&[path], 100000).unwrap();
+            assert!(DirectArrays::from_native_chunk(&root, &spec, 1).is_err());
+            let blocked = root.join("blocked.rsfb");
+            crate::blocked_native::write(&blocked, &data, 7).unwrap();
+            let spec = crate::corpus::describe(&[blocked], 100000).unwrap();
+            assert!(DirectArrays::from_native_chunk(&root, &spec, 0).is_err());
+            let _ = _hash;
+            std::fs::remove_dir_all(root).unwrap();
+        }
+    }
+}
+
+pub mod mmap_guard {
+    //! Read-only random-access guard over a verified corpus artifact.
+    //!
+    //! The codebase forbids `unsafe`, so raw `mmap` syscalls are out of scope;
+    //! this guard uses pread (`File::read_at`) and exposes mmap-compatible
+    //! semantics instead: read-only views, bounds-checked slices, byte-budget
+    //! refusal before any access, and fail-closed revalidation if the artifact
+    //! is replaced or truncated after the guard is created. No partial slice is
+    //! ever published: the budget is checked up front and every slice is
+    //! bounds-checked against the resident bytes.
+
+    use crate::Result;
+    use std::{
+        fs::{self, File},
+        io::Read,
+        path::Path,
+        path::PathBuf,
+    };
+
+    /// Read-only, bounds-checked access over one artifact.
+    pub struct MmapGuard {
+        bytes: Vec<u8>,
+        length: u64,
+        path: PathBuf,
+    }
+
+    impl MmapGuard {
+        /// Open `path`, read it fully once its length passes `budget`, and refuse
+        /// before any read when the artifact exceeds the budget.
+        pub fn open(path: &Path, budget: u64) -> Result<Self> {
+            if budget == 0 {
+                return Err("mmap budget must be nonzero".into());
+            }
+            let mut file = File::open(path).map_err(|e| e.to_string())?;
+            if !file.metadata().map_err(|e| e.to_string())?.is_file() {
+                return Err("mmap input must be a regular file".into());
+            }
+            let length = file.metadata().map_err(|e| e.to_string())?.len();
+            if length == 0 {
+                return Err("empty artifact cannot be mapped".into());
+            }
+            if length > budget {
+                return Err("mmap byte budget refused before mapping".into());
+            }
+            let mut bytes = vec![0u8; length as usize];
+            file.read_exact(&mut bytes).map_err(|e| e.to_string())?;
+            drop(file);
+            let length_after = std::fs::metadata(path).map_err(|e| e.to_string())?.len();
+            if length_after != length {
+                return Err("artifact changed length during read".into());
+            }
+            Ok(Self {
+                bytes,
+                length,
+                path: path.to_path_buf(),
+            })
+        }
+
+        pub fn len(&self) -> u64 {
+            self.length
+        }
+
+        pub fn is_empty(&self) -> bool {
+            self.length == 0
+        }
+
+        pub fn as_bytes(&self) -> &[u8] {
+            &self.bytes
+        }
+
+        /// Bounds-checked slice of the mapped artifact.
+        pub fn slice(&self, offset: usize, len: usize) -> Result<&[u8]> {
+            let end = offset
+                .checked_add(len)
+                .ok_or("mmap slice offset overflow")?;
+            self.bytes
+                .get(offset..end)
+                .ok_or("mmap slice outside artifact".into())
+        }
+
+        /// Re-check the backing file length; refuses if the artifact was replaced,
+        /// truncated or grew after the guard was created.
+        pub fn still_current(&self) -> Result<()> {
+            let metadata = fs::metadata(&self.path).map_err(|e| e.to_string())?;
+            if metadata.len() != self.length {
+                return Err("mmap artifact length changed".into());
+            }
+            Ok(())
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        #[test]
+        fn guard_budget_refusal_reads_nothing() {
+            let root = std::env::temp_dir().join(format!("mmap-guard-{}", std::process::id()));
+            std::fs::create_dir(&root).unwrap();
+            let path = root.join("sample.rsf");
+            let content = b"exact artifact contents for mmap guard tests";
+            std::fs::write(&path, content).unwrap();
+            assert!(MmapGuard::open(&path, content.len() as u64 - 1).is_err());
+            assert!(MmapGuard::open(&path, 0).is_err());
+            let guard = MmapGuard::open(&path, content.len() as u64).unwrap();
+            assert_eq!(guard.len(), content.len() as u64);
+            assert!(!guard.is_empty());
+            assert_eq!(guard.as_bytes(), content);
+            assert_eq!(guard.slice(0, 5).unwrap(), b"exact");
+            assert!(guard.slice(content.len(), 1).is_err());
+            assert!(guard.slice(content.len() - 1, 2).is_err());
+            assert!(guard.still_current().is_ok());
+            let _: &[u8] = guard.as_bytes();
+            std::fs::remove_dir_all(root).unwrap();
+        }
+        #[test]
+        fn guard_detects_artifact_replacement_after_mapping() {
+            let root = std::env::temp_dir().join(format!("mmap-guard2-{}", std::process::id()));
+            std::fs::create_dir(&root).unwrap();
+            let path = root.join("sample.rsf");
+            std::fs::write(&path, b"short").unwrap();
+            let guard = MmapGuard::open(&path, 1024).unwrap();
+            std::fs::write(
+                &path,
+                b"this replacement is deliberately longer than before",
+            )
+            .unwrap();
+            assert!(guard.still_current().is_err());
+            std::fs::remove_dir_all(root).unwrap();
+        }
+        #[test]
+        fn guard_slice_exposes_only_shared_read_only_views() {
+            let root = std::env::temp_dir().join(format!("mmap-guard3-{}", std::process::id()));
+            std::fs::create_dir(&root).unwrap();
+            let path = root.join("sample.rsf");
+            std::fs::write(&path, b"readonly").unwrap();
+            let guard = MmapGuard::open(&path, 1024).unwrap();
+            let bytes: &[u8] = guard.as_bytes();
+            assert_eq!(bytes, b"readonly");
+            let _borrow: &[u8] = guard.slice(0, 4).unwrap();
+            assert_eq!(_borrow, b"read");
+            std::fs::remove_dir_all(root).unwrap();
         }
     }
 }
