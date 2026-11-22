@@ -33,17 +33,25 @@ are not counted as integrated into `main`.
 - **Verified end-to-end completion (Metric B): ~69%.** (supersedes ~68%; cached diagnostic
   full-corpus execution over the 22-month pin is now verified end-to-end for all eight
   instruments.)
-- **Cached diagnostic full-corpus execution (card t_9623c913 / PR #28):** verified end-to-end
-  for all eight instruments over the owner-selected 22-month pin (2025-01..2026-10) through
-  the unchanged authoritative sequential engine: 110 executed months, 66 refused months,
-  11,584 trades, 694,984 rejections, P&L -1,759,377,176 uUSD, worst-month drawdown 47,783,390
-  uUSD; cache ratio cold 0 hits / 110+66 misses then warm 110 hits / 66 misses; every
-  instrument's cold and warm reports byte-identical apart from cache counters. Evidence:
+- **Cached diagnostic full-corpus execution (card t_9623c913 / PR #28, refreshed):** verified
+  end-to-end for all eight instruments over the owner-selected 22-month pin (2025-01..2026-10)
+  through the unchanged authoritative sequential engine: 176 executed months, 0 refused months,
+  21,104 trades, 1,094,379 rejections, P&L -3,077,229,124 uUSD, worst-month drawdown 47,783,390
+  uUSD; cache ratio cold 0 hits / 176 misses then warm 176 hits / 0 misses; every instrument's
+  cold and warm reports byte-identical apart from cache counters. This refreshes the earlier
+  5-executed/3-refused receipt, which predated the reciprocal USD-account conversion. Evidence:
   `scripts/run-diagnostic-execution-cached.py`, configs
   `configs/historical-migration/{strategies,costs}/*.json`,
   `docs/historical-migration/diagnostic-cache-v1/`, aggregate receipt
-  `docs/historical-migration/DIAGNOSTIC_EXECUTION_CACHED_RECEIPT.json` (sha256
-  02be66677cd4b719f3e6e5bf34e4d31560dc0e41b92f473cc08e326964ae0ca0).
+  `docs/historical-migration/DIAGNOSTIC_EXECUTION_CACHED_RECEIPT.json`.
+- **Scientific validation (diagnostic, fail-closed):** the owner criteria are evaluated per
+  instrument over the refreshed corpus (`scientific_validation` module + `scientific-validation`
+  CLI; per-month outcome statistics in `historical_corpus`): 8/8 instruments, 21,104 resolved
+  exits, net win rate 14.29%, worst per-month streak 51; every instrument REJECTED (diagnostic
+  class plus failing numerical floors) and 0 qualify. Reset-fold per-month accounts cannot
+  establish continuous full-period accounting, which stays unknown. Evidence:
+  `docs/historical-migration/SCIENTIFIC_VALIDATION.md`,
+  `docs/historical-migration/SCIENTIFIC_VALIDATION_RECEIPT.json`.
 - **Progress added this milestone (PR #22 + PR #24 + PR #28): ~+1.0 weighted point each metric.**
   The owner-selected 22-month research window (2025-01..2026-10) is now an explicit, tested
   calendar pin rather than a count-coincidence default: exact boundaries for all eight

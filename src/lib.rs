@@ -126,3 +126,5 @@ pub mod worker_selection;
 pub mod os_enforcement;
 
 pub mod qualification;
+
+pub mod scientific_validation;

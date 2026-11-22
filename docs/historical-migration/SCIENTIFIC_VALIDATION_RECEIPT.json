@@ -1,0 +1,856 @@
+{
+  "kind": "scientific-validation-receipt-v1",
+  "driver": "scientific-validation-driver-v1",
+  "generated_at_utc": "2026-11-21T21:40:32+00:00",
+  "host": {
+    "node": "vmi3658677",
+    "system": "Linux",
+    "release": "6.8.0-147-generic",
+    "machine": "x86_64",
+    "cpus": 6
+  },
+  "source": {
+    "head": "8e0b7089130dc22cdb67433ae1cf80dc1459ab62",
+    "head_short": "8e0b708",
+    "branch": "hermes/scientific-validation",
+    "dirty_paths": [
+      "M docs/historical-migration/DIAGNOSTIC_EXECUTION_CACHED_RECEIPT.json"
+    ]
+  },
+  "binary": {
+    "path": "/root/workspace/Rust-strategy-factory/target/release/rust-strategy-factory",
+    "sha256": "71b17d3b84532b6162b110f37d7338bd1d71a33828a1d1517b9b6ef0b88d6ab7",
+    "size_bytes": 15526448
+  },
+  "inputs": {
+    "catalog_root": "/var/lib/hermes-factory",
+    "native_output": "/root/workspace/historical-migration-output/full-100k",
+    "strategy": {
+      "path": "/root/workspace/rsf-wt-research/configs/historical-migration/strategies/m1-long-above-mean-v1.json",
+      "sha256": "6b5e2c3271e618a2b7091cec6e856206341d8de1d3759df23f60004f9774529c"
+    },
+    "costs": {
+      "path": "/root/workspace/rsf-wt-research/configs/historical-migration/costs/bid-anchored-floor-v1-default.json",
+      "sha256": "61a5b8c64fa9e4bdc10e521f82ae8414a7fd4feb195ac23ffb0850ffabfd7103"
+    },
+    "budget": {
+      "max_candles": 1000000,
+      "feature_cells": 1000000,
+      "max_receipts": 1000000
+    },
+    "expected_months": 22,
+    "cache_dir": "/root/workspace/rsf-wt-research/work/scientific-validation-cache-v4",
+    "report_dir": "/root/workspace/rsf-wt-research/docs/historical-migration/diagnostic-cache-v1",
+    "diagnostic_receipt": {
+      "path": "/root/workspace/rsf-wt-research/docs/historical-migration/DIAGNOSTIC_EXECUTION_CACHED_RECEIPT.json",
+      "sha256": "f9af850c0e3ece96f9a2dbae7bdc9350dc9ef1a7bff938fc8b3d365e03e390fe"
+    }
+  },
+  "classification": "diagnostic_simulation",
+  "eligibility": "none",
+  "qualification_granted": false,
+  "limitations": "Diagnostic simulation only. The authoritative sequential engine and frozen financial rules are applied to real structurally-valid history, and each month starts a fresh account, so the criteria summary is reset-fold and descriptive. No research eligibility, calendar/profile/licensing approval, scientific validity or qualification is granted, and no strategy is qualified. Synthetic or diagnostic evidence can never qualify.",
+  "validation": {
+    "method": "scientific-validation-reset-fold-v1",
+    "classification": "diagnostic_simulation",
+    "eligibility": "none",
+    "instruments": [
+      {
+        "instrument": "EURUSD",
+        "identity": "520e7141cb4abb7adc35caa1d410e2869ccef79e15290fe2e8eb58613840d256",
+        "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2",
+        "classification": "diagnostic_simulation",
+        "eligibility": "none",
+        "conversion_policy": "identity_usd_v1",
+        "months_executed": 22,
+        "months_refused": 0,
+        "resolved": 3060,
+        "wins": 480,
+        "losses": 2580,
+        "breakevens": 0,
+        "net_win_rate_bps": 1568,
+        "max_losing_streak": 26,
+        "gross_win_micro_usd": 403829380,
+        "gross_loss_micro_usd": 843337720,
+        "achieved_rr_milli": 478,
+        "planned_rr_milli": 3000,
+        "net_micro_usd": -439508340,
+        "additive_ending_micro_usd": -419523130,
+        "year_2025": {
+          "resolved": 1775,
+          "wins": 291,
+          "losses": 1484,
+          "breakevens": 0,
+          "net_micro_usd": -239814020
+        },
+        "year_2026": {
+          "resolved": 1285,
+          "wins": 189,
+          "losses": 1096,
+          "breakevens": 0,
+          "net_micro_usd": -199694320
+        },
+        "unresolved_positions": 2,
+        "criteria": {
+          "status": "REJECTED",
+          "numeric_gates_passed": false,
+          "criteria": [
+            {
+              "name": "declared_data_class",
+              "state": "fail",
+              "detail": "classification=diagnostic_simulation eligibility=none; diagnostic simulation and ineligible classes are not evidence"
+            },
+            {
+              "name": "resolved_2025",
+              "state": "pass",
+              "detail": "resolved exits in 2025 = 1775 (floor 50)"
+            },
+            {
+              "name": "resolved_2026",
+              "state": "pass",
+              "detail": "resolved exits in 2026 = 1285 (floor 50)"
+            },
+            {
+              "name": "net_win_rate",
+              "state": "fail",
+              "detail": "net win rate = 1568 bps (floor 5000 bps) over 3060 resolved exits"
+            },
+            {
+              "name": "max_consecutive_losses",
+              "state": "fail",
+              "detail": "worst per-month losing streak = 26 (ceiling 5); reset-fold, not continuous"
+            },
+            {
+              "name": "achieved_reward_risk",
+              "state": "fail",
+              "detail": "achieved gross win/loss = Some(478) milli versus the frozen planned 3000 milli; descriptive only"
+            },
+            {
+              "name": "equity_objective",
+              "state": "fail",
+              "detail": "additive ending equity = -419523130 micro-USD (objective 500000000); additive, not compounded"
+            },
+            {
+              "name": "continuous_full_period_accounting",
+              "state": "unknown",
+              "detail": "diagnostic months reset to the initial account; a continuous single-account full-period replay is not established"
+            },
+            {
+              "name": "independent_evidence",
+              "state": "unknown",
+              "detail": "calendar/profile/legal/scientific approvals and corpus-wide coverage remain pending"
+            }
+          ],
+          "reasons": [
+            "declared evidence class is diagnostic/ineligible and can never qualify",
+            "net_win_rate failed: net win rate = 1568 bps (floor 5000 bps) over 3060 resolved exits",
+            "max_consecutive_losses failed: worst per-month losing streak = 26 (ceiling 5); reset-fold, not continuous",
+            "equity_objective failed: additive ending equity = -419523130 micro-USD (objective 500000000); additive, not compounded",
+            "independent protected validation, approved provenance/profile, full coverage, accounting and version evidence not established by this assessment"
+          ],
+          "qualification_granted": false,
+          "scope": "Reset-fold diagnostic summary only. Each diagnostic month starts a fresh account, so these are descriptive observations rather than a continuous single-account full-period result. No independent calendar/profile/legal/scientific approval is established, and no eligibility or qualification is granted or implied. Synthetic or diagnostic evidence can never qualify."
+        }
+      },
+      {
+        "instrument": "GBPUSD",
+        "identity": "cb645f2f1876c06c2069d48e0dc5e89b41165ef8ce70892a7211fbb70262e2a1",
+        "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2",
+        "classification": "diagnostic_simulation",
+        "eligibility": "none",
+        "conversion_policy": "identity_usd_v1",
+        "months_executed": 22,
+        "months_refused": 0,
+        "resolved": 3341,
+        "wins": 481,
+        "losses": 2860,
+        "breakevens": 0,
+        "net_win_rate_bps": 1439,
+        "max_losing_streak": 33,
+        "gross_win_micro_usd": 323039580,
+        "gross_loss_micro_usd": 762753910,
+        "achieved_rr_milli": 423,
+        "planned_rr_milli": 3000,
+        "net_micro_usd": -439714330,
+        "additive_ending_micro_usd": -419714330,
+        "year_2025": {
+          "resolved": 1849,
+          "wins": 270,
+          "losses": 1579,
+          "breakevens": 0,
+          "net_micro_usd": -239846680
+        },
+        "year_2026": {
+          "resolved": 1492,
+          "wins": 211,
+          "losses": 1281,
+          "breakevens": 0,
+          "net_micro_usd": -199867650
+        },
+        "unresolved_positions": 0,
+        "criteria": {
+          "status": "REJECTED",
+          "numeric_gates_passed": false,
+          "criteria": [
+            {
+              "name": "declared_data_class",
+              "state": "fail",
+              "detail": "classification=diagnostic_simulation eligibility=none; diagnostic simulation and ineligible classes are not evidence"
+            },
+            {
+              "name": "resolved_2025",
+              "state": "pass",
+              "detail": "resolved exits in 2025 = 1849 (floor 50)"
+            },
+            {
+              "name": "resolved_2026",
+              "state": "pass",
+              "detail": "resolved exits in 2026 = 1492 (floor 50)"
+            },
+            {
+              "name": "net_win_rate",
+              "state": "fail",
+              "detail": "net win rate = 1439 bps (floor 5000 bps) over 3341 resolved exits"
+            },
+            {
+              "name": "max_consecutive_losses",
+              "state": "fail",
+              "detail": "worst per-month losing streak = 33 (ceiling 5); reset-fold, not continuous"
+            },
+            {
+              "name": "achieved_reward_risk",
+              "state": "fail",
+              "detail": "achieved gross win/loss = Some(423) milli versus the frozen planned 3000 milli; descriptive only"
+            },
+            {
+              "name": "equity_objective",
+              "state": "fail",
+              "detail": "additive ending equity = -419714330 micro-USD (objective 500000000); additive, not compounded"
+            },
+            {
+              "name": "continuous_full_period_accounting",
+              "state": "unknown",
+              "detail": "diagnostic months reset to the initial account; a continuous single-account full-period replay is not established"
+            },
+            {
+              "name": "independent_evidence",
+              "state": "unknown",
+              "detail": "calendar/profile/legal/scientific approvals and corpus-wide coverage remain pending"
+            }
+          ],
+          "reasons": [
+            "declared evidence class is diagnostic/ineligible and can never qualify",
+            "net_win_rate failed: net win rate = 1439 bps (floor 5000 bps) over 3341 resolved exits",
+            "max_consecutive_losses failed: worst per-month losing streak = 33 (ceiling 5); reset-fold, not continuous",
+            "equity_objective failed: additive ending equity = -419714330 micro-USD (objective 500000000); additive, not compounded",
+            "independent protected validation, approved provenance/profile, full coverage, accounting and version evidence not established by this assessment"
+          ],
+          "qualification_granted": false,
+          "scope": "Reset-fold diagnostic summary only. Each diagnostic month starts a fresh account, so these are descriptive observations rather than a continuous single-account full-period result. No independent calendar/profile/legal/scientific approval is established, and no eligibility or qualification is granted or implied. Synthetic or diagnostic evidence can never qualify."
+        }
+      },
+      {
+        "instrument": "USDJPY",
+        "identity": "669a72c6ab5e9dcfb1a87af324c77a059db89fc58f04d50577d1809778cfd901",
+        "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2",
+        "classification": "diagnostic_simulation",
+        "eligibility": "none",
+        "conversion_policy": "diagnostic_reciprocal_closing_rate_v1_long_bid_short_ask",
+        "months_executed": 22,
+        "months_refused": 0,
+        "resolved": 4089,
+        "wins": 614,
+        "losses": 3475,
+        "breakevens": 0,
+        "net_win_rate_bps": 1501,
+        "max_losing_streak": 38,
+        "gross_win_micro_usd": 277296001,
+        "gross_loss_micro_usd": 716697906,
+        "achieved_rr_milli": 386,
+        "planned_rr_milli": 3000,
+        "net_micro_usd": -439401905,
+        "additive_ending_micro_usd": -419374632,
+        "year_2025": {
+          "resolved": 2181,
+          "wins": 316,
+          "losses": 1865,
+          "breakevens": 0,
+          "net_micro_usd": -239881345
+        },
+        "year_2026": {
+          "resolved": 1908,
+          "wins": 298,
+          "losses": 1610,
+          "breakevens": 0,
+          "net_micro_usd": -199520560
+        },
+        "unresolved_positions": 1,
+        "criteria": {
+          "status": "REJECTED",
+          "numeric_gates_passed": false,
+          "criteria": [
+            {
+              "name": "declared_data_class",
+              "state": "fail",
+              "detail": "classification=diagnostic_simulation eligibility=none; diagnostic simulation and ineligible classes are not evidence"
+            },
+            {
+              "name": "resolved_2025",
+              "state": "pass",
+              "detail": "resolved exits in 2025 = 2181 (floor 50)"
+            },
+            {
+              "name": "resolved_2026",
+              "state": "pass",
+              "detail": "resolved exits in 2026 = 1908 (floor 50)"
+            },
+            {
+              "name": "net_win_rate",
+              "state": "fail",
+              "detail": "net win rate = 1501 bps (floor 5000 bps) over 4089 resolved exits"
+            },
+            {
+              "name": "max_consecutive_losses",
+              "state": "fail",
+              "detail": "worst per-month losing streak = 38 (ceiling 5); reset-fold, not continuous"
+            },
+            {
+              "name": "achieved_reward_risk",
+              "state": "fail",
+              "detail": "achieved gross win/loss = Some(386) milli versus the frozen planned 3000 milli; descriptive only"
+            },
+            {
+              "name": "equity_objective",
+              "state": "fail",
+              "detail": "additive ending equity = -419374632 micro-USD (objective 500000000); additive, not compounded"
+            },
+            {
+              "name": "continuous_full_period_accounting",
+              "state": "unknown",
+              "detail": "diagnostic months reset to the initial account; a continuous single-account full-period replay is not established"
+            },
+            {
+              "name": "independent_evidence",
+              "state": "unknown",
+              "detail": "calendar/profile/legal/scientific approvals and corpus-wide coverage remain pending"
+            }
+          ],
+          "reasons": [
+            "declared evidence class is diagnostic/ineligible and can never qualify",
+            "net_win_rate failed: net win rate = 1501 bps (floor 5000 bps) over 4089 resolved exits",
+            "max_consecutive_losses failed: worst per-month losing streak = 38 (ceiling 5); reset-fold, not continuous",
+            "equity_objective failed: additive ending equity = -419374632 micro-USD (objective 500000000); additive, not compounded",
+            "independent protected validation, approved provenance/profile, full coverage, accounting and version evidence not established by this assessment"
+          ],
+          "qualification_granted": false,
+          "scope": "Reset-fold diagnostic summary only. Each diagnostic month starts a fresh account, so these are descriptive observations rather than a continuous single-account full-period result. No independent calendar/profile/legal/scientific approval is established, and no eligibility or qualification is granted or implied. Synthetic or diagnostic evidence can never qualify."
+        }
+      },
+      {
+        "instrument": "USDCHF",
+        "identity": "e763051d077e31332c8b9b0398df5a39e6bdab676ba26cabc95b043621f7bfad",
+        "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2",
+        "classification": "diagnostic_simulation",
+        "eligibility": "none",
+        "conversion_policy": "diagnostic_reciprocal_closing_rate_v1_long_bid_short_ask",
+        "months_executed": 22,
+        "months_refused": 0,
+        "resolved": 2345,
+        "wins": 277,
+        "losses": 2068,
+        "breakevens": 0,
+        "net_win_rate_bps": 1181,
+        "max_losing_streak": 51,
+        "gross_win_micro_usd": 214996521,
+        "gross_loss_micro_usd": 654624170,
+        "achieved_rr_milli": 328,
+        "planned_rr_milli": 3000,
+        "net_micro_usd": -439627649,
+        "additive_ending_micro_usd": -419614860,
+        "year_2025": {
+          "resolved": 1267,
+          "wins": 141,
+          "losses": 1126,
+          "breakevens": 0,
+          "net_micro_usd": -239837438
+        },
+        "year_2026": {
+          "resolved": 1078,
+          "wins": 136,
+          "losses": 942,
+          "breakevens": 0,
+          "net_micro_usd": -199790211
+        },
+        "unresolved_positions": 3,
+        "criteria": {
+          "status": "REJECTED",
+          "numeric_gates_passed": false,
+          "criteria": [
+            {
+              "name": "declared_data_class",
+              "state": "fail",
+              "detail": "classification=diagnostic_simulation eligibility=none; diagnostic simulation and ineligible classes are not evidence"
+            },
+            {
+              "name": "resolved_2025",
+              "state": "pass",
+              "detail": "resolved exits in 2025 = 1267 (floor 50)"
+            },
+            {
+              "name": "resolved_2026",
+              "state": "pass",
+              "detail": "resolved exits in 2026 = 1078 (floor 50)"
+            },
+            {
+              "name": "net_win_rate",
+              "state": "fail",
+              "detail": "net win rate = 1181 bps (floor 5000 bps) over 2345 resolved exits"
+            },
+            {
+              "name": "max_consecutive_losses",
+              "state": "fail",
+              "detail": "worst per-month losing streak = 51 (ceiling 5); reset-fold, not continuous"
+            },
+            {
+              "name": "achieved_reward_risk",
+              "state": "fail",
+              "detail": "achieved gross win/loss = Some(328) milli versus the frozen planned 3000 milli; descriptive only"
+            },
+            {
+              "name": "equity_objective",
+              "state": "fail",
+              "detail": "additive ending equity = -419614860 micro-USD (objective 500000000); additive, not compounded"
+            },
+            {
+              "name": "continuous_full_period_accounting",
+              "state": "unknown",
+              "detail": "diagnostic months reset to the initial account; a continuous single-account full-period replay is not established"
+            },
+            {
+              "name": "independent_evidence",
+              "state": "unknown",
+              "detail": "calendar/profile/legal/scientific approvals and corpus-wide coverage remain pending"
+            }
+          ],
+          "reasons": [
+            "declared evidence class is diagnostic/ineligible and can never qualify",
+            "net_win_rate failed: net win rate = 1181 bps (floor 5000 bps) over 2345 resolved exits",
+            "max_consecutive_losses failed: worst per-month losing streak = 51 (ceiling 5); reset-fold, not continuous",
+            "equity_objective failed: additive ending equity = -419614860 micro-USD (objective 500000000); additive, not compounded",
+            "independent protected validation, approved provenance/profile, full coverage, accounting and version evidence not established by this assessment"
+          ],
+          "qualification_granted": false,
+          "scope": "Reset-fold diagnostic summary only. Each diagnostic month starts a fresh account, so these are descriptive observations rather than a continuous single-account full-period result. No independent calendar/profile/legal/scientific approval is established, and no eligibility or qualification is granted or implied. Synthetic or diagnostic evidence can never qualify."
+        }
+      },
+      {
+        "instrument": "USDCAD",
+        "identity": "393c6d7ea07d88c2795d3839b58b74309ebefb1932795b7eab6ee3bc17ac8035",
+        "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2",
+        "classification": "diagnostic_simulation",
+        "eligibility": "none",
+        "conversion_policy": "diagnostic_reciprocal_closing_rate_v1_long_bid_short_ask",
+        "months_executed": 22,
+        "months_refused": 0,
+        "resolved": 3086,
+        "wins": 413,
+        "losses": 2672,
+        "breakevens": 1,
+        "net_win_rate_bps": 1338,
+        "max_losing_streak": 34,
+        "gross_win_micro_usd": 274375558,
+        "gross_loss_micro_usd": 713278859,
+        "achieved_rr_milli": 384,
+        "planned_rr_milli": 3000,
+        "net_micro_usd": -438903301,
+        "additive_ending_micro_usd": -418862456,
+        "year_2025": {
+          "resolved": 1760,
+          "wins": 235,
+          "losses": 1525,
+          "breakevens": 0,
+          "net_micro_usd": -239785298
+        },
+        "year_2026": {
+          "resolved": 1326,
+          "wins": 178,
+          "losses": 1147,
+          "breakevens": 1,
+          "net_micro_usd": -199118003
+        },
+        "unresolved_positions": 7,
+        "criteria": {
+          "status": "REJECTED",
+          "numeric_gates_passed": false,
+          "criteria": [
+            {
+              "name": "declared_data_class",
+              "state": "fail",
+              "detail": "classification=diagnostic_simulation eligibility=none; diagnostic simulation and ineligible classes are not evidence"
+            },
+            {
+              "name": "resolved_2025",
+              "state": "pass",
+              "detail": "resolved exits in 2025 = 1760 (floor 50)"
+            },
+            {
+              "name": "resolved_2026",
+              "state": "pass",
+              "detail": "resolved exits in 2026 = 1326 (floor 50)"
+            },
+            {
+              "name": "net_win_rate",
+              "state": "fail",
+              "detail": "net win rate = 1338 bps (floor 5000 bps) over 3086 resolved exits"
+            },
+            {
+              "name": "max_consecutive_losses",
+              "state": "fail",
+              "detail": "worst per-month losing streak = 34 (ceiling 5); reset-fold, not continuous"
+            },
+            {
+              "name": "achieved_reward_risk",
+              "state": "fail",
+              "detail": "achieved gross win/loss = Some(384) milli versus the frozen planned 3000 milli; descriptive only"
+            },
+            {
+              "name": "equity_objective",
+              "state": "fail",
+              "detail": "additive ending equity = -418862456 micro-USD (objective 500000000); additive, not compounded"
+            },
+            {
+              "name": "continuous_full_period_accounting",
+              "state": "unknown",
+              "detail": "diagnostic months reset to the initial account; a continuous single-account full-period replay is not established"
+            },
+            {
+              "name": "independent_evidence",
+              "state": "unknown",
+              "detail": "calendar/profile/legal/scientific approvals and corpus-wide coverage remain pending"
+            }
+          ],
+          "reasons": [
+            "declared evidence class is diagnostic/ineligible and can never qualify",
+            "net_win_rate failed: net win rate = 1338 bps (floor 5000 bps) over 3086 resolved exits",
+            "max_consecutive_losses failed: worst per-month losing streak = 34 (ceiling 5); reset-fold, not continuous",
+            "equity_objective failed: additive ending equity = -418862456 micro-USD (objective 500000000); additive, not compounded",
+            "independent protected validation, approved provenance/profile, full coverage, accounting and version evidence not established by this assessment"
+          ],
+          "qualification_granted": false,
+          "scope": "Reset-fold diagnostic summary only. Each diagnostic month starts a fresh account, so these are descriptive observations rather than a continuous single-account full-period result. No independent calendar/profile/legal/scientific approval is established, and no eligibility or qualification is granted or implied. Synthetic or diagnostic evidence can never qualify."
+        }
+      },
+      {
+        "instrument": "AUDUSD",
+        "identity": "056a656401f7b0ebd4895398343f7c6aa6fba2493cd00ef1132bf9f665026775",
+        "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2",
+        "classification": "diagnostic_simulation",
+        "eligibility": "none",
+        "conversion_policy": "identity_usd_v1",
+        "months_executed": 22,
+        "months_refused": 0,
+        "resolved": 2681,
+        "wins": 411,
+        "losses": 2269,
+        "breakevens": 1,
+        "net_win_rate_bps": 1533,
+        "max_losing_streak": 37,
+        "gross_win_micro_usd": 280352550,
+        "gross_loss_micro_usd": 719765500,
+        "achieved_rr_milli": 389,
+        "planned_rr_milli": 3000,
+        "net_micro_usd": -439412950,
+        "additive_ending_micro_usd": -419409720,
+        "year_2025": {
+          "resolved": 1463,
+          "wins": 225,
+          "losses": 1237,
+          "breakevens": 1,
+          "net_micro_usd": -239691650
+        },
+        "year_2026": {
+          "resolved": 1218,
+          "wins": 186,
+          "losses": 1032,
+          "breakevens": 0,
+          "net_micro_usd": -199721300
+        },
+        "unresolved_positions": 12,
+        "criteria": {
+          "status": "REJECTED",
+          "numeric_gates_passed": false,
+          "criteria": [
+            {
+              "name": "declared_data_class",
+              "state": "fail",
+              "detail": "classification=diagnostic_simulation eligibility=none; diagnostic simulation and ineligible classes are not evidence"
+            },
+            {
+              "name": "resolved_2025",
+              "state": "pass",
+              "detail": "resolved exits in 2025 = 1463 (floor 50)"
+            },
+            {
+              "name": "resolved_2026",
+              "state": "pass",
+              "detail": "resolved exits in 2026 = 1218 (floor 50)"
+            },
+            {
+              "name": "net_win_rate",
+              "state": "fail",
+              "detail": "net win rate = 1533 bps (floor 5000 bps) over 2681 resolved exits"
+            },
+            {
+              "name": "max_consecutive_losses",
+              "state": "fail",
+              "detail": "worst per-month losing streak = 37 (ceiling 5); reset-fold, not continuous"
+            },
+            {
+              "name": "achieved_reward_risk",
+              "state": "fail",
+              "detail": "achieved gross win/loss = Some(389) milli versus the frozen planned 3000 milli; descriptive only"
+            },
+            {
+              "name": "equity_objective",
+              "state": "fail",
+              "detail": "additive ending equity = -419409720 micro-USD (objective 500000000); additive, not compounded"
+            },
+            {
+              "name": "continuous_full_period_accounting",
+              "state": "unknown",
+              "detail": "diagnostic months reset to the initial account; a continuous single-account full-period replay is not established"
+            },
+            {
+              "name": "independent_evidence",
+              "state": "unknown",
+              "detail": "calendar/profile/legal/scientific approvals and corpus-wide coverage remain pending"
+            }
+          ],
+          "reasons": [
+            "declared evidence class is diagnostic/ineligible and can never qualify",
+            "net_win_rate failed: net win rate = 1533 bps (floor 5000 bps) over 2681 resolved exits",
+            "max_consecutive_losses failed: worst per-month losing streak = 37 (ceiling 5); reset-fold, not continuous",
+            "equity_objective failed: additive ending equity = -419409720 micro-USD (objective 500000000); additive, not compounded",
+            "independent protected validation, approved provenance/profile, full coverage, accounting and version evidence not established by this assessment"
+          ],
+          "qualification_granted": false,
+          "scope": "Reset-fold diagnostic summary only. Each diagnostic month starts a fresh account, so these are descriptive observations rather than a continuous single-account full-period result. No independent calendar/profile/legal/scientific approval is established, and no eligibility or qualification is granted or implied. Synthetic or diagnostic evidence can never qualify."
+        }
+      },
+      {
+        "instrument": "NZDUSD",
+        "identity": "a9cf81658571bab392e46b3e18e4ed9a40ad3ff759b54230da5560ecc2a0e959",
+        "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2",
+        "classification": "diagnostic_simulation",
+        "eligibility": "none",
+        "conversion_policy": "identity_usd_v1",
+        "months_executed": 22,
+        "months_refused": 0,
+        "resolved": 2492,
+        "wins": 339,
+        "losses": 2152,
+        "breakevens": 1,
+        "net_win_rate_bps": 1360,
+        "max_losing_streak": 37,
+        "gross_win_micro_usd": 210048340,
+        "gross_loss_micro_usd": 649612510,
+        "achieved_rr_milli": 323,
+        "planned_rr_milli": 3000,
+        "net_micro_usd": -439564170,
+        "additive_ending_micro_usd": -419559400,
+        "year_2025": {
+          "resolved": 1395,
+          "wins": 191,
+          "losses": 1204,
+          "breakevens": 0,
+          "net_micro_usd": -239738770
+        },
+        "year_2026": {
+          "resolved": 1097,
+          "wins": 148,
+          "losses": 948,
+          "breakevens": 1,
+          "net_micro_usd": -199825400
+        },
+        "unresolved_positions": 6,
+        "criteria": {
+          "status": "REJECTED",
+          "numeric_gates_passed": false,
+          "criteria": [
+            {
+              "name": "declared_data_class",
+              "state": "fail",
+              "detail": "classification=diagnostic_simulation eligibility=none; diagnostic simulation and ineligible classes are not evidence"
+            },
+            {
+              "name": "resolved_2025",
+              "state": "pass",
+              "detail": "resolved exits in 2025 = 1395 (floor 50)"
+            },
+            {
+              "name": "resolved_2026",
+              "state": "pass",
+              "detail": "resolved exits in 2026 = 1097 (floor 50)"
+            },
+            {
+              "name": "net_win_rate",
+              "state": "fail",
+              "detail": "net win rate = 1360 bps (floor 5000 bps) over 2492 resolved exits"
+            },
+            {
+              "name": "max_consecutive_losses",
+              "state": "fail",
+              "detail": "worst per-month losing streak = 37 (ceiling 5); reset-fold, not continuous"
+            },
+            {
+              "name": "achieved_reward_risk",
+              "state": "fail",
+              "detail": "achieved gross win/loss = Some(323) milli versus the frozen planned 3000 milli; descriptive only"
+            },
+            {
+              "name": "equity_objective",
+              "state": "fail",
+              "detail": "additive ending equity = -419559400 micro-USD (objective 500000000); additive, not compounded"
+            },
+            {
+              "name": "continuous_full_period_accounting",
+              "state": "unknown",
+              "detail": "diagnostic months reset to the initial account; a continuous single-account full-period replay is not established"
+            },
+            {
+              "name": "independent_evidence",
+              "state": "unknown",
+              "detail": "calendar/profile/legal/scientific approvals and corpus-wide coverage remain pending"
+            }
+          ],
+          "reasons": [
+            "declared evidence class is diagnostic/ineligible and can never qualify",
+            "net_win_rate failed: net win rate = 1360 bps (floor 5000 bps) over 2492 resolved exits",
+            "max_consecutive_losses failed: worst per-month losing streak = 37 (ceiling 5); reset-fold, not continuous",
+            "equity_objective failed: additive ending equity = -419559400 micro-USD (objective 500000000); additive, not compounded",
+            "independent protected validation, approved provenance/profile, full coverage, accounting and version evidence not established by this assessment"
+          ],
+          "qualification_granted": false,
+          "scope": "Reset-fold diagnostic summary only. Each diagnostic month starts a fresh account, so these are descriptive observations rather than a continuous single-account full-period result. No independent calendar/profile/legal/scientific approval is established, and no eligibility or qualification is granted or implied. Synthetic or diagnostic evidence can never qualify."
+        }
+      },
+      {
+        "instrument": "XAUUSD",
+        "identity": "1a62a9702eb88d875086ff854c8dc489be5f0440ef76e8815602757c84eeb4b0",
+        "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2",
+        "classification": "diagnostic_simulation",
+        "eligibility": "none",
+        "conversion_policy": "identity_usd_v1",
+        "months_executed": 22,
+        "months_refused": 0,
+        "resolved": 10,
+        "wins": 1,
+        "losses": 9,
+        "breakevens": 0,
+        "net_win_rate_bps": 1000,
+        "max_losing_streak": 6,
+        "gross_win_micro_usd": 114900,
+        "gross_loss_micro_usd": 1285496,
+        "achieved_rr_milli": 89,
+        "planned_rr_milli": 3000,
+        "net_micro_usd": -1170596,
+        "additive_ending_micro_usd": 18829404,
+        "year_2025": {
+          "resolved": 7,
+          "wins": 0,
+          "losses": 7,
+          "breakevens": 0,
+          "net_micro_usd": -705320
+        },
+        "year_2026": {
+          "resolved": 3,
+          "wins": 1,
+          "losses": 2,
+          "breakevens": 0,
+          "net_micro_usd": -465276
+        },
+        "unresolved_positions": 0,
+        "criteria": {
+          "status": "REJECTED",
+          "numeric_gates_passed": false,
+          "criteria": [
+            {
+              "name": "declared_data_class",
+              "state": "fail",
+              "detail": "classification=diagnostic_simulation eligibility=none; diagnostic simulation and ineligible classes are not evidence"
+            },
+            {
+              "name": "resolved_2025",
+              "state": "fail",
+              "detail": "resolved exits in 2025 = 7 (floor 50)"
+            },
+            {
+              "name": "resolved_2026",
+              "state": "fail",
+              "detail": "resolved exits in 2026 = 3 (floor 50)"
+            },
+            {
+              "name": "net_win_rate",
+              "state": "fail",
+              "detail": "net win rate = 1000 bps (floor 5000 bps) over 10 resolved exits"
+            },
+            {
+              "name": "max_consecutive_losses",
+              "state": "fail",
+              "detail": "worst per-month losing streak = 6 (ceiling 5); reset-fold, not continuous"
+            },
+            {
+              "name": "achieved_reward_risk",
+              "state": "fail",
+              "detail": "achieved gross win/loss = Some(89) milli versus the frozen planned 3000 milli; descriptive only"
+            },
+            {
+              "name": "equity_objective",
+              "state": "fail",
+              "detail": "additive ending equity = 18829404 micro-USD (objective 500000000); additive, not compounded"
+            },
+            {
+              "name": "continuous_full_period_accounting",
+              "state": "unknown",
+              "detail": "diagnostic months reset to the initial account; a continuous single-account full-period replay is not established"
+            },
+            {
+              "name": "independent_evidence",
+              "state": "unknown",
+              "detail": "calendar/profile/legal/scientific approvals and corpus-wide coverage remain pending"
+            }
+          ],
+          "reasons": [
+            "declared evidence class is diagnostic/ineligible and can never qualify",
+            "resolved_2025 failed: resolved exits in 2025 = 7 (floor 50)",
+            "resolved_2026 failed: resolved exits in 2026 = 3 (floor 50)",
+            "net_win_rate failed: net win rate = 1000 bps (floor 5000 bps) over 10 resolved exits",
+            "max_consecutive_losses failed: worst per-month losing streak = 6 (ceiling 5); reset-fold, not continuous",
+            "equity_objective failed: additive ending equity = 18829404 micro-USD (objective 500000000); additive, not compounded",
+            "independent protected validation, approved provenance/profile, full coverage, accounting and version evidence not established by this assessment"
+          ],
+          "qualification_granted": false,
+          "scope": "Reset-fold diagnostic summary only. Each diagnostic month starts a fresh account, so these are descriptive observations rather than a continuous single-account full-period result. No independent calendar/profile/legal/scientific approval is established, and no eligibility or qualification is granted or implied. Synthetic or diagnostic evidence can never qualify."
+        }
+      }
+    ],
+    "totals": {
+      "instruments": 8,
+      "instruments_executed": 8,
+      "instruments_refused": 0,
+      "resolved": 21104,
+      "wins": 3016,
+      "losses": 18085,
+      "breakevens": 3,
+      "net_win_rate_bps": 1429,
+      "max_losing_streak": 51,
+      "gross_win_micro_usd": 1984052830,
+      "gross_loss_micro_usd": 5061356071,
+      "net_micro_usd": -3077303241,
+      "additive_ending_micro_usd": -2917229124
+    },
+    "qualification_granted": false,
+    "limitations": "Reset-fold diagnostic summary only. Each diagnostic month starts a fresh account, so these are descriptive observations rather than a continuous single-account full-period result. No independent calendar/profile/legal/scientific approval is established, and no eligibility or qualification is granted or implied. Synthetic or diagnostic evidence can never qualify."
+  },
+  "receipt_sha256": "6a2324f6f9ce05cfc1988a7277a319276593001e48e5d73b9ac2da2c3291ab45"
+}

@@ -4,6 +4,7 @@
   "strategy_identity": "f7e9f6a65377a7ba76352fce8eea60bfc0bf9865538906bda07b4455ce7be9c2",
   "classification": "diagnostic_simulation",
   "eligibility": "none",
+  "conversion_policy": "identity_usd_v1",
   "months": [
     {
       "year": 2025,
@@ -15,13 +16,25 @@
       "replay_dataset_id": "ca4a6fd80f32ef0280742f50b1ad4b420ff20a18e61a64c7aa489b2e837c22b2",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 20000000,
       "final_marked_micro_usd": 20000000,
       "maximum_drawdown_micro_usd": 0,
       "trades": 0,
       "rejections": 14891,
-      "receipt_hash": "22c1f42b88f8c7a21d583e0a0dc15618cf8a3908fbfa85810da1ccc173ad1897"
+      "receipt_hash": "22c1f42b88f8c7a21d583e0a0dc15618cf8a3908fbfa85810da1ccc173ad1897",
+      "outcomes": {
+        "resolved": 0,
+        "wins": 0,
+        "losses": 0,
+        "breakevens": 0,
+        "max_losing_streak": 0,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 0,
+        "net_micro_usd": 0,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -33,13 +46,25 @@
       "replay_dataset_id": "3d06ad7a8a5df16a202d6468e58a37046ded7e9b776ffa37c6703829e55b0ccd",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 19445130,
       "final_marked_micro_usd": 19445130,
       "maximum_drawdown_micro_usd": 554870,
       "trades": 6,
       "rejections": 13666,
-      "receipt_hash": "481ceae35fc5352ae5201729c233e757284bacb0beb2c275731471e1c3ff7a56"
+      "receipt_hash": "481ceae35fc5352ae5201729c233e757284bacb0beb2c275731471e1c3ff7a56",
+      "outcomes": {
+        "resolved": 6,
+        "wins": 0,
+        "losses": 6,
+        "breakevens": 0,
+        "max_losing_streak": 6,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 554870,
+        "net_micro_usd": -554870,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -51,13 +76,25 @@
       "replay_dataset_id": "0efbf24179725f5ed9412ef2b02045db307efa3fea4eae2cca43dd66507b7303",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 20000000,
       "final_marked_micro_usd": 20000000,
       "maximum_drawdown_micro_usd": 0,
       "trades": 0,
       "rejections": 14683,
-      "receipt_hash": "0de57a036031d82a923be2b8ff463980237cd278251dca4f628bc72c3af01acf"
+      "receipt_hash": "0de57a036031d82a923be2b8ff463980237cd278251dca4f628bc72c3af01acf",
+      "outcomes": {
+        "resolved": 0,
+        "wins": 0,
+        "losses": 0,
+        "breakevens": 0,
+        "max_losing_streak": 0,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 0,
+        "net_micro_usd": 0,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -69,13 +106,25 @@
       "replay_dataset_id": "23de2330449d6ce65a6170b849d4df60be850f2bec6f4835002297ff4a8bcfb3",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 20000000,
       "final_marked_micro_usd": 20000000,
       "maximum_drawdown_micro_usd": 0,
       "trades": 0,
       "rejections": 14480,
-      "receipt_hash": "99377e937f79839caab34b1cba35bf2273c0069cf56ef3d9f74408d458d4d8f0"
+      "receipt_hash": "99377e937f79839caab34b1cba35bf2273c0069cf56ef3d9f74408d458d4d8f0",
+      "outcomes": {
+        "resolved": 0,
+        "wins": 0,
+        "losses": 0,
+        "breakevens": 0,
+        "max_losing_streak": 0,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 0,
+        "net_micro_usd": 0,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -87,13 +136,25 @@
       "replay_dataset_id": "d65660d2b1bf26e3b60b61e9bc76589eb630fb22882c0749bcd0a78b48a428bb",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 19849550,
       "final_marked_micro_usd": 19849550,
       "maximum_drawdown_micro_usd": 150450,
       "trades": 1,
       "rejections": 14979,
-      "receipt_hash": "08f7d6abb1ea8ca7a2d3bf41c9a48f75ef093447178123e62e110268b16e150b"
+      "receipt_hash": "08f7d6abb1ea8ca7a2d3bf41c9a48f75ef093447178123e62e110268b16e150b",
+      "outcomes": {
+        "resolved": 1,
+        "wins": 0,
+        "losses": 1,
+        "breakevens": 0,
+        "max_losing_streak": 1,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 150450,
+        "net_micro_usd": -150450,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -105,13 +166,25 @@
       "replay_dataset_id": "3c80ffeaf1b93b9e967a7de74cf1a17e2ca3527eb60ababd23b1ce6969897f43",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 20000000,
       "final_marked_micro_usd": 20000000,
       "maximum_drawdown_micro_usd": 0,
       "trades": 0,
       "rejections": 14558,
-      "receipt_hash": "b6107974aae08e92dfb603f7a711c77032db907180643212311b4eff83f61934"
+      "receipt_hash": "b6107974aae08e92dfb603f7a711c77032db907180643212311b4eff83f61934",
+      "outcomes": {
+        "resolved": 0,
+        "wins": 0,
+        "losses": 0,
+        "breakevens": 0,
+        "max_losing_streak": 0,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 0,
+        "net_micro_usd": 0,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -123,13 +196,25 @@
       "replay_dataset_id": "3414b3c8a21aaae67d3b807ad7e6ae5d168681155d040c9980a3b269c3fe28dc",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 20000000,
       "final_marked_micro_usd": 20000000,
       "maximum_drawdown_micro_usd": 0,
       "trades": 0,
       "rejections": 15659,
-      "receipt_hash": "9a5e6e32700253f764aef6c6206bf3beb78b8e441ca29da55e0e0990bf7316ec"
+      "receipt_hash": "9a5e6e32700253f764aef6c6206bf3beb78b8e441ca29da55e0e0990bf7316ec",
+      "outcomes": {
+        "resolved": 0,
+        "wins": 0,
+        "losses": 0,
+        "breakevens": 0,
+        "max_losing_streak": 0,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 0,
+        "net_micro_usd": 0,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -141,13 +226,25 @@
       "replay_dataset_id": "58ce859fb0dc500f8a2faa2daaab55631354b48eb9cf3948879731f7a1a681cc",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 20000000,
       "final_marked_micro_usd": 20000000,
       "maximum_drawdown_micro_usd": 0,
       "trades": 0,
       "rejections": 14294,
-      "receipt_hash": "7beef17f6703ad96177815c13bb2b0b3943013c6036847d3ab2a91cf68137c82"
+      "receipt_hash": "7beef17f6703ad96177815c13bb2b0b3943013c6036847d3ab2a91cf68137c82",
+      "outcomes": {
+        "resolved": 0,
+        "wins": 0,
+        "losses": 0,
+        "breakevens": 0,
+        "max_losing_streak": 0,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 0,
+        "net_micro_usd": 0,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -159,13 +256,25 @@
       "replay_dataset_id": "6e77af2a56b3748d8731e09dbf3bd0372919560bb432079c8d1d97a7f861ba96",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 20000000,
       "final_marked_micro_usd": 20000000,
       "maximum_drawdown_micro_usd": 0,
       "trades": 0,
       "rejections": 15291,
-      "receipt_hash": "56a0174214c4d1e6feafa7e015fd057cf389804727dd61570b1cbc634345f556"
+      "receipt_hash": "56a0174214c4d1e6feafa7e015fd057cf389804727dd61570b1cbc634345f556",
+      "outcomes": {
+        "resolved": 0,
+        "wins": 0,
+        "losses": 0,
+        "breakevens": 0,
+        "max_losing_streak": 0,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 0,
+        "net_micro_usd": 0,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -177,13 +286,25 @@
       "replay_dataset_id": "661a17d789c90e9bc90842a036d5c080b952a2b0c9eb844816dc577807868aa0",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 20000000,
       "final_marked_micro_usd": 20000000,
       "maximum_drawdown_micro_usd": 0,
       "trades": 0,
       "rejections": 15876,
-      "receipt_hash": "fc874a50d09eb2ad481f19a8454ecd40dd18d54cd0e418a8d3c9edfcc087062c"
+      "receipt_hash": "fc874a50d09eb2ad481f19a8454ecd40dd18d54cd0e418a8d3c9edfcc087062c",
+      "outcomes": {
+        "resolved": 0,
+        "wins": 0,
+        "losses": 0,
+        "breakevens": 0,
+        "max_losing_streak": 0,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 0,
+        "net_micro_usd": 0,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -195,13 +316,25 @@
       "replay_dataset_id": "74667ac336776d525278db0a5a8c6fb6cf475b849c37c2e6788743cdf2d534e5",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 20000000,
       "final_marked_micro_usd": 20000000,
       "maximum_drawdown_micro_usd": 0,
       "trades": 0,
       "rejections": 13935,
-      "receipt_hash": "0ad0f1b93052585eae39825329be3a2361f50735658394354e5d1a5ace246bf4"
+      "receipt_hash": "0ad0f1b93052585eae39825329be3a2361f50735658394354e5d1a5ace246bf4",
+      "outcomes": {
+        "resolved": 0,
+        "wins": 0,
+        "losses": 0,
+        "breakevens": 0,
+        "max_losing_streak": 0,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 0,
+        "net_micro_usd": 0,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2025,
@@ -213,13 +346,25 @@
       "replay_dataset_id": "b8388a65f30c4bb98f4869fbfd3613f762a0fed0248f23fb672dfe622de53df3",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 20000000,
       "final_marked_micro_usd": 20000000,
       "maximum_drawdown_micro_usd": 0,
       "trades": 0,
       "rejections": 14855,
-      "receipt_hash": "04bcf554abec2cf4f3d9ad0e59d358ff65407b458f3fd569948f639e7a4276c0"
+      "receipt_hash": "04bcf554abec2cf4f3d9ad0e59d358ff65407b458f3fd569948f639e7a4276c0",
+      "outcomes": {
+        "resolved": 0,
+        "wins": 0,
+        "losses": 0,
+        "breakevens": 0,
+        "max_losing_streak": 0,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 0,
+        "net_micro_usd": 0,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -231,13 +376,25 @@
       "replay_dataset_id": "77bf77d9098a4443c3a294bb47a36d680105dcb05b736208ac59aa62842a5264",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 20000000,
       "final_marked_micro_usd": 20000000,
       "maximum_drawdown_micro_usd": 0,
       "trades": 0,
       "rejections": 14643,
-      "receipt_hash": "0a869b989b2501a4ce6ec3c46ef3e90224777637c223ad2a38c601908fac164c"
+      "receipt_hash": "0a869b989b2501a4ce6ec3c46ef3e90224777637c223ad2a38c601908fac164c",
+      "outcomes": {
+        "resolved": 0,
+        "wins": 0,
+        "losses": 0,
+        "breakevens": 0,
+        "max_losing_streak": 0,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 0,
+        "net_micro_usd": 0,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -249,13 +406,25 @@
       "replay_dataset_id": "e623fee9e6a44b76476903a095a787356cdef9f75a7f53e737bc08772a152061",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 20114900,
       "final_marked_micro_usd": 20114900,
       "maximum_drawdown_micro_usd": 15320,
       "trades": 1,
       "rejections": 13855,
-      "receipt_hash": "7ee7e2782b22e655f53093656371abc0dc89ba33f58408f0b31028a81b81cf03"
+      "receipt_hash": "7ee7e2782b22e655f53093656371abc0dc89ba33f58408f0b31028a81b81cf03",
+      "outcomes": {
+        "resolved": 1,
+        "wins": 1,
+        "losses": 0,
+        "breakevens": 0,
+        "max_losing_streak": 0,
+        "gross_win_micro_usd": 114900,
+        "gross_loss_micro_usd": 0,
+        "net_micro_usd": 114900,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -267,13 +436,25 @@
       "replay_dataset_id": "368f516392795a3676aecce839dee4a1a289f2c48282923390d188487ac1e38f",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 20000000,
       "final_marked_micro_usd": 20000000,
       "maximum_drawdown_micro_usd": 0,
       "trades": 0,
       "rejections": 15206,
-      "receipt_hash": "e257355076bc7954c4d82e4aa8992ea6aca4df5205f3c15e66be8e4b64b3a353"
+      "receipt_hash": "e257355076bc7954c4d82e4aa8992ea6aca4df5205f3c15e66be8e4b64b3a353",
+      "outcomes": {
+        "resolved": 0,
+        "wins": 0,
+        "losses": 0,
+        "breakevens": 0,
+        "max_losing_streak": 0,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 0,
+        "net_micro_usd": 0,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -285,13 +466,25 @@
       "replay_dataset_id": "cac82b465c241a77fa6fb347e55fcf7862546bd3f5f1efc3eed002fb3d71bd54",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 20000000,
       "final_marked_micro_usd": 20000000,
       "maximum_drawdown_micro_usd": 0,
       "trades": 0,
       "rejections": 14446,
-      "receipt_hash": "228b5bd65e6be6e62d2d0aeecfc2fc34c28fa62cab508546cf0d805ca74d712a"
+      "receipt_hash": "228b5bd65e6be6e62d2d0aeecfc2fc34c28fa62cab508546cf0d805ca74d712a",
+      "outcomes": {
+        "resolved": 0,
+        "wins": 0,
+        "losses": 0,
+        "breakevens": 0,
+        "max_losing_streak": 0,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 0,
+        "net_micro_usd": 0,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -303,13 +496,25 @@
       "replay_dataset_id": "7732eed3ecc84b3acc0ed6b8f57c5c0ec0ea5a36c7e303df28baeade551844b2",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 20000000,
       "final_marked_micro_usd": 20000000,
       "maximum_drawdown_micro_usd": 0,
       "trades": 0,
       "rejections": 14312,
-      "receipt_hash": "88b034a766ec6c6f6c359f6c4a10ba718587310f1927c7ac79f2aebc5af8a1b9"
+      "receipt_hash": "88b034a766ec6c6f6c359f6c4a10ba718587310f1927c7ac79f2aebc5af8a1b9",
+      "outcomes": {
+        "resolved": 0,
+        "wins": 0,
+        "losses": 0,
+        "breakevens": 0,
+        "max_losing_streak": 0,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 0,
+        "net_micro_usd": 0,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -321,13 +526,25 @@
       "replay_dataset_id": "600217f3b19e8210bc3625719c1f043a469f49297d2b771e8506163571f68d4e",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 20000000,
       "final_marked_micro_usd": 20000000,
       "maximum_drawdown_micro_usd": 0,
       "trades": 0,
       "rejections": 14794,
-      "receipt_hash": "705a125ebeaa073343aa1f938b92c9c3c57a5c7464da4206f972a3b86311952b"
+      "receipt_hash": "705a125ebeaa073343aa1f938b92c9c3c57a5c7464da4206f972a3b86311952b",
+      "outcomes": {
+        "resolved": 0,
+        "wins": 0,
+        "losses": 0,
+        "breakevens": 0,
+        "max_losing_streak": 0,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 0,
+        "net_micro_usd": 0,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -339,13 +556,25 @@
       "replay_dataset_id": "38ad49105e6b9a6e4dce9cb685532fd464a64e4d342bae14d300b25dbaf923e2",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 19667225,
       "final_marked_micro_usd": 19667225,
       "maximum_drawdown_micro_usd": 332775,
       "trades": 1,
       "rejections": 15271,
-      "receipt_hash": "775944bc0a966416071305ae69b6d36d46b14b3427fc37ffe02b7c410a44504a"
+      "receipt_hash": "775944bc0a966416071305ae69b6d36d46b14b3427fc37ffe02b7c410a44504a",
+      "outcomes": {
+        "resolved": 1,
+        "wins": 0,
+        "losses": 1,
+        "breakevens": 0,
+        "max_losing_streak": 1,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 332775,
+        "net_micro_usd": -332775,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -357,13 +586,25 @@
       "replay_dataset_id": "7f7ef8cf5024908bfb44355aa80daf0d03b18b16220899a9f8ebfa3a6b01e0c6",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 19752599,
       "final_marked_micro_usd": 19752599,
       "maximum_drawdown_micro_usd": 247401,
       "trades": 1,
       "rejections": 14701,
-      "receipt_hash": "89b47db33caa1b5d5058586faa56ac18884b926dbabee93327c513b00d6502ab"
+      "receipt_hash": "89b47db33caa1b5d5058586faa56ac18884b926dbabee93327c513b00d6502ab",
+      "outcomes": {
+        "resolved": 1,
+        "wins": 0,
+        "losses": 1,
+        "breakevens": 0,
+        "max_losing_streak": 1,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 247401,
+        "net_micro_usd": -247401,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -375,13 +616,25 @@
       "replay_dataset_id": "aa9671d99635e42c336b1a110b2844a4b956f1fd80d42aaccf5577aa867fff14",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 20000000,
       "final_marked_micro_usd": 20000000,
       "maximum_drawdown_micro_usd": 0,
       "trades": 0,
       "rejections": 14844,
-      "receipt_hash": "560475480b9116cdef0d8fa87ffd4f74b28f095de658bfa2513df71444eb4b43"
+      "receipt_hash": "560475480b9116cdef0d8fa87ffd4f74b28f095de658bfa2513df71444eb4b43",
+      "outcomes": {
+        "resolved": 0,
+        "wins": 0,
+        "losses": 0,
+        "breakevens": 0,
+        "max_losing_streak": 0,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 0,
+        "net_micro_usd": 0,
+        "unresolved_positions": 0
+      }
     },
     {
       "year": 2026,
@@ -393,13 +646,25 @@
       "replay_dataset_id": "89a0389688493e9618e02942241d287bf9bd37ae651a26f96055cfa38e11fe2e",
       "declared_class": "RealStructurallyValid",
       "profile_id": "84a2b3f9e8f44ed35da6fabf9bf9ad037627ee62f9b65ee0863168a1257f81d6",
+      "conversion_policy": "identity_usd_v1",
       "initial_micro_usd": 20000000,
       "realized_micro_usd": 20000000,
       "final_marked_micro_usd": 20000000,
       "maximum_drawdown_micro_usd": 0,
       "trades": 0,
       "rejections": 14658,
-      "receipt_hash": "75b802579a03b5b1256a571d24b448847cb766e3b7bdeb79ed13109e8b0c924d"
+      "receipt_hash": "75b802579a03b5b1256a571d24b448847cb766e3b7bdeb79ed13109e8b0c924d",
+      "outcomes": {
+        "resolved": 0,
+        "wins": 0,
+        "losses": 0,
+        "breakevens": 0,
+        "max_losing_streak": 0,
+        "gross_win_micro_usd": 0,
+        "gross_loss_micro_usd": 0,
+        "net_micro_usd": 0,
+        "unresolved_positions": 0
+      }
     }
   ],
   "refusals": [],
@@ -410,9 +675,17 @@
     "rejections": 323897,
     "initial_micro_usd": 440000000,
     "pnl_micro_usd": -1170596,
-    "maximum_drawdown_micro_usd": 554870
+    "maximum_drawdown_micro_usd": 554870,
+    "wins": 1,
+    "losses": 9,
+    "breakevens": 0,
+    "max_losing_streak": 6,
+    "gross_win_micro_usd": 114900,
+    "gross_loss_micro_usd": 1285496,
+    "net_micro_usd": -1170596,
+    "unresolved_positions": 0
   },
   "cache_hits": 0,
   "cache_misses": 22,
-  "limitations": "Diagnostic simulation only. The authoritative sequential engine and frozen financial rules are applied to real structurally-valid literal-USD history using explicit test-convention profiles, so results are not broker-approved execution. No research eligibility, calendar/profile/licensing approval, scientific validity or qualification is granted. Non-USD-quote instruments and eligibility-bearing data classes are refused. Counts and money figures are observations, not performance evidence."
+  "limitations": "Diagnostic simulation only. The authoritative sequential engine and frozen financial rules are applied to real structurally-valid history using explicit test-convention profiles, so results are not broker-approved execution. USD-quoted instruments use the identity conversion; USD-base non-USD-quote instruments (USDJPY/USDCHF/USDCAD) use a diagnostic direction-based reciprocal closing rate derived from the instrument's own verified quote (long -> bid, short -> ask; USD per quote currency = price_scale / price). That conversion convention is an explicit unverified research assumption, not an approved broker conversion rule; the documented MT5 profitability-based variant is not implemented. Cross-currency pairs and eligibility-bearing data classes are refused. No research eligibility, calendar/profile/licensing approval, scientific validity or qualification is granted. Counts and money figures are observations, not performance evidence."
 }

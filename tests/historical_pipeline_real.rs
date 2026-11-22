@@ -200,9 +200,22 @@ fn real_historical_diagnostic_execution() {
             sample.trades + sample.rejections > 0,
             "{instrument}: sample month must produce engine activity"
         );
+        assert_eq!(
+            sample.outcomes.resolved,
+            sample.outcomes.wins + sample.outcomes.losses + sample.outcomes.breakevens,
+            "{instrument}: outcome counts must reconcile with resolved trades"
+        );
+        assert_eq!(sample.outcomes.resolved, sample.trades);
+        assert!(sample.outcomes.max_losing_streak <= sample.outcomes.resolved);
         executed += 1;
         aggregate.trades += sample.trades;
         aggregate.rejections += sample.rejections;
+        aggregate.outcome_wins += sample.outcomes.wins;
+        aggregate.outcome_losses += sample.outcomes.losses;
+        aggregate.outcome_breakevens += sample.outcomes.breakevens;
+        aggregate.outcome_max_streak = aggregate
+            .outcome_max_streak
+            .max(sample.outcomes.max_losing_streak);
         aggregate.pnl_micro_usd += sample.final_marked_micro_usd - sample.initial_micro_usd;
         aggregate.maximum_drawdown_micro_usd = aggregate
             .maximum_drawdown_micro_usd
@@ -227,6 +240,12 @@ fn real_historical_diagnostic_execution() {
         aggregate.rejections > 0,
         "aggregate must contain engine rejections"
     );
+    assert_eq!(
+        aggregate.trades,
+        aggregate.outcome_wins + aggregate.outcome_losses + aggregate.outcome_breakevens,
+        "aggregate outcome counts must reconcile with resolved trades"
+    );
+    assert!(aggregate.outcome_max_streak <= aggregate.trades);
 }
 
 #[derive(Default)]
@@ -235,4 +254,8 @@ struct ExecutedAggregate {
     rejections: usize,
     pnl_micro_usd: i128,
     maximum_drawdown_micro_usd: i128,
+    outcome_wins: usize,
+    outcome_losses: usize,
+    outcome_breakevens: usize,
+    outcome_max_streak: usize,
 }
