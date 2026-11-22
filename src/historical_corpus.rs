@@ -7,7 +7,7 @@
 
 use crate::{
     Result,
-    contracts::Profile,
+    contracts::{self, Profile},
     data::{self, Tick},
     historical_migration::{self, Partition},
     native,
@@ -1071,7 +1071,11 @@ pub fn execute_continuous(
         let executed = match execute_month(spec, index, strategy, costs, budget) {
             Ok(e) => e,
             Err(reason) => {
-                refusals.push(MonthRefusal { year, month, reason });
+                refusals.push(MonthRefusal {
+                    year,
+                    month,
+                    reason,
+                });
                 continue;
             }
         };
@@ -1080,7 +1084,12 @@ pub fn execute_continuous(
         let monthly_pnl = executed
             .outcomes
             .net_micro_usd
-            .checked_add(executed.initial_micro_usd.checked_sub(contracts::INITIAL_EQUITY).unwrap_or(0))
+            .checked_add(
+                executed
+                    .initial_micro_usd
+                    .checked_sub(contracts::INITIAL_EQUITY)
+                    .unwrap_or(0),
+            )
             .ok_or("continuous monthly P&L overflow")?;
         running_equity = running_equity
             .checked_add(monthly_pnl)
@@ -1093,25 +1102,42 @@ pub fn execute_continuous(
             .ok_or("continuous drawdown overflow")?;
 
         // Chain losing streak across month boundary
-        if executed.outcomes.wins > 0 {
-            // Month had at least one win — reset the continuous streak
+        if executed.outcomes.ending_streak == 0 {
+            // Month ended with a win or breakeven — reset continuous streak
             continuous_streak = 0;
-        } else if executed.outcomes.losses > 0 && executed.outcomes.wins == 0 {
-            // Month ended with only losses — chain the ending streak
+        } else {
+            // Month ended with losses — chain the ending streak
             continuous_streak = continuous_streak.saturating_add(executed.outcomes.ending_streak);
         }
-        // If month had breakevens only (no wins, no losses), streak continues as-is
         max_continuous_streak = max_continuous_streak.max(continuous_streak);
 
-        cumulative_wins = cumulative_wins.checked_add(executed.outcomes.wins).ok_or("continuous wins overflow")?;
-        cumulative_losses = cumulative_losses.checked_add(executed.outcomes.losses).ok_or("continuous losses overflow")?;
-        cumulative_breakevens = cumulative_breakevens.checked_add(executed.outcomes.breakevens).ok_or("continuous breakevens overflow")?;
-        cumulative_gross_win = cumulative_gross_win.checked_add(executed.outcomes.gross_win_micro_usd).ok_or("continuous gross win overflow")?;
-        cumulative_gross_loss = cumulative_gross_loss.checked_add(executed.outcomes.gross_loss_micro_usd).ok_or("continuous gross loss overflow")?;
-        cumulative_net = cumulative_net.checked_add(executed.outcomes.net_micro_usd).ok_or("continuous net overflow")?;
-        cumulative_trades = cumulative_trades.checked_add(executed.trades).ok_or("continuous trades overflow")?;
-        cumulative_rejections = cumulative_rejections.checked_add(executed.rejections).ok_or("continuous rejections overflow")?;
-        cumulative_unresolved = cumulative_unresolved.checked_add(executed.outcomes.unresolved_positions).ok_or("continuous unresolved overflow")?;
+        cumulative_wins = cumulative_wins
+            .checked_add(executed.outcomes.wins)
+            .ok_or("continuous wins overflow")?;
+        cumulative_losses = cumulative_losses
+            .checked_add(executed.outcomes.losses)
+            .ok_or("continuous losses overflow")?;
+        cumulative_breakevens = cumulative_breakevens
+            .checked_add(executed.outcomes.breakevens)
+            .ok_or("continuous breakevens overflow")?;
+        cumulative_gross_win = cumulative_gross_win
+            .checked_add(executed.outcomes.gross_win_micro_usd)
+            .ok_or("continuous gross win overflow")?;
+        cumulative_gross_loss = cumulative_gross_loss
+            .checked_add(executed.outcomes.gross_loss_micro_usd)
+            .ok_or("continuous gross loss overflow")?;
+        cumulative_net = cumulative_net
+            .checked_add(executed.outcomes.net_micro_usd)
+            .ok_or("continuous net overflow")?;
+        cumulative_trades = cumulative_trades
+            .checked_add(executed.trades)
+            .ok_or("continuous trades overflow")?;
+        cumulative_rejections = cumulative_rejections
+            .checked_add(executed.rejections)
+            .ok_or("continuous rejections overflow")?;
+        cumulative_unresolved = cumulative_unresolved
+            .checked_add(executed.outcomes.unresolved_positions)
+            .ok_or("continuous unresolved overflow")?;
 
         months.push(ContinuousMonthExecution {
             year,
@@ -1148,8 +1174,12 @@ pub fn execute_continuous(
         rejections: cumulative_rejections,
         initial_micro_usd: contracts::INITIAL_EQUITY,
         ending_micro_usd: running_equity,
-        net_pnl_micro_usd: running_equity.checked_sub(contracts::INITIAL_EQUITY).ok_or("continuous net P&L overflow")?,
-        full_period_max_drawdown_micro_usd: peak_equity.checked_sub(running_equity.min(peak_equity)).unwrap_or(0),
+        net_pnl_micro_usd: running_equity
+            .checked_sub(contracts::INITIAL_EQUITY)
+            .ok_or("continuous net P&L overflow")?,
+        full_period_max_drawdown_micro_usd: peak_equity
+            .checked_sub(running_equity.min(peak_equity))
+            .unwrap_or(0),
         wins: cumulative_wins,
         losses: cumulative_losses,
         breakevens: cumulative_breakevens,
@@ -1703,6 +1733,7 @@ mod tests {
                     gross_loss_micro_usd: 1_000_000,
                     net_micro_usd: 8_000_000,
                     unresolved_positions: 1,
+                    ending_streak: 0,
                 },
             ),
             execution_with_outcomes(
@@ -1718,6 +1749,7 @@ mod tests {
                     gross_loss_micro_usd: 2_000_000,
                     net_micro_usd: 1_000_000,
                     unresolved_positions: 0,
+                    ending_streak: 0,
                 },
             ),
         ];

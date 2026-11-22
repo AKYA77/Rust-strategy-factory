@@ -47,6 +47,7 @@ fn month_json(item: &MonthOutcome) -> serde_json::Value {
             "losses": item.losses,
             "breakevens": item.breakevens,
             "max_losing_streak": item.streak,
+            "ending_streak": 0,
             "gross_win_micro_usd": item.gross_win,
             "gross_loss_micro_usd": item.gross_loss,
             "net_micro_usd": item.net,
