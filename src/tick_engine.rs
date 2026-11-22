@@ -555,10 +555,13 @@ impl AccountState {
                     } else {
                         bid
                     };
+                    // Stop orders move away from the market (executable side); limit
+                    // orders move toward it (resting side). The minus sign was lost in a
+                    // later edit, making limits marketable instead of resting.
                     let sign = if matches!(plan, crate::strategies::EntryPlan::StopMarket { .. }) {
                         strategy.side.sign()
                     } else {
-                        strategy.side.sign()
+                        -strategy.side.sign()
                     };
                     let level = anchor
                         .checked_add(sign.checked_mul(offset).ok_or("entry offset overflow")?)

@@ -5,7 +5,7 @@
 
 set -e
 
-FACTORY="/root/workspace/Rust-strategy-factory/target/debug/rust-strategy-factory"
+FACTORY="/root/workspace/Rust-strategy-factory/target/release/rust-strategy-factory"
 REGISTRY="/root/.local/share/rust-strategy-factory/state/research-real.sqlite"
 CONFIG="/root/workspace/Rust-strategy-factory/configs/research-real-data-multi.json"
 
