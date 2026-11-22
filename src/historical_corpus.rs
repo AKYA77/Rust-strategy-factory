@@ -13,6 +13,7 @@ use crate::{
     native,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::Path;
 
 pub const VERSION: &str = "historical-monthly-corpus-v2";
@@ -698,6 +699,104 @@ pub fn study(
         candles,
         signals,
         limitations: LIMITATIONS.into(),
+    })
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CorpusGroup {
+    pub timeframe: crate::candles::Timeframe,
+    pub evidence: crate::behavior::Evidence,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CorpusDiversity {
+    pub instrument: String,
+    pub corpus_identity: String,
+    pub months: usize,
+    pub events: u64,
+    /// One diversity measurement per primary timeframe; mixed-timeframe populations are
+    /// never compared across unequal candle grids.
+    pub groups: Vec<CorpusGroup>,
+    pub limitations: String,
+}
+
+/// Bounded read-only behavioral diversity over a registered multi-month corpus: per month,
+/// verify the month's inventory and compute causal decision vectors for the whole population
+/// in one shared frame build, then concatenate chronologically and measure exact pairwise
+/// distances per timeframe. No replay, no account state, no eligibility or qualification input.
+pub fn diversity(
+    spec: &HistoricalCorpus,
+    strategies: &[crate::strategies::Strategy],
+    max_candles: usize,
+    feature_cells: usize,
+) -> Result<CorpusDiversity> {
+    if strategies.is_empty() {
+        return Err("behavioral diversity requires at least one strategy".into());
+    }
+    let mut vectors: BTreeMap<crate::candles::Timeframe, Vec<(String, Vec<bool>)>> =
+        BTreeMap::new();
+    for strategy in strategies {
+        let canonical = strategy.canonical()?;
+        vectors
+            .entry(canonical.timeframe)
+            .or_default()
+            .push((canonical.identity()?, Vec::new()));
+    }
+    let mut events = 0u64;
+    let mut counters: BTreeMap<crate::candles::Timeframe, usize> = BTreeMap::new();
+    for month in &spec.months {
+        let dir = Path::new(&month.output_dir);
+        let chunks: Vec<std::path::PathBuf> = month
+            .chunk_files
+            .iter()
+            .map(|file| dir.join(file))
+            .collect();
+        let corpus_spec =
+            crate::corpus::describe(&chunks, crate::historical_migration::MAX_CHUNK_EVENTS)?;
+        crate::corpus::inspect(dir, &corpus_spec)?;
+        let facts = crate::corpus::source_facts(dir, &corpus_spec)?;
+        let masks =
+            crate::corpus::signals_many(dir, &corpus_spec, strategies, max_candles, feature_cells)?;
+        events += facts.events();
+        for (strategy, mask) in strategies.iter().zip(masks.iter()) {
+            let canonical = strategy.canonical()?;
+            let len = mask.len();
+            let mut dense = vec![false; len];
+            for index in mask.set_indices()? {
+                dense[index] = true;
+            }
+            let timeframe = canonical.timeframe;
+            let group = vectors
+                .get_mut(&timeframe)
+                .ok_or("behavioral group missing")?;
+            let index = counters.entry(timeframe).or_default();
+            let member = group.get_mut(*index).ok_or("behavioral member missing")?;
+            member.1.extend(dense);
+            *index += 1;
+        }
+        for counter in counters.values_mut() {
+            *counter = 0;
+        }
+    }
+    let mut groups = Vec::with_capacity(vectors.len());
+    for (timeframe, members) in vectors {
+        let evidence = crate::behavior::diversity(
+            members
+                .into_iter()
+                .map(|(concept, vector)| (concept, timeframe, vector))
+                .collect(),
+        )?;
+        groups.push(CorpusGroup {
+            timeframe,
+            evidence,
+        });
+    }
+    Ok(CorpusDiversity {
+        instrument: spec.instrument.clone(),
+        corpus_identity: spec.identity.clone(),
+        months: spec.months.len(),
+        events,
+        limitations: LIMITATIONS.into(),
+        groups,
     })
 }
 

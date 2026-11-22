@@ -165,6 +165,15 @@ fn frozen_protocol_executes_all_windows_and_reuses_an_immutable_report() {
     );
     assert_eq!(
         breakdown
+            .entry_momentum
+            .values()
+            .map(|b| b.resolved)
+            .sum::<usize>(),
+        candidate.pooled_oos_reset_fold_stats.closed
+    );
+    assert!(!breakdown.entry_momentum.is_empty());
+    assert_eq!(
+        breakdown
             .exit_years
             .values()
             .map(|b| b.resolved)

@@ -9,7 +9,10 @@ use crate::{
     tick_engine::Costs,
 };
 use std::collections::BTreeSet;
-pub const VERSION: &str = "bounded-seeded-rule-structure-v1";
+pub const VERSION: &str = "bounded-seeded-rule-structure-v2";
+/// Hard bound on returned cases. The seeded hash ranking below is what selects
+/// within this bound; refused or duplicate children are omissions, never relaxations.
+pub const MAX_CASES: usize = 16;
 
 /// Cross only rules from compatible directional/timeframe scopes. All execution
 /// fields come from the primary parent; donor entry/stop fields are not inherited.
@@ -47,25 +50,31 @@ pub fn cases(parent: &Strategy, costs: &Costs, seed: u64) -> Result<Vec<Case>> {
             raw.push((format!("structural-drop-term-{index}"), child));
         }
     }
-    if let Some(timeframe) = Timeframe::ALL
+    // Prior higher-timeframe confirmation at every strictly higher timeframe, with two
+    // fixed mean windows. Bounded by the grammar's Boolean arity and timeframe hierarchy.
+    for timeframe in Timeframe::ALL
         .iter()
-        .position(|t| *t == parent.timeframe)
-        .and_then(|i| Timeframe::ALL.get(i + 1))
         .copied()
+        .filter(|t| *t > parent.timeframe)
     {
-        let mut child = parent.clone();
-        child.rule = Rule::All(vec![
-            parent.rule.clone(),
-            Rule::HigherTimeframe {
-                timeframe,
-                rule: Box::new(if parent.side == Side::Long {
-                    Rule::AboveMean { window: 20 }
-                } else {
-                    Rule::BelowMean { window: 20 }
-                }),
-            },
-        ]);
-        raw.push(("structural-add-prior-higher-mean20".into(), child));
+        for window in [20, 10] {
+            let mut child = parent.clone();
+            child.rule = Rule::All(vec![
+                parent.rule.clone(),
+                Rule::HigherTimeframe {
+                    timeframe,
+                    rule: Box::new(if parent.side == Side::Long {
+                        Rule::AboveMean { window }
+                    } else {
+                        Rule::BelowMean { window }
+                    }),
+                },
+            ]);
+            raw.push((
+                format!("structural-add-prior-higher-mean{window}-{timeframe:?}"),
+                child,
+            ));
+        }
     }
     static TEMPLATES: std::sync::OnceLock<Vec<strategies::Candidate>> = std::sync::OnceLock::new();
     let templates = TEMPLATES.get_or_init(strategies::family_templates);
@@ -85,7 +94,7 @@ pub fn cases(parent: &Strategy, costs: &Costs, seed: u64) -> Result<Vec<Case>> {
         }
     }
     donors.sort_by(|a, b| a.0.cmp(&b.0));
-    for (_, rule_id, donor) in donors.into_iter().take(2) {
+    for (_, rule_id, donor) in donors.into_iter().take(3) {
         for conjunction in [true, false] {
             if let Ok(child) = crossover(&parent, donor, conjunction) {
                 let mode = if conjunction { "all" } else { "any" };
@@ -115,5 +124,9 @@ pub fn cases(parent: &Strategy, costs: &Costs, seed: u64) -> Result<Vec<Case>> {
         }
     }
     ranked.sort_by(|a, b| a.0.cmp(&b.0));
-    Ok(ranked.into_iter().take(8).map(|(_, case)| case).collect())
+    Ok(ranked
+        .into_iter()
+        .take(MAX_CASES)
+        .map(|(_, case)| case)
+        .collect())
 }

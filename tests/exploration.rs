@@ -36,7 +36,7 @@ fn seeded_structure_is_bounded_canonical_distinct_and_preserves_execution() {
     };
     let a = exploration::cases(&s, &costs, 42).unwrap();
     assert!(!a.is_empty());
-    assert!(a.len() <= 8);
+    assert!(a.len() <= exploration::MAX_CASES);
     assert_eq!(
         serde_json::to_string(&a).unwrap(),
         serde_json::to_string(&exploration::cases(&s, &costs, 42).unwrap()).unwrap()
@@ -61,7 +61,7 @@ fn seeded_structure_is_bounded_canonical_distinct_and_preserves_execution() {
     );
     assert!(
         a.iter()
-            .any(|c| c.name == "structural-add-prior-higher-mean20")
+            .any(|c| c.name.starts_with("structural-add-prior-higher-mean20-"))
     );
     for case in a {
         assert!(seen.insert(case.strategy.identity().unwrap()));
@@ -98,7 +98,7 @@ fn crossover_refuses_mismatched_scope_contradiction_and_excess_complexity() {
         exploration::cases(&large, &Costs::default(), 42)
             .unwrap()
             .len()
-            <= 8
+            <= exploration::MAX_CASES
     );
     let mut invalid = a.clone();
     invalid.rule = Rule::All(vec![]);
@@ -109,6 +109,33 @@ fn crossover_refuses_mismatched_scope_contradiction_and_excess_complexity() {
         exploration::cases(&daily, &Costs::default(), 0)
             .unwrap()
             .iter()
-            .all(|c| c.name != "structural-add-prior-higher-mean20")
+            .all(|c| !c.name.starts_with("structural-add-prior-higher-mean20"))
     );
+}
+#[test]
+fn higher_timeframe_coverage_spans_every_strictly_higher_timeframe() {
+    let s = parent();
+    let costs = Costs::default();
+    let mut names = BTreeSet::new();
+    for seed in 0..24u64 {
+        for case in exploration::cases(&s, &costs, seed).unwrap() {
+            assert!(case.name.starts_with("structural-"));
+            names.insert(case.name);
+        }
+    }
+    for timeframe in ["M5", "M15", "M30", "H1", "H4", "D1"] {
+        assert!(
+            names
+                .iter()
+                .any(|name| name == &format!("structural-add-prior-higher-mean20-{timeframe}")),
+            "missing higher-timeframe variant for {timeframe}"
+        );
+    }
+    assert!(
+        names
+            .iter()
+            .any(|name| name.starts_with("structural-add-prior-higher-mean10-"))
+    );
+    assert!(names.iter().any(|name| name.contains("-all-")));
+    assert!(names.iter().any(|name| name.contains("-any-")));
 }

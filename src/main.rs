@@ -418,6 +418,56 @@ fn run(args: &[String]) -> Result<()> {
                 .collect::<Result<Vec<_>>>()?,
         ),
         ["generate"] => print(&strategies::generate()),
+        ["behavior-diversity", dataset, strategies, max_bars] => {
+            let dataset = read_dataset(dataset)?;
+            let strategies: Vec<Strategy> = read_json(strategies)?;
+            let max_bars: usize = max_bars
+                .parse()
+                .map_err(|_| "invalid behavioral bar budget")?;
+            print(&rust_strategy_factory::behavior::measure(
+                &dataset,
+                &strategies,
+                max_bars,
+            )?)
+        }
+        [
+            "historical-corpus-diversity",
+            spec,
+            max_candles,
+            feature_cells,
+            strategies,
+            report,
+        ] => {
+            let corpus: rust_strategy_factory::historical_corpus::HistoricalCorpus =
+                read_json(spec)?;
+            let strategies: Vec<Strategy> = read_json(strategies)?;
+            let max_candles: usize = max_candles.parse().map_err(|_| "invalid candle budget")?;
+            let feature_cells: usize = feature_cells
+                .parse()
+                .map_err(|_| "invalid feature budget")?;
+            let diversity = rust_strategy_factory::historical_corpus::diversity(
+                &corpus,
+                &strategies,
+                max_candles,
+                feature_cells,
+            )?;
+            save_replace(report, &diversity)?;
+            print(&serde_json::json!({
+                "instrument": diversity.instrument,
+                "corpus_identity": diversity.corpus_identity,
+                "months": diversity.months.to_string(),
+                "events": diversity.events.to_string(),
+                "groups": diversity.groups.iter().map(|group| serde_json::json!({
+                    "timeframe": format!("{:?}", group.timeframe),
+                    "members": group.evidence.members.to_string(),
+                    "bars": group.evidence.bars.to_string(),
+                    "mean_distance_bps": group.evidence.mean_distance_bps.to_string(),
+                    "max_distance_bps": group.evidence.max_distance_bps.to_string(),
+                    "zero_distance_pairs": group.evidence.zero_distance_pairs.to_string(),
+                })).collect::<Vec<_>>(),
+                "scope": "Descriptive read-only behavioral diversity; no eligibility or qualification claim.",
+            }))
+        }
         ["import", input, profile, source, output, category] => {
             if !["real", "synthetic"].contains(category) {
                 return Err("category must be real or synthetic".into());
