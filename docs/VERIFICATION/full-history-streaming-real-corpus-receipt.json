@@ -1,0 +1,51 @@
+{
+  "task": "t_62324ac7",
+  "branch": "hermes/full-history-streaming",
+  "corpus": "existing 22-month native corpus (no new data acquisition)",
+  "channel": "EURUSD-202603 full/",
+  "instruction": "streaming, resumable source reads, resumable import/coverage, checkpoint-aware incremental decode",
+  "release_binary": "/root/workspace/Rust-strategy-factory/target/release/rust-strategy-factory",
+  "spec_identity": "d01333ce1c2b7302ec9b151cbabeffce33fce71dab2595dbdb6ccd86c6d9405d",
+  "instrument": "EURUSD",
+  "chunks": 6,
+  "events": 2639808,
+  "first_ms": 1772402401195,
+  "last_ms": 1775019594787,
+  "decode_steps": [
+    {
+      "step": 1,
+      "max_events": 1000000,
+      "consumed_chunks": 2,
+      "consumed_events": 1000000,
+      "complete": false
+    },
+    {
+      "step": 2,
+      "max_events": 1000000,
+      "consumed_chunks": 4,
+      "consumed_events": 2000000,
+      "complete": false
+    },
+    {
+      "step": 3,
+      "max_events": 1000000,
+      "consumed_chunks": 6,
+      "consumed_events": 2639808,
+      "complete": true
+    }
+  ],
+  "store_dir": "/tmp/stream-receipts/store2",
+  "resume_status": {
+    "complete": true,
+    "consumed_chunks": 6,
+    "consumed_events": 2639808,
+    "total_chunks": 6,
+    "total_events": 2639808
+  },
+  "checks": {
+    "prefix_causality": "passed (each decode step re-verifies consumed prefix via native::read_bounded fingerprint + ordered_events_hash, checksum in spec)",
+    "identity_deterministic": "passed (re-describe identity == d01333ce...)",
+    "checkpoint_chain": "hash-chained (self_hash / previous chained, store self-authenticating)",
+    "manifest_source_control": "tracked under hermes/full-history-streaming branch; CI pending"
+  }
+}

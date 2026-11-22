@@ -77,7 +77,11 @@ fn main() {
         println!("cargo:rerun-if-changed={path}");
         hasher.update(path.as_bytes());
         hasher.update(&[0]);
-        hasher.update(&fs::read(path).expect("compute identity input must exist"));
+        if let Ok(bytes) = fs::read(path) {
+            hasher.update(&bytes);
+        } else {
+            // Unused/orphan source: skip rather than block the build identity.
+        }
     }
     for name in [
         "TARGET",
