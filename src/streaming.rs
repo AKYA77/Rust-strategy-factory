@@ -437,21 +437,19 @@ impl CheckpointStore {
         Ok(())
     }
 
-    /// Load the latest checkpoint by modification order, or None if none exists.
+    /// Load the latest checkpoint: the chain tip with the highest `consumed_chunks`.
+    /// Ordering by filesystem modification time is unreliable when several
+    /// checkpoints are written within the same timestamp resolution, so the tip is
+    /// chosen deterministically by chain position instead.
     pub fn latest(&self) -> Result<Option<StreamCheckpoint>> {
-        let mut entries: Vec<(PathBuf, std::time::SystemTime)> = Vec::new();
+        let mut best: Option<StreamCheckpoint> = None;
         for entry in fs::read_dir(&self.dir).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
             let metadata = entry.metadata().map_err(|e| e.to_string())?;
-            if metadata.is_file() {
-                entries.push((
-                    entry.path(),
-                    metadata.modified().map_err(|e| e.to_string())?,
-                ));
+            if !metadata.is_file() {
+                continue;
             }
-        }
-        entries.sort_by_key(|(_, m)| *m);
-        for (path, _) in entries.into_iter().rev() {
+            let path = entry.path();
             let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
                 continue;
             };
@@ -464,9 +462,19 @@ impl CheckpointStore {
             if checkpoint.hash_binding()? != checkpoint.self_hash {
                 continue; // corrupt entry: skip, never trust
             }
-            return Ok(Some(checkpoint));
+            let is_newer = match &best {
+                None => true,
+                Some(current) => {
+                    checkpoint.consumed_chunks > current.consumed_chunks
+                        || (checkpoint.consumed_chunks == current.consumed_chunks
+                            && checkpoint.self_hash > current.self_hash)
+                }
+            };
+            if is_newer {
+                best = Some(checkpoint);
+            }
         }
-        Ok(None)
+        Ok(best)
     }
 
     /// Load a checkpoint by its self-hash name.
