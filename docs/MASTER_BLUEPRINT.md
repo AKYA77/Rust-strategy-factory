@@ -538,8 +538,6 @@ Apply slippage in the unfavorable direction for the actual buy or sell fill.
 
 This includes applicable entries and exits.
 
-Do not automatically apply market-order slippage to passive limit orders.
-
 Preserve correct order-type semantics.
 
 Do not manufacture better fills when an order crosses the market.
@@ -888,7 +886,6 @@ Required features:
 - Market orders.
 - Stop orders.
 - Stop-market orders.
-- Limit orders.
 - Entry and exit processing.
 - Correct executable bid/ask prices.
 - Exact price/tick grids.

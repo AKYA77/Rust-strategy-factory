@@ -247,14 +247,11 @@ impl Rule {
     }
 }
 /// Relative to the publication event's effective executable entry side.
+/// Only stop-market resting orders exist; limit orders were removed (owner
+/// directive 2026-11-22: market orders only).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EntryPlan {
     StopMarket {
-        offset_ticks: i64,
-        ttl_ms: i64,
-        cancel_on_signal_false: bool,
-    },
-    Limit {
         offset_ticks: i64,
         ttl_ms: i64,
         cancel_on_signal_false: bool,
@@ -264,11 +261,6 @@ impl EntryPlan {
     pub fn parameters(&self) -> (i64, i64, bool) {
         match *self {
             Self::StopMarket {
-                offset_ticks,
-                ttl_ms,
-                cancel_on_signal_false,
-            }
-            | Self::Limit {
                 offset_ticks,
                 ttl_ms,
                 cancel_on_signal_false,

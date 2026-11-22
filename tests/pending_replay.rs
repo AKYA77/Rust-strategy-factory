@@ -55,13 +55,6 @@ fn stop() -> EntryPlan {
         cancel_on_signal_false: false,
     }
 }
-fn limit() -> EntryPlan {
-    EntryPlan::Limit {
-        offset_ticks: 30,
-        ttl_ms: 60000,
-        cancel_on_signal_false: false,
-    }
-}
 #[test]
 fn long_pending_stop_reserves_at_publication_then_trades_with_3r_accounting() {
     let r = run(
@@ -93,19 +86,7 @@ fn long_pending_stop_reserves_at_publication_then_trades_with_3r_accounting() {
     assert_eq!(r.realized_micro_usd, 20_000_000 + trade.net_micro_usd);
 }
 #[test]
-fn pending_limit_uses_observed_quote_without_entry_slippage() {
-    let r = run(
-        vec![t(120001, 3, 100000, 100010), t(120002, 4, 100200, 100210)],
-        Side::Long,
-        limit(),
-    );
-    assert_eq!(r.trades.len(), 1);
-    assert_eq!(r.trades[0].entry, 100020);
-    assert_eq!(r.trades[0].exit, 100170);
-    assert_eq!(r.trades[0].reason, ExitReason::TargetLimit);
-}
-#[test]
-fn short_stop_and_limit_use_bid_entry_ask_exit() {
+fn short_stop_uses_bid_entry_ask_exit() {
     let r = run(
         vec![t(120001, 3, 100010, 100020), t(120002, 4, 99800, 99810)],
         Side::Short,
@@ -115,12 +96,6 @@ fn short_stop_and_limit_use_bid_entry_ask_exit() {
         (r.trades[0].entry, r.trades[0].target, r.trades[0].exit),
         (99990, 99840, 99840)
     );
-    let r = run(
-        vec![t(120001, 3, 100080, 100090), t(120002, 4, 99800, 99810)],
-        Side::Short,
-        limit(),
-    );
-    assert_eq!((r.trades[0].entry, r.trades[0].exit), (100080, 99930));
 }
 #[test]
 fn no_quote_does_not_fill_and_deadline_precedes_trigger() {
@@ -191,7 +166,7 @@ fn legacy_market_identity_is_unchanged_and_entry_policy_is_not_deduplicated() {
     let mut changed = s.clone();
     changed.entry = Some(stop());
     assert_ne!(s.identity().unwrap(), changed.identity().unwrap());
-    changed.entry = Some(EntryPlan::Limit {
+    changed.entry = Some(EntryPlan::StopMarket {
         offset_ticks: 0,
         ttl_ms: 1,
         cancel_on_signal_false: false,

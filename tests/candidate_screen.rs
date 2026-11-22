@@ -117,7 +117,7 @@ fn unsupported_and_unclosed_models_escalate_without_fabricating_trades() {
     assert_eq!(e.estimated_closed_trades, 0);
     assert_eq!(e.estimated_net_win_rate_bps, None);
     let mut s = strategy();
-    s.entry = Some(EntryPlan::Limit {
+    s.entry = Some(EntryPlan::StopMarket {
         offset_ticks: 1,
         ttl_ms: 60000,
         cancel_on_signal_false: false,

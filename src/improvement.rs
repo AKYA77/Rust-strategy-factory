@@ -345,14 +345,7 @@ pub fn friction_stop_probe(
     profile.validate()?;
     costs.validate()?;
     let strategy = strategy.canonical()?;
-    let entry_slip = if matches!(
-        strategy.entry,
-        Some(crate::strategies::EntryPlan::Limit { .. })
-    ) {
-        0
-    } else {
-        costs.slippage_pips
-    };
+    let entry_slip = costs.slippage_pips;
     let ticks = i128::from(profile.min_stop_ticks)
         + (i128::from(costs.spread_floor_pips) + i128::from(entry_slip)) * i128::from(profile.pip)
             / i128::from(profile.tick);

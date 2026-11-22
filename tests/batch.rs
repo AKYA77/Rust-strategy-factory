@@ -196,7 +196,7 @@ fn shared_window_atr_pending_and_proof_contexts_keep_exact_scalar_results() {
         window: 3,
         multiple_bps: 15000,
     });
-    candidates[2].entry = Some(EntryPlan::Limit {
+    candidates[2].entry = Some(EntryPlan::StopMarket {
         offset_ticks: 30,
         ttl_ms: 600000,
         cancel_on_signal_false: true,

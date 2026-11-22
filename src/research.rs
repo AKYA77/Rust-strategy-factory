@@ -4,7 +4,7 @@ use crate::{
     contracts::Conversion,
     data::{self, Dataset},
     storage::{Claim, ExperimentKey, Outcome, Registry, Stage},
-    strategies::{self, EntryPlan, Features, Rule, Strategy},
+    strategies::{self, Features, Rule, Strategy},
     tick_engine::{self, Costs},
 };
 use rusqlite::{OptionalExtension, params};
@@ -919,19 +919,10 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
     }
     s.stop_ticks = 500;
     s.stop_ticks += (region / 300) as i64 * 200;
-    s.entry = match region % 3 {
-        0 => None,
-        1 => Some(EntryPlan::StopMarket {
-            offset_ticks: 30,
-            ttl_ms: 1800000,
-            cancel_on_signal_false: true,
-        }),
-        _ => Some(EntryPlan::Limit {
-            offset_ticks: 30,
-            ttl_ms: 1800000,
-            cancel_on_signal_false: true,
-        }),
-    };
+    // Owner directive 2026-11-22: market orders only. Every generated strategy enters
+    // at the next executable market quote; limit (and other resting) entry plans are
+    // removed from the grammar.
+    s.entry = None;
     Ok((candidate.family, s.canonical()?))
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]

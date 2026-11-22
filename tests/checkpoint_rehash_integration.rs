@@ -99,8 +99,8 @@ fn combined_private_checkpoints_and_current_source_proofs_preserve_complete_orde
                 ttl_ms: 120000,
                 cancel_on_signal_false: true,
             }),
-            Some(EntryPlan::Limit {
-                offset_ticks: 2,
+            Some(EntryPlan::StopMarket {
+                offset_ticks: 3,
                 ttl_ms: 120000,
                 cancel_on_signal_false: true,
             }),
@@ -400,8 +400,8 @@ fn preflight_churn_with_more_physical_source_bindings_than_workers_keeps_exact_r
             ttl_ms: 120000,
             cancel_on_signal_false: true,
         })),
-        strategy(Some(EntryPlan::Limit {
-            offset_ticks: 2,
+        strategy(Some(EntryPlan::StopMarket {
+            offset_ticks: 3,
             ttl_ms: 120000,
             cancel_on_signal_false: true,
         })),

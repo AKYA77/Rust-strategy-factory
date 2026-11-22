@@ -1411,7 +1411,7 @@ fn declared_stop_probe_preserves_policies_and_refuses_noop_and_grammar_overflow(
         window: 2,
         multiple_bps: 15000,
     });
-    s.entry = Some(EntryPlan::Limit {
+    s.entry = Some(EntryPlan::StopMarket {
         offset_ticks: 2,
         ttl_ms: 60000,
         cancel_on_signal_false: true,
@@ -1420,9 +1420,11 @@ fn declared_stop_probe_preserves_policies_and_refuses_noop_and_grammar_overflow(
     let child = improvement::friction_stop_probe(&s, &costs, &p)
         .unwrap()
         .unwrap();
-    assert_eq!(child.stop_ticks, 21); // Passive entry has no adverse entry slippage.
+    // Market/stop entries pay adverse slippage, so the friction minimum includes it:
+    // min_stop_ticks + (spread_floor + slippage) * pip / tick = 1 + (2+2)*10 = 41.
+    assert_eq!(child.stop_ticks, 41);
     let mut expected = s.clone();
-    expected.stop_ticks = 21;
+    expected.stop_ticks = 41;
     assert_eq!(child.identity().unwrap(), expected.identity().unwrap());
     assert!(
         improvement::friction_stop_probe(&child, &costs, &p)

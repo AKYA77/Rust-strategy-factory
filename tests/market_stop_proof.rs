@@ -85,7 +85,7 @@ fn proof_refuses_pending_adaptive_and_tampered_contexts() {
     let mut proof = screen::market_stop_proof(&p, &costs, &s).unwrap().unwrap();
     proof.fixed_stop_price_units += 1;
     assert!(screen::verify_market_stop_proof(&proof, &p, &costs, &s).is_err());
-    s.entry = Some(EntryPlan::Limit {
+    s.entry = Some(EntryPlan::StopMarket {
         offset_ticks: 1,
         ttl_ms: 60000,
         cancel_on_signal_false: false,

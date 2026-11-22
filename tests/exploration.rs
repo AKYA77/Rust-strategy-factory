@@ -11,7 +11,7 @@ fn parent() -> Strategy {
     Strategy {
         timeframe: Timeframe::M1,
         side: Side::Long,
-        entry: Some(EntryPlan::Limit {
+        entry: Some(EntryPlan::StopMarket {
             offset_ticks: 3,
             ttl_ms: 1000,
             cancel_on_signal_false: true,

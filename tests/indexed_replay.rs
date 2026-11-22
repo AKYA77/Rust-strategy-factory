@@ -189,7 +189,7 @@ fn pending_fractional_and_nonliteral_usd_cases_use_exact_sequential_fallback() {
     let (d, mut fx) = fixture("EURUSD", 21, 1000);
     let mut s = strategy(Side::Long, 300);
     let costs = Costs::default();
-    s.entry = Some(EntryPlan::Limit {
+    s.entry = Some(EntryPlan::StopMarket {
         offset_ticks: 30,
         ttl_ms: 300000,
         cancel_on_signal_false: true,

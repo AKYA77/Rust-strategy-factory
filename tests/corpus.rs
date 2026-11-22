@@ -444,8 +444,8 @@ fn corpus_account_replay_matches_all_materialized_receipt_fields() {
                 ttl_ms: 120000,
                 cancel_on_signal_false: true,
             }),
-            Some(EntryPlan::Limit {
-                offset_ticks: 2,
+            Some(EntryPlan::StopMarket {
+                offset_ticks: 3,
                 ttl_ms: 120000,
                 cancel_on_signal_false: true,
             }),
@@ -3747,8 +3747,8 @@ fn block_account_replay_preserves_every_market_stop_limit_receipt_and_nonzero_tr
                 ttl_ms: 120000,
                 cancel_on_signal_false: true,
             }),
-            Some(EntryPlan::Limit {
-                offset_ticks: 2,
+            Some(EntryPlan::StopMarket {
+                offset_ticks: 3,
                 ttl_ms: 120000,
                 cancel_on_signal_false: true,
             }),
@@ -5459,8 +5459,8 @@ fn shared_worker_preparation_actual_cli_matches_full_order_receipts_and_cached_r
             ttl_ms: 120000,
             cancel_on_signal_false: true,
         }),
-        Some(EntryPlan::Limit {
-            offset_ticks: 2,
+        Some(EntryPlan::StopMarket {
+            offset_ticks: 3,
             ttl_ms: 120000,
             cancel_on_signal_false: true,
         }),
@@ -5777,8 +5777,8 @@ fn multi_round_cli_preparation_session_reuses_after_restart_and_preserves_full_r
     .unwrap();
     let mut first:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
     let mut second = first.clone();
-    second.entry = Some(EntryPlan::Limit {
-        offset_ticks: 2,
+    second.entry = Some(EntryPlan::StopMarket {
+        offset_ticks: 3,
         ttl_ms: 120000,
         cancel_on_signal_false: true,
     });
@@ -6423,8 +6423,8 @@ fn trusted_session_accounts_skip_only_worker_produced_prefix_and_preserve_comple
             ttl_ms: 120000,
             cancel_on_signal_false: true,
         }),
-        Some(EntryPlan::Limit {
-            offset_ticks: 2,
+        Some(EntryPlan::StopMarket {
+            offset_ticks: 3,
             ttl_ms: 120000,
             cancel_on_signal_false: true,
         }),

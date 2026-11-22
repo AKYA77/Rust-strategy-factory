@@ -555,38 +555,31 @@ impl AccountState {
                     } else {
                         bid
                     };
-                    // Stop orders move away from the market (executable side); limit
-                    // orders move toward it (resting side). The minus sign was lost in a
-                    // later edit, making limits marketable instead of resting.
-                    let sign = if matches!(plan, crate::strategies::EntryPlan::StopMarket { .. }) {
-                        strategy.side.sign()
-                    } else {
-                        -strategy.side.sign()
-                    };
+                    // Stop-market orders rest on the executable side, away from the
+                    // market: Long stop = ask + offset, Short stop = bid - offset.
                     let level = anchor
-                        .checked_add(sign.checked_mul(offset).ok_or("entry offset overflow")?)
+                        .checked_add(
+                            strategy
+                                .side
+                                .sign()
+                                .checked_mul(offset)
+                                .ok_or("entry offset overflow")?,
+                        )
                         .ok_or("entry price overflow")?;
-                    let is_stop = matches!(plan, crate::strategies::EntryPlan::StopMarket { .. });
-                    let kind = if is_stop {
-                        crate::orders::Kind::StopMarket { trigger: level }
-                    } else {
-                        crate::orders::Kind::Limit { limit: level }
-                    };
+                    let kind = crate::orders::Kind::StopMarket { trigger: level };
                     let entry = level
-                        .checked_add(if is_stop {
+                        .checked_add(
                             strategy
                                 .side
                                 .sign()
                                 .checked_mul(slip)
-                                .ok_or("entry slippage overflow")?
-                        } else {
-                            0
-                        })
+                                .ok_or("entry slippage overflow")?,
+                        )
                         .ok_or("entry price overflow")?;
                     protective(entry, strategy.side, distance)?;
                     let friction = ask
                         .checked_sub(bid)
-                        .and_then(|s| s.checked_add(if is_stop { slip } else { 0 }))
+                        .and_then(|s| s.checked_add(slip))
                         .ok_or("friction overflow")?;
                     let mark = entry
                         .checked_sub(
@@ -869,16 +862,13 @@ fn corpus_key_from_facts(
     {
         return Err("invalid corpus execution budget".into());
     }
-    let allowed_classes = [
-        crate::data::DataClass::SyntheticTestOnly,
-        crate::data::DataClass::RealStructurallyValid,
-        crate::data::DataClass::RealQualityAccepted,
-        crate::data::DataClass::RealProfileApproved,
-    ];
-    if !allowed_classes.contains(&observed.declared_class())
+    // Registration identity keys are reserved for the frozen synthetic literal-USD
+    // corpus-step contract. Real structurally-valid data reaches research through
+    // `ReplayMode::Registered` (see `replay_corpus`), not through this key path.
+    if observed.declared_class() != crate::data::DataClass::SyntheticTestOnly
         || observed.profile().quote != "USD"
     {
-        return Err("registered corpus execution requires synthetic literal-USD or real structurally-valid inputs".into());
+        return Err("registered corpus execution requires synthetic literal USD".into());
     }
     let strategy = strategy.canonical()?;
     Ok(crate::storage::ExperimentKey {
@@ -1563,11 +1553,6 @@ mod account_checkpoint_tests {
                 for entry in [
                     None,
                     Some(EntryPlan::StopMarket {
-                        offset_ticks: 2,
-                        ttl_ms: 120000,
-                        cancel_on_signal_false: true,
-                    }),
-                    Some(EntryPlan::Limit {
                         offset_ticks: 2,
                         ttl_ms: 120000,
                         cancel_on_signal_false: true,
@@ -2343,8 +2328,8 @@ mod worker_preparation_tests {
         let costs = Costs::default();
         let budget = budget();
         let mut strategies = [strategy(), strategy(), strategy()];
-        strategies[1].entry = Some(crate::strategies::EntryPlan::Limit {
-            offset_ticks: 2,
+        strategies[1].entry = Some(crate::strategies::EntryPlan::StopMarket {
+            offset_ticks: 3,
             ttl_ms: 120000,
             cancel_on_signal_false: true,
         });

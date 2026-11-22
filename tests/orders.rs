@@ -77,56 +77,6 @@ fn stops_trigger_on_correct_quote_side_and_gap_fill_is_not_capped() {
     );
 }
 #[test]
-fn limits_require_executable_quote_and_do_not_receive_market_slippage() {
-    let p = Profile::synthetic("EURUSD").unwrap();
-    let c = Costs::default();
-    let mut buy = Order::submit(
-        &p,
-        &c,
-        Side::Long,
-        Kind::Limit { limit: 100000 },
-        1000,
-        t(0, 0, 100100, 100120),
-        10000,
-    )
-    .unwrap();
-    // Recorded ask crosses, but the pessimistic spread floor still prevents eligibility.
-    assert!(
-        buy.on_quote(&p, &c, t(1, 1, 99990, 99995))
-            .unwrap()
-            .is_none()
-    );
-    assert_eq!(
-        buy.on_quote(&p, &c, t(2, 2, 99950, 99960))
-            .unwrap()
-            .unwrap()
-            .price,
-        99970
-    );
-    let mut sell = Order::submit(
-        &p,
-        &c,
-        Side::Short,
-        Kind::Limit { limit: 100100 },
-        1000,
-        t(0, 0, 100000, 100010),
-        10000,
-    )
-    .unwrap();
-    assert!(
-        sell.on_quote(&p, &c, t(1, 1, 100090, 100200))
-            .unwrap()
-            .is_none()
-    );
-    assert_eq!(
-        sell.on_quote(&p, &c, t(2, 2, 100110, 100120))
-            .unwrap()
-            .unwrap()
-            .price,
-        100110
-    );
-}
-#[test]
 fn expiry_and_cancellation_never_fabricate_fills() {
     let p = Profile::synthetic("EURUSD").unwrap();
     let c = Costs::default();
@@ -177,7 +127,7 @@ fn order_contracts_and_quote_chronology_are_immutable() {
             &p,
             &c,
             Side::Long,
-            Kind::Limit { limit: 0 },
+            Kind::StopMarket { trigger: 0 },
             1000,
             submitted,
             100

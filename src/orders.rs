@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 pub enum Kind {
     Market,
     StopMarket { trigger: i64 },
-    Limit { limit: i64 },
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Fill {
@@ -99,7 +98,6 @@ impl Order {
         let level = match kind {
             Kind::Market => None,
             Kind::StopMarket { trigger } => Some(trigger),
-            Kind::Limit { limit } => Some(limit),
         };
         if level.is_some_and(|l| l <= 0 || l % p.tick != 0) {
             return Err("invalid order price grid".into());
@@ -179,21 +177,21 @@ impl Order {
                 Side::Long => ask >= trigger,
                 Side::Short => bid <= trigger,
             },
-            Kind::Limit { limit } => match self.side {
-                Side::Long => ask <= limit,
-                Side::Short => bid >= limit,
-            },
         };
         if !eligible {
             return Ok(None);
         }
-        let price = if matches!(self.kind, Kind::Limit { .. }) {
-            if self.side == Side::Long { ask } else { bid }
-        } else {
-            market_price(p, costs, tick, self.side)?
+        let price = market_price(p, costs, tick, self.side)?;
+        let fill = Fill {
+            sequence: tick.sequence,
+            timestamp_ms: tick.timestamp_ms,
+            price,
+            volume_micro_lots: self.volume_micro_lots,
+            side: self.side,
+            kind: self.kind,
+            model: "entry-l1-full-fill-v1; price-taking quote assumption; no queue/depth evidence"
+                .into(),
         };
-        let fill=Fill {sequence:tick.sequence,timestamp_ms:tick.timestamp_ms,price,volume_micro_lots:self.volume_micro_lots,side:self.side,kind:self.kind,
-            model:"entry-l1-full-fill-v1; price-taking quote assumption; no queue/depth evidence; limit eligible at observed executable quote without market slippage".into()};
         self.state = State::Filled(fill.clone());
         Ok(Some(fill))
     }
