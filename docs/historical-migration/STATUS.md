@@ -276,20 +276,26 @@ Residual accepted: `register`/`verify`/`audit` trust the per-month receipt as th
 anchor; `verify_bound` and `historical-verify <dir> <source>` are the explicit source-byte
 equivalence checks. `audit` does not re-read the Parquet.
 
-## Integration branch `hermes/integration-codex-stack`
+## Integration branch `hermes/integration-codex-stack` — MERGED TO `main` @ `0ba942e`
 
-- Created from the Codex stack tip `codex/retained-preflight-inventory` @ `74790a4` and merged
-  with `hermes/real-data-migration` (merge commit `cbcfb62`, clean auto-merge, no conflicts).
-- Combined verification: `cargo build`, `cargo fmt --check`, `cargo clippy --all-targets
-  -D warnings`, full `scripts/check.sh` (exit 0, all Rust tests including the real-data
-  pipeline/study), release build, `check-data-compute-identity.py`,
-  `check-operations.py`, `check-full-horizon.py` — all exit 0.
-- File overlap between the two lines was only `tests/corpus.rs`; the Hermes `src/` modules are
-  additive and disjoint from the Codex engine/corpus/campaign/dashboard files.
-- This is the cumulative integration candidate for Codex PRs #8–#13 plus the Hermes
-  historical-data work. Not merged to `main`; hosted CI must pass on the exact pushed SHA.
-- Independent `codex/long-campaign-ledger` (PR #1) merged cleanly on top (`e69a693`).
-- Test-stability fixes (no assertion weakened):
+- `hermes/integration-codex-stack` merged into `main` via commit `0ba942e`
+  "feat: continuous full-period execution + scientific validation + completion metrics".
+  origin/main == local main == hermes/integration-codex-stack == remotes/origin/hermes/integration-codex-stack == `0ba942e`.
+- PRs #44 (scientific validation over the 22-month diagnostic corpus), #45 (sparse signal-mask
+  storage + opt-in controlled recursive acceptance), #47 (item-10 ledger reconciliation:
+  scheduler/resource controls via PR #27) and #48 (richer regimes, broader seeded exploration,
+  behavioral diversity) are all merged into main via commit `0ba942e` and closed as superseded
+  with history preserved. Every PR head commit is an ancestor of origin/main; no force-push,
+  no branch deletion. No other branch holds unique unmerged work.
+- Hosted CI run 45031961750 (push, main, head_sha `0ba942e`): conclusion success, completed
+  2026-11-22T14:16:56Z. CI evidence is on the exact current SHA, not an ancestor. Twin
+  stack-branch run 45031941165 also success.
+- Combined verification on the exact merged tree: `cargo fmt --all -- --check` clean;
+  `cargo clippy --locked --all-targets -- -D warnings` clean; `cargo test --locked --lib
+  --bins --tests` (619 passed / 0 failed across 58 binaries); `scripts/check.sh` exit 0;
+  release build; `check-data-compute-identity.py`; `check-operations.py`;
+  `check-full-horizon.py` — all exit 0.
+- Test-stability fixes carried in the merged tree (no assertion weakened):
   - `tests/corpus.rs`: a process-local lock serializes the wall-clock/subprocess fleet tests,
     which previously starved each other's children under the 92-test parallel run.
   - `fleet_loop_ready_retry_...`: the fixture's retry deadline is anchored to the setup run, so
@@ -300,6 +306,11 @@ equivalence checks. `audit` does not re-read the Parquet.
     deliberately keeps a 10 ms busy timeout so the sampling loop stays responsive, so without
     the retry a concurrent writer's brief lock aborted an otherwise healthy child with
     `database is locked` / `parent-resource-journal-unavailable`.
+- Remaining work: (a) owner manual reboot for reboot-persistence evidence (systemctl reboot
+  is on the agent's unconditional blocklist), and (b) external-evidence gates — real-data
+  acquisition disabled by owner; broker/session/profile/calendar conversion facts absent.
+  0 instruments research-eligible — a numerical result on diagnostic evidence, not an
+  external gate.
 
 ## Remaining work
 

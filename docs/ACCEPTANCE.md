@@ -2,6 +2,13 @@
 
 Status: **SOFTWARE_INCOMPLETE**. This is a foundational checkpoint, not final acceptance.
 
+## Hosted CI evidence — exact SHA 0ba942e (2026-11-22)
+
+- Hosted CI run 45031961750 (push, main, head_sha 0ba942e == origin/main == hermes/integration-codex-stack): conclusion success, completed 2026-11-22T14:16:56Z. CI evidence is on the exact current SHA, not an ancestor. Twin stack-branch run 45031941165 also success.
+- PRs #44 (scientific validation over the 22-month diagnostic corpus), #45 (sparse signal-mask storage + opt-in controlled recursive acceptance), #47 (item-10 ledger reconciliation: scheduler/resource controls via PR #27) and #48 (richer regimes, broader seeded exploration, behavioral diversity) are all merged into main via commit 0ba942e "feat: continuous full-period execution + scientific validation + completion metrics" and closed as superseded with history preserved. No open PRs remain; every PR head commit is an ancestor of origin/main; no force-push, no branch deletion.
+- Full ladder passed on the exact combined tree: cargo fmt --all -- --check; cargo clippy --locked --all-targets -- -D warnings; cargo test --locked --lib --bins --tests (619 passed / 0 failed across 58 binaries); scripts/check.sh; cargo build --locked --release; check-data-compute-identity.py; check-operations.py; check-full-horizon.py; all browser suites.
+- SOFTWARE_INCOMPLETE retained: honest remaining work is (a) owner manual reboot for reboot-persistence evidence and (b) external-evidence gates (real-data acquisition disabled; broker/session/profile/calendar conversion facts absent). No percentage gain claimed from reconciliation alone; diagnostic results never reported as performance or qualification evidence.
+
 2026-11-12, cloud Linux x86_64, Rust/Cargo 1.100.0:
 
 - `scripts/check.sh`: formatting, Clippy all targets with warnings denied, and 35 integration tests passed (14 core, one CLI workflow, seven order lifecycle, seven persistence/holdout, one index differential and five validation-boundary tests). No tests were ignored or disabled.
