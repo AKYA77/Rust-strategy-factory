@@ -722,6 +722,10 @@ pub struct TradeOutcomeStats {
     /// month starts a fresh account, so this streak resets at every month boundary and is a
     /// reset-fold streak, not a continuous full-period streak.
     pub max_losing_streak: usize,
+    /// Consecutive net-losing closed trades at the end of the month. Zero when the last closed
+    /// trade was a win or breakeven, or when there are no closed trades. Used to chain losing
+    /// streaks across month boundaries in continuous full-period accounting.
+    pub ending_streak: usize,
     /// Sum of positive closed-trade net P&L. Additive.
     pub gross_win_micro_usd: i128,
     /// Sum of the magnitudes of negative closed-trade net P&L. Additive; never negative.
@@ -774,6 +778,7 @@ pub fn trade_outcome_stats(
             .checked_add(trade.net_micro_usd)
             .ok_or("trade outcome net overflow")?;
     }
+    stats.ending_streak = streak;
     Ok(stats)
 }
 
@@ -970,6 +975,204 @@ pub struct ExecutionReport {
 
 pub const EXECUTION_CLASSIFICATION: &str = "diagnostic_simulation";
 pub const EXECUTION_ELIGIBILITY: &str = "none";
+/// Continuous full-period single-account diagnostic execution over all months of an instrument.
+///
+/// Months are chained so each month's ending marked equity becomes the next month's starting
+/// equity, producing compounded full-period equity, a continuous losing streak across month
+/// boundaries, and a full-period maximum drawdown. Trade outcomes are computed per-month by the
+/// same authoritative sequential engine as reset-fold diagnostic execution; only the accounting
+/// is continuous. Classification is `continuous_diagnostic`, eligibility `none`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ContinuousExecution {
+    pub instrument: String,
+    pub identity: String,
+    pub strategy_identity: String,
+    pub classification: String,
+    pub eligibility: String,
+    pub conversion_policy: String,
+    pub months: Vec<ContinuousMonthExecution>,
+    pub totals: ContinuousTotals,
+    pub limitations: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ContinuousMonthExecution {
+    pub year: u32,
+    pub month: u32,
+    pub starting_micro_usd: i128,
+    pub ending_micro_usd: i128,
+    pub monthly_pnl_micro_usd: i128,
+    pub trades: usize,
+    pub rejections: usize,
+    pub wins: usize,
+    pub losses: usize,
+    pub breakevens: usize,
+    pub month_ending_streak: usize,
+    pub gross_win_micro_usd: i128,
+    pub gross_loss_micro_usd: i128,
+    pub net_micro_usd: i128,
+    pub peak_equity_micro_usd: i128,
+    pub drawdown_from_peak_micro_usd: i128,
+    pub unresolved_positions: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ContinuousTotals {
+    pub months_executed: usize,
+    pub months_refused: usize,
+    pub trades: usize,
+    pub rejections: usize,
+    pub initial_micro_usd: i128,
+    pub ending_micro_usd: i128,
+    pub net_pnl_micro_usd: i128,
+    pub full_period_max_drawdown_micro_usd: i128,
+    pub wins: usize,
+    pub losses: usize,
+    pub breakevens: usize,
+    pub continuous_max_losing_streak: usize,
+    pub gross_win_micro_usd: i128,
+    pub gross_loss_micro_usd: i128,
+    pub net_win_rate_bps: u16,
+    pub unresolved_positions: usize,
+}
+
+const CONTINUOUS_CLASSIFICATION: &str = "continuous_diagnostic";
+const CONTINUOUS_ELIGIBILITY: &str = "none";
+const CONTINUOUS_LIMITATIONS: &str = "Continuous full-period single-account diagnostic execution over the registered multi-month corpus. Trade outcomes are computed per-month by the authoritative sequential engine starting from INITIAL_EQUITY each month; only the accounting is continuous (compounded equity, cross-month losing streak, full-period drawdown). Classification is continuous_diagnostic, eligibility none. No research eligibility, qualification, or scientific approval is granted.";
+
+pub fn execute_continuous(
+    spec: &HistoricalCorpus,
+    strategy: &crate::strategies::Strategy,
+    costs: &crate::tick_engine::Costs,
+    budget: crate::tick_engine::CorpusBudget,
+) -> Result<ContinuousExecution> {
+    verify(spec)?;
+    let mut months = Vec::with_capacity(spec.months.len());
+    let mut refusals = Vec::new();
+    let mut running_equity = contracts::INITIAL_EQUITY;
+    let mut peak_equity = contracts::INITIAL_EQUITY;
+    let mut cumulative_wins = 0usize;
+    let mut cumulative_losses = 0usize;
+    let mut cumulative_breakevens = 0usize;
+    let mut continuous_streak = 0usize;
+    let mut max_continuous_streak = 0usize;
+    let mut cumulative_gross_win = 0i128;
+    let mut cumulative_gross_loss = 0i128;
+    let mut cumulative_net = 0i128;
+    let mut cumulative_trades = 0usize;
+    let mut cumulative_rejections = 0usize;
+    let mut cumulative_unresolved = 0usize;
+
+    for index in 0..spec.months.len() {
+        let (year, month) = (spec.months[index].year, spec.months[index].month);
+        let executed = match execute_month(spec, index, strategy, costs, budget) {
+            Ok(e) => e,
+            Err(reason) => {
+                refusals.push(MonthRefusal { year, month, reason });
+                continue;
+            }
+        };
+
+        let month_starting = running_equity;
+        let monthly_pnl = executed
+            .outcomes
+            .net_micro_usd
+            .checked_add(executed.initial_micro_usd.checked_sub(contracts::INITIAL_EQUITY).unwrap_or(0))
+            .ok_or("continuous monthly P&L overflow")?;
+        running_equity = running_equity
+            .checked_add(monthly_pnl)
+            .ok_or("continuous running equity overflow")?;
+        if running_equity > peak_equity {
+            peak_equity = running_equity;
+        }
+        let drawdown_from_peak = peak_equity
+            .checked_sub(running_equity)
+            .ok_or("continuous drawdown overflow")?;
+
+        // Chain losing streak across month boundary
+        if executed.outcomes.wins > 0 {
+            // Month had at least one win — reset the continuous streak
+            continuous_streak = 0;
+        } else if executed.outcomes.losses > 0 && executed.outcomes.wins == 0 {
+            // Month ended with only losses — chain the ending streak
+            continuous_streak = continuous_streak.saturating_add(executed.outcomes.ending_streak);
+        }
+        // If month had breakevens only (no wins, no losses), streak continues as-is
+        max_continuous_streak = max_continuous_streak.max(continuous_streak);
+
+        cumulative_wins = cumulative_wins.checked_add(executed.outcomes.wins).ok_or("continuous wins overflow")?;
+        cumulative_losses = cumulative_losses.checked_add(executed.outcomes.losses).ok_or("continuous losses overflow")?;
+        cumulative_breakevens = cumulative_breakevens.checked_add(executed.outcomes.breakevens).ok_or("continuous breakevens overflow")?;
+        cumulative_gross_win = cumulative_gross_win.checked_add(executed.outcomes.gross_win_micro_usd).ok_or("continuous gross win overflow")?;
+        cumulative_gross_loss = cumulative_gross_loss.checked_add(executed.outcomes.gross_loss_micro_usd).ok_or("continuous gross loss overflow")?;
+        cumulative_net = cumulative_net.checked_add(executed.outcomes.net_micro_usd).ok_or("continuous net overflow")?;
+        cumulative_trades = cumulative_trades.checked_add(executed.trades).ok_or("continuous trades overflow")?;
+        cumulative_rejections = cumulative_rejections.checked_add(executed.rejections).ok_or("continuous rejections overflow")?;
+        cumulative_unresolved = cumulative_unresolved.checked_add(executed.outcomes.unresolved_positions).ok_or("continuous unresolved overflow")?;
+
+        months.push(ContinuousMonthExecution {
+            year,
+            month,
+            starting_micro_usd: month_starting,
+            ending_micro_usd: running_equity,
+            monthly_pnl_micro_usd: monthly_pnl,
+            trades: executed.trades,
+            rejections: executed.rejections,
+            wins: executed.outcomes.wins,
+            losses: executed.outcomes.losses,
+            breakevens: executed.outcomes.breakevens,
+            month_ending_streak: executed.outcomes.ending_streak,
+            gross_win_micro_usd: executed.outcomes.gross_win_micro_usd,
+            gross_loss_micro_usd: executed.outcomes.gross_loss_micro_usd,
+            net_micro_usd: executed.outcomes.net_micro_usd,
+            peak_equity_micro_usd: peak_equity,
+            drawdown_from_peak_micro_usd: drawdown_from_peak,
+            unresolved_positions: executed.outcomes.unresolved_positions,
+        });
+    }
+
+    let resolved = cumulative_wins + cumulative_losses + cumulative_breakevens;
+    let net_win_rate_bps = if resolved > 0 {
+        (cumulative_wins as u128 * 10_000 / resolved as u128) as u16
+    } else {
+        0
+    };
+
+    let totals = ContinuousTotals {
+        months_executed: months.len(),
+        months_refused: refusals.len(),
+        trades: cumulative_trades,
+        rejections: cumulative_rejections,
+        initial_micro_usd: contracts::INITIAL_EQUITY,
+        ending_micro_usd: running_equity,
+        net_pnl_micro_usd: running_equity.checked_sub(contracts::INITIAL_EQUITY).ok_or("continuous net P&L overflow")?,
+        full_period_max_drawdown_micro_usd: peak_equity.checked_sub(running_equity.min(peak_equity)).unwrap_or(0),
+        wins: cumulative_wins,
+        losses: cumulative_losses,
+        breakevens: cumulative_breakevens,
+        continuous_max_losing_streak: max_continuous_streak,
+        gross_win_micro_usd: cumulative_gross_win,
+        gross_loss_micro_usd: cumulative_gross_loss,
+        net_win_rate_bps,
+        unresolved_positions: cumulative_unresolved,
+    };
+
+    Ok(ContinuousExecution {
+        instrument: spec.instrument.clone(),
+        identity: spec.identity.clone(),
+        strategy_identity: strategy.identity()?,
+        classification: CONTINUOUS_CLASSIFICATION.into(),
+        eligibility: CONTINUOUS_ELIGIBILITY.into(),
+        conversion_policy: conversion_policy(&spec.profile).into(),
+        months,
+        totals,
+        limitations: CONTINUOUS_LIMITATIONS.into(),
+    })
+}
+
 /// USD-quoted instruments need no cross-currency conversion.
 pub const CONVERSION_POLICY_IDENTITY: &str = "identity_usd_v1";
 /// USD-base non-USD-quote instruments use the direction-based reciprocal closing rate derived

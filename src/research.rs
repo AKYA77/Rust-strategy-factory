@@ -27,6 +27,12 @@ pub struct Config {
     pub training_window: Option<crate::validation::Interval>,
     #[serde(skip_serializing_if = "zero_children")]
     pub improvement_children: usize,
+    /// Explicit opt-in recursion depth for automatic improvement scheduling.
+    /// Zero preserves the historical no-descendant behaviour. When positive,
+    /// one resolved review child per completed parent may be scheduled for its
+    /// own training diagnosis, up to this many generations.
+    #[serde(skip_serializing_if = "zero_depth")]
+    pub improvement_max_depth: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shadow_policy: Option<crate::candidate_screen::ShadowPolicy>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -41,6 +47,9 @@ pub struct Config {
 fn zero_children(n: &usize) -> bool {
     *n == 0
 }
+fn zero_depth(n: &usize) -> bool {
+    *n == 0
+}
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -52,6 +61,7 @@ impl Default for Config {
             state_budget_bytes: 256 * 1024 * 1024,
             training_window: None,
             improvement_children: 0,
+            improvement_max_depth: 0,
             shadow_policy: None,
             proof_policy: None,
             indexed_policy: None,
@@ -59,6 +69,52 @@ impl Default for Config {
             cpu_guard: None,
         }
     }
+}
+
+/// Maximum controlled recursive acceptance generations admitted by one run.
+pub const MAX_IMPROVEMENT_DEPTH: u64 = 2;
+
+/// Schema migration: bound recursive improvement jobs with an explicit depth
+/// and the accepted proposal edge. The old table's composite foreign key to
+/// `research_steps` cannot describe a recursive parent (a reviewed child
+/// experiment is not a research step), so the table is rebuilt additively and
+/// the durable rows are copied unchanged at depth 0.
+pub(crate) fn initialize_recursion(
+    connection: &mut rusqlite::Connection,
+    previous: i64,
+) -> Result<()> {
+    if previous >= 24 {
+        return Ok(());
+    }
+    let tx = crate::storage::writer_tx_open(connection).map_err(|e| e.to_string())?;
+    let current: i64 = tx
+        .query_row("PRAGMA user_version", [], |r| r.get(0))
+        .map_err(|e| e.to_string())?;
+    if current < 24 {
+        tx.execute_batch(
+            "CREATE TABLE improvement_jobs_v24(
+                run_id TEXT NOT NULL REFERENCES research_runs(id),
+                parent_cursor INTEGER NOT NULL CHECK(parent_cursor>=0),
+                input_index INTEGER NOT NULL CHECK(input_index>=0),
+                parent_id TEXT NOT NULL REFERENCES experiments(id),
+                state TEXT NOT NULL DEFAULT 'queued' CHECK(state IN ('queued','completed','failed')),
+                diagnosis_id TEXT REFERENCES training_diagnoses(id),
+                review_id TEXT REFERENCES training_reviews(id),
+                error TEXT,
+                depth INTEGER NOT NULL DEFAULT 0 CHECK(depth BETWEEN 0 AND 2),
+                accepted_edge_id TEXT,
+                PRIMARY KEY(run_id,parent_cursor,depth)
+            );
+            INSERT INTO improvement_jobs_v24(run_id,parent_cursor,input_index,parent_id,state,diagnosis_id,review_id,error,depth,accepted_edge_id)
+                SELECT run_id,parent_cursor,input_index,parent_id,state,diagnosis_id,review_id,error,0,NULL FROM improvement_jobs;
+            DROP TABLE improvement_jobs;
+            ALTER TABLE improvement_jobs_v24 RENAME TO improvement_jobs;
+            CREATE UNIQUE INDEX IF NOT EXISTS one_pending_improvement ON improvement_jobs(run_id) WHERE state='queued';
+            PRAGMA user_version=24;",
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Execution {
@@ -891,9 +947,13 @@ pub struct ImprovementStatus {
     pub completed: i64,
     pub failed: i64,
     pub child_receipt_links: i64,
+    /// Deepest controlled recursive generation currently recorded (0 = none).
+    pub max_depth: i64,
+    /// Jobs admitted as an accepted review descendant (`depth > 0`).
+    pub accepted_descendants: i64,
 }
 pub fn status(registry: &Registry, id: &str, now: i64) -> Result<Status> {
-    let improvements = registry.connection.query_row("SELECT coalesce(sum(j.state='queued'),0),coalesce(sum(j.state='completed'),0),coalesce(sum(j.state='failed'),0),coalesce(sum(json_array_length(r.report_json,'$.children')),0) FROM improvement_jobs j LEFT JOIN training_reviews r ON r.id=j.review_id WHERE j.run_id=?1",[id],|r|Ok(ImprovementStatus {queued:r.get(0)?,completed:r.get(1)?,failed:r.get(2)?,child_receipt_links:r.get(3)?})).map_err(|e|e.to_string())?;
+    let improvements = registry.connection.query_row("SELECT coalesce(sum(j.state='queued'),0),coalesce(sum(j.state='completed'),0),coalesce(sum(j.state='failed'),0),coalesce(sum(json_array_length(r.report_json,'$.children')),0),coalesce(max(j.depth),0),coalesce(sum(j.accepted_edge_id IS NOT NULL),0) FROM improvement_jobs j LEFT JOIN training_reviews r ON r.id=j.review_id WHERE j.run_id=?1",[id],|r|Ok(ImprovementStatus {queued:r.get(0)?,completed:r.get(1)?,failed:r.get(2)?,child_receipt_links:r.get(3)?,max_depth:r.get(4)?,accepted_descendants:r.get(5)?})).map_err(|e|e.to_string())?;
 
     registry.connection.query_row("SELECT state,cursor,executed,reused,rejected,failed,active,expires_ms,latest,last_error FROM research_runs WHERE id=?1",[id],|r|{
         let active:i64=r.get(6)?;let expires:Option<i64>=r.get(7)?;
@@ -909,10 +969,12 @@ pub struct ImprovementJob {
     pub diagnosis_id: Option<String>,
     pub review_id: Option<String>,
     pub error: Option<String>,
+    pub depth: u64,
+    pub accepted_edge_id: Option<String>,
 }
 /// Most recent hundred durable jobs; history remains in the registry/backup.
 pub fn improvement_jobs(registry: &Registry, id: &str) -> Result<Vec<ImprovementJob>> {
-    let mut query = registry.connection.prepare("SELECT parent_cursor,input_index,parent_id,state,diagnosis_id,review_id,error FROM improvement_jobs WHERE run_id=?1 ORDER BY parent_cursor DESC LIMIT 100").map_err(|e|e.to_string())?;
+    let mut query = registry.connection.prepare("SELECT parent_cursor,input_index,parent_id,state,diagnosis_id,review_id,error,depth,accepted_edge_id FROM improvement_jobs WHERE run_id=?1 ORDER BY parent_cursor DESC LIMIT 100").map_err(|e|e.to_string())?;
     query
         .query_map([id], |r| {
             Ok(ImprovementJob {
@@ -923,6 +985,8 @@ pub fn improvement_jobs(registry: &Registry, id: &str) -> Result<Vec<Improvement
                 diagnosis_id: r.get(4)?,
                 review_id: r.get(5)?,
                 error: r.get(6)?,
+                depth: r.get::<_, i64>(7)? as u64,
+                accepted_edge_id: r.get(8)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -986,6 +1050,8 @@ impl Driver {
         if inputs.is_empty()
             || inputs.len() > 8
             || config.improvement_children > 4
+            || config.improvement_max_depth > MAX_IMPROVEMENT_DEPTH as usize
+            || (config.improvement_max_depth > 0 && config.improvement_children == 0)
             || config.feature_cells == 0
             || config.feature_cells > 4_000_000
             || config.max_total_events == 0
@@ -1122,7 +1188,7 @@ impl Driver {
             .checked_mul(strategies::family_templates().len() as u64)
             .and_then(|v| v.checked_mul(self.inputs.len() as u64))
             .ok_or("research budget overflow")?;
-        let pending: Option<(i64,usize,String)> = self.registry.connection.query_row("SELECT parent_cursor,input_index,parent_id FROM improvement_jobs WHERE run_id=?1 AND state='queued'",[&self.id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional().map_err(|e|e.to_string())?;
+        let pending: Option<(i64,usize,String,u64)> = self.registry.connection.query_row("SELECT parent_cursor,input_index,parent_id,depth FROM improvement_jobs WHERE run_id=?1 AND state='queued'",[&self.id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get::<_,i64>(3)? as u64))).optional().map_err(|e|e.to_string())?;
         let expires = now
             .checked_add(self.config.lease_ms)
             .ok_or("lease overflow")?;
@@ -1247,7 +1313,7 @@ impl Driver {
         &mut self,
         now: i64,
         started: std::time::Instant,
-        job: (i64, usize, String),
+        job: (i64, usize, String, u64),
     ) -> Result<bool> {
         let token = self.token.as_ref().ok_or("coordinator lease required")?;
         let execution = (|| -> Result<(String, Option<String>, bool)> {
@@ -1287,6 +1353,13 @@ impl Driver {
         };
         let pressure = error.is_some()
             && check_state_budget(&self.registry, self.config.state_budget_bytes).is_err();
+        // Select the accepted descendant before opening the publication
+        // transaction so completion and the next queued generation commit as
+        // one atomic step.
+        let descendant = match (&review, complete, &error, pressure) {
+            (Some(review), true, None, false) => self.accepted_descendant(&job, review)?,
+            _ => None,
+        };
         let finished = now
             .checked_add(
                 i64::try_from(started.elapsed().as_millis())
@@ -1304,9 +1377,57 @@ impl Driver {
         if n != 1 {
             return Err("improvement job already completed".into());
         }
+        if let Some(child) = descendant {
+            let n=tx.execute("INSERT INTO improvement_jobs(run_id,parent_cursor,input_index,parent_id,state,depth,accepted_edge_id) VALUES(?1,?2,?3,?4,'queued',?5,?6)",params![self.id,job.0,job.1 as i64,child.experiment_id,child.depth as i64,child.proposal_edge_id]).map_err(|e|e.to_string())?;
+            if n != 1 {
+                return Err("recursive descendant admission conflict".into());
+            }
+        }
         tx.commit().map_err(|e| e.to_string())?;
         Ok(!pressure)
     }
+
+    /// Deterministically choose at most one resolved review child to expand.
+    /// Ranking uses only the run seed and the immutable proposal edge; it never
+    /// reads the net delta, replay outcome or any OOS/protected evidence, so the
+    /// acceptance rule cannot select on performance. Unresolved children are
+    /// skipped and the depth cap is enforced by the caller's configuration.
+    fn accepted_descendant(
+        &self,
+        job: &(i64, usize, String, u64),
+        review_id: &str,
+    ) -> Result<Option<Descendant>> {
+        if self.config.improvement_max_depth == 0
+            || job.3 >= self.config.improvement_max_depth as u64
+        {
+            return Ok(None);
+        }
+        let report = crate::training_review::read_report(&self.registry, review_id)?
+            .ok_or("descendant review missing")?;
+        let mut ranked = report
+            .children
+            .iter()
+            .filter(|child| child.evidence.resolved_net_micro_usd.is_some())
+            .map(|child| {
+                Ok((
+                    data::hash(&(self.config.seed, &child.proposal_edge_id))?,
+                    child,
+                ))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        ranked.sort_by(|a, b| a.0.cmp(&b.0));
+        Ok(ranked.into_iter().next().map(|(_, child)| Descendant {
+            experiment_id: child.evidence.experiment_id.clone(),
+            proposal_edge_id: child.proposal_edge_id.clone(),
+            depth: job.3 + 1,
+        }))
+    }
+}
+
+struct Descendant {
+    experiment_id: String,
+    proposal_edge_id: String,
+    depth: u64,
 }
 impl Drop for Driver {
     fn drop(&mut self) {

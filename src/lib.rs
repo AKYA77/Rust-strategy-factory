@@ -2,6 +2,7 @@ pub mod candles;
 pub mod contracts;
 pub mod data;
 pub mod indicators;
+pub mod sparse_mask;
 pub mod strategies;
 pub mod tick_engine;
 
