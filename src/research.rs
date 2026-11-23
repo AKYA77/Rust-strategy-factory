@@ -917,16 +917,11 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
             multiple_bps: 20000,
         });
     }
-    // Template stops are 150/200 ticks (15/20 pips for EURUSD where pip=100).
-    // Region ramp adds 200 ticks per 300 regions, keeping stops in the 15-20 pip
-    // band plus upward exploration. The executable-side minimum (spread_floor +
-    // slippage = 4 pips = 40 ticks) is enforced by risk::reserve; tight stops are
-    // screened out by screen::market_stop_proof.
-    s.stop_ticks += (region / 300) as i64 * 200;
-
-    // ORB session rotation: rotate session_hour (0=Asian, 8=London, 13=New York)
-    // across regions so ORB strategies are tested on all sessions per instrument.
+    // Stop distance ramp: non-ORB families use per-300-region steps; ORB uses
+    // per-region steps so each region gets a distinct stop distance within its
+    // session_hour group (regions 0-299 all share session_hour=0, etc.).
     if candidate.family == strategies::Family::Orb {
+        s.stop_ticks += region as i64;
         if let Some(session_hour) = s.rule.orb_session_mut() {
             *session_hour = match region % 3 {
                 0 => 0u8,   // Asian
@@ -934,6 +929,8 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
                 _ => 13u8,  // New York
             };
         }
+    } else {
+        s.stop_ticks += (region / 300) as i64 * 200;
     }
 
     // Owner directive 2026-11-22: market orders only. Every generated strategy enters
