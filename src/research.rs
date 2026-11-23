@@ -917,12 +917,11 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
             multiple_bps: 20000,
         });
     }
-    // Executable-side minimum distance is min_stop_ticks + (spread_floor + slippage) *
-    // pip / tick (risk::reserve). The raw template stops (30/100 ticks) fall below that
-    // minimum for the modeled cost profile, so every candidate was risk-rejected and no
-    // trade ever filled. Lift the template stop ADDITIVELY — flattening to one constant
-    // erased the template's stop dimension and made half of all candidates identical.
-    s.stop_ticks += 500;
+    // Keep the template's own stop dimension (30/100 ticks). Tight stops that cannot
+    // satisfy the executable-side minimum are screened out cheaply by
+    // `screen::market_stop_proof` (proof_rejection), which is exactly what the
+    // proof-screening campaign exercises; lifting every stop above the minimum would
+    // erase that path. Region still ramps the stop upward.
     s.stop_ticks += (region / 300) as i64 * 200;
     // Owner directive 2026-11-22: market orders only. Every generated strategy enters
     // at the next executable market quote; limit (and other resting) entry plans are
