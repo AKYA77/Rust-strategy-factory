@@ -291,8 +291,8 @@ fn bounds_reject_invalid_configuration_and_new_regions_are_not_repeats() {
             let id = s.identity().unwrap();
             if !ids.insert(id.clone()) {
                 dups += 1;
-                if dups <= 10 {
-                    eprintln!("DUP region={region} slot={slot} family={family:?} stop_ticks={} entry={:?} rule={:?} timeframe={:?} side={:?}", s.stop_ticks, s.entry, s.rule, s.timeframe, s.side);
+                if dups <= 20 {
+                    eprintln!("DUP region={region} slot={slot} family={family:?} stop_ticks={} tf={:?} side={:?} rule={:?}", s.stop_ticks, s.timeframe, s.side, s.rule);
                 }
             }
         }
