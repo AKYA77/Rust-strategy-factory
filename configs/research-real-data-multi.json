@@ -5,7 +5,7 @@
     "max_total_events": 500000,
     "max_regions": 10000,
     "lease_ms": 300000,
-    "state_budget_bytes": 2147483648,
+    "state_budget_bytes": 8589934592,
     "training_window": {
       "start_ms": 1735689600000,
       "end_exclusive_ms": 1738360797318
