@@ -38,7 +38,7 @@ parser=argparse.ArgumentParser()
 parser.add_argument('before',type=Path);parser.add_argument('after',type=Path);parser.add_argument('output',type=Path)
 parser.add_argument('--new-chunks',type=int,default=64)
 parser.add_argument('--workers',type=int,default=1)
-parser.add_argument('--strategies',type=int,choices=[1,3],default=3)
+parser.add_argument('--strategies',type=int,choices=[1,2],default=2)
 parser.add_argument('--chunks',type=int,default=2)
 parser.add_argument('--format',choices=['native','blocked','mixed'],default='native')
 parser.add_argument('--timeframe',choices=['M1','M5','M15'],default='M1')
@@ -67,7 +67,7 @@ with tempfile.TemporaryDirectory(prefix='preparation-benchmark-') as tmp:
         artifacts.append(native)
     command(after,'corpus-create',base/'corpus.json',*artifacts)
     strategies=[]
-    for entry in [None,{'StopMarket':{'offset_ticks':2,'ttl_ms':120000,'cancel_on_signal_false':True}},{'Limit':{'offset_ticks':2,'ttl_ms':120000,'cancel_on_signal_false':True}}][:a.strategies]:
+    for entry in [None,{'StopMarket':{'offset_ticks':2,'ttl_ms':120000,'cancel_on_signal_false':True}}][:a.strategies]:
         strategies.append({'timeframe':a.timeframe,'side':'Long','stop_ticks':100,'entry':entry,'rule':{'UtcSession':{'start_hour':0,'end_hour':23,'weekdays':127}}})
     config=base/'config.json';config.write_text(json.dumps({'specification':'corpus.json','strategies':strategies,'budget':{'max_candles':100000,'feature_cells':1000000,'max_receipts':10000},'limits':{'workers':a.workers,'max_parallel_candles':100000*a.workers,'max_parallel_feature_cells':1000000*a.workers,'max_parallel_receipts':10000*a.workers,'max_new_chunks':a.new_chunks,'lease_ms':600000}}))
     records=[]
