@@ -141,8 +141,8 @@ struct CorpusBatchFile {
 type CorpusSearchFile = rust_strategy_factory::operator_config::SearchFile;
 fn research_inputs(config_path: &str) -> Result<(Vec<research::Input>, research::Config)> {
     let config: ResearchFile = read_json(config_path)?;
-    if config.inputs.is_empty() || config.inputs.len() > 8 {
-        return Err("one to eight input datasets required".into());
+    if config.inputs.is_empty() || config.inputs.len() > 256 {
+        return Err("one to 256 input datasets required".into());
     }
     let base = Path::new(config_path).parent().unwrap_or(Path::new("."));
     let mut bytes = 0_u64;
@@ -157,8 +157,8 @@ fn research_inputs(config_path: &str) -> Result<(Vec<research::Input>, research:
                 .ok_or("input byte overflow")?;
         }
     }
-    if bytes > 128 * 1024 * 1024 {
-        return Err("loaded research input files exceed 128 MiB budget; full-history streaming remains pending".into());
+    if bytes > 2 * 1024 * 1024 * 1024 {
+        return Err("loaded research input files exceed 2 GiB budget; full-history streaming remains pending".into());
     }
     let mut inputs = Vec::new();
     for input in config.inputs {

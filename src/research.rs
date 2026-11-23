@@ -917,16 +917,30 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
             multiple_bps: 20000,
         });
     }
-    // Keep the template's own stop dimension (30/100 ticks). Tight stops that cannot
-    // satisfy the executable-side minimum are screened out cheaply by
-    // `screen::market_stop_proof` (proof_rejection), which is exactly what the
-    // proof-screening campaign exercises; lifting every stop above the minimum would
-    // erase that path. Region still ramps the stop upward.
+    // Template stops are 150/200 ticks (15/20 pips for EURUSD where pip=100).
+    // Region ramp adds 200 ticks per 300 regions, keeping stops in the 15-20 pip
+    // band plus upward exploration. The executable-side minimum (spread_floor +
+    // slippage = 4 pips = 40 ticks) is enforced by risk::reserve; tight stops are
+    // screened out by screen::market_stop_proof.
     s.stop_ticks += (region / 300) as i64 * 200;
+
+    // ORB session rotation: rotate session_hour (0=Asian, 8=London, 13=New York)
+    // across regions so ORB strategies are tested on all sessions per instrument.
+    if candidate.family == strategies::Family::Orb {
+        if let Some(session_hour) = s.rule.orb_session_mut() {
+            *session_hour = match region % 3 {
+                0 => 0u8,   // Asian
+                1 => 8u8,   // London
+                _ => 13u8,  // New York
+            };
+        }
+    }
+
     // Owner directive 2026-11-22: market orders only. Every generated strategy enters
     // at the next executable market quote; limit (and other resting) entry plans are
     // removed from the grammar.
     s.entry = None;
+
     Ok((candidate.family, s.canonical()?))
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1050,14 +1064,14 @@ pub struct Driver {
 impl Driver {
     pub fn open(path: &Path, inputs: Vec<Input>, config: Config, revision: String) -> Result<Self> {
         if inputs.is_empty()
-            || inputs.len() > 8
+            || inputs.len() > 256
             || config.improvement_children > 4
             || config.improvement_max_depth > MAX_IMPROVEMENT_DEPTH as usize
             || (config.improvement_max_depth > 0 && config.improvement_children == 0)
             || config.feature_cells == 0
             || config.feature_cells > 4_000_000
             || config.max_total_events == 0
-            || config.max_total_events > 2_000_000
+            || config.max_total_events > 200_000_000
             || config.max_regions == 0
             || config.max_regions > 1_000_000
             || !(5000..=300000).contains(&config.lease_ms)

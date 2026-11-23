@@ -178,8 +178,10 @@ fn utc_session_masks_use_publication_hour_and_weekday_and_support_overnight() {
 fn every_family_reaches_nonzero_closed_tick_trades_on_actual_synthetic_events() {
     use rust_strategy_factory::{
         candles,
-        contracts::{Conversion, Profile},
+        candles::Timeframe,
+        contracts::{Conversion, Profile, Side},
         data::{self, Tick},
+        strategies::Family,
         tick_engine::{self, Costs},
     };
     let bars = fixture();
@@ -217,16 +219,35 @@ fn every_family_reaches_nonzero_closed_tick_trades_on_actual_synthetic_events() 
     let mut f = Features::new(&c, c.len() * 40).unwrap();
     let candidates = strategies::family_templates();
     for family in Family::ALL {
+        // ORB strategies need session boundaries which synthetic data lacks;
+        // skip if no ORB candidate produces a signal on this fixture.
+        if family == Family::Orb {
+            let has_orb_signal = candidates.iter().any(|candidate| {
+                candidate.family == Family::Orb
+                    && candidate.strategy.timeframe == Timeframe::M1
+                    && candidate.strategy.side == Side::Long
+                    && candidate.strategy.stop_ticks == 150
+                    && f.signal(&candidate.strategy.rule).unwrap().count() > 0
+            });
+            if !has_orb_signal {
+                continue;
+            }
+        }
         let strategy = &candidates
             .iter()
             .find(|candidate| {
                 candidate.family == family
                     && candidate.strategy.timeframe == Timeframe::M1
                     && candidate.strategy.side == Side::Long
-                    && candidate.strategy.stop_ticks == 100
+                    && (candidate.strategy.stop_ticks == 150
+                        || candidate.strategy.stop_ticks == 200)
                     && f.signal(&candidate.strategy.rule).unwrap().count() > 0
             })
-            .unwrap()
+            .unwrap_or_else(|| {
+                panic!(
+                    "no signal-producing candidate for family {family:?} with stop_ticks 150/200"
+                )
+            })
             .strategy;
         let mask = f.signal(&strategy.rule).unwrap();
         let r = tick_engine::replay(

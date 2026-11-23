@@ -543,6 +543,8 @@ fn leaf_primitives(rule: &Rule, out: &mut Vec<&'static str>) {
         Rule::UtcSession { .. } => out.push("UtcSession"),
         Rule::MacdCross { .. } => out.push("MacdCross"),
         Rule::BollingerCross { .. } => out.push("BollingerCross"),
+        Rule::OrbLongBreakout { .. } => out.push("OrbLongBreakout"),
+        Rule::OrbShortBreakout { .. } => out.push("OrbShortBreakout"),
         Rule::All(children) | Rule::Any(children) => {
             for child in children {
                 leaf_primitives(child, out);

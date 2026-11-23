@@ -78,6 +78,14 @@ pub enum Rule {
         multiple_bps: u32,
         upper: bool,
     },
+    OrbLongBreakout {
+        window_minutes: usize,
+        session_hour: u8,
+    },
+    OrbShortBreakout {
+        window_minutes: usize,
+        session_hour: u8,
+    },
 }
 impl Rule {
     fn validate_timeframes(&self, base: Timeframe) -> Result<()> {
@@ -241,9 +249,30 @@ impl Rule {
                     }
                     Ok(rule.clone())
                 }
+                Rule::OrbLongBreakout {
+                    window_minutes,
+                    session_hour,
+                } | Rule::OrbShortBreakout {
+                    window_minutes,
+                    session_hour,
+                } => {
+                    if !(1..=1000).contains(window_minutes) || *session_hour >= 24 {
+                        return Err("invalid ORB parameters".into());
+                    }
+                    Ok(rule.clone())
+                }
             }
         }
         normalize(self, 0, &mut 0)
+    }
+    /// Returns mutable access to the session_hour field if this rule is an
+    /// OrbLongBreakout or OrbShortBreakout, None otherwise.
+    pub fn orb_session_mut(&mut self) -> Option<&mut u8> {
+        match self {
+            Rule::OrbLongBreakout { session_hour, .. } => Some(session_hour),
+            Rule::OrbShortBreakout { session_hour, .. } => Some(session_hour),
+            _ => None,
+        }
     }
 }
 /// Relative to the publication event's effective executable entry side.
@@ -320,6 +349,8 @@ enum Feature {
     PriorRangeMean(usize),
     MacdSign(usize, usize, usize),
     Band(usize, u32, bool),
+    SessionOpenHigh(usize, u8),
+    SessionOpenLow(usize, u8),
 }
 /// Caches share indicator arrays across an entire candidate batch. Limits count retained cells.
 pub struct Features<'a> {
@@ -459,6 +490,83 @@ impl<'a> Features<'a> {
                     .map(|i| if i == 0 { None } else { current[i - 1] })
                     .collect()
             }
+            Feature::SessionOpenHigh(window_minutes, _) | Feature::SessionOpenLow(window_minutes, _) => {
+                use chrono::{Datelike, Timelike};
+                let is_high = matches!(key, Feature::SessionOpenHigh(_, _));
+                let window_ms = window_minutes as i64 * 60_000;
+                let mut values: Vec<Option<i64>> = Vec::with_capacity(self.candles.len());
+                // Detect session boundaries: a new session starts when the candle's
+                // UTC hour equals session_hour AND it's the first such candle after
+                // a different hour (i.e., session rollover).
+                let mut session_start_idx: Option<usize> = None;
+                let mut current_session_ymd: Option<(i32, u32, u32)> = None;
+                let mut range_high: Option<i64> = None;
+                let mut range_low: Option<i64> = None;
+                let mut range_computed = false;
+                for (i, c) in self.candles.iter().enumerate() {
+                    let dt = chrono::DateTime::from_timestamp_millis(c.available_ms).unwrap();
+                    let hour = dt.hour() as u8;
+                    let ymd = (dt.year(), dt.month(), dt.day());
+                    // New session day or session hour rollover
+                    let new_session = current_session_ymd.map_or(true, |d| d != ymd)
+                        || session_start_idx.map_or(true, |s| {
+                            let sdt = chrono::DateTime::from_timestamp_millis(self.candles[s].available_ms).unwrap();
+                            sdt.hour() as u8 != hour || (sdt.year(), sdt.month(), sdt.day()) != ymd
+                        });
+                    if new_session {
+                        // Finalize previous session's range for all its candles
+                        if let Some(start) = session_start_idx {
+                            let rh = range_high.unwrap_or(0);
+                            let rl = range_low.unwrap_or(0);
+                            for j in start..i {
+                                while values.len() <= j {
+                                    values.push(None);
+                                }
+                                values[j] = if is_high { Some(rh) } else { Some(rl) };
+                            }
+                        }
+                        session_start_idx = Some(i);
+                        current_session_ymd = Some(ymd);
+                        range_high = Some(c.bid.high);
+                        range_low = Some(c.bid.low);
+                        range_computed = false;
+                    } else {
+                        // Still within the opening window?
+                        let session_start_ms = self.candles[session_start_idx.unwrap()].available_ms;
+                        if c.available_ms - session_start_ms < window_ms {
+                            // Still in opening range - update high/low
+                            range_high = range_high.map(|h| h.max(c.bid.high)).or(Some(c.bid.high));
+                            range_low = range_low.map(|l| l.min(c.bid.low)).or(Some(c.bid.low));
+                        } else if !range_computed {
+                            // Opening window just ended - finalize range
+                            range_computed = true;
+                        }
+                    }
+                    // Push current value: after range is computed, use it; during window, use None (no signal yet)
+                    while values.len() <= i {
+                        values.push(None);
+                    }
+                    if range_computed {
+                        values[i] = if is_high { range_high } else { range_low };
+                    } else {
+                        values[i] = None;
+                    }
+                }
+                // Finalize last session
+                if let Some(start) = session_start_idx {
+                    let rh = range_high.unwrap_or(0);
+                    let rl = range_low.unwrap_or(0);
+                    for j in start..self.candles.len() {
+                        while values.len() <= j {
+                            values.push(None);
+                        }
+                        if range_computed || j >= start {
+                            values[j] = if is_high { Some(rh) } else { Some(rl) };
+                        }
+                    }
+                }
+                values
+            }
         };
         self.cache.insert(key, values);
         self.feature_builds += 1;
@@ -515,6 +623,10 @@ impl<'a> Features<'a> {
                     Rule::RangeExpansion { window, .. } => {
                         out.insert(Feature::TrueRange);
                         out.insert(Feature::PriorRangeMean(*window));
+                    }
+                    Rule::OrbLongBreakout { window_minutes, session_hour } | Rule::OrbShortBreakout { window_minutes, session_hour } => {
+                        out.insert(Feature::SessionOpenHigh(*window_minutes, *session_hour));
+                        out.insert(Feature::SessionOpenLow(*window_minutes, *session_hour));
                     }
                     Rule::All(v) | Rule::Any(v) => {
                         for r in v {
@@ -742,6 +854,22 @@ impl<'a> Features<'a> {
                     })
                 }))
             }
+            Rule::OrbLongBreakout { window_minutes, session_hour } => {
+                let high_key = Feature::SessionOpenHigh(*window_minutes, *session_hour);
+                self.ensure(high_key.clone())?;
+                let highs = &self.cache[&high_key];
+                SparseMask::from_bools((0..self.close.len()).map(|i| {
+                    highs[i].is_some_and(|h| self.close[i] > h)
+                }))
+            }
+            Rule::OrbShortBreakout { window_minutes, session_hour } => {
+                let low_key = Feature::SessionOpenLow(*window_minutes, *session_hour);
+                self.ensure(low_key.clone())?;
+                let lows = &self.cache[&low_key];
+                SparseMask::from_bools((0..self.close.len()).map(|i| {
+                    lows[i].is_some_and(|l| self.close[i] < l)
+                }))
+            }
             Rule::All(rules) | Rule::Any(rules) => {
                 let mut acc = self.evaluate(&rules[0])?;
                 for r in &rules[1..] {
@@ -767,9 +895,10 @@ pub enum Family {
     Volatility,
     Session,
     Confluence,
+    Orb,
 }
 impl Family {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::MeanReversion,
         Self::Momentum,
         Self::Breakout,
@@ -779,6 +908,7 @@ impl Family {
         Self::Volatility,
         Self::Session,
         Self::Confluence,
+        Self::Orb,
     ];
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -793,7 +923,7 @@ pub fn family_templates() -> Vec<Candidate> {
         for side in [Side::Long, Side::Short] {
             let long = side == Side::Long;
             for window in [5, 10, 20] {
-                for stop_ticks in [30, 100] {
+                for stop_ticks in [150, 200] {
                     for family in Family::ALL {
                         let rule = match family {
                             Family::MeanReversion => Rule::All(vec![
@@ -884,6 +1014,7 @@ pub fn family_templates() -> Vec<Candidate> {
                                     above: long,
                                 },
                             ]),
+                            Family::Orb => orb_rule(window, long),
                         };
                         out.push(Candidate {
                             family,
@@ -902,6 +1033,26 @@ pub fn family_templates() -> Vec<Candidate> {
         }
     }
     out
+}
+
+/// Build an ORB rule for the given window and side.
+///
+/// ORB (Opening Range Breakout): detects the session open, measures the high/low
+/// of the first `window_minutes` after open, then fires when price breaks beyond
+/// the range on the strategy's side. Session is determined by `session_hour`:
+///   0 = Asian (00:00 UTC), 8 = London (08:00 UTC), 13 = New York (13:00 UTC).
+fn orb_rule(window: usize, long: bool) -> Rule {
+    if long {
+        Rule::OrbLongBreakout {
+            window_minutes: window,
+            session_hour: 0, // Asian; region ramp will rotate sessions
+        }
+    } else {
+        Rule::OrbShortBreakout {
+            window_minutes: window,
+            session_hour: 0,
+        }
+    }
 }
 pub fn generate() -> Vec<Strategy> {
     family_templates().into_iter().map(|c| c.strategy).collect()
