@@ -929,6 +929,13 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
                 _ => 13u8,  // New York
             };
         }
+        // A small subset of regions use stop_ticks=30 (3 pips, below the
+        // 41-tick executable minimum) so proof-screening has infeasible-stop
+        // strategies to reject. These are risk-rejected on real data (no
+        // trades) but exercise the proof-rejection path.
+        if region % 50 == 0 {
+            s.stop_ticks = 30;
+        }
     } else {
         s.stop_ticks += (region / 300) as i64 * 200;
     }
