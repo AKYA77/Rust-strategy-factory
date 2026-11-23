@@ -8,7 +8,10 @@ from pathlib import Path
 MINIMUM_NET_WIN_RATE_BPS = 5000  # 50.00%
 MAXIMUM_CONSECUTIVE_LOSSES = 5
 PLANNED_RR_MILLI = 3000  # 3:1
-MINIMUM_RESOLVED_PER_YEAR = 0  # no floor specified for continuous diagnostic
+# The owner-approved per-year resolved floors (>=50 in 2025 and >=50 in 2026) apply to the
+# registered qualification path. A continuous diagnostic report carries no per-year split, so
+# no resolved-per-year floor is applied here; inventing one would assert a criterion this
+# report cannot measure.
 
 REPORT_PATHS = [
     "work/continuous-EURUSD.json",
