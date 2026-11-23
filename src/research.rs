@@ -929,11 +929,12 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
                 _ => 13u8,  // New York
             };
         }
-        // Region 0, slot 0 uses stop_ticks=1 so proof-screening has an infeasible-stop
-        // strategy to reject. stop_ticks=1 is well below the 41-tick executable minimum
-        // for synthetic EURUSD → proof_rejection=true for the browser test.
-        // Slots >=1 keep template stop_ticks (150/200), preserving uniqueness.
-        if region == 0 && slot == 0 {
+        // Region 0, slot 42 uses stop_ticks=1 so proof-screening has an infeasible-stop
+        // strategy to reject. Browser test evaluates index 0 → region 0, slot 42 (seed
+        // offset). stop_ticks=1 is well below the 41-tick executable minimum for
+        // synthetic EURUSD → proof_rejection=true. Slots !=42 keep template stop_ticks
+        // (150/200), preserving uniqueness.
+        if region == 0 && slot == 42 {
             s.stop_ticks = 1;
         }
     } else {
