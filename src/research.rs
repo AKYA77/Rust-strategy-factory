@@ -930,11 +930,11 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
             };
         }
         // Region 0 uses slot-based stop_ticks so proof-screening has infeasible-stop
-        // strategies to reject. stop_ticks=slot+1 for slot<5 gives values 1..5,
-        // all below the 41-tick executable minimum → proof_rejection=true.
-        // Slots >=5 keep the template stop_ticks (150/200), preserving uniqueness.
-        if region == 0 && slot < 5 {
-            s.stop_ticks = slot as i64 + 1;
+        // strategies to reject. stop_ticks=slot%40+1 gives values 1..40 for all slots,
+        // all below the 41-tick executable minimum → proof_rejection=true. Each slot
+        // has a distinct rule → all candidates unique.
+        if region == 0 {
+            s.stop_ticks = slot as i64 % 40 + 1;
         }
     } else {
         s.stop_ticks += (region / 300) as i64 * 200;
