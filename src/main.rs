@@ -936,6 +936,67 @@ fn run(args: &[String]) -> Result<()> {
                 "net_win_rate_bps": execution.totals.net_win_rate_bps,
             }))
         }
+        [
+            "historical-corpus-execute-registered-full-period",
+            root,
+            output_root,
+            instrument,
+            strategy,
+            costs,
+            max_candles,
+            feature_cells,
+            max_receipts,
+            training_window,
+            report,
+        ] => {
+            let spec = rust_strategy_factory::historical_corpus::register_research_window(
+                Path::new(root),
+                Path::new(output_root),
+                instrument,
+                &rust_strategy_factory::historical_corpus::ResearchWindow::OWNER_SELECTED,
+            )?;
+            let strategy: rust_strategy_factory::strategies::Strategy = read_json(strategy)?;
+            let costs: rust_strategy_factory::tick_engine::Costs = read_json(costs)?;
+            let max_candles: usize = max_candles.parse().map_err(|_| "invalid candle budget")?;
+            let feature_cells: usize = feature_cells
+                .parse()
+                .map_err(|_| "invalid feature budget")?;
+            let max_receipts: usize = max_receipts.parse().map_err(|_| "invalid receipt budget")?;
+            let training_window: rust_strategy_factory::validation::Interval =
+                read_json(training_window)?;
+            let execution =
+                rust_strategy_factory::historical_corpus::execute_registered_full_period(
+                    &spec,
+                    &strategy,
+                    &costs,
+                    rust_strategy_factory::tick_engine::CorpusBudget {
+                        max_candles,
+                        feature_cells,
+                        max_receipts,
+                    },
+                    Some(training_window),
+                )?;
+            save_replace(report, &execution)?;
+            print(&serde_json::json!({
+                "identity": execution.identity,
+                "instrument": execution.instrument,
+                "classification": execution.classification,
+                "eligibility": execution.eligibility,
+                "training_window": execution.training_window,
+                "months_executed": execution.totals.months_executed,
+                "trades": execution.totals.trades,
+                "ending_micro_usd": execution.totals.ending_micro_usd,
+                "net_pnl_micro_usd": execution.totals.net_pnl_micro_usd,
+                "full_period_max_drawdown_micro_usd": execution.totals.full_period_max_drawdown_micro_usd,
+                "wins": execution.totals.wins,
+                "losses": execution.totals.losses,
+                "breakevens": execution.totals.breakevens,
+                "continuous_max_losing_streak": execution.totals.continuous_max_losing_streak,
+                "net_win_rate_bps": execution.totals.net_win_rate_bps,
+                "unresolved_positions": execution.totals.unresolved_positions,
+                "report_hash": execution.report_hash,
+            }))
+        }
         ["scientific-validation", report @ ..] if !report.is_empty() => {
             let mut reports = Vec::with_capacity(report.len());
             for path in report {
