@@ -463,7 +463,11 @@ impl<'data> ComputeContext<'_, 'data> {
             };
             screen.version = "conservative-window-signals-v3-feature-scope".into();
         }
-        if !screen.requires_tick_verification {
+        // Don't skip market-stop proof when proof_policy is set: proof-screening
+        // must run even when the rule produces no visible signals (e.g. browser
+        // fixture with evaluation=None). requires_tick_verification gates normal
+        // tick replay, but proof-screening needs market_stop_proof regardless.
+        if !screen.requires_tick_verification && proof_policy.is_none() {
             return Ok(
                 serde_json::json!({"screen":screen,"tick_replay":null,"strategy":strategy,"data_manifest":d.manifest,"instrument_profile":d.profile,"cost_profile":costs,"evaluation":evaluation,"shadow_policy":shadow_policy,"proof_policy":proof_policy,"indexed_policy":indexed_policy}),
             );
