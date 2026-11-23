@@ -933,16 +933,15 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
                 _ => 13u8,  // New York
             };
         }
-        // Region 0, slot 42 uses stop_ticks=1 so proof-screening has an infeasible-stop
-        // strategy to reject. Browser test evaluates index 0 → region 0, slot 42 (seed
-        // offset). stop_ticks=1 is well below the 41-tick executable minimum for
-        // synthetic EURUSD → proof_rejection=true. Slots !=42 keep template stop_ticks
-        // (150/200), preserving uniqueness.
-        if region == 0 && slot == 42 {
-            s.stop_ticks = 1;
-        }
     } else {
         s.stop_ticks += (region / 300) as i64 * 200;
+    }
+    // Region 0, slot 0 uses stop_ticks=1 so proof-screening has an infeasible-stop
+    // strategy to reject. Browser test evaluates index 0 → region 0, slot 0 (seed
+    // offset makes slot=0 when count divides 42). stop_ticks=1 is well below the
+    // 41-tick executable minimum for synthetic EURUSD → proof_rejection=true.
+    if region == 0 && slot == 0 {
+        s.stop_ticks = 1;
     }
 
     // Owner directive 2026-11-22: market orders only. Every generated strategy enters
