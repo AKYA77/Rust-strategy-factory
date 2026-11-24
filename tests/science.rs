@@ -821,3 +821,85 @@ fn scientific_summary_preserves_full_width_counts_and_net_without_qualification(
     assert!(summary["candidates"][0]["evidence_gate"].is_null());
     std::fs::remove_dir_all(directory).unwrap();
 }
+
+#[test]
+fn real_structurally_valid_data_enters_frozen_protocol_pipeline() {
+    let directory = dir();
+    let path = directory.join("real-data.sqlite");
+    let mut registry = Registry::open(&path).unwrap();
+    let mut input = input();
+    input.dataset.manifest.class = data::DataClass::RealStructurallyValid;
+    input.dataset.manifest.archive_hash = "real-archive-v1".into();
+    input.dataset.manifest.content_hash = data::hash(&input.dataset.ticks).unwrap();
+    input.dataset.verify().unwrap();
+    assert_eq!(
+        input.dataset.manifest.class,
+        data::DataClass::RealStructurallyValid
+    );
+
+    let p = plan();
+    let budget = science::Budget {
+        feature_cells: 100000,
+        ..Default::default()
+    };
+    let result = science::execute(
+        &mut registry,
+        &input,
+        &p,
+        "real-data-revision",
+        &budget,
+    )
+    .unwrap();
+    assert!(!result.reused);
+    assert_eq!(result.report.status, "INSUFFICIENT_EVIDENCE");
+    assert_eq!(
+        result.report.data_class,
+        data::DataClass::RealStructurallyValid
+    );
+    assert_eq!(result.report.candidates[0].experiments.len(), 6);
+    assert!(result.report.candidates[0].pooled_oos_reset_fold_stats.closed > 0);
+    assert_eq!(result.report.candidates[0].failed_windows, 0);
+    assert_eq!(result.report.candidates[0].robustness.len(), 5);
+    // Numerical execution alone never qualifies; the report states what is still missing.
+    assert!(!result.report.missing_requirements.is_empty());
+    // Reproducibility: identical re-execution reuses the immutable frozen report.
+    let before = registry.counts().unwrap();
+    let again = science::execute(&mut registry, &input, &p, "real-data-revision", &budget).unwrap();
+    assert!(again.reused);
+    assert_eq!(result.report.protocol_id, again.report.protocol_id);
+    assert_eq!(before.attempts, registry.counts().unwrap().attempts);
+    registry.integrity().unwrap();
+    drop(registry);
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn real_data_below_the_structural_bar_is_still_refused() {
+    let directory = dir();
+    let path = directory.join("real-refused.sqlite");
+    let mut registry = Registry::open(&path).unwrap();
+    let mut input = input();
+    input.dataset.manifest.class = data::DataClass::RealUnreviewed;
+    input.dataset.verify().unwrap();
+    let error = science::execute(
+        &mut registry,
+        &input,
+        &plan(),
+        "fixed-code",
+        &science::Budget::default(),
+    )
+    .unwrap_err();
+    assert!(error.contains("real protected-final execution blocked"));
+    let conn = rusqlite::Connection::open(&path).unwrap();
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM scientific_protocols", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(count, 0);
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM instrument_holdouts", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(count, 0);
+    drop(conn);
+    drop(registry);
+    std::fs::remove_dir_all(directory).unwrap();
+}

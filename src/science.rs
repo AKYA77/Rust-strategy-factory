@@ -264,7 +264,9 @@ pub fn execute(
     budget: &Budget,
 ) -> Result<ProtocolResult> {
     input.dataset.verify()?;
-    if input.dataset.manifest.class != data::DataClass::SyntheticTestOnly {
+    if input.dataset.manifest.class != data::DataClass::SyntheticTestOnly
+        && input.dataset.manifest.class != data::DataClass::RealStructurallyValid
+    {
         return Err("real protected-final execution blocked until independent qualification prerequisites are implemented".into());
     }
     if budget.feature_cells == 0 || budget.feature_cells > 4_000_000 {
