@@ -197,15 +197,20 @@ mod tests {
     fn make_profile() -> Profile {
         Profile {
             symbol: "EURUSD".to_string(),
+            version: "test-v1".into(),
             base: "EUR".to_string(),
             quote: "USD".to_string(),
-            tick: 100,
-            lot_size: 100000,
-            min_lot: 1000,
-            lot_step: 1000,
-            margin_currency: "USD".to_string(),
-            point: 100,
-            digits: 5,
+            price_scale: 100_000,
+            tick: 1,
+            pip: 10,
+            contract_units: 100_000,
+            min_micro_lots: 10,
+            step_micro_lots: 10,
+            max_micro_lots: 1_000_000,
+            leverage: 100,
+            min_stop_ticks: 1,
+            provenance: "test".into(),
+            research_only: false,
         }
     }
 
