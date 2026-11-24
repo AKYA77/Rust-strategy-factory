@@ -7,8 +7,8 @@ use rust_strategy_factory::historical_catalog::{self};
 use rust_strategy_factory::historical_corpus::{self, EXPECTED_MONTHS, ResearchWindow};
 use std::path::Path;
 
-const INSTRUMENTS: [&str; 8] = [
-    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD", "XAUUSD",
+const INSTRUMENTS: [&str; 7] = [
+    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD",
 ];
 
 #[test]
@@ -39,7 +39,7 @@ fn real_corpus_end_to_end() {
         historical_catalog::scan_catalog(catalog_root, output, &INSTRUMENTS, EXPECTED_MONTHS)
             .unwrap();
     catalog.verify().unwrap();
-    assert_eq!(catalog.instruments.len(), 8);
+    assert_eq!(catalog.instruments.len(), 7);
     assert!(catalog.instruments.iter().all(|i| i.structural_valid));
     assert!(catalog.instruments.iter().all(|i| !i.eligible_for_research));
     let usdcad = catalog

@@ -74,12 +74,9 @@ fn profiles_and_exact_decimals() {
             .unwrap(),
         150123
     );
-    let gold = Profile::synthetic("XAUUSD").unwrap();
-    assert_eq!(gold.price("2500.12").unwrap(), 250012);
-    assert_eq!(
-        contracts::pnl(&gold, 100, 1_000_000, Conversion::usd()).unwrap(),
-        100_000_000
-    );
+    // Final seven-instrument scope (V2 mandate): gold profiles are rejected,
+    // never silently rescaled into an FX convention.
+    assert!(Profile::synthetic("XAUUSD").is_err());
     let eur = Profile::synthetic("EURUSD").unwrap();
     assert_eq!(
         contracts::pnl(&eur, 100, 10_000, Conversion::usd()).unwrap(),

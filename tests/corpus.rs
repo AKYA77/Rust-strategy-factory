@@ -163,7 +163,7 @@ fn source_revisions_reordering_mixed_profiles_and_oversized_chunks_fail_closed()
 }
 #[test]
 fn actual_cli_creation_inventory_and_relocation_preserve_identity_and_original_artifacts() {
-    let f = Fixture::new("cli", "XAUUSD", 7);
+    let f = Fixture::new("cli", "GBPUSD", 7);
     let spec_path = f.root.join("corpus.json");
     let out = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
         .args(["corpus-create", spec_path.to_str().unwrap()])
@@ -435,7 +435,7 @@ fn corpus_account_replay_matches_all_materialized_receipt_fields() {
         tick_engine::{self, CorpusBudget, Costs},
     };
     let mut trades = 0;
-    for symbol in ["EURUSD", "XAUUSD"] {
+    for symbol in ["EURUSD", "GBPUSD"] {
         let f = Fixture::new("account-parity", symbol, 2);
         for entry in [
             None,
@@ -1851,7 +1851,7 @@ fn corpus_fleet_fixture(first: &Fixture, second: &Fixture) -> std::path::PathBuf
 fn multi_corpus_fleet_rotates_after_each_round_and_preserves_full_scalar_receipts() {
     use rust_strategy_factory::{corpus_fleet, operator_config, storage::Registry, tick_engine};
     let first = Fixture::new("fleet-parity", "EURUSD", 7);
-    let second = Fixture::new("fleet-parity", "XAUUSD", 7);
+    let second = Fixture::new("fleet-parity", "GBPUSD", 7);
     let file = corpus_fleet_fixture(&first, &second);
     let db = first.root.join("fleet.sqlite");
     let id = corpus_fleet::register_file(&file, &db).unwrap();
@@ -1919,7 +1919,7 @@ fn multi_corpus_fleet_rotates_after_each_round_and_preserves_full_scalar_receipt
 fn missing_corpus_is_isolated_while_other_input_finishes_then_restores() {
     use rust_strategy_factory::{corpus_fleet, storage::Registry};
     let first = Fixture::new("fleet-blocked", "EURUSD", 7);
-    let second = Fixture::new("fleet-blocked", "XAUUSD", 7);
+    let second = Fixture::new("fleet-blocked", "GBPUSD", 7);
     let file = corpus_fleet_fixture(&first, &second);
     let db = first.root.join("fleet.sqlite");
     let id = corpus_fleet::register_file(&file, &db).unwrap();
@@ -1966,7 +1966,7 @@ fn missing_corpus_is_isolated_while_other_input_finishes_then_restores() {
 fn fleet_backup_rotation_and_terminal_control_are_durable() {
     use rust_strategy_factory::{corpus_fleet, storage::Registry};
     let first = Fixture::new("fleet-backup", "EURUSD", 7);
-    let second = Fixture::new("fleet-backup", "XAUUSD", 7);
+    let second = Fixture::new("fleet-backup", "GBPUSD", 7);
     let file = corpus_fleet_fixture(&first, &second);
     let db = first.root.join("original.sqlite");
     let backup = first.root.join("backup.sqlite");
@@ -1993,7 +1993,7 @@ fn fleet_backup_rotation_and_terminal_control_are_durable() {
 fn fleet_source_identity_changes_block_one_input_but_runtime_worker_changes_do_not() {
     use rust_strategy_factory::{corpus_fleet, corpus_search, storage::Registry};
     let first = Fixture::new("fleet-config", "EURUSD", 7);
-    let second = Fixture::new("fleet-config", "XAUUSD", 7);
+    let second = Fixture::new("fleet-config", "GBPUSD", 7);
     let file = corpus_fleet_fixture(&first, &second);
     let db = first.root.join("fleet.sqlite");
     let id = corpus_fleet::register_file(&file, &db).unwrap();
@@ -2051,7 +2051,7 @@ fn fleet_duplicate_inputs_and_global_resource_pressure_do_not_start_searches() {
 fn fleet_cli_restarts_at_next_input_and_stops_with_terminal_budget() {
     let _fleet_timing = fleet_timing_guard();
     let first = Fixture::new("fleet-cli", "EURUSD", 7);
-    let second = Fixture::new("fleet-cli", "XAUUSD", 7);
+    let second = Fixture::new("fleet-cli", "GBPUSD", 7);
     let file = corpus_fleet_fixture(&first, &second);
     let db = first.root.join("fleet.sqlite");
     let initialized = Command::new(env!("CARGO_BIN_EXE_rust-strategy-factory"))
@@ -2162,7 +2162,7 @@ fn disk_pressure_sessions_refuse_before_registration_and_resume_with_unchanged_k
 fn fleet_disk_guard_preserves_cursor_and_isolates_one_source_until_policy_restored() {
     use rust_strategy_factory::{corpus_fleet, storage::Registry};
     let first = Fixture::new("disk-fleet", "EURUSD", 7);
-    let second = Fixture::new("disk-fleet", "XAUUSD", 7);
+    let second = Fixture::new("disk-fleet", "GBPUSD", 7);
     let file = corpus_fleet_fixture(&first, &second);
     let db = first.root.join("fleet.sqlite");
     let mut config: serde_json::Value = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
@@ -3166,7 +3166,7 @@ fn owned_fleet_rotation_preserves_scalar_receipts_exact_cost_observations_and_ba
     let _fleet_timing = fleet_timing_guard();
     use rust_strategy_factory::{corpus_fleet, operator_config, storage::Registry, tick_engine};
     let first = Fixture::new("owned-fleet-parity", "EURUSD", 7);
-    let second = Fixture::new("owned-fleet-parity", "XAUUSD", 7);
+    let second = Fixture::new("owned-fleet-parity", "GBPUSD", 7);
     let file = corpus_fleet_fixture(&first, &second);
     let db = first.root.join("fleet.sqlite");
     let id = corpus_fleet::register_file(&file, &db).unwrap();
@@ -3283,7 +3283,7 @@ fn owned_fleet_rotation_preserves_scalar_receipts_exact_cost_observations_and_ba
 fn owned_fleet_rejects_insufficient_coordinator_lease_before_claim_or_spawn() {
     use rust_strategy_factory::{corpus_fleet, storage::Registry};
     let first = Fixture::new("owned-fleet-lease", "EURUSD", 7);
-    let second = Fixture::new("owned-fleet-lease", "XAUUSD", 7);
+    let second = Fixture::new("owned-fleet-lease", "GBPUSD", 7);
     let file = corpus_fleet_fixture(&first, &second);
     let db = first.root.join("fleet.sqlite");
     let id = corpus_fleet::register_file(&file, &db).unwrap();
@@ -3311,7 +3311,7 @@ fn owned_fleet_rejects_insufficient_coordinator_lease_before_claim_or_spawn() {
 fn owned_fleet_link_failure_keeps_child_evidence_and_rolls_back_rotation_prefix() {
     use rust_strategy_factory::{corpus_fleet, storage::Registry};
     let first = Fixture::new("owned-fleet-link", "EURUSD", 7);
-    let second = Fixture::new("owned-fleet-link", "XAUUSD", 7);
+    let second = Fixture::new("owned-fleet-link", "GBPUSD", 7);
     let file = corpus_fleet_fixture(&first, &second);
     let db = first.root.join("fleet.sqlite");
     let id = corpus_fleet::register_file(&file, &db).unwrap();
@@ -3354,7 +3354,7 @@ fn owned_fleet_link_failure_keeps_child_evidence_and_rolls_back_rotation_prefix(
 fn owned_fleet_isolates_missing_input_and_never_overrides_operator_source_pause() {
     use rust_strategy_factory::{corpus_fleet, corpus_search, storage::Registry};
     let first = Fixture::new("owned-fleet-isolation", "EURUSD", 7);
-    let second = Fixture::new("owned-fleet-isolation", "XAUUSD", 7);
+    let second = Fixture::new("owned-fleet-isolation", "GBPUSD", 7);
     let file = corpus_fleet_fixture(&first, &second);
     let db = first.root.join("fleet.sqlite");
     let id = corpus_fleet::register_file(&file, &db).unwrap();
@@ -3737,7 +3737,7 @@ fn block_account_replay_preserves_every_market_stop_limit_receipt_and_nonzero_tr
         tick_engine::{self, CorpusBudget, Costs},
     };
     let mut trades = 0;
-    for symbol in ["EURUSD", "XAUUSD"] {
+    for symbol in ["EURUSD", "GBPUSD"] {
         let f = Fixture::new("blocks-account", symbol, 7);
         let spec = block_spec(&f, false);
         for entry in [
@@ -4855,7 +4855,7 @@ fn rotation_fixture(
     PathBuf,
 ) {
     let euro = Fixture::new(&format!("rotation-euro-{label}"), "EURUSD", 3);
-    let gold = Fixture::new(&format!("rotation-gold-{label}"), "XAUUSD", 2);
+    let gold = Fixture::new(&format!("rotation-gold-{label}"), "GBPUSD", 2);
     let (_, db, first, policy, limits) = campaign_owned_fixture(&euro, 2);
     let config = corpus_search_fixture(&gold);
     let mut file: serde_json::Value = serde_json::from_slice(&fs::read(&config).unwrap()).unwrap();

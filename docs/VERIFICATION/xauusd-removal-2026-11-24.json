@@ -1,0 +1,1888 @@
+{
+  "class": "XAUUSD_ONLY_DATA_REMOVAL_V2",
+  "mandate": "Hermes V2 handover 2026-11-24, appendix p. 02 (P0 gold removal)",
+  "executed_at_utc": "2026-11-24T17:57:11.080055+00:00",
+  "roots_scanned": [
+    "/root/workspace/historical-migration-output/full-100k",
+    "/root/workspace/historical-migration-output/full"
+  ],
+  "retained_fx_partitions_checked": 308,
+  "retained_fx_partitions_full_100k": 154,
+  "retained_fx_files": 3751,
+  "retained_fx_bytes": 17549426075,
+  "retained_fx_sha256_by_partition": {
+    "full-100k/AUDUSD-202501": {
+      "sha256": "57fa003532031635a03b87178c857929954d20c68a013d42641116ce05091672",
+      "files": 18,
+      "bytes": 53422325
+    },
+    "full-100k/AUDUSD-202502": {
+      "sha256": "7159a3d724d413feddc0574b79c60db75b5dd7becdb98fa5e008e6a64fe8ced5",
+      "files": 14,
+      "bytes": 40912022
+    },
+    "full-100k/AUDUSD-202503": {
+      "sha256": "51e1fe9e05588f549f4c1a1348c48ff6545c4e29f6bda123cd9c60919024f2af",
+      "files": 16,
+      "bytes": 46450869
+    },
+    "full-100k/AUDUSD-202504": {
+      "sha256": "c1108768e2c776f550fd95b06e4af83eb24856c0690986bfac12ed71ec828d80",
+      "files": 32,
+      "bytes": 97966514
+    },
+    "full-100k/AUDUSD-202505": {
+      "sha256": "e2421ca68d93a495dad7ead03cf627d1d5062c58b70991ac8b67317692e9ebaf",
+      "files": 15,
+      "bytes": 42357440
+    },
+    "full-100k/AUDUSD-202506": {
+      "sha256": "5cc7e2976c2793a93a9e8245453d82b6260efaaf87d91e05332cc161e5ee4c4a",
+      "files": 14,
+      "bytes": 39966241
+    },
+    "full-100k/AUDUSD-202507": {
+      "sha256": "c5d24cfaad35cad7e6c8320432a75bb7b101e7a572480b4ee45141ececddd367",
+      "files": 14,
+      "bytes": 40130977
+    },
+    "full-100k/AUDUSD-202508": {
+      "sha256": "aedb44a3b1266638563bf5bcc205031cb68ad294d19256e09bbad79e65dce53e",
+      "files": 11,
+      "bytes": 31587007
+    },
+    "full-100k/AUDUSD-202509": {
+      "sha256": "02abc12f590b796e99e3280687a71b91bb63d21f04d83b2e24536f51b25db9b6",
+      "files": 12,
+      "bytes": 34339330
+    },
+    "full-100k/AUDUSD-202510": {
+      "sha256": "fef6a4751379d721bf489c1707205802236bc2a46e672a650f6a6d8ecf3e39f4",
+      "files": 14,
+      "bytes": 40495014
+    },
+    "full-100k/AUDUSD-202511": {
+      "sha256": "a483717619193316325a9e0a8c6c2985c7aa6d8b9782f57f1fd43c8240309d1b",
+      "files": 13,
+      "bytes": 37028995
+    },
+    "full-100k/AUDUSD-202512": {
+      "sha256": "af7ef2c21193ee4f146a386e97c07febd361f7e5b11c689f104b7d9b9d21976d",
+      "files": 12,
+      "bytes": 34753443
+    },
+    "full-100k/AUDUSD-202601": {
+      "sha256": "4ca90f23486f977b5c7b36f4e1c8d3a13e0c2ad66eb68c9e41212579d17c8402",
+      "files": 15,
+      "bytes": 43007966
+    },
+    "full-100k/AUDUSD-202602": {
+      "sha256": "a7e72c058873ac3d8cafd8d7a89c23d2f139532973237e6caa8c4d7a3463a577",
+      "files": 18,
+      "bytes": 52758035
+    },
+    "full-100k/AUDUSD-202603": {
+      "sha256": "815b0ba2a3aafeecd61d8a22eb68d4e0fa567179d5184a30532aa65735c1bffc",
+      "files": 35,
+      "bytes": 105927510
+    },
+    "full-100k/AUDUSD-202604": {
+      "sha256": "3df8e1464d7d63a0322082c5d928ce32953c0062aef4c3ec563f19a4b41ab406",
+      "files": 21,
+      "bytes": 61023451
+    },
+    "full-100k/AUDUSD-202605": {
+      "sha256": "6d610e54dca9c08ccd046977e9f5277ea1bee4f2e81573b10ccd9a87b64eaaa7",
+      "files": 17,
+      "bytes": 49210755
+    },
+    "full-100k/AUDUSD-202606": {
+      "sha256": "e5352e8de86b81e231c8b847eb0ef6e198d42d21f4612b319ec0ca5689a07f2e",
+      "files": 19,
+      "bytes": 55171659
+    },
+    "full-100k/AUDUSD-202607": {
+      "sha256": "1d0739db17e7444a79df1f0b3c231e55d1e8705152f6880893cc26e977f9146c",
+      "files": 16,
+      "bytes": 45436670
+    },
+    "full-100k/AUDUSD-202608": {
+      "sha256": "5ea43510fa94fe15c4e4440be0dab5fc4f8c48eaa8cf02c7328cc05c943fa37e",
+      "files": 11,
+      "bytes": 29345538
+    },
+    "full-100k/AUDUSD-202609": {
+      "sha256": "747db126d2ceb90a0a681ee4210e9a47cfca848c91b9c84aead956ec9ca25643",
+      "files": 13,
+      "bytes": 37319117
+    },
+    "full-100k/AUDUSD-202610": {
+      "sha256": "e9ed4d5f80bf3ceea53b2fe1de84d0865ac9fb55923ae8cf621cf288de428f95",
+      "files": 18,
+      "bytes": 54027941
+    },
+    "full-100k/EURUSD-202501": {
+      "sha256": "08b3d2436928a851ef3c936b95ae535c7976b9fe92ccefd0ca021b22c03c8bb5",
+      "files": 24,
+      "bytes": 73106497
+    },
+    "full-100k/EURUSD-202502": {
+      "sha256": "a6d29daddb5d747843c4dbbc70a3b76a12bf25586bef5d4c89a0a623d6afd557",
+      "files": 22,
+      "bytes": 65743679
+    },
+    "full-100k/EURUSD-202503": {
+      "sha256": "881cfec35b0c53693091ad7c357ab6b9524b720ee1b982f8aa0c5ed7fdd2aa46",
+      "files": 25,
+      "bytes": 75351420
+    },
+    "full-100k/EURUSD-202504": {
+      "sha256": "185845276d1f503cd64a8b1587077a06ff06f86d200a42b7dd5cca08a21c3ca5",
+      "files": 41,
+      "bytes": 125414955
+    },
+    "full-100k/EURUSD-202505": {
+      "sha256": "55e122902c15ae507fa80ad59ced757d7f6faef212c4a7a73e34ca1b9ad27328",
+      "files": 26,
+      "bytes": 77237529
+    },
+    "full-100k/EURUSD-202506": {
+      "sha256": "7be2c64640c71491dec4be7cdf9f26c326af6aa0c090ba0549dd48f90dd1b938",
+      "files": 22,
+      "bytes": 65458572
+    },
+    "full-100k/EURUSD-202507": {
+      "sha256": "3422a8b03f863ae32f2a0b91190b3e05e7b5a7f25152eadae12f2118d944b463",
+      "files": 17,
+      "bytes": 49815921
+    },
+    "full-100k/EURUSD-202508": {
+      "sha256": "413d9b8e24e376950714e72fad45ef5860e2dd928a3c459421aa550a927c4f1f",
+      "files": 15,
+      "bytes": 42858803
+    },
+    "full-100k/EURUSD-202509": {
+      "sha256": "b591b70c0069ec3bd0963170dc98b2e0f7314ffd7a1f416cf9c1e35ab1b2794d",
+      "files": 16,
+      "bytes": 47825332
+    },
+    "full-100k/EURUSD-202510": {
+      "sha256": "278184ec6a81e582168658d396377152970d175934faf16268b12cd44ca45ad3",
+      "files": 16,
+      "bytes": 47443706
+    },
+    "full-100k/EURUSD-202511": {
+      "sha256": "a365a915455c35b719f0606c3200fb3f9e5473442bb0e47786a966bdfa628355",
+      "files": 14,
+      "bytes": 39776822
+    },
+    "full-100k/EURUSD-202512": {
+      "sha256": "0d83e2dcfefdc655526f9a60d69bc76f2463033a3904d9a49acd0131961685e6",
+      "files": 14,
+      "bytes": 41085365
+    },
+    "full-100k/EURUSD-202601": {
+      "sha256": "cf6f4e8d0fa8e427346161b5698d306d2050019f62e152b7baa5e3ead667877d",
+      "files": 17,
+      "bytes": 48232602
+    },
+    "full-100k/EURUSD-202602": {
+      "sha256": "55e05fdefcc61e645aa03a82790fbe4c34f8eec7b752046095cea43894200730",
+      "files": 15,
+      "bytes": 42591711
+    },
+    "full-100k/EURUSD-202603": {
+      "sha256": "5aa166a23890939ff7dcdb13263c0356195065aa0570ff611e474bb23c4a32bd",
+      "files": 28,
+      "bytes": 84523623
+    },
+    "full-100k/EURUSD-202604": {
+      "sha256": "2b38da780697360cd42714c83f3a6d4320689a54f719e510505f4983366cb03c",
+      "files": 21,
+      "bytes": 61270959
+    },
+    "full-100k/EURUSD-202605": {
+      "sha256": "96e0c66e263f659c374bc7d4abbe8299a1f82578b8106590ea12ff591c6ecedc",
+      "files": 16,
+      "bytes": 46233752
+    },
+    "full-100k/EURUSD-202606": {
+      "sha256": "2196ac9ebc43222bf3b1cf87815b0f4f8e7710f1c224d457098e7e077983b8bc",
+      "files": 16,
+      "bytes": 45501531
+    },
+    "full-100k/EURUSD-202607": {
+      "sha256": "6bb2dfe4029cd7e4388e4ac2e75327c19dd20eea9040138d5c8b070c2f9e8308",
+      "files": 15,
+      "bytes": 44213326
+    },
+    "full-100k/EURUSD-202608": {
+      "sha256": "5c96b4496c21dca8ff1f3e0caf29ff17e3fd863441148136e7a25275c57dd955",
+      "files": 12,
+      "bytes": 33714051
+    },
+    "full-100k/EURUSD-202609": {
+      "sha256": "07cb1d5c0b3f991b134cdd9c5eda1fd16e869bd3a97fc4f954711c7ace7c9be6",
+      "files": 15,
+      "bytes": 44492308
+    },
+    "full-100k/EURUSD-202610": {
+      "sha256": "5a0fb846758a1bcdb6016080d639be7ec874d247accb7e9cd2820c439118f7cd",
+      "files": 20,
+      "bytes": 57818443
+    },
+    "full-100k/GBPUSD-202501": {
+      "sha256": "a96be16c853ec247c23bf79091129cdb9a413051190d3060a876541ac4864c53",
+      "files": 28,
+      "bytes": 85173113
+    },
+    "full-100k/GBPUSD-202502": {
+      "sha256": "53dd07ddfa1419bf9cdaf64d55bd60b00f7497d76ccda6c4c8d059ea16726572",
+      "files": 23,
+      "bytes": 70225502
+    },
+    "full-100k/GBPUSD-202503": {
+      "sha256": "93d48046462d531803ed67036f72e0f8a193bf14d7adbad341e281643b111799",
+      "files": 22,
+      "bytes": 66563775
+    },
+    "full-100k/GBPUSD-202504": {
+      "sha256": "65d490ff34cb3487779d8ca47c478c055bf6f8453b0a9877cfa5e9aa7f9378aa",
+      "files": 38,
+      "bytes": 116212205
+    },
+    "full-100k/GBPUSD-202505": {
+      "sha256": "a5000000024afe0fc8362fc9abdba0973ebbff38ecc497cc0c57cde745ac28b3",
+      "files": 21,
+      "bytes": 62867469
+    },
+    "full-100k/GBPUSD-202506": {
+      "sha256": "996abb353cc37c636c03492edd3ca9f1784bbbfb4aa363997f22389b4c088ca3",
+      "files": 20,
+      "bytes": 58632492
+    },
+    "full-100k/GBPUSD-202507": {
+      "sha256": "cf0aff52d3929df1be65c9b941df0f732256a11a8a1b3d614851f779de2f70d3",
+      "files": 20,
+      "bytes": 58288364
+    },
+    "full-100k/GBPUSD-202508": {
+      "sha256": "99ff1f806ee713c594c433649aeb38fa303cba7e66a8d70003ece2f834e3a3b2",
+      "files": 16,
+      "bytes": 46570770
+    },
+    "full-100k/GBPUSD-202509": {
+      "sha256": "19a691f91fe3a249d56c3994cf1d3c5fef2f42ffb37a1a9cbafc0d0d6477ca8d",
+      "files": 18,
+      "bytes": 54006384
+    },
+    "full-100k/GBPUSD-202510": {
+      "sha256": "c90ac2204ddf792b4240d85705f739695c9de331799b66ebd1f8a07d30cec344",
+      "files": 19,
+      "bytes": 57278646
+    },
+    "full-100k/GBPUSD-202511": {
+      "sha256": "11680fa9c0c33e5af5ee2c2fdf053ebbd027ba35a712dfdc46133caf2037e37b",
+      "files": 18,
+      "bytes": 53640913
+    },
+    "full-100k/GBPUSD-202512": {
+      "sha256": "84cdfeeb08ee21ec4d5c620aa888c6759ac2c7de0162c4ce7292a4056fcd66f5",
+      "files": 18,
+      "bytes": 51975471
+    },
+    "full-100k/GBPUSD-202601": {
+      "sha256": "bb528f5427383572bd0eb6c17f013d21eaced5a9f8694effd5fd4b1f6169c3b8",
+      "files": 20,
+      "bytes": 57897418
+    },
+    "full-100k/GBPUSD-202602": {
+      "sha256": "d02c64012d1d561896f5b60ee699f72213c4fc72a2fd61b996a0ce195d767dfa",
+      "files": 18,
+      "bytes": 52233586
+    },
+    "full-100k/GBPUSD-202603": {
+      "sha256": "7226b945a1ff0a4706319884cac391b9ae218307478b9d58dfefb69433ae3ee5",
+      "files": 34,
+      "bytes": 102681980
+    },
+    "full-100k/GBPUSD-202604": {
+      "sha256": "cc85ebebd5368d5940bea8dc1f43e99cb517d1f2341c36c5f184586cd6d506ac",
+      "files": 25,
+      "bytes": 76129641
+    },
+    "full-100k/GBPUSD-202605": {
+      "sha256": "3c7d860a580530020f40e9ca95550b28991c717629741950c4579359ca403075",
+      "files": 21,
+      "bytes": 61079530
+    },
+    "full-100k/GBPUSD-202606": {
+      "sha256": "eed686d537681dd531f84fe6f62f86a5e76bafe4b64be564e70d3d43711bb211",
+      "files": 21,
+      "bytes": 63887286
+    },
+    "full-100k/GBPUSD-202607": {
+      "sha256": "10d288c4ad3a14d5c4548c4657eccfc3c3d135e0058511c8dee579d7462fe34d",
+      "files": 24,
+      "bytes": 70908646
+    },
+    "full-100k/GBPUSD-202608": {
+      "sha256": "d4583965b007f2e957e64c5cad28d8c76c212fa5c546d539298c2b1507a263f3",
+      "files": 18,
+      "bytes": 51758483
+    },
+    "full-100k/GBPUSD-202609": {
+      "sha256": "d96e64902a33d687b6a9378ab477f2dd77cd95b562835a4c4d34bc58b2133468",
+      "files": 21,
+      "bytes": 62213185
+    },
+    "full-100k/GBPUSD-202610": {
+      "sha256": "defec55e9f7509094362313a441ab79e6bdfe7e5653b3860f6f78ffa8bd25dca",
+      "files": 22,
+      "bytes": 66510339
+    },
+    "full-100k/NZDUSD-202501": {
+      "sha256": "f41f04dbb7ed8ad1563f8b17a6f0f44e26b496746d142bd7a9d30f00260c9c93",
+      "files": 15,
+      "bytes": 43115750
+    },
+    "full-100k/NZDUSD-202502": {
+      "sha256": "65abb0baf232abb334f5994c37f7fd09f900c3b190ce677bb1abf2547a796ce9",
+      "files": 13,
+      "bytes": 37364407
+    },
+    "full-100k/NZDUSD-202503": {
+      "sha256": "1c70ffd730e4877f0055d71bddb1065c4f4e73a8b6b9e0f5406831220ae8143a",
+      "files": 13,
+      "bytes": 37799572
+    },
+    "full-100k/NZDUSD-202504": {
+      "sha256": "29a7cd5d71bc482bbf90d437d7972d7117da3905579411cb580523b7133de870",
+      "files": 26,
+      "bytes": 79375285
+    },
+    "full-100k/NZDUSD-202505": {
+      "sha256": "c3157fca6e8fb3f444605ddd2f27d4c9c386a3acffbf00fb63020e72083dfa8f",
+      "files": 14,
+      "bytes": 40002921
+    },
+    "full-100k/NZDUSD-202506": {
+      "sha256": "63ad65a42c87efd35cecb23020b083ee932d51e1c9ee3b0087ac15125ef8bd28",
+      "files": 14,
+      "bytes": 39481155
+    },
+    "full-100k/NZDUSD-202507": {
+      "sha256": "880033552f0e520e1455c9eccf48471b018a51b2c5a1916fc4cf30b324befb5a",
+      "files": 13,
+      "bytes": 36760771
+    },
+    "full-100k/NZDUSD-202508": {
+      "sha256": "a5ce4aeb6a0e112a1783992100dedf9420c91a1893c881bbed532384c62b95c7",
+      "files": 11,
+      "bytes": 29007579
+    },
+    "full-100k/NZDUSD-202509": {
+      "sha256": "fcbc62f50baa78c1f85e959c98cdd1ae5051901f3df87ed5fead7c063f368aa0",
+      "files": 11,
+      "bytes": 29375680
+    },
+    "full-100k/NZDUSD-202510": {
+      "sha256": "d7bb980ee7b80b669670c0a1af16a24c2fc72d523626c2ea23ceb7d3b947f935",
+      "files": 11,
+      "bytes": 31535941
+    },
+    "full-100k/NZDUSD-202511": {
+      "sha256": "7678e07dc569473cae96210599f3e807411ade6ce3f4572c3746ea7dcfbe5e8b",
+      "files": 11,
+      "bytes": 30795297
+    },
+    "full-100k/NZDUSD-202512": {
+      "sha256": "fa04ceb4a3de085237726f18a76c31a57377ecb846c34269016378751e23ad9a",
+      "files": 10,
+      "bytes": 28075973
+    },
+    "full-100k/NZDUSD-202601": {
+      "sha256": "de64ee549832b9d71563d046fa38ebcbafa03c6dc7643be5e0394f26854fd14e",
+      "files": 13,
+      "bytes": 37367107
+    },
+    "full-100k/NZDUSD-202602": {
+      "sha256": "8498b9f7b1b759a42ebbb53f7cd14c0f10b4e88ca1ef77a2a389c9a72b78bd6e",
+      "files": 14,
+      "bytes": 39200448
+    },
+    "full-100k/NZDUSD-202603": {
+      "sha256": "98ec772536eb845849aa73b53a1e6071140ed786507f9e22b537dab8c953cbce",
+      "files": 22,
+      "bytes": 65315172
+    },
+    "full-100k/NZDUSD-202604": {
+      "sha256": "b072723691db76f786c64cea51ce24b3a2021f89fee00f03623bc7b2f8b2142b",
+      "files": 14,
+      "bytes": 38825344
+    },
+    "full-100k/NZDUSD-202605": {
+      "sha256": "15c0e462fe1ca3a24a66daaa1405d3246f2ed5855e6c3050ca0da93ec2c0e0e6",
+      "files": 14,
+      "bytes": 38650879
+    },
+    "full-100k/NZDUSD-202606": {
+      "sha256": "f2eaa169ac936b70910801c5c2e707b93bc1f41fe9aac7feac3a6756f101fafd",
+      "files": 15,
+      "bytes": 43300942
+    },
+    "full-100k/NZDUSD-202607": {
+      "sha256": "68f0e20ba777629af2987bf771aad4a7fb536f38fc60ca51e050a6f011e3a7ce",
+      "files": 16,
+      "bytes": 46083583
+    },
+    "full-100k/NZDUSD-202608": {
+      "sha256": "cc86ada267a8cdadd448d65935498c15f61a705e20205292b2a63b81a5613bfc",
+      "files": 13,
+      "bytes": 37326131
+    },
+    "full-100k/NZDUSD-202609": {
+      "sha256": "ec607e824cdd5230a17ea7adb5e2e7f76680f704115e5bc92b93012171535e20",
+      "files": 16,
+      "bytes": 44840884
+    },
+    "full-100k/NZDUSD-202610": {
+      "sha256": "738b04823c33b29dab036a85ff98975e6ee2ac05fa417fdeebdf3eaabb5ca8ce",
+      "files": 17,
+      "bytes": 49591620
+    },
+    "full-100k/USDCAD-202501": {
+      "sha256": "1cad934704226109b0ec24e7df59e2fa5e5871712cf338fed4c347ac85332217",
+      "files": 26,
+      "bytes": 79867477
+    },
+    "full-100k/USDCAD-202502": {
+      "sha256": "c1b6ee328b4b773892355d6383de4dd50f4b764e2d3c45247968165a36303ea4",
+      "files": 24,
+      "bytes": 72347335
+    },
+    "full-100k/USDCAD-202503": {
+      "sha256": "2ded837cf19df72fba82d6f7f5908cf4546b67e9d93294c3a4f862f695bfeb21",
+      "files": 28,
+      "bytes": 86280284
+    },
+    "full-100k/USDCAD-202504": {
+      "sha256": "ccf9acbd5cb7775569027f10a76b179cf23568f62c4841bdd2f872e84136ccce",
+      "files": 35,
+      "bytes": 108030013
+    },
+    "full-100k/USDCAD-202505": {
+      "sha256": "0eaae4c2b7ff61150fe910ef4a54feb2803a4ce038d268ef4a3e2ae264b9c3f0",
+      "files": 17,
+      "bytes": 48489615
+    },
+    "full-100k/USDCAD-202506": {
+      "sha256": "d804fd848f38e734609e680ad048943297d5a810cfccaaf5199dc57f7d6533a3",
+      "files": 17,
+      "bytes": 49356977
+    },
+    "full-100k/USDCAD-202507": {
+      "sha256": "13f2ccd8a09123adc2b1f0d09dc1bd1c145c0cf0e37e887f54225caa6f7a1d03",
+      "files": 17,
+      "bytes": 50377843
+    },
+    "full-100k/USDCAD-202508": {
+      "sha256": "4a396873401a1e36c09b8cec18563151649e348ef5a8293c44b54ea43979788f",
+      "files": 15,
+      "bytes": 43891856
+    },
+    "full-100k/USDCAD-202509": {
+      "sha256": "7e3a6c888da2754364be5b426d3d1fc356f9b316c7d04f0162daaac6b777bdba",
+      "files": 16,
+      "bytes": 46670481
+    },
+    "full-100k/USDCAD-202510": {
+      "sha256": "969ad4b715a3c6fd91759bd5a3a28936c315c08851b44f89d00b90881b66946b",
+      "files": 17,
+      "bytes": 50973050
+    },
+    "full-100k/USDCAD-202511": {
+      "sha256": "63c5e4f3cdfa266ff3987383373b7f923052b85e5d117772bb6687d4f9c114c6",
+      "files": 18,
+      "bytes": 52370002
+    },
+    "full-100k/USDCAD-202512": {
+      "sha256": "a68fc385030bd52bf693501e9a3b82385e6f3172592c5513b133958aeb5e1f1e",
+      "files": 18,
+      "bytes": 52619892
+    },
+    "full-100k/USDCAD-202601": {
+      "sha256": "1bc6f49926205802c5c4ee868202bff1c067933267e07df8057084f7d1be9077",
+      "files": 19,
+      "bytes": 57632847
+    },
+    "full-100k/USDCAD-202602": {
+      "sha256": "2bebc0f564bcaea6121b1d78aaae51e987b7091577fdba4bef067920a0ff527a",
+      "files": 18,
+      "bytes": 51372258
+    },
+    "full-100k/USDCAD-202603": {
+      "sha256": "0f214838a26235e5cc3e8fd3baa9d7bd45f9dc1067f369f3a4ecfff17e6d7746",
+      "files": 26,
+      "bytes": 79813073
+    },
+    "full-100k/USDCAD-202604": {
+      "sha256": "d3da26fdd2d37497e99e5a362008796d833f6422037f0c0583b0693327184349",
+      "files": 18,
+      "bytes": 53162161
+    },
+    "full-100k/USDCAD-202605": {
+      "sha256": "c62c9c02be29a48372078a946989b78334c7554c43da5493491a9193adc6583c",
+      "files": 19,
+      "bytes": 56014548
+    },
+    "full-100k/USDCAD-202606": {
+      "sha256": "f5bddab1cef7143ecf800463e99da7360f248f33f278cf640c7f9cc370d3dcbc",
+      "files": 22,
+      "bytes": 64147613
+    },
+    "full-100k/USDCAD-202607": {
+      "sha256": "f8c26d62da4dd7fd8e54e67a704a01025b509ca798c75076c88e30440804294d",
+      "files": 14,
+      "bytes": 39265244
+    },
+    "full-100k/USDCAD-202608": {
+      "sha256": "e97d6f1c367789da6e41170899e6e108ae0b314eaf6ac23fdd99c2a95db65a46",
+      "files": 12,
+      "bytes": 34693743
+    },
+    "full-100k/USDCAD-202609": {
+      "sha256": "5d6a2557d0a68d2ca976dc294a195054d662765a20b6bc726074a967f029f881",
+      "files": 15,
+      "bytes": 43048442
+    },
+    "full-100k/USDCAD-202610": {
+      "sha256": "78d9b078b9eece1d2f10ec9bdb28a7ba133bdf0a76b5eba987299142dad1f671",
+      "files": 22,
+      "bytes": 66597819
+    },
+    "full-100k/USDCHF-202501": {
+      "sha256": "55231bc53ca5c51007124b8cb8b080cb3871bed480cae4a9672754b146c98900",
+      "files": 18,
+      "bytes": 52120101
+    },
+    "full-100k/USDCHF-202502": {
+      "sha256": "39cbb9c228cf2fc9907c876772220823f53d9b62feae893dc4651316fcbcc5d2",
+      "files": 15,
+      "bytes": 43771492
+    },
+    "full-100k/USDCHF-202503": {
+      "sha256": "4fc8cbdddd12b90758139f2e5b4ef4ad488d650f2c0672e92a64e35632645f8e",
+      "files": 15,
+      "bytes": 43063715
+    },
+    "full-100k/USDCHF-202504": {
+      "sha256": "dcb110a34a1cd38e67b8ae54604bf2388d74d17717aced5f8d441dcbba964136",
+      "files": 32,
+      "bytes": 97770304
+    },
+    "full-100k/USDCHF-202505": {
+      "sha256": "259f2d271845628f80a89a3da5193b02747c314ba875d0db3de1486bb55f349b",
+      "files": 21,
+      "bytes": 60938827
+    },
+    "full-100k/USDCHF-202506": {
+      "sha256": "788be12764a44ced9a3ca523217465afd98883d28b7b3e38bdb89da0f8898304",
+      "files": 17,
+      "bytes": 49124551
+    },
+    "full-100k/USDCHF-202507": {
+      "sha256": "41ff248c32360b21a2ea8caac9277e5e10b70d847f679979b846d76d07ed78f0",
+      "files": 14,
+      "bytes": 41421219
+    },
+    "full-100k/USDCHF-202508": {
+      "sha256": "ed7cddb3b2aa5d1c1a44b834f6ab51ee74dd2b5081a4e6f41dc5757e1c1d9d78",
+      "files": 13,
+      "bytes": 35616578
+    },
+    "full-100k/USDCHF-202509": {
+      "sha256": "ec4b11edbf51a65e98dda83e22cb9ce0fae9150c2fef6b19f6cbca6a39f5f066",
+      "files": 13,
+      "bytes": 35314694
+    },
+    "full-100k/USDCHF-202510": {
+      "sha256": "449d78fd89c29c94d27195b7af116f5a3e7e8f6c4aefc2a529d654e70556dc53",
+      "files": 14,
+      "bytes": 39411184
+    },
+    "full-100k/USDCHF-202511": {
+      "sha256": "e9094892db5afdf6332b3bc4740c174bd1c34339c06ad887797552621089b5e0",
+      "files": 11,
+      "bytes": 29984934
+    },
+    "full-100k/USDCHF-202512": {
+      "sha256": "8cc7ca9900f1102893c4ef63affc1554eb36e4c0c3e9bd09e9693f664e0593d0",
+      "files": 11,
+      "bytes": 31200390
+    },
+    "full-100k/USDCHF-202601": {
+      "sha256": "5bd872a823e030640f41d103214a17650c89eb8dd573750add87e972f0e6c8dd",
+      "files": 14,
+      "bytes": 41161894
+    },
+    "full-100k/USDCHF-202602": {
+      "sha256": "2d4e3b4309df0214ed3fe809f2cde078e5587571ce7690380dbb35e5d735e570",
+      "files": 13,
+      "bytes": 35620224
+    },
+    "full-100k/USDCHF-202603": {
+      "sha256": "4bef0885931e4be58b648c40315163dfe4c9c4f1164bcc7880475cf0b6d9c662",
+      "files": 19,
+      "bytes": 57099138
+    },
+    "full-100k/USDCHF-202604": {
+      "sha256": "6a29c9f5b6f7dc884c682a87ac393b704d451493bba655204f16c230a2e4f824",
+      "files": 15,
+      "bytes": 44295970
+    },
+    "full-100k/USDCHF-202605": {
+      "sha256": "3eebfa673f463e82d07e534aa1720b8d6a60e9b74084acd17a3abedaa3e1ff1d",
+      "files": 13,
+      "bytes": 36696770
+    },
+    "full-100k/USDCHF-202606": {
+      "sha256": "f0bff8f9876562298bf579868cd1a95064a2f2b8b02d965eabc4939d54926d60",
+      "files": 15,
+      "bytes": 44577773
+    },
+    "full-100k/USDCHF-202607": {
+      "sha256": "7ff9775febf7592a1e0efd8c114a7beedca666b17c7f09489598561a3367b5c3",
+      "files": 15,
+      "bytes": 42935401
+    },
+    "full-100k/USDCHF-202608": {
+      "sha256": "924262ef9b698a56f79404e0d6e1873077d6879d73e97e1f1d5ffec4c76afd86",
+      "files": 12,
+      "bytes": 34952858
+    },
+    "full-100k/USDCHF-202609": {
+      "sha256": "ea8b38a251ae37c5180f1c94fbe4f0037f6a050277121ff1a337aac6e69d1da1",
+      "files": 18,
+      "bytes": 53296788
+    },
+    "full-100k/USDCHF-202610": {
+      "sha256": "53359347647b6c4c345ac8e3c90664d543bbff649bf98fd3ff218babdbcedb70",
+      "files": 22,
+      "bytes": 64605133
+    },
+    "full-100k/USDJPY-202501": {
+      "sha256": "3b1db57409ab645c2883f1201e87977c3168ef4bb285b058ac4a3593d3b6097c",
+      "files": 36,
+      "bytes": 111010474
+    },
+    "full-100k/USDJPY-202502": {
+      "sha256": "9880c01b40612a9334b94906d3885b1c290a2bf3a9db460c6888ccdd221d80a2",
+      "files": 34,
+      "bytes": 104384932
+    },
+    "full-100k/USDJPY-202503": {
+      "sha256": "e6dcc8acbcacc271419fa675cb3b71b937c55509d6ad7c1d41b7cf786654ef6b",
+      "files": 41,
+      "bytes": 125363552
+    },
+    "full-100k/USDJPY-202504": {
+      "sha256": "371808f435dfe2ffdbf10376d20422bdb3c551dde1324de574ec9568ba97b608",
+      "files": 57,
+      "bytes": 177375484
+    },
+    "full-100k/USDJPY-202505": {
+      "sha256": "a6973c4b7850ca009d0b0411eaa76f4c31f7f9cc874915334dcb4ba24186afd5",
+      "files": 33,
+      "bytes": 100293805
+    },
+    "full-100k/USDJPY-202506": {
+      "sha256": "071197bf3f5a7d2246b2b81430ff51d0faef0a53319582bd724d606707f2eebd",
+      "files": 26,
+      "bytes": 77933131
+    },
+    "full-100k/USDJPY-202507": {
+      "sha256": "3718bc99158dd97ba8ddd0207160ed15151744805d78b39e2dafe6e87fa8395f",
+      "files": 23,
+      "bytes": 69541246
+    },
+    "full-100k/USDJPY-202508": {
+      "sha256": "e9a99de1ee2a36320d223ccdc7e310eca4a638ddfdeba5af3a594ea1be0b0106",
+      "files": 20,
+      "bytes": 57687340
+    },
+    "full-100k/USDJPY-202509": {
+      "sha256": "1c09ff2ad460300fd7d0ec478a875e963d27ac92c79b1ca720c87eabca048ac6",
+      "files": 22,
+      "bytes": 65066238
+    },
+    "full-100k/USDJPY-202510": {
+      "sha256": "f518b8c6553afea092a514e32d8eef5383b6e51f607346af939cdb8de4977e98",
+      "files": 25,
+      "bytes": 75853807
+    },
+    "full-100k/USDJPY-202511": {
+      "sha256": "a25de49f9d3f0f4de07300391592d37b39a453d7d10fd5dd5687129ef45aee4a",
+      "files": 22,
+      "bytes": 64854747
+    },
+    "full-100k/USDJPY-202512": {
+      "sha256": "f391b1df47de26ef9a0c201c0a1c2d578cf51e5c4653d1bb872de6eecae47001",
+      "files": 20,
+      "bytes": 60571350
+    },
+    "full-100k/USDJPY-202601": {
+      "sha256": "f403b33c5dc45477d04433ffd51d87b8767ccd3c30583a551dce4558e72a74e0",
+      "files": 24,
+      "bytes": 70481125
+    },
+    "full-100k/USDJPY-202602": {
+      "sha256": "86fecf5e0b904a55be31476eefc77f11d1e456e15b5b1b3f2a56ba8fcc73e76b",
+      "files": 21,
+      "bytes": 63848182
+    },
+    "full-100k/USDJPY-202603": {
+      "sha256": "5dc8623a2528187ef6f33ca4c297c803dcb97fd9c554ee41a9ad7d35b422ceb6",
+      "files": 29,
+      "bytes": 86826548
+    },
+    "full-100k/USDJPY-202604": {
+      "sha256": "4d14bf56305d9feccba71cc0357b404e69c378a5b534fc3b2bcc54fec62c975d",
+      "files": 21,
+      "bytes": 62868566
+    },
+    "full-100k/USDJPY-202605": {
+      "sha256": "195546bc7cf65c62e335faf7a11d1d031383b84b95045a702faed0b43a3788ac",
+      "files": 17,
+      "bytes": 48349186
+    },
+    "full-100k/USDJPY-202606": {
+      "sha256": "6a671d58b209483aa3b4289c2bc4cf64b3ceeab6ca095b63978df98550620abd",
+      "files": 15,
+      "bytes": 42757291
+    },
+    "full-100k/USDJPY-202607": {
+      "sha256": "c836597ba3213b637709102ed8b3e3cd0974855889af8091c8332b2131acd370",
+      "files": 23,
+      "bytes": 69010844
+    },
+    "full-100k/USDJPY-202608": {
+      "sha256": "b9ecac51400a608c305a7e6407b6bb066a8bc815bc8843636c18aa9a0e3b9efd",
+      "files": 22,
+      "bytes": 66577649
+    },
+    "full-100k/USDJPY-202609": {
+      "sha256": "be7954468be1dcf6e44e7d6ea5060da22e64f03b2a81d31220980e27295b29ce",
+      "files": 36,
+      "bytes": 111492896
+    },
+    "full-100k/USDJPY-202610": {
+      "sha256": "71018be5240ae96eff68a9add3108c1755d53edc49c6b9b745aa17eb9a305587",
+      "files": 27,
+      "bytes": 80145620
+    },
+    "full/AUDUSD-202501": {
+      "sha256": "1ff1367db7b2f335abb397f34babd25139f519675869b40df0395489bbfa7314",
+      "files": 5,
+      "bytes": 53400299
+    },
+    "full/AUDUSD-202502": {
+      "sha256": "255f2c501ecf42db2e9ad34930f4a6673f4de22b726db82d61aa36dd449bf212",
+      "files": 4,
+      "bytes": 40895084
+    },
+    "full/AUDUSD-202503": {
+      "sha256": "334432294886bcda76a50d3d368245bb662e69d417af6229a0f2b8a15e51d6b9",
+      "files": 4,
+      "bytes": 46430541
+    },
+    "full/AUDUSD-202504": {
+      "sha256": "6d449bb0bb02407b94928a7122c113df7865055fe2cf53755f6694a93f8a6a95",
+      "files": 8,
+      "bytes": 97925839
+    },
+    "full/AUDUSD-202505": {
+      "sha256": "0487dc828244a7b0da66f7b2d198d90da50758988cb7d6629fccb0887fba1356",
+      "files": 4,
+      "bytes": 42338809
+    },
+    "full/AUDUSD-202506": {
+      "sha256": "1c54187c54ff6bf4fbd0956109e1343a718f0341d1b6c734b80a32b04e376f7e",
+      "files": 4,
+      "bytes": 39949303
+    },
+    "full/AUDUSD-202507": {
+      "sha256": "716e14847fd0247417164cb8e026733a68c2ae387eb6b565433ae6eb6c2a461e",
+      "files": 4,
+      "bytes": 40114039
+    },
+    "full/AUDUSD-202508": {
+      "sha256": "615c22c0fa39aa6c45d7a46e3550a6ca13a9671a6f5fdfa5316e42bff77dcdc5",
+      "files": 3,
+      "bytes": 31573461
+    },
+    "full/AUDUSD-202509": {
+      "sha256": "f287821d8b7f579c0a140c112934ca9f42baaba7947626d0b82b696e734959ed",
+      "files": 4,
+      "bytes": 34325782
+    },
+    "full/AUDUSD-202510": {
+      "sha256": "e42554c2b7e1e5d64d9fa98a4a33485d3d90003888389243a067a94965ad264e",
+      "files": 4,
+      "bytes": 40478078
+    },
+    "full/AUDUSD-202511": {
+      "sha256": "b12caba1c978e2f53391dcd6a4cf510a3b4fae22f18499e711475fc2be62a874",
+      "files": 4,
+      "bytes": 37013754
+    },
+    "full/AUDUSD-202512": {
+      "sha256": "075ddd58059e60e6c11a2c54a0461a7ff9eb8808b513c6e0add6fee689491895",
+      "files": 4,
+      "bytes": 34739895
+    },
+    "full/AUDUSD-202601": {
+      "sha256": "27b91d93514327f1f9388674c61c567f64e18344d19c2d2207d3577613098abe",
+      "files": 4,
+      "bytes": 42989336
+    },
+    "full/AUDUSD-202602": {
+      "sha256": "a648b1f31e774588f50556792800bd960725a13e81a2deaf38438319e5c8e5c8",
+      "files": 5,
+      "bytes": 52736024
+    },
+    "full/AUDUSD-202603": {
+      "sha256": "414ed14d2d02925e7ba3f4720808349491e453b7dc01e040d6690c1a82fd246d",
+      "files": 8,
+      "bytes": 105881755
+    },
+    "full/AUDUSD-202604": {
+      "sha256": "2948b64834252a153292f292a8fa2d848f4a3d3cc8872bebe0e16b8005c87b7d",
+      "files": 5,
+      "bytes": 60996346
+    },
+    "full/AUDUSD-202605": {
+      "sha256": "a80c482f2f147352d80636f420135683c0e1a9196afcdeb603a69c565ec416c5",
+      "files": 5,
+      "bytes": 49190424
+    },
+    "full/AUDUSD-202606": {
+      "sha256": "5c412b99ab0db9782b66d8962e863f8fe55e7cf75a27c16e86f56f77b8ae5e71",
+      "files": 5,
+      "bytes": 55147935
+    },
+    "full/AUDUSD-202607": {
+      "sha256": "8c4e5097060e6220cfad2f94c18638937007c8ee0c8e0673fad8a730c5fc172b",
+      "files": 4,
+      "bytes": 45416299
+    },
+    "full/AUDUSD-202608": {
+      "sha256": "d7d01811fd81ca015da1f70c1fd2780da30f8204645807f0b14ef2924b5261eb",
+      "files": 3,
+      "bytes": 29331966
+    },
+    "full/AUDUSD-202609": {
+      "sha256": "96f5f59c00d500da057c99d99e4254eb42e8cab9697b45e1f7b7df6d79ee0ab3",
+      "files": 4,
+      "bytes": 37303847
+    },
+    "full/AUDUSD-202610": {
+      "sha256": "1cb187e1a068a41b4eed76c97d3d1d6278bf5af01a1dcca40e6ff17dccb5ffd1",
+      "files": 5,
+      "bytes": 54005870
+    },
+    "full/EURUSD-202501": {
+      "sha256": "a64f6a485b096ee92da4e38117286b52a44a735c0d34bac14f239e1add80f9a7",
+      "files": 6,
+      "bytes": 73076010
+    },
+    "full/EURUSD-202502": {
+      "sha256": "3466bec578bdaf0f8e84e13ca5c321566a6fefbf3b9b255f1c5fdc657421d63e",
+      "files": 6,
+      "bytes": 65716584
+    },
+    "full/EURUSD-202503": {
+      "sha256": "8907df87768beeed12126fb38126700e9cb80e9a1f0640d695d77b6967a94900",
+      "files": 6,
+      "bytes": 75319244
+    },
+    "full/EURUSD-202504": {
+      "sha256": "8189fba81e96ec1635b84ae7f082c9a46ea87d3af8698bdf1a865eb434f5184b",
+      "files": 9,
+      "bytes": 125360752
+    },
+    "full/EURUSD-202505": {
+      "sha256": "d8056560dd884c1027941af31e0ed100823d84db3d7d7295530b82cfc22bddcf",
+      "files": 6,
+      "bytes": 77203660
+    },
+    "full/EURUSD-202506": {
+      "sha256": "cda802579a7bb2c35867142688b20fa4bc3d495a81936c21fe4586a70af2a558",
+      "files": 6,
+      "bytes": 65431477
+    },
+    "full/EURUSD-202507": {
+      "sha256": "06e4a4a5db42a442e2e0906508412c091f6a573fc4d534bf575574d4ee97da67",
+      "files": 5,
+      "bytes": 49795604
+    },
+    "full/EURUSD-202508": {
+      "sha256": "12c319d94bbcbf5767ae48bcb463b6b787763cfb4d58cb643d3bef3b0cc17d5d",
+      "files": 4,
+      "bytes": 42840183
+    },
+    "full/EURUSD-202509": {
+      "sha256": "d276790d6b553e785c947cf6735bf8fc962a25edbd2a41abb6749fa20c4990a1",
+      "files": 4,
+      "bytes": 47805016
+    },
+    "full/EURUSD-202510": {
+      "sha256": "6c1e963b52520e286b2f656b69818cd162aaecf372ad9a2ca6018b9499231de9",
+      "files": 4,
+      "bytes": 47423391
+    },
+    "full/EURUSD-202511": {
+      "sha256": "88946f1e6e674b0b8ddd3a090addb5b5eb50c1d794c20af967de0f61cf0fdf6b",
+      "files": 4,
+      "bytes": 39759896
+    },
+    "full/EURUSD-202512": {
+      "sha256": "56d13543c8ffbea434eac525c463c85fd1dff0aaff57315c3cdc796a7c755d29",
+      "files": 4,
+      "bytes": 41068439
+    },
+    "full/EURUSD-202601": {
+      "sha256": "9a1de7a9ebdc8cb5a647e572b7e4b7b559016641a2c0d1f8a7eeaddc755c0a5b",
+      "files": 5,
+      "bytes": 48212273
+    },
+    "full/EURUSD-202602": {
+      "sha256": "cbdba7be21761bfea5f8940f100be5d2b991f4fda261c8f0efb5292b1c222d72",
+      "files": 4,
+      "bytes": 42573080
+    },
+    "full/EURUSD-202603": {
+      "sha256": "b68348421a35a5693396c3e10650472b06d083d3913896a9ea91a175f6c6ce08",
+      "files": 7,
+      "bytes": 84488057
+    },
+    "full/EURUSD-202604": {
+      "sha256": "99215b20bac3bd8fad3b2a955bd1ed9ffccc40bda4f78981309bf50ee27672ff",
+      "files": 5,
+      "bytes": 61243865
+    },
+    "full/EURUSD-202605": {
+      "sha256": "0b657b0385c4cedbfdb03476a4c8e7f7e8866673bf504cc79b158e80238f4e20",
+      "files": 4,
+      "bytes": 46213433
+    },
+    "full/EURUSD-202606": {
+      "sha256": "9b1dc8dbb45b81b41a6b4b53498e33b7872cadda57eea121fbbbefb6ee09e18f",
+      "files": 4,
+      "bytes": 45481210
+    },
+    "full/EURUSD-202607": {
+      "sha256": "37299091d7e9c272c533b1ec500def5cc6c5e20c735738bffb24ff3493991917",
+      "files": 4,
+      "bytes": 44194664
+    },
+    "full/EURUSD-202608": {
+      "sha256": "41452b099679296dd29b2ecfaf9b2e9ada67823abddf0d883c666a1d726b1b69",
+      "files": 4,
+      "bytes": 33700482
+    },
+    "full/EURUSD-202609": {
+      "sha256": "0fa470a33e21b3f83de917dea6f923cc4f83589ee187a5fa4876845114ac8273",
+      "files": 4,
+      "bytes": 44473640
+    },
+    "full/EURUSD-202610": {
+      "sha256": "1ae6349536ec1a886d7244730c5bc89bc1cc5da3d219aba74301e8f9d8211590",
+      "files": 5,
+      "bytes": 57792975
+    },
+    "full/GBPUSD-202501": {
+      "sha256": "67ada9b00b87fa67a5665a3a5faf6131c36224585a528cf04f8d03deb4ceeb71",
+      "files": 7,
+      "bytes": 85137547
+    },
+    "full/GBPUSD-202502": {
+      "sha256": "88459b7f3ae1f2c7e8669cbd63e16e9fd0dbbcb89c493fca78b34185e1abd58b",
+      "files": 6,
+      "bytes": 70196714
+    },
+    "full/GBPUSD-202503": {
+      "sha256": "d875d505d5ff22fd9406ff2498598ec6c4732877e84899c08d4c14dcef424c6a",
+      "files": 6,
+      "bytes": 66536678
+    },
+    "full/GBPUSD-202504": {
+      "sha256": "5ee67a3ff7e51d9dcf2f1d2b5ac90805cf9c769e3c854704a1d5f2b2258bcd8f",
+      "files": 9,
+      "bytes": 116163083
+    },
+    "full/GBPUSD-202505": {
+      "sha256": "a44e576e75f1c007fcb80d9cee4a21cfc400a1595f1dbb83335013ca06e957ff",
+      "files": 5,
+      "bytes": 62840375
+    },
+    "full/GBPUSD-202506": {
+      "sha256": "6a57f952a2ed79a804249fe6ebe1e0de424102da3f9c2bfa08086edd1f2d481e",
+      "files": 5,
+      "bytes": 58607096
+    },
+    "full/GBPUSD-202507": {
+      "sha256": "e2685b97a21d8186921b0d30e51e3005b8fe725bd22b7f933c6874772116659f",
+      "files": 5,
+      "bytes": 58262967
+    },
+    "full/GBPUSD-202508": {
+      "sha256": "1d227b52b6a20703a2e511e10d2d1767de484192d81e288c579ae7db57f33d11",
+      "files": 4,
+      "bytes": 46550455
+    },
+    "full/GBPUSD-202509": {
+      "sha256": "4a2142be7c1a7afa2e828ff515ef6afad371ec9e8da7e7d94c7f9f830db78fd7",
+      "files": 5,
+      "bytes": 53984374
+    },
+    "full/GBPUSD-202510": {
+      "sha256": "045447174c6be6959566c4a769f3f453205159abaa2decbcfbe20f43fbbcefed",
+      "files": 5,
+      "bytes": 57254942
+    },
+    "full/GBPUSD-202511": {
+      "sha256": "3f9d6ecf17ad2e583c65dd085af4d81796af76c056a867506d987544da8377c6",
+      "files": 5,
+      "bytes": 53618903
+    },
+    "full/GBPUSD-202512": {
+      "sha256": "3401d7cf0296d757e1f482b002d441c33920721a53bb6bd630647817e12b79b3",
+      "files": 5,
+      "bytes": 51953463
+    },
+    "full/GBPUSD-202601": {
+      "sha256": "75d42a925c7ba0467e5c387ee1bb6c8c4fa9963d23b9aea73dc0a541286f71f4",
+      "files": 5,
+      "bytes": 57872022
+    },
+    "full/GBPUSD-202602": {
+      "sha256": "b17037f92edb4c58e72c140cb977572f874526dad42080d5cb6cfa9911b2813c",
+      "files": 5,
+      "bytes": 52211574
+    },
+    "full/GBPUSD-202603": {
+      "sha256": "181c899ad2512949716e5c9a1d6ef1d78742a4fda56ea6e2bd5f5d41b2bf098e",
+      "files": 8,
+      "bytes": 102637943
+    },
+    "full/GBPUSD-202604": {
+      "sha256": "243880b85447c8ae4297aedb2c619df583c043f4731c2ea1a75bf8bed375e00d",
+      "files": 6,
+      "bytes": 76097464
+    },
+    "full/GBPUSD-202605": {
+      "sha256": "1a914410417d19bc1625e09b1b7e356c54a0e497200f18593ea35c18ce25ba9c",
+      "files": 5,
+      "bytes": 61052440
+    },
+    "full/GBPUSD-202606": {
+      "sha256": "47e613e59a7ddbec783c49a03f4d5c00c067ccd5e47ee13605851b909deaafbc",
+      "files": 5,
+      "bytes": 63860189
+    },
+    "full/GBPUSD-202607": {
+      "sha256": "6ae12bcc8060ac02c84ca054ebc9a9baa1edccde6947cff19b866a269727aa0d",
+      "files": 6,
+      "bytes": 70878098
+    },
+    "full/GBPUSD-202608": {
+      "sha256": "bf6398d0d42746f02ab229175465277387828df4230ec14fc7d316bcd1fdaa41",
+      "files": 5,
+      "bytes": 51736426
+    },
+    "full/GBPUSD-202609": {
+      "sha256": "60b112016c09b2a1d292309c53c0f771b43911a8ad19a021cd76d5ba45dc85d7",
+      "files": 5,
+      "bytes": 62186030
+    },
+    "full/GBPUSD-202610": {
+      "sha256": "8365bbd9c6e6be530843d04d1182ec5519c6e2d26ffb6c9d37571afc816d9138",
+      "files": 6,
+      "bytes": 66483181
+    },
+    "full/NZDUSD-202501": {
+      "sha256": "0315108d9cf352147908374e9aefeed17da6e11179fb524d9ffae2ec67898de2",
+      "files": 4,
+      "bytes": 43097130
+    },
+    "full/NZDUSD-202502": {
+      "sha256": "ac10e5f50ddac15cc75628b9c7169f7936c6fedc95a3b45c6397ef7e2456a2c9",
+      "files": 4,
+      "bytes": 37349165
+    },
+    "full/NZDUSD-202503": {
+      "sha256": "fa6883718a74f216f9b069f16f2fbdc4ce6274417d4e910295539f2c34df4853",
+      "files": 4,
+      "bytes": 37784333
+    },
+    "full/NZDUSD-202504": {
+      "sha256": "d1a840464e82f3011d1acd9e038c6acf0d76de2570dfff125f466456089475b9",
+      "files": 6,
+      "bytes": 79341395
+    },
+    "full/NZDUSD-202505": {
+      "sha256": "165bc0aca68ed8770bb1f87e1ead221c8d25fc1a8b2883ec1af9b8bd89d1c444",
+      "files": 4,
+      "bytes": 39985979
+    },
+    "full/NZDUSD-202506": {
+      "sha256": "dffaf129b243a26cdc6e44c007c419a5ec04c777377fa0a92de54be0d86c1586",
+      "files": 4,
+      "bytes": 39464218
+    },
+    "full/NZDUSD-202507": {
+      "sha256": "a33c5a8ce5044bb846a0c1deb367e43d03f680a4b4bbab65c24696d1b84380ac",
+      "files": 4,
+      "bytes": 36745530
+    },
+    "full/NZDUSD-202508": {
+      "sha256": "deb785b59e2c37c10e6c0b1cd623c7477b39b9750b7c226db4129f4d55b37e31",
+      "files": 3,
+      "bytes": 28994039
+    },
+    "full/NZDUSD-202509": {
+      "sha256": "b05211b22808362e7255bca78ff724c7bffec56ca1e08edb56097100b3b8ee16",
+      "files": 3,
+      "bytes": 29362135
+    },
+    "full/NZDUSD-202510": {
+      "sha256": "9ed77fd743f670ed2ddc8e61cb9a2e703f9bd216980a6e85540cdfa3fd9bc225",
+      "files": 3,
+      "bytes": 31522393
+    },
+    "full/NZDUSD-202511": {
+      "sha256": "a91f5029d1b3a5ff5e83b083b3aca256dc11dffe1e17d8035f359535b5e25659",
+      "files": 3,
+      "bytes": 30781752
+    },
+    "full/NZDUSD-202512": {
+      "sha256": "380d4f2676808c6f4ecdedea578ffcf97747c9d1774139078b1f98b2e450b057",
+      "files": 3,
+      "bytes": 28064120
+    },
+    "full/NZDUSD-202601": {
+      "sha256": "4eb68e38dcb9d1588aef7e7a0daa5a8dd2e4ec05a278711d15556548e7855ebd",
+      "files": 4,
+      "bytes": 37351865
+    },
+    "full/NZDUSD-202602": {
+      "sha256": "ba1e895bfc4f8aa84e8dc9cabbd6e419f6d4bc2d48b36aba8ac94a44528af39d",
+      "files": 4,
+      "bytes": 39183513
+    },
+    "full/NZDUSD-202603": {
+      "sha256": "6f2cdb4764abf6fbeb8308e479994c4684d4bb3dcdeeb03b909ed5b385e53fc4",
+      "files": 6,
+      "bytes": 65288060
+    },
+    "full/NZDUSD-202604": {
+      "sha256": "80e25d3392c8dc5e4cf69fc86f3d96831877887295dbfa04675fb94cf2c85ed4",
+      "files": 4,
+      "bytes": 38808409
+    },
+    "full/NZDUSD-202605": {
+      "sha256": "d725e0071490e1d62ba039863b2bded2ca4d42314278695793842f3060fbe6ea",
+      "files": 4,
+      "bytes": 38633946
+    },
+    "full/NZDUSD-202606": {
+      "sha256": "b741327ccdbffc9ea6febf5993fabb78d3ea4fe709b28a226f9989b7209f6f2f",
+      "files": 4,
+      "bytes": 43282302
+    },
+    "full/NZDUSD-202607": {
+      "sha256": "a2e3e084f76cb92afa2227079ac27da0a528e644a2661482df56a3da56fc3081",
+      "files": 4,
+      "bytes": 46063211
+    },
+    "full/NZDUSD-202608": {
+      "sha256": "ee7789fcac83aae06002b8683a9da46b979c8531d93f54a01dc41ac22b25c73e",
+      "files": 4,
+      "bytes": 37310855
+    },
+    "full/NZDUSD-202609": {
+      "sha256": "e22d6b9c2369cebfb80fdae46adb797d8fe0be1019c8d32cecc800670ea81e33",
+      "files": 4,
+      "bytes": 44820521
+    },
+    "full/NZDUSD-202610": {
+      "sha256": "f3f72c9b7793c02a46527f6489fd19a402c2ab5c6e4b6b3e4d055d3acaaf23e4",
+      "files": 5,
+      "bytes": 49571246
+    },
+    "full/USDCAD-202501": {
+      "sha256": "0b1c8d278d3ca40144a4dbd1b3f39e104cdd68c4c82669db4287bbd053b29236",
+      "files": 6,
+      "bytes": 79833586
+    },
+    "full/USDCAD-202502": {
+      "sha256": "81a09c79914a5f3e706682f6fdbf9f9c06f2b5615e5f61dee95cf84a4fcdc944",
+      "files": 6,
+      "bytes": 72316818
+    },
+    "full/USDCAD-202503": {
+      "sha256": "ac768b005330829709698abdc57adab5ed7b783b65880b1b742314a214d9adad",
+      "files": 7,
+      "bytes": 86244692
+    },
+    "full/USDCAD-202504": {
+      "sha256": "001e43985063a8a0f40b06cb99d79a3876837e8a1cb112fc6167f0819ca69aec",
+      "files": 8,
+      "bytes": 107984247
+    },
+    "full/USDCAD-202505": {
+      "sha256": "b20fbc7d80dd10343fe682d076c24afc8f9c6cd043673cc5498e93a0323d2ea9",
+      "files": 5,
+      "bytes": 48469273
+    },
+    "full/USDCAD-202506": {
+      "sha256": "fbcd1f16720fb658e332e26713fa280ef14d18e9627e144487825c8dc055672b",
+      "files": 5,
+      "bytes": 49336634
+    },
+    "full/USDCAD-202507": {
+      "sha256": "f9f0964bb00adafc3a4ac6f6c996852a2ea59176b9dcbc24c36b3215f6126df7",
+      "files": 5,
+      "bytes": 50357499
+    },
+    "full/USDCAD-202508": {
+      "sha256": "3dadefe3059aa256e607751a5d0626bf31214fb52a2ca9548bc66fcfc9565bdc",
+      "files": 4,
+      "bytes": 43873212
+    },
+    "full/USDCAD-202509": {
+      "sha256": "c3afe8d73926b8f1d643fd5b634787fd16df9661a40f2fac0f34a61f73994441",
+      "files": 4,
+      "bytes": 46650140
+    },
+    "full/USDCAD-202510": {
+      "sha256": "6670af7dc6c2f77af6b690ce99ed4742fbf038939fc6d374515bd55312160737",
+      "files": 5,
+      "bytes": 50952706
+    },
+    "full/USDCAD-202511": {
+      "sha256": "7c368b97fa7c74f199262fa86bdb58645fcfe3291f42faaaea09eea95dcc2f03",
+      "files": 5,
+      "bytes": 52347967
+    },
+    "full/USDCAD-202512": {
+      "sha256": "e44dc4b599724a9ee20c5a20bf66ce0861172a8c015e45f344e5b65b5c9600cb",
+      "files": 5,
+      "bytes": 52597854
+    },
+    "full/USDCAD-202601": {
+      "sha256": "8dd61bae2807b82b5cff9cd09cdbd444dd90c05ca3545a1021cb0ef5b1cfc8a0",
+      "files": 5,
+      "bytes": 57609117
+    },
+    "full/USDCAD-202602": {
+      "sha256": "379e905111f15cfd82c3330030b5bb0be07a6f92fb1e54887dcc51a33b9fe39c",
+      "files": 5,
+      "bytes": 51350237
+    },
+    "full/USDCAD-202603": {
+      "sha256": "a065355b15398b4ef1d67ca45be926c4451c2b8aded6c5f90b43b44655442476",
+      "files": 6,
+      "bytes": 79779168
+    },
+    "full/USDCAD-202604": {
+      "sha256": "623932ac8c129e743897fa56dc97c72ef2451461d235a93158134223b4d9d00f",
+      "files": 5,
+      "bytes": 53140125
+    },
+    "full/USDCAD-202605": {
+      "sha256": "40f0572942d2ec9dbb55ff355c54c57ee41701ed0479106e3cb45a901fb4e255",
+      "files": 5,
+      "bytes": 55990813
+    },
+    "full/USDCAD-202606": {
+      "sha256": "158cce763798a143f10b0330b47cac25f5cc66c5161a24a62213207df0a10b3f",
+      "files": 6,
+      "bytes": 64120482
+    },
+    "full/USDCAD-202607": {
+      "sha256": "296ebf35c3e0cdaf72a69d00283870a19ba60825b8193a85ea6056f5865f4921",
+      "files": 4,
+      "bytes": 39248272
+    },
+    "full/USDCAD-202608": {
+      "sha256": "a01332f22ff5264e500177480b73d166e7256e0649936b4513d680540b152e30",
+      "files": 4,
+      "bytes": 34680166
+    },
+    "full/USDCAD-202609": {
+      "sha256": "941dd01b0ab1f27e8c3757c7ff512d0e42f22bdca904b8cb5165bde35708b4c1",
+      "files": 4,
+      "bytes": 43029770
+    },
+    "full/USDCAD-202610": {
+      "sha256": "21ef95e4411effe786cf3d9c29a1b0449f737fdcbf22cbfaef1a6f2ec3bf7c52",
+      "files": 6,
+      "bytes": 66570647
+    },
+    "full/USDCHF-202501": {
+      "sha256": "f299806b60a01003d84462cdb7f81450d8a337f15431dbb35bedde5f0353b064",
+      "files": 5,
+      "bytes": 52098064
+    },
+    "full/USDCHF-202502": {
+      "sha256": "1df5ba3f1d5fc92ac041d7a83fba6f6eaf97cbf53e0d760842ee8ba1a0976dd8",
+      "files": 4,
+      "bytes": 43752847
+    },
+    "full/USDCHF-202503": {
+      "sha256": "6cccdb846c10ac44385cf97af40c9e651f363cb3f492b2f92f2fbe0407096f30",
+      "files": 4,
+      "bytes": 43045071
+    },
+    "full/USDCHF-202504": {
+      "sha256": "6c0eb5f5a3a179d7b54eb880184e05a18cb461fccef80fcb9f9221b32e216186",
+      "files": 8,
+      "bytes": 97729619
+    },
+    "full/USDCHF-202505": {
+      "sha256": "4a860b90eba421f1f7dcdfa86b8ea7a5bfb5b608d45f152d4ee1b8b199823157",
+      "files": 5,
+      "bytes": 60911710
+    },
+    "full/USDCHF-202506": {
+      "sha256": "b7a7e7dc9bc8e5c21f19cb3ca720d9638c36d9633593965e0f69302374568241",
+      "files": 5,
+      "bytes": 49104218
+    },
+    "full/USDCHF-202507": {
+      "sha256": "06e422a54b61c9296b940785aa8fa400d640a41c3bc3bea52ebc0bb3f2ccf69c",
+      "files": 4,
+      "bytes": 41404282
+    },
+    "full/USDCHF-202508": {
+      "sha256": "366198479d9cc127b74bd4ff23e000aed1f069c580a86cef8b29bc8c00847ca0",
+      "files": 4,
+      "bytes": 35601337
+    },
+    "full/USDCHF-202509": {
+      "sha256": "215875a189129c46fd083ad4345d3cfd8c4f29e13dfeca882a4d865ce9fc4213",
+      "files": 4,
+      "bytes": 35299451
+    },
+    "full/USDCHF-202510": {
+      "sha256": "cb7a35df463bec8a6d3373f0642215b116c49e2307e7647e4c8ab034f55dad20",
+      "files": 4,
+      "bytes": 39394239
+    },
+    "full/USDCHF-202511": {
+      "sha256": "5ed8c403b3443597cb2ff8571e963609744465fe94decd4cabf6f3457cdece34",
+      "files": 3,
+      "bytes": 29971384
+    },
+    "full/USDCHF-202512": {
+      "sha256": "c9b3c0e4f60ebad6eaa70f1e0721e81359586c3c9f881a96ee301c01809c3705",
+      "files": 3,
+      "bytes": 31186840
+    },
+    "full/USDCHF-202601": {
+      "sha256": "f9477f85b62197e413d7ecdcd6617c62132e2b673f0e57a26d13b252237bd487",
+      "files": 4,
+      "bytes": 41144953
+    },
+    "full/USDCHF-202602": {
+      "sha256": "7138c79d09b15924be24cb86a10f63d04b3dc973dc05147a05f3142acac67762",
+      "files": 4,
+      "bytes": 35604985
+    },
+    "full/USDCHF-202603": {
+      "sha256": "a3584bc60fab463c8308e0851f44819eb18e3e5e174e1dc453ed100ba6206b49",
+      "files": 5,
+      "bytes": 57075420
+    },
+    "full/USDCHF-202604": {
+      "sha256": "f85aaa7992a1cdff09d7a74db922099f7cd63dc3086279c5d0cbdbd29766b537",
+      "files": 4,
+      "bytes": 44277339
+    },
+    "full/USDCHF-202605": {
+      "sha256": "b91bdf2dac317eaa7b222e97e9ba92095f1be89bf3332dbc281d027281eec090",
+      "files": 4,
+      "bytes": 36681529
+    },
+    "full/USDCHF-202606": {
+      "sha256": "ef4d60cbc42304e05d9318c917652faeeb75ecbaa524b720a34cdaefb9388a65",
+      "files": 4,
+      "bytes": 44559135
+    },
+    "full/USDCHF-202607": {
+      "sha256": "6d75e12e34710826c8ddb8c2644c8df9d91e52ecff20945edd8d71df97e34e11",
+      "files": 4,
+      "bytes": 42916716
+    },
+    "full/USDCHF-202608": {
+      "sha256": "1fe406ee3617838a58ccde5ab2ce979399c8ea6db45490dd9a9d788a7bd780da",
+      "files": 4,
+      "bytes": 34939271
+    },
+    "full/USDCHF-202609": {
+      "sha256": "0cbd4dfb9fca482125a05de24c53e787de2c434700e076df49c23a1f42fddd67",
+      "files": 5,
+      "bytes": 53274705
+    },
+    "full/USDCHF-202610": {
+      "sha256": "aed87186cef1a1c5c4d06a0c57cf404d438d15c2dcdd9255b96b0858f2cd0b14",
+      "files": 6,
+      "bytes": 64577942
+    },
+    "full/USDJPY-202501": {
+      "sha256": "7b0292787d95eadef15383cfae9b610c4b5301dfb05ebfad0076006cbd4d95ed",
+      "files": 8,
+      "bytes": 110962903
+    },
+    "full/USDJPY-202502": {
+      "sha256": "fec7bf7e7309ef06bf912b6bd4b2ed63b731b2e122aea684d54688b7041f8789",
+      "files": 8,
+      "bytes": 104340758
+    },
+    "full/USDJPY-202503": {
+      "sha256": "f1912da8abdfab3be0e8fee4f72677f55a6dd48edf16a48aac39c3349bb9b1b5",
+      "files": 9,
+      "bytes": 125309181
+    },
+    "full/USDJPY-202504": {
+      "sha256": "4ef11dd0dc138701a94a941e7f786a4339173d9735cf157fde889083ff2e8211",
+      "files": 13,
+      "bytes": 177300721
+    },
+    "full/USDJPY-202505": {
+      "sha256": "87e1e3b96f8bd6252ffcb1c02a0b1fca6ce24725ba8299979c0f06a5d1d3becf",
+      "files": 8,
+      "bytes": 100251331
+    },
+    "full/USDJPY-202506": {
+      "sha256": "1239f66cb9a6eca3aa4a2982cd6288dbbb187a2ba945011c605b3d7c70dcbefa",
+      "files": 6,
+      "bytes": 77899160
+    },
+    "full/USDJPY-202507": {
+      "sha256": "cb8cd76b57404f8f08e7281772a880216c5af8f4d73925ef83abc7510a189184",
+      "files": 6,
+      "bytes": 69512373
+    },
+    "full/USDJPY-202508": {
+      "sha256": "2565b92cf779f12311b7d16af8a4abab18c252b409a25e18e5ddb3e97786fc44",
+      "files": 5,
+      "bytes": 57661872
+    },
+    "full/USDJPY-202509": {
+      "sha256": "1e86bde141c093f83ccdcec8a6511c89ff4079816129dd985bd3d88102a96764",
+      "files": 6,
+      "bytes": 65039060
+    },
+    "full/USDJPY-202510": {
+      "sha256": "9b0895cbfc31e78b44b3c1d2b4ff7c5543a3f29cba082bbc5e113751eb6ec62e",
+      "files": 6,
+      "bytes": 75821535
+    },
+    "full/USDJPY-202511": {
+      "sha256": "fddfde1401e611187b0091472e1e68c4fad3b91221bf70bd4a87920a16d4e41d",
+      "files": 6,
+      "bytes": 64827572
+    },
+    "full/USDJPY-202512": {
+      "sha256": "64ea708bb47a5b11d1dd6315181b1a0f89540519d6a879c46967cab73284d7c8",
+      "files": 5,
+      "bytes": 60545875
+    },
+    "full/USDJPY-202601": {
+      "sha256": "c52c730e9021ddd639250c0b2bbadaa9c59902449c1bc88ab96c4e30407f7bac",
+      "files": 6,
+      "bytes": 70450550
+    },
+    "full/USDJPY-202602": {
+      "sha256": "69f30ff77c86f351a5702365b593a37dca8ac491b00fe495ceeac4585132616f",
+      "files": 5,
+      "bytes": 63821009
+    },
+    "full/USDJPY-202603": {
+      "sha256": "8874172a1e46e6ea67887b5f56f841e3a6155d13d8ed1be88a1a7adfb77ae651",
+      "files": 7,
+      "bytes": 86789179
+    },
+    "full/USDJPY-202604": {
+      "sha256": "dfbeff4551f170c2dd5bc15b615bf61c3945b43d660659e15ad80217aa2059cd",
+      "files": 5,
+      "bytes": 62841393
+    },
+    "full/USDJPY-202605": {
+      "sha256": "f7679f27974856254191e58745800726bba53d30f49db45857ebb17a8b3478aa",
+      "files": 5,
+      "bytes": 48328809
+    },
+    "full/USDJPY-202606": {
+      "sha256": "6c46525a53b53b93bc6a7bc1d30d0febdc1cee5d007754cff157bf9a3a18e23a",
+      "files": 4,
+      "bytes": 42738608
+    },
+    "full/USDJPY-202607": {
+      "sha256": "3aa773cc21fa513bd5210e73ab620a63ad0b0bc7334652b9edbab42e2e7fd86b",
+      "files": 6,
+      "bytes": 68981906
+    },
+    "full/USDJPY-202608": {
+      "sha256": "6c1a17f3ca64cec21af631bed8837998bb53905115964676f37b4c165cb70d2d",
+      "files": 6,
+      "bytes": 66550413
+    },
+    "full/USDJPY-202609": {
+      "sha256": "6b4642900be2bf65b32caa9177b9e8f8d68fde57ff6e37e0cbbbb5a862bd24cf",
+      "files": 8,
+      "bytes": 111445222
+    },
+    "full/USDJPY-202610": {
+      "sha256": "47d8e3e0a39e0453099054f5a1ebf613ed701c1ea1c2fc3a7d66257ff7decb50",
+      "files": 7,
+      "bytes": 80111572
+    }
+  },
+  "retained_identity_mismatches_after_delete": [],
+  "deleted_gold_partitions": {
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202501": {
+      "sha256_before_delete": "cae511ebd6b537e97aa135100fbdcf6ead3c4689dc114d1598e5fb4d2c2c3130",
+      "files": 59,
+      "bytes": 185645374
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202502": {
+      "sha256_before_delete": "9593254b440cb75253c6d5b75ee4fd49bc7c2774b333150d5a90d54c51b9fd14",
+      "files": 60,
+      "bytes": 186208931
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202503": {
+      "sha256_before_delete": "2c0594c12cda226ad6edf8210675dbbf0a4af6fdbc7349c793089820d5c70c8a",
+      "files": 56,
+      "bytes": 174024684
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202504": {
+      "sha256_before_delete": "3c21243f875a15f15fa08ae12ff68eac353d04e68e5e9af2f8c1ce4a872888a6",
+      "files": 63,
+      "bytes": 197165853
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202505": {
+      "sha256_before_delete": "515645ce689b8417ff3dcc9424d9493681b043446f7883749306eabc2177ab8c",
+      "files": 54,
+      "bytes": 169223264
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202506": {
+      "sha256_before_delete": "4933333434d51303a922a48af12253c73f8c4d799f4ea12c8553f37af3a8319c",
+      "files": 49,
+      "bytes": 152980871
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202507": {
+      "sha256_before_delete": "0c56bd33680fcbad115fae82e86e6be27984bd5a85c9a744f60d0c1bd403b9fd",
+      "files": 43,
+      "bytes": 134312303
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202508": {
+      "sha256_before_delete": "07e59442f83918d4d94553a5d39ba2fb7d43a94d9c60deeb2f7aa70ff824812c",
+      "files": 45,
+      "bytes": 139939178
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202509": {
+      "sha256_before_delete": "e608735bb9e601bda038986aedf714ad4d72d56289b89dbec04c9a6bf19773ca",
+      "files": 59,
+      "bytes": 185608313
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202510": {
+      "sha256_before_delete": "8318acc9bc17f0fd77c06aaf27cdcc0e6d32d848e6d7c21fa31684763ae5f019",
+      "files": 94,
+      "bytes": 296033396
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202511": {
+      "sha256_before_delete": "1bb014403965c043662b6363af4fb2e86650c0fe1064a908c75634481b0b0802",
+      "files": 68,
+      "bytes": 212399101
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202512": {
+      "sha256_before_delete": "20663f9d9ea2ce1633c216fccd56c0b4b9416a66af67c0f481c138e11f51239e",
+      "files": 79,
+      "bytes": 249250951
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202601": {
+      "sha256_before_delete": "dafda41ac1d4dc9692ff00d32fb086d45c94eb03988228d1c0c227574295fbf3",
+      "files": 93,
+      "bytes": 292481837
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202602": {
+      "sha256_before_delete": "68a1773a3ce2a384de03211a17d57e10fb34b3b86b0a6068063143f2d9ff6532",
+      "files": 77,
+      "bytes": 241359595
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202603": {
+      "sha256_before_delete": "9fb1bdd7683ca4bb974539fdcdf6a1830b4deea982c3568f0755ff55c577aca5",
+      "files": 96,
+      "bytes": 303248195
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202604": {
+      "sha256_before_delete": "637be3e1e624e7cd80546d2f0d6ef7f51a71360654bd0ff74a824a6a84c7aab8",
+      "files": 76,
+      "bytes": 238234667
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202605": {
+      "sha256_before_delete": "a9bfaa9f5daf0fcc7cebee38282a1c8cc672da092dc42b53eb3603d325a12624",
+      "files": 85,
+      "bytes": 267354617
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202606": {
+      "sha256_before_delete": "2939b3c3715d6cd981da6852fcd1335b40aa310feb7b614cdcfa31fc7cef8fd9",
+      "files": 84,
+      "bytes": 262995941
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202607": {
+      "sha256_before_delete": "1dbf329f8068f867b1d95cbecb29b4170c190a22269df8b3cb895e6dafb961eb",
+      "files": 75,
+      "bytes": 235387835
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202608": {
+      "sha256_before_delete": "b9021425b4da8fa6abdb7495cea9892449ea0b6f0cb4638cb096c23478b7f5cd",
+      "files": 54,
+      "bytes": 166911857
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202609": {
+      "sha256_before_delete": "f044d7f329bfcca0362c47f972143a73399b6982abd818c2b35b0c8f375406d8",
+      "files": 67,
+      "bytes": 208805251
+    },
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202610": {
+      "sha256_before_delete": "91b34868e7c3ae17fb91a79bd3cd20a7ec1d0949e1d11e7621040f1fde88887e",
+      "files": 66,
+      "bytes": 206394433
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202501": {
+      "sha256_before_delete": "294e422019a812b804e29da9d650f5e9cf818dc211f0232ea2b2d6b0203bab7a",
+      "files": 13,
+      "bytes": 185567468
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202502": {
+      "sha256_before_delete": "ba72ec6699f8d283dde78efdc3261307ff4ecdf47c4a656c383e42e90c2b9bae",
+      "files": 13,
+      "bytes": 186129325
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202503": {
+      "sha256_before_delete": "df613ebb449131940d3c37cecb69797cd11339990ba7ff8f771c427c96d7488a",
+      "files": 12,
+      "bytes": 173950181
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202504": {
+      "sha256_before_delete": "012c53bb85726dcfbda476f092d463e82c81ecffef644de8101af3dd898f95af",
+      "files": 14,
+      "bytes": 197082878
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202505": {
+      "sha256_before_delete": "ec515f55b16050db8601edc7932a160b68667ef0174ed8a5ff6890470d065d59",
+      "files": 12,
+      "bytes": 169152145
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202506": {
+      "sha256_before_delete": "50c3f489242952bdee8e58baaf01ffbcd459a82096db714ec59831ac1db569e3",
+      "files": 11,
+      "bytes": 152916530
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202507": {
+      "sha256_before_delete": "49a5fed080fece2d587b447e2127793adc4c3329996e914279f76600800a21ed",
+      "files": 10,
+      "bytes": 134256430
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202508": {
+      "sha256_before_delete": "49e022fbe2f4c4e959fda1b9fe65b97f518dd977c54cabb1db8aebb0ca6d19d9",
+      "files": 10,
+      "bytes": 139879919
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202509": {
+      "sha256_before_delete": "e1e8a500fb0547bb2cae5d066310b9d457008d788d2dcd2fac10f26eb637bf30",
+      "files": 13,
+      "bytes": 185530419
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202510": {
+      "sha256_before_delete": "e0b23ca905083580be254c55958f45caaa5e92e1bf7dbef1fc6154df1e3c8abe",
+      "files": 20,
+      "bytes": 295908079
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202511": {
+      "sha256_before_delete": "2360c94a572a8dbf312140a16631f73c65fa9de57073bc198a6ad9e3eee751af",
+      "files": 15,
+      "bytes": 212309352
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202512": {
+      "sha256_before_delete": "80a82072bb6d99c9a8b50600ffb7d5a831c30d974ec406b6dfd536d21097aef8",
+      "files": 17,
+      "bytes": 249145957
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202601": {
+      "sha256_before_delete": "0327eadcaec0550df04616c48716738c178424638aab8c2b8905dee585e551c5",
+      "files": 20,
+      "bytes": 292358215
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202602": {
+      "sha256_before_delete": "cc96887ef0c861474015227a6e9c0c2a2e3802e1eaa33c2ca650bf4f48ff3379",
+      "files": 17,
+      "bytes": 241257987
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202603": {
+      "sha256_before_delete": "5e0bb04fefd1ba157fdd2044b85d28d504d0afd89220729bad291c9f630ffb2e",
+      "files": 20,
+      "bytes": 303119491
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202604": {
+      "sha256_before_delete": "061520143bf39cde6d53faf63a0df57ae6138b064f2629e54eec9718425b2765",
+      "files": 16,
+      "bytes": 238133061
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202605": {
+      "sha256_before_delete": "6840b75af284278f69b6e08871cd51521e42dd6022087a0a3279a466ed44cd86",
+      "files": 18,
+      "bytes": 267241155
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202606": {
+      "sha256_before_delete": "dfbc532553106bdffc86a79231a1d778a8a5613b0d5669afe80571e8c07e572b",
+      "files": 18,
+      "bytes": 262884150
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202607": {
+      "sha256_before_delete": "5aa602c1a89f54651d0a743aef3304e6724a46be9c3933102356f046a7efc286",
+      "files": 16,
+      "bytes": 235287685
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202608": {
+      "sha256_before_delete": "583b167a824013d23391f53a9b18b69a14cf1715cf12abd7aaa2c6a3580a3e25",
+      "files": 12,
+      "bytes": 166840589
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202609": {
+      "sha256_before_delete": "9a986e970c50e33ca55b5ff85c4c0691f65703978bc6f382b9a2042b26741103",
+      "files": 15,
+      "bytes": 208716977
+    },
+    "/root/workspace/historical-migration-output/full/XAUUSD-202610": {
+      "sha256_before_delete": "4576c1ec700ef1b19bd31d8c4b6ff8801e557fad3cace928791932539f3a92e6",
+      "files": 14,
+      "bytes": 206306125
+    }
+  },
+  "deleted_paths": [
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202501",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202502",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202503",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202504",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202505",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202506",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202507",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202508",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202509",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202510",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202511",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202512",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202601",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202602",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202603",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202604",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202605",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202606",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202607",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202608",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202609",
+    "/root/workspace/historical-migration-output/full-100k/XAUUSD-202610",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202501",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202502",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202503",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202504",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202505",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202506",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202507",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202508",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202509",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202510",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202511",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202512",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202601",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202602",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202603",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202604",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202605",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202606",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202607",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202608",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202609",
+    "/root/workspace/historical-migration-output/full/XAUUSD-202610",
+    "/root/workspace/historical-migration-output/XAUUSD-corpus.json",
+    "/root/workspace/historical-migration-output/audit-XAUUSD.json",
+    "/root/workspace/historical-migration-output/study-XAUUSD.json",
+    "/var/lib/hermes-factory/archives/XAUUSD-202501-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202502-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202503-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202504-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202505-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202506-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202507-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202508-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202509-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202510-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202511-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202512-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202601-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202602-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202603-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202604-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202605-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202606-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202607-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202608-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202609-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202610-ticks.zip",
+    "/var/lib/hermes-factory/archives/XAUUSD-202501.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202502.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202503.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202504.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202505.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202506.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202507.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202508.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202509.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202510.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202511.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202512.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202601.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202602.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202603.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202604.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202605.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202606.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202607.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202608.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202609.lock",
+    "/var/lib/hermes-factory/archives/XAUUSD-202610.lock"
+  ],
+  "files_deleted": 1875,
+  "bytes_freed": 10436202166,
+  "remaining_gold_paths_after_delete": [],
+  "preserved_as_immutable_superseded_audit_metadata": [
+    "/var/lib/hermes-factory/archives/XAUUSD-*-ticks.manifest.json",
+    "/var/lib/hermes-factory/archives/XAUUSD-*-ticks.page-sha256",
+    "/var/lib/hermes-factory/catalog/XAUUSD-*-import-report.json",
+    "/var/lib/hermes-factory/backfill/logs/XAUUSD-*.log",
+    "docs/historical-migration/studies/XAUUSD.json",
+    "docs/historical-migration/diagnostic-cache-v1/XAUUSD.cold.json",
+    "docs/historical-migration/diagnostic-cache-v1/XAUUSD.warm.json",
+    "docs/PROJECT_STATE.json and docs/REAL_DATA_MATRIX.json (eight-instrument receipts, superseded)"
+  ],
+  "limitations": [
+    "Content-addressed /var/lib/hermes-factory/catalog data directories are shared with FX partitions and were not deleted; no gold payload is opened by the active seven-instrument pipeline.",
+    "No source, licensing, calendar or scientific approval is implied."
+  ]
+}

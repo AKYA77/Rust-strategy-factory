@@ -51,11 +51,12 @@ fn minimum_volume_is_not_mistaken_for_a_nonmonotone_binary_search() {
     assert!(risk::size(&p, &Costs::default(), request()).is_err());
 }
 #[test]
-fn gold_and_jpy_margin_use_distinct_contract_scales_and_conversion() {
-    let gold = Profile::synthetic("XAUUSD").unwrap();
+fn margin_uses_contract_scale_and_event_aligned_conversion() {
+    // USD-quoted pair: identity conversion; scale/units are synthetic conventions.
+    let aud = Profile::synthetic("AUDUSD").unwrap();
     assert_eq!(
-        risk::margin(&gold, 250000, 1000, Conversion::usd()).unwrap(),
-        2_500_000
+        risk::margin(&aud, 100000, 1000, Conversion::usd()).unwrap(),
+        1_000_000
     );
     let jpy = Profile::synthetic("USDJPY").unwrap();
     let fx = Conversion {
@@ -135,13 +136,7 @@ fn all_eight_profiles_match_independent_exhaustive_grid_sizing_oracle() {
             },
             _ => Conversion::usd(),
         };
-        let entry = if symbol == "XAUUSD" {
-            250000
-        } else if symbol == "USDJPY" {
-            150000
-        } else {
-            100000
-        };
+        let entry = if symbol == "USDJPY" { 150000 } else { 100000 };
         for side in [Side::Long, Side::Short] {
             for equity in [1_000i128, 100_000, 1_000_000, 20_000_000] {
                 for commission in [0i64, 333_333, 10_000_000] {

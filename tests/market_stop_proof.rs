@@ -68,7 +68,7 @@ fn independent_necessary_condition_matches_reserve_for_all_profiles_sides_and_co
             }
         }
     }
-    assert_eq!(cases, 96);
+    assert_eq!(cases, 84);
 }
 #[test]
 fn proof_refuses_pending_adaptive_and_tampered_contexts() {

@@ -11,7 +11,7 @@ function failure(error){byId('error').textContent=error.message;}
 const form=byId('login');
 if(form){form.addEventListener('submit',async e=>{e.preventDefault();byId('error').textContent='';try{await api('/api/login',{password:byId('password').value});byId('password').value='';location.assign('/');}catch(error){failure(error);}});}
 else{
-const symbols=['EURUSD','GBPUSD','USDJPY','USDCHF','USDCAD','AUDUSD','NZDUSD','XAUUSD'];
+const symbols=['EURUSD','GBPUSD','USDJPY','USDCHF','USDCAD','AUDUSD','NZDUSD','GBPUSD'];
 for(const symbol of symbols){const option=el('option',symbol);option.value=symbol;byId('instrument').append(option);const board=el('article');board.className='card';board.append(el('h3',symbol),el('p','No independently qualified strategies.'));byId('boards').append(board);}
 let historyBefore=null,historyStack=[],historyNext=null,historyRequest=0;
 function historyControls(){byId('history-previous').disabled=historyStack.length===0;byId('history-next').disabled=historyNext===null;}

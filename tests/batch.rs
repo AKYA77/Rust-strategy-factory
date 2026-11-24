@@ -25,7 +25,7 @@ fn directory() -> PathBuf {
 }
 fn input(symbol: &str) -> Input {
     let p = Profile::synthetic(symbol).unwrap();
-    let base = if symbol == "XAUUSD" { 250000 } else { 100000 };
+    let base = if symbol == "GBPUSD" { 250000 } else { 100000 };
     let ticks = (0..1200)
         .map(|i| {
             let n = i % 120;
@@ -167,8 +167,8 @@ fn shared_batches_equal_independent_scalar_receipts_for_all_instruments_and_reus
         assert!(repeated.iter().all(|e| e.reused));
     }
     assert!(trades > 0);
-    assert_eq!(batch.counts().unwrap().attempts, 32);
-    assert_eq!(scalar.counts().unwrap().attempts, 32);
+    assert_eq!(batch.counts().unwrap().attempts, 28);
+    assert_eq!(scalar.counts().unwrap().attempts, 28);
     scalar.integrity().unwrap();
     batch.integrity().unwrap();
     drop(scalar);
@@ -516,8 +516,8 @@ fn indexed_training_batches_preserve_financial_receipts_and_audit_supported_case
             .all(|e| e.reused)
         );
     }
-    assert_eq!((fast, fallback), (20, 12));
-    assert_eq!(registry.counts().unwrap().attempts, 64);
+    assert_eq!((fast, fallback), (16, 12));
+    assert_eq!(registry.counts().unwrap().attempts, 56);
     registry.integrity().unwrap();
     drop(registry);
     std::fs::remove_dir_all(d).unwrap();

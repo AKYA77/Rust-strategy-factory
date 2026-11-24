@@ -282,8 +282,6 @@ pub fn synthetic_fixture(symbol: &str) -> Result<Dataset> {
     let p = Profile::synthetic(symbol)?;
     let base = if symbol == "USDJPY" {
         150 * p.price_scale
-    } else if symbol == "XAUUSD" {
-        2500 * p.price_scale
     } else {
         p.price_scale
     };

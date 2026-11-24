@@ -1547,7 +1547,7 @@ mod account_checkpoint_tests {
     fn serialized_account_boundaries_preserve_complete_state() {
         use crate::strategies::{EntryPlan, Features, Rule};
         let mut resolved = 0;
-        for symbol in ["EURUSD", "XAUUSD"] {
+        for symbol in ["EURUSD", "GBPUSD"] {
             let data = crate::data::synthetic_fixture(symbol).unwrap();
             for side in [Side::Long, Side::Short] {
                 for entry in [

@@ -1,7 +1,7 @@
 //! Real historical-data structural pipeline acceptance.
 //!
 //! Path: verified native corpus → observed source facts → closed M1 candles → causal
-//! signals, for all eight instruments on genuine VPS data. This is structural/diagnostic
+//! signals, for all seven instruments on genuine VPS data. This is structural/diagnostic
 //! only: it does not execute replay or grant eligibility. Corpus replay remains scoped to
 //! synthetic literal-USD inputs; real/FX conversion streams are not integrated.
 
@@ -13,8 +13,8 @@ use rust_strategy_factory::strategies::{Rule, Strategy};
 use rust_strategy_factory::tick_engine::{CorpusBudget, Costs};
 use std::path::{Path, PathBuf};
 
-const INSTRUMENTS: [&str; 8] = [
-    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD", "XAUUSD",
+const INSTRUMENTS: [&str; 7] = [
+    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD",
 ];
 const MONTH: &str = "202510";
 
@@ -221,12 +221,13 @@ fn real_historical_diagnostic_execution() {
             .maximum_drawdown_micro_usd
             .max(sample.maximum_drawdown_micro_usd);
     }
-    // Every instrument now executes; the diagnostic simulation never refuses a real
+    // Every active instrument executes; the diagnostic simulation never refuses a real
     // structurally-valid literal-USD corpus (the old 5/3 split was the pre-change gate).
-    assert_eq!(executed, 8, "all eight instruments must execute");
+    // XAUUSD is out of scope under the V2 mandate: only the seven FX instruments remain.
+    assert_eq!(executed, 7, "all seven active FX instruments must execute");
     assert_eq!(
-        identity, 5,
-        "USD-quoted instruments use the identity conversion"
+        identity, 4,
+        "USD-quoted FX instruments use the identity conversion"
     );
     assert_eq!(
         reciprocal, 3,

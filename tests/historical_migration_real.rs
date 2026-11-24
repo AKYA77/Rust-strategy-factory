@@ -6,11 +6,7 @@ use rust_strategy_factory::historical_migration::{self, Config};
 use std::path::{Path, PathBuf};
 
 fn migration_profile(symbol: &str) -> Profile {
-    let tick = if symbol == "USDJPY" || symbol == "XAUUSD" {
-        1_000
-    } else {
-        10
-    };
+    let tick = if symbol == "USDJPY" { 1_000 } else { 10 };
     Profile {
         symbol: symbol.into(),
         version: "migration-profile-v1".into(),
@@ -19,7 +15,7 @@ fn migration_profile(symbol: &str) -> Profile {
         price_scale: 1_000_000,
         tick,
         pip: tick * 10,
-        contract_units: if symbol == "XAUUSD" { 100 } else { 100_000 },
+        contract_units: 100_000,
         min_micro_lots: 10,
         step_micro_lots: 10,
         max_micro_lots: 1_000_000,

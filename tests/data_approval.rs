@@ -413,7 +413,7 @@ fn source_area_symbol_permissions_and_owner_only_secret_files_are_enforced() {
     );
     c.decide(&a, &p, f.request(&c, &a, Area::Source, Decision::Reject))
         .unwrap();
-    reviewer.grants[0].symbol = "XAUUSD".into();
+    reviewer.grants[0].symbol = "GBPUSD".into();
     let path = f.root.join("wrong-symbol.secret");
     Authority::initialize(&path, vec![reviewer]).unwrap();
     let a = Authority::load(&path).unwrap();

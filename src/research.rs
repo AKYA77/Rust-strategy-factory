@@ -816,6 +816,32 @@ pub fn evaluate_batch_report(
         audit_coverage,
     })
 }
+/// Explicit stage policy for the training loop.
+///
+/// A candidate index is an enumeration artifact, never an authorization signal.
+/// Every candidate enters at TickVerification; promotion to CandleScreen and any
+/// protected validation are explicit transitions recorded by the stage machine,
+/// not selected by arithmetic on the index.
+pub(crate) fn training_stage(_candidate_index: u64) -> crate::storage::Stage {
+    crate::storage::Stage::TickVerification
+}
+
+#[cfg(test)]
+mod stage_policy_tests {
+    use super::*;
+
+    #[test]
+    fn candidate_index_never_selects_a_protected_stage() {
+        for index in 0..256 {
+            assert_eq!(
+                training_stage(index),
+                crate::storage::Stage::TickVerification,
+                "index {index} must not imply a protected stage"
+            );
+        }
+    }
+}
+
 /// Bounded novel parameter regions; no cycling through already completed template ranges.
 pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strategy)> {
     static TEMPLATES: std::sync::OnceLock<Vec<strategies::Candidate>> = std::sync::OnceLock::new();
@@ -932,9 +958,9 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
         s.stop_ticks += region as i64;
         if let Some(session_hour) = s.rule.orb_session_mut() {
             *session_hour = match region % 3 {
-                0 => 0u8,   // Asian
-                1 => 8u8,   // London
-                _ => 13u8,  // New York
+                0 => 0u8,  // Asian
+                1 => 8u8,  // London
+                _ => 13u8, // New York
             };
         }
     } else {
@@ -1264,14 +1290,13 @@ impl Driver {
         let input_index = s.cursor as usize % self.inputs.len();
         let candidate_index = s.cursor / self.inputs.len() as u64;
         let (_, strategy) = candidate_at(candidate_index, self.config.seed)?;
-        // Cycle through all 3 stages: TickVerification → CandleScreen → IndependentValidation
-        // Start with TickVerification (candidate_index=0) so the first experiment is
-        // immediately diagnosable (authorize() requires TickVerification or valid protocol).
-        let stage = match candidate_index % 3 {
-            0 => Stage::TickVerification,
-            1 => Stage::CandleScreen,
-            _ => Stage::IndependentValidation,
-        };
+        // V2 mandate P0.2: the former `candidate_index % 3` rotation labelled
+        // training-window experiments as IndependentValidation. A training window
+        // is not independent evidence, so a candidate index may never select a
+        // protected stage. Every training candidate enters explicitly at
+        // TickVerification; promotion to CandleScreen and any protected
+        // validation are separately authorized stage transitions.
+        let stage = training_stage(candidate_index);
         let stage_for_eval = stage.clone();
         let stage_for_improvement = stage.clone();
         let evaluation = match stage_for_eval {

@@ -4,7 +4,7 @@ use rust_strategy_factory::{
     contracts::{Conversion, Profile, SYMBOLS, Side},
     data::{self, Tick},
     research::{self, BatchOptions, EvaluationOptions, Input},
-    storage::{Claim, Registry},
+    storage::{Claim, Registry, Stage},
     strategies::{Features, Rule, Strategy},
     tick_engine::Costs,
 };
@@ -39,6 +39,7 @@ fn options() -> EvaluationOptions<'static> {
     EvaluationOptions {
         feature_cells: 1_000_000,
         evaluation: None,
+        stage: Stage::TickVerification,
         shadow_policy: None,
         proof_policy: None,
         indexed_policy: None,
@@ -52,7 +53,7 @@ fn main() {
         .iter()
         .map(|symbol| {
             let p = Profile::synthetic(symbol).unwrap();
-            let base = if *symbol == "XAUUSD" {
+            let base = if *symbol == "GBPUSD" {
                 250000
             } else if *symbol == "USDJPY" {
                 150000

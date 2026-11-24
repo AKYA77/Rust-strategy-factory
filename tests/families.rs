@@ -219,19 +219,73 @@ fn every_family_reaches_nonzero_closed_tick_trades_on_actual_synthetic_events() 
     let mut f = Features::new(&c, c.len() * 40).unwrap();
     let candidates = strategies::family_templates();
     for family in Family::ALL {
-        // ORB strategies need session boundaries which synthetic data lacks;
-        // skip if no ORB candidate produces a signal on this fixture.
+        // ORB needs a completed session range; the generic oscillating fixture has
+        // no causal opening range. Use an explicit positive fixture for both the
+        // signal and the tick replay (no silent skip).
         if family == Family::Orb {
-            let has_orb_signal = candidates.iter().any(|candidate| {
-                candidate.family == Family::Orb
-                    && candidate.strategy.timeframe == Timeframe::M1
-                    && candidate.strategy.side == Side::Long
-                    && candidate.strategy.stop_ticks == 150
-                    && f.signal(&candidate.strategy.rule).unwrap().count() > 0
-            });
-            if !has_orb_signal {
-                continue;
-            }
+            let base_ms = 1736146200000i64; // 2025-01-06T06:50:00Z
+            let ticks: Vec<Tick> = (0..70)
+                .map(|i| {
+                    let price = match i {
+                        20 => 100_050, // 07:10 window high
+                        30 => 99_950,  // 07:20 window low
+                        40 => 100_060, // 07:30 causal breakout
+                        i if i > 40 => 100_060 + (i - 40) * 100,
+                        _ => 100_000,
+                    };
+                    Tick {
+                        timestamp_ms: base_ms + i * 60_000,
+                        sequence: i as u64,
+                        bid: price,
+                        ask: price + 20,
+                    }
+                })
+                .collect();
+            let d = data::dataset(
+                Profile::synthetic("EURUSD").unwrap(),
+                ticks,
+                "SYNTHETIC_TEST_ONLY orb families fixture",
+                "generated".into(),
+                true,
+            )
+            .unwrap();
+            let c = candles::build(&d, Timeframe::M1).unwrap();
+            let mut f = Features::new(&c, c.len() * 40).unwrap();
+            let rule = Rule::OrbLongBreakout {
+                window_minutes: 30,
+                session_hour: 7,
+            };
+            let mask = f.signal(&rule).unwrap();
+            assert!(
+                mask.count() > 0,
+                "ORB must produce at least one causal signal on a known completed range"
+            );
+            let mut strategy = candidates
+                .iter()
+                .find(|candidate| {
+                    candidate.family == Family::Orb
+                        && candidate.strategy.timeframe == Timeframe::M1
+                        && candidate.strategy.side == Side::Long
+                        && candidate.strategy.stop_ticks == 150
+                })
+                .expect("ORB M1 long template")
+                .strategy
+                .clone();
+            strategy.rule = rule;
+            let replay = tick_engine::replay(
+                &d,
+                &c,
+                &mask,
+                &strategy,
+                &Costs::default(),
+                &vec![Conversion::usd(); d.ticks.len()],
+            )
+            .unwrap();
+            assert!(
+                !replay.trades.is_empty(),
+                "ORB must reach a closed tick trade"
+            );
+            continue;
         }
         let strategy = &candidates
             .iter()

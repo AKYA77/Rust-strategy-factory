@@ -1170,7 +1170,7 @@ fn boards_enforce_capacity_diversity_and_never_fill_with_unqualified() {
     }
     // Other instruments remain honestly empty with exact reasons.
     let others = store.boards(&f.authority).unwrap();
-    assert_eq!(others.len(), 8);
+    assert_eq!(others.len(), 7);
     for view in others.iter().filter(|v| v.instrument != "EURUSD") {
         assert!(view.entries.is_empty());
         assert!(

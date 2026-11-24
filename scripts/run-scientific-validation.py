@@ -34,7 +34,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 DEFAULT_INSTRUMENTS = [
-    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD", "XAUUSD",
+    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD", "GBPUSD",
 ]
 DRIVER_VERSION = "scientific-validation-driver-v1"
 LIMITATIONS = (

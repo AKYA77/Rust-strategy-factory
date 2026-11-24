@@ -1,36 +1,94 @@
 # Next action
 
-Status: SOFTWARE_INCOMPLETE. Use the existing checkout. Read AGENTS.md, PROJECT_STATE.json, IMPLEMENTATION_QUEUE.md and relevant MASTER_BLUEPRINT.md requirements. After every verified milestone update evidence/state/this file, commit, push, check remote/hosted CI, reread this file from disk and continue.
+Status: SOFTWARE_INCOMPLETE. Use the existing checkout at `/root/workspace/Rust-strategy-factory`.
+Read AGENTS.md, PROJECT_STATE.json (superseded eight-instrument fields), IMPLEMENTATION_QUEUE.md,
+MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone update
+evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
+continue. Never treat a pending CI run as passed.
 
-## Latest verified local milestone
+## Latest verified local milestone (2026-11-24)
 
-Current HEAD `bda7fca` on `main` == `origin/main` (pushed). Merge commit `bda7fca` "Merge pull request #54 from AKYA77/pr/51-base" merges PR #54 (20-month training window Jan 2025-Aug 2026 + Sep/Oct 2026 OOS holdout; Conversion::usd sentinel contract restored). PR #54 head f61bb6c is an ancestor of origin/main (containment proven via git merge-base --is-ancestor); no force-push, no branch deletion; PR #54 closed as merged with history preserved. PR #51 (continuous diagnostic accounting hygiene) was previously merged via 2fd5104 (hosted CI runs 45362955070/45362943643 all success; PR closed). No open PRs remain.
+Base HEAD `e772334` (== PDF-pinned remote HEAD). Working tree carries the V2 seven-instrument
+scope + P0 correctness changes; no commit has been made yet for this milestone.
 
-- Hosted CI run 45402952012 (push, main, head_sha bda7fca) is in progress on all 7 jobs: release-build, data-compute-identity, check-operations, full-horizon, rust-checks, browser, dependency-audit. CI evidence will be recorded only after the run concludes; do not report success on an in-progress run. Prior green: hosted CI run 45339910079 on ba66956 (PR #52) success on all 7 jobs; PR-level CI for PR #51 (sha 290b760) and PR #54 (sha f61bb6c) all success.
+- `scripts/check.sh` on `RSF_BUILDER_PROFILE=hermes-v2-m1`: **EXIT=0**, 65 test suites,
+  **694 passed / 0 failed**, fmt clean, Clippy `-D warnings` clean. Log:
+  `/root/.hermes/cache/scratch/m1-check16.log` (outside repo; durable evidence is the commit +
+  hosted CI below).
+- Scope: `Profile::SYMBOLS` = EURUSD GBPUSD AUDUSD NZDUSD USDJPY USDCAD USDCHF. XAUUSD submissions
+  are rejected (`gold_submission_rejected`); gold calendar checks removed; the 2026-11-21 market
+  calendar approval is WITHDRAWN (profile session weeks/hours only, addendum checks retained).
+- ORB causal replay fixed (`tests/orb_causality.rs` positive causality/order regressions);
+  `tests/families.rs` uses a dedicated completed-range ORB fixture and may no longer skip ORB.
+- Removed the false `candidate_index % 3` stage rotation. Every training candidate enters
+  explicitly at TickVerification. Durable crash-safe stage transitions are NOT implemented yet.
+- Conversion identity sentinel now quote-conditioned (USD-quote only); non-USD quotes require an
+  event-aligned observation. Registered corpus mode still refuses non-USD profiles unless a
+  conversion file is supplied; continuous event-aligned conversion support is NOT complete.
+- Data-validation addendum implemented in `src/data_validation.rs` (timestamp ties vs duplicate
+  `(timestamp_ms, sequence)` identities, time-based gap evidence, bounded streaming examples with
+  exact counters) and `src/economic_calendar.rs` (instrument-identity filtering, causal
+  availability, interval validation).
 
-- PR #52 (registered full-period real-data executor over the 22-month corpus): execute_continuous replays each registered month through execute_month, chains each month's ending marked equity into the next month's starting equity, and reports compounded full-period equity, cross-month continuous losing streak and full-period peak-to-trough max drawdown. All 8 instruments execute (176/176 months, 0 refused); diagnostic only, never registers or qualifies. Evidence: tests/registered_full_period.rs.
+### Gold-only data deletion (verified)
 
-- Prior milestone (historical, superseded): HEAD 0ba942e merged PRs #44, #45, #47, #48 via commit 0ba942e; hosted CI run 45031961750 success; those PRs closed as superseded with history preserved.
+Receipt: `docs/VERIFICATION/xauusd-removal-2026-11-24.json`. No corpus job was active (the only
+long-running process is the dashboard `serve`, which holds no corpus files open).
 
-## Implement next
+- Deleted 44 XAUUSD-only partitions across both project-owned roots
+  (`historical-migration-output/full-100k/` and `.../full/`), plus
+  `XAUUSD-corpus.json`, `audit-XAUUSD.json`, `study-XAUUSD.json`, 22 tick archives and 22 locks.
+- **10,436,202,166 bytes freed**; 1,875 files deleted; remaining gold paths under both roots: 0.
+- All **308 retained FX partitions** were hashed before mutation and re-hashed after deletion:
+  **0 identity mismatches**. Retained counts: 154 partitions per root, 7 instruments.
+- Preserved as immutable superseded audit metadata: gold manifests/page-sha256, import reports,
+  backfill logs and study/diagnostic-cache JSON. See
+  `docs/VERIFICATION/superseded-eight-instrument-receipts.md`.
 
-Next steps are external-evidence gated, not implementation:
+## Implement next (ordered)
 
-(a) Owner manual reboot for reboot-persistence evidence. `systemctl reboot` is on the agent's unconditional blocklist — the owner must reboot the VPS manually to complete target-VPS acceptance. Reboot persistence is verified by enabled units + active user linger (Linger=yes); no disruptive reboot executed by the agent. Receipt: docs/VERIFICATION/vps-live-acceptance-2026-11-21.json.
+1. **P0.2 full-corpus coverage**: replace the 160-path Jan 2025–Aug 2026 first-chunk config with
+   ordered consumption of every eligible chunk for the specified stage; record ordered coverage;
+   keep round-robin research selection independent from coverage evidence.
+2. **P0.2 proof authorization contract**: reproduce that `improvement::authorize` rejects
+   `Stage::CandleScreen` while proof-policy evaluation invokes it; correct the contract without
+   bypassing authorization.
+3. **P0.3 continuous accounting/currency**: one continuous chronological account state across
+   months (feature history + open positions, exact intraperiod drawdown, correct streak logic)
+   and event-aligned conversion support for USDJPY/USDCHF/USDCAD in registered corpus mode.
+4. **P0.4 real-data scientific path**: implement the approved real-data qualification path in
+   `src/science.rs`/`qualification.rs` bound to actual accounting receipts; recompute all counters
+   from immutable receipts; audit prior exposure of the 22-month window before claiming any
+   holdout is unseen (else mark contaminated).
+5. **Milestone 2**: replace the broad enumerator with exactly ten fixed-daily-checkpoint families
+   and the 70 instrument-family groups / max-35 leaderboard, with per-family contract tests.
+6. **Milestone 3**: durable stage transitions, 40% Stage-1 policy with proven-bound handling,
+   bounded population, immutable evaluator, telemetry/lineage.
+7. **Milestones 4–7**: shared preparation caches, full validation, measured optimization
+   (correctness first, reference-equivalence proofs), VPS acceptance evidence.
 
-(b) External-evidence gates: real-data acquisition disabled by owner — 22-month local corpus (2025-01..2026-10, 176 partitions, 421,078,937 events) is the final dataset, no Dukascopy/HistData/FXOpen/TrueFX retries; broker/session/profile/calendar conversion facts absent (broker dependency removed — deterministic broker-independent execution-cost model; market calendar policy approved — all valid available data incl. Sunday sessions; scientific criteria owner-approved; legal local-only — REAL_STRUCTURALLY_VALID is not eligibility). 0 instruments research-eligible — a numerical result on diagnostic evidence, not an external gate.
+## Owner decisions (V2, 2026-11-24)
 
-Continue the remaining software queue — full end-to-end acceptance with hardware/resource evidence, resumable sources/imports/coverage acceptance — without weakening financial, provenance, scientific or security safeguards. The converted native corpus is REAL_STRUCTURALLY_VALID only and grants no calendar completeness, profile approval, source licensing, scientific eligibility or qualification.
-
-## Owner decisions (final, 2026-11-21)
-
-* Broker dependency: REMOVED. Deterministic broker-independent execution-cost model: fixed 2.0 pip spread, fixed 2.0 pip slippage per side, zero commission, no broker-specific swap/financing, no broker API/account/credentials/connectivity. Never add commission to the $0-commission research scenario.
-* External data acquisition: DISABLED. 22-month local corpus (2025-01..2026-10, 176 partitions, 421M events) is the final dataset. No Dukascopy/HistData/FXOpen/TrueFX retries.
-* Market calendar policy: APPROVED. Trade when instrument market is open; include Sunday evening FX sessions and Friday sessions before close; respect gold-market breaks; handle holidays/DST with UTC-normalized timestamps; never invent candles/ticks/prices during closed sessions.
-* Scientific protocol: owner-approved. >=50.00% verified net win rate per instrument; <=5 consecutive losses; 3:1 RR target; keep 5 best qualified strategies per instrument; preserve OOS testing, leakage prevention, robustness checks. Synthetic never qualifies.
-* Legal review: local corpus provenance documented; no redistribution; no invented license approval.
-* Target VPS acceptance: continue testing against existing 4-vCPU/8-GB environment — production builds, local dataset loading, systemd service behavior, bounded memory/CPU, safe restart/recovery. Reboot persistence half requires owner manual reboot (agent blocklist).
+* Active instruments: exactly the seven FX symbols above; XAUUSD forbidden and its project-owned
+  data deleted.
+* Market calendar policy approved 2026-11-21: **WITHDRAWN**. Session logic uses profile
+  week/hour masks; no calendar completeness or closed-session claims.
+* Broker dependency: REMOVED (deterministic broker-independent cost model: 2-pip spread floor,
+  separate 2-pip adverse slippage, zero commission).
+* External data acquisition: DISABLED. The local 22-month corpus (2025-01..2026-10, 154 FX
+  partitions/root) is final; no downloads.
+* Scientific protocol: >=50.00% net win rate, >=50 resolved exits per calendar year, max loss
+  streak 5, no unresolved positions, full-window evidence; synthetic never qualifies. 70%+ is an
+  aspiration, not a gate. The 12+6+4 split remains conditional on an exposure audit.
+* Target VPS acceptance: continue against the existing 4-vCPU/8-GB environment. Reboot
+  persistence requires an owner manual reboot (agent blocklist).
 
 ## Invariants
 
-Exact executable bid/ask, 2-pip spread floor plus separate 2-pip adverse market/stop slippage, zero commission, 10% intended risk/$20 initial/3R/24h; frozen pending distance/quantity; no fabricated gaps/fills/depth; no protected OOS/final adaptation; synthetic never qualifies. Qualification needs independent approved complete evidence, not a high test count or tiny benchmark.
+Exact executable bid/ask, 2-pip spread floor plus separate 2-pip adverse slippage, zero commission,
+$20 initial / 10% intended risk / planned 3:1 RR / 24h max holding; frozen pending
+distance/quantity; no fabricated gaps/fills/depth; no protected OOS or final adaptation; synthetic
+never qualifies; one scheduled evaluation per eligible session-day (zero or one entry, deterministic
+skip, no forced retry). Qualification requires independent approved complete evidence, not a high
+test count or a benchmark. Structural validity is not licensing, calendar, profile or scientific
+approval.

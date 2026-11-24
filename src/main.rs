@@ -169,8 +169,18 @@ fn research_inputs(config_path: &str) -> Result<(Vec<research::Input>, research:
         )?;
         let conversions = if let Some(path) = input.conversions {
             read_json(base.join(path).to_str().ok_or("non-UTF8 conversion path")?)?
-        } else {
+        } else if dataset.profile.quote == "USD" {
+            // USD-quoted instruments use the documented identity conversion.
             vec![Conversion::usd(); dataset.ticks.len()]
+        } else {
+            // V2 mandate P0.3: an absent conversion file must never silently
+            // become an identity conversion for USDJPY/USDCHF/USDCAD. Only
+            // approved, event-aligned rates may be used, and diagnostic
+            // reciprocal rates may never be relabelled as registered results.
+            return Err(format!(
+                "non-USD quote instrument {} requires an explicit approved event-aligned conversion file",
+                dataset.profile.symbol
+            ));
         };
         inputs.push(research::Input {
             dataset,
@@ -1034,7 +1044,7 @@ fn run(args: &[String]) -> Result<()> {
                 Path::new(root),
                 Path::new(output_root),
                 &[
-                    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD", "XAUUSD",
+                    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD",
                 ],
                 rust_strategy_factory::historical_corpus::EXPECTED_MONTHS,
             )?;
@@ -2668,7 +2678,9 @@ fn run(args: &[String]) -> Result<()> {
                 })
                 .transpose()?;
             let evaluation_ref = evaluation.as_ref();
-            let stage = evaluation_ref.map(|e| e.stage.clone()).unwrap_or(rust_strategy_factory::storage::Stage::TickVerification);
+            let stage = evaluation_ref
+                .map(|e| e.stage.clone())
+                .unwrap_or(rust_strategy_factory::storage::Stage::TickVerification);
             let report = research::evaluate_batch_report(
                 &mut Registry::open(Path::new(database))?,
                 &input,

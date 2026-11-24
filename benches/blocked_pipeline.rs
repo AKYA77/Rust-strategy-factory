@@ -12,11 +12,11 @@ use rust_strategy_factory::{
 };
 use serde_json::{Value, json};
 use std::{fs, path::Path, process::Command, time::Instant};
-const SYMBOLS: [&str; 5] = ["EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "XAUUSD"];
+const SYMBOLS: [&str; 5] = ["EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "GBPUSD"];
 const FORMATS: [&str; 3] = ["native", "block256", "block8192"];
 fn fixture(symbol: &str) -> Dataset {
     let p = Profile::synthetic(symbol).unwrap();
-    let base = if symbol == "XAUUSD" {
+    let base = if symbol == "GBPUSD" {
         2500 * p.price_scale
     } else {
         p.price_scale

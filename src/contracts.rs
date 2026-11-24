@@ -4,8 +4,12 @@ use serde::{Deserialize, Serialize};
 
 pub const INITIAL_EQUITY: i128 = 20_000_000;
 pub const MAX_HOLD_MS: i64 = 86_400_000;
-pub const SYMBOLS: [&str; 8] = [
-    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD", "XAUUSD",
+/// Final owner-approved research scope (V2 mandate, 2026-11-24): seven FX pairs.
+/// XAUUSD was removed from the active scope; gold submissions are rejected and
+/// project-owned gold-only data was deleted. Historical eight-symbol receipts are
+/// retained as immutable audit evidence but are superseded, not current.
+pub const SYMBOLS: [&str; 7] = [
+    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD",
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -32,23 +36,22 @@ impl Profile {
         if !SYMBOLS.contains(&symbol) {
             return Err("unsupported instrument".into());
         }
-        let gold = symbol == "XAUUSD";
         let jpy = symbol == "USDJPY";
         Ok(Self {
             symbol: symbol.into(),
             version: "synthetic-v1".into(),
             base: symbol[..3].into(),
             quote: symbol[3..].into(),
-            price_scale: if gold { 100 } else if jpy { 1000 } else { 100_000 },
+            price_scale: if jpy { 1000 } else { 100_000 },
             tick: 1,
-            pip: if gold { 1 } else { 10 },
-            contract_units: if gold { 100 } else { 100_000 },
+            pip: 10,
+            contract_units: 100_000,
             min_micro_lots: 10,
             step_micro_lots: 10,
             max_micro_lots: 1_000_000,
             leverage: 100,
             min_stop_ticks: 1,
-            provenance: "SYNTHETIC_TEST_ONLY; arbitrary test volume/leverage; gold pip=0.01 is a test convention, not approved".into(),
+            provenance: "SYNTHETIC_TEST_ONLY; arbitrary test volume/leverage conventions, never broker specifications or approved research parameters".into(),
             research_only: true,
         })
     }
@@ -149,6 +152,9 @@ impl Conversion {
             || self.quote_den > 1_000_000_000
             || self.as_of_ms > event_ms
             || (p.quote == "USD" && (self.usd_num != self.quote_den))
+            // The identity sentinel is valid only for USD-quoted instruments;
+            // a non-USD quote must carry a real, event-aligned observation.
+            || (p.quote != "USD" && self.as_of_ms == i64::MIN)
             || (p.quote != "USD"
                 && self.as_of_ms != i64::MIN
                 && i128::from(event_ms) - i128::from(self.as_of_ms) > i128::from(max_age_ms))

@@ -363,3 +363,36 @@ pub fn friction_stop_probe(
     child.stop_ticks = ticks as i64;
     Ok(Some(child.canonical()?))
 }
+
+#[cfg(test)]
+mod authorization_tests {
+    use super::*;
+
+    fn key(stage: Stage) -> ExperimentKey {
+        ExperimentKey {
+            concept_hash: "test".into(),
+            instrument: "EURUSD".into(),
+            dataset_hash: "test".into(),
+            start_ms: 0,
+            end_exclusive_ms: 1,
+            signal_version: crate::SIGNAL_VERSION.into(),
+            indicator_version: crate::INDICATOR_VERSION.into(),
+            cost_hash: "test".into(),
+            fill_policy: "test".into(),
+            profile_hash: "test".into(),
+            engine_version: crate::ENGINE_VERSION.into(),
+            protocol_hash: crate::data::hash(&"training-only-conservative-signals-v1").unwrap(),
+            code_revision: "test".into(),
+            configuration_hash: "test".into(),
+            stage,
+        }
+    }
+
+    #[test]
+    fn candle_screen_never_authorizes_adaptation() {
+        // The proof screen invokes CandleScreen for screening; adaptation may not
+        // consume a screen-only result as training evidence. This is a deliberate
+        // authorization boundary, not a missing case to be bypassed.
+        assert!(authorize(&key(Stage::CandleScreen)).is_err());
+    }
+}

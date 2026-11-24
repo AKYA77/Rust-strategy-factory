@@ -442,66 +442,6 @@
     },
     {
       "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202608/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202501/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202502/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202503/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202504/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202505/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202506/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202507/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202508/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202509/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202510/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202511/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202512/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202601/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202602/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202603/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202604/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202605/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202606/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202607/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202608/chunk-000000.rsf"
     }
   ]
 }

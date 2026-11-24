@@ -252,7 +252,8 @@ impl Rule {
                 Rule::OrbLongBreakout {
                     window_minutes,
                     session_hour,
-                } | Rule::OrbShortBreakout {
+                }
+                | Rule::OrbShortBreakout {
                     window_minutes,
                     session_hour,
                 } => {
@@ -492,79 +493,60 @@ impl<'a> Features<'a> {
                     .map(|i| if i == 0 { None } else { current[i - 1] })
                     .collect()
             }
-            Feature::SessionOpenHigh(window_minutes, _) | Feature::SessionOpenLow(window_minutes, _) => {
-                use chrono::{Datelike, Timelike};
+            Feature::SessionOpenHigh(window_minutes, session_hour)
+            | Feature::SessionOpenLow(window_minutes, session_hour) => {
                 let is_high = matches!(key, Feature::SessionOpenHigh(_, _));
-                let window_ms = window_minutes as i64 * 60_000;
-                let mut values: Vec<Option<i64>> = Vec::with_capacity(self.candles.len());
-                // Detect session boundaries: a new session starts when the candle's
-                // UTC hour equals session_hour AND it's the first such candle after
-                // a different hour (i.e., session rollover).
-                let mut session_start_idx: Option<usize> = None;
-                let mut current_session_ymd: Option<(i32, u32, u32)> = None;
+                let window_ms = (window_minutes as i64)
+                    .checked_mul(60_000)
+                    .ok_or("session opening window overflow")?;
+                if window_ms < 0 {
+                    return Err("negative session opening window".into());
+                }
+                let hour = (session_hour as i64).min(23);
+                let mut values: Vec<Option<i64>> = vec![None; self.candles.len()];
+                // A session starts at `hour:00` UTC on a date and runs overnight:
+                // candles before that hour belong to the previous date's session.
+                // The session key is therefore the most recent session start at or
+                // before the candle, never "the hour changed".
+                let mut session_start: Option<i64> = None;
                 let mut range_high: Option<i64> = None;
                 let mut range_low: Option<i64> = None;
-                let mut range_computed = false;
+                let mut in_window_candles = 0_usize;
+                let mut published = false;
                 for (i, c) in self.candles.iter().enumerate() {
-                    let dt = chrono::DateTime::from_timestamp_millis(c.available_ms).unwrap();
-                    let hour = dt.hour() as u8;
-                    let ymd = (dt.year(), dt.month(), dt.day());
-                    // New session day or session hour rollover
-                    let new_session = current_session_ymd.map_or(true, |d| d != ymd)
-                        || session_start_idx.map_or(true, |s| {
-                            let sdt = chrono::DateTime::from_timestamp_millis(self.candles[s].available_ms).unwrap();
-                            sdt.hour() as u8 != hour || (sdt.year(), sdt.month(), sdt.day()) != ymd
-                        });
-                    if new_session {
-                        // Finalize previous session's range for all its candles
-                        if let Some(start) = session_start_idx {
-                            let rh = range_high.unwrap_or(0);
-                            let rl = range_low.unwrap_or(0);
-                            for j in start..i {
-                                while values.len() <= j {
-                                    values.push(None);
-                                }
-                                values[j] = if is_high { Some(rh) } else { Some(rl) };
-                            }
-                        }
-                        session_start_idx = Some(i);
-                        current_session_ymd = Some(ymd);
-                        range_high = Some(c.bid.high);
-                        range_low = Some(c.bid.low);
-                        range_computed = false;
+                    let day_start = c
+                        .start_ms
+                        .div_euclid(86_400_000)
+                        .checked_mul(86_400_000)
+                        .ok_or("session day overflow")?;
+                    let candidate = day_start + hour * 3_600_000;
+                    let this_session = if candidate <= c.start_ms {
+                        candidate
                     } else {
-                        // Still within the opening window?
-                        let session_start_ms = self.candles[session_start_idx.unwrap()].available_ms;
-                        if c.available_ms - session_start_ms < window_ms {
-                            // Still in opening range - update high/low
-                            range_high = range_high.map(|h| h.max(c.bid.high)).or(Some(c.bid.high));
-                            range_low = range_low.map(|l| l.min(c.bid.low)).or(Some(c.bid.low));
-                        } else if !range_computed {
-                            // Opening window just ended - finalize range
-                            range_computed = true;
-                        }
+                        candidate - 86_400_000
+                    };
+                    if session_start != Some(this_session) {
+                        session_start = Some(this_session);
+                        range_high = None;
+                        range_low = None;
+                        in_window_candles = 0;
+                        published = false;
                     }
-                    // Push current value: after range is computed, use it; during window, use None (no signal yet)
-                    while values.len() <= i {
-                        values.push(None);
+                    let session_end = this_session + window_ms;
+                    // Accumulate only strictly inside the opening window and only
+                    // until the range is frozen; later candles never rewrite it.
+                    if !published && c.start_ms >= this_session && c.start_ms < session_end {
+                        range_high = Some(range_high.map_or(c.bid.high, |h| h.max(c.bid.high)));
+                        range_low = Some(range_low.map_or(c.bid.low, |l| l.min(c.bid.low)));
+                        in_window_candles = in_window_candles.saturating_add(1);
                     }
-                    if range_computed {
+                    // Causal publication: the completed range is knowable only at
+                    // the first candle published at/after the window boundary.
+                    if !published && in_window_candles > 0 && c.available_ms >= session_end {
+                        published = true;
+                    }
+                    if published {
                         values[i] = if is_high { range_high } else { range_low };
-                    } else {
-                        values[i] = None;
-                    }
-                }
-                // Finalize last session
-                if let Some(start) = session_start_idx {
-                    let rh = range_high.unwrap_or(0);
-                    let rl = range_low.unwrap_or(0);
-                    for j in start..self.candles.len() {
-                        while values.len() <= j {
-                            values.push(None);
-                        }
-                        if range_computed || j >= start {
-                            values[j] = if is_high { Some(rh) } else { Some(rl) };
-                        }
                     }
                 }
                 values
@@ -626,7 +608,14 @@ impl<'a> Features<'a> {
                         out.insert(Feature::TrueRange);
                         out.insert(Feature::PriorRangeMean(*window));
                     }
-                    Rule::OrbLongBreakout { window_minutes, session_hour } | Rule::OrbShortBreakout { window_minutes, session_hour } => {
+                    Rule::OrbLongBreakout {
+                        window_minutes,
+                        session_hour,
+                    }
+                    | Rule::OrbShortBreakout {
+                        window_minutes,
+                        session_hour,
+                    } => {
                         out.insert(Feature::SessionOpenHigh(*window_minutes, *session_hour));
                         out.insert(Feature::SessionOpenLow(*window_minutes, *session_hour));
                     }
@@ -667,26 +656,35 @@ impl<'a> Features<'a> {
     }
 
     /// Returns a mask where `true` means the candle is NOT near a high-impact
-    /// economic news event (safe to trade), `false` means avoid trading.
-    /// If no economic calendar is configured, all candles are safe (all true).
-    pub fn news_blackout_mask(&self, window_minutes: i64) -> SparseMask {
-        let window_ms = window_minutes as i64 * 60_000;
+    /// economic news event for its instrument.
+    ///
+    /// Unavailable calendar data is an explicit error: the absence of an approved
+    /// calendar never certifies safety, and a missing frame context never falls
+    /// back to an empty symbol.
+    pub fn news_blackout_mask(&self, window_minutes: i64) -> Result<SparseMask> {
+        let window_ms = window_minutes
+            .checked_mul(60_000)
+            .ok_or("news blackout window overflow")?;
+        if window_ms < 0 {
+            return Err("negative news blackout window".into());
+        }
+        let calendar = self
+            .economic_calendar
+            .ok_or("economic calendar unavailable; news blackout cannot certify safety")?;
+        let instrument = self
+            .context
+            .map(|(d, _)| d.profile.symbol.as_str())
+            .ok_or("news blackout requires an instrument dataset context")?;
         let mut bools = Vec::with_capacity(self.close.len());
         for candle in self.candles.iter() {
-            let safe = match &self.economic_calendar {
-                Some(cal) => {
-                    let instrument = self
-                        .context
-                        .map(|(d, _)| d.profile.symbol.clone())
-                        .unwrap_or_default();
-                    cal.high_impact_near(&instrument, candle.start_ms, window_ms)
-                        .is_none()
-                }
-                None => true,
-            };
+            // Causal: a candle may only reference events knowable when it was
+            // published, and the blackout is evaluated per candle publication.
+            let safe = calendar
+                .high_impact_near(instrument, candle.available_ms, window_ms)?
+                .is_none();
             bools.push(safe);
         }
-        SparseMask::from_bools(bools)
+        Ok(SparseMask::from_bools(bools))
     }
 
     fn evaluate(&mut self, rule: &Rule) -> Result<SparseMask> {
@@ -880,21 +878,27 @@ impl<'a> Features<'a> {
                     })
                 }))
             }
-            Rule::OrbLongBreakout { window_minutes, session_hour } => {
+            Rule::OrbLongBreakout {
+                window_minutes,
+                session_hour,
+            } => {
                 let high_key = Feature::SessionOpenHigh(*window_minutes, *session_hour);
                 self.ensure(high_key.clone())?;
                 let highs = &self.cache[&high_key];
-                SparseMask::from_bools((0..self.close.len()).map(|i| {
-                    highs[i].is_some_and(|h| self.close[i] > h)
-                }))
+                SparseMask::from_bools(
+                    (0..self.close.len()).map(|i| highs[i].is_some_and(|h| self.close[i] > h)),
+                )
             }
-            Rule::OrbShortBreakout { window_minutes, session_hour } => {
+            Rule::OrbShortBreakout {
+                window_minutes,
+                session_hour,
+            } => {
                 let low_key = Feature::SessionOpenLow(*window_minutes, *session_hour);
                 self.ensure(low_key.clone())?;
                 let lows = &self.cache[&low_key];
-                SparseMask::from_bools((0..self.close.len()).map(|i| {
-                    lows[i].is_some_and(|l| self.close[i] < l)
-                }))
+                SparseMask::from_bools(
+                    (0..self.close.len()).map(|i| lows[i].is_some_and(|l| self.close[i] < l)),
+                )
             }
             Rule::All(rules) | Rule::Any(rules) => {
                 let mut acc = self.evaluate(&rules[0])?;

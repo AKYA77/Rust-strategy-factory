@@ -5,7 +5,7 @@ use rust_strategy_factory::{
     data::{self, Tick},
     proof_screen,
     research::{self, EvaluationOptions, Input},
-    storage::Registry,
+    storage::{Registry, Stage},
     strategies::{Rule, Strategy},
     tick_engine::Costs,
 };
@@ -21,7 +21,7 @@ fn main() {
             let p = Profile::synthetic(symbol).unwrap();
             let base = if *symbol == "USDJPY" {
                 150 * p.price_scale
-            } else if *symbol == "XAUUSD" {
+            } else if *symbol == "GBPUSD" {
                 2500 * p.price_scale
             } else {
                 p.price_scale
@@ -106,6 +106,7 @@ fn main() {
                         EvaluationOptions {
                             feature_cells: 1_000_000,
                             evaluation: None,
+                            stage: Stage::TickVerification,
                             shadow_policy: None,
                             proof_policy: optimized.then_some(&policy),
                             indexed_policy: None,

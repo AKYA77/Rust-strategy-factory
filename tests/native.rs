@@ -14,7 +14,7 @@ fn dir() -> PathBuf {
     p
 }
 #[test]
-fn native_roundtrip_preserves_all_eight_profiles_provenance_and_tied_order() {
+fn native_roundtrip_preserves_all_seven_profiles_provenance_and_tied_order() {
     let dir = dir();
     for symbol in rust_strategy_factory::contracts::SYMBOLS {
         let mut input = data::synthetic_fixture(symbol).unwrap();
@@ -36,7 +36,7 @@ fn native_roundtrip_preserves_all_eight_profiles_provenance_and_tied_order() {
         );
         assert!(restored.ticks[0].sequence < restored.ticks[1].sequence);
     }
-    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 8);
+    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 7);
     std::fs::remove_dir_all(dir).unwrap();
 }
 #[test]

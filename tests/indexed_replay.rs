@@ -10,7 +10,7 @@ use rust_strategy_factory::{
 };
 fn fixture(symbol: &str, seed: u64, n: usize) -> (data::Dataset, Vec<Conversion>) {
     let p = Profile::synthetic(symbol).unwrap();
-    let base = if symbol == "XAUUSD" { 250000 } else { 100000 };
+    let base = if symbol == "GBPUSD" { 250000 } else { 100000 };
     let mut rng = seed;
     let mut timestamp = 1735689600000i64;
     let ticks = (0..n)
@@ -137,7 +137,7 @@ fn seeded_full_accounting_matches_all_profiles_sides_costs_windows_and_atr() {
             }
         }
     }
-    assert_eq!(checked, 512);
+    assert_eq!(checked, 448);
     assert!(trades > 0);
 }
 #[test]

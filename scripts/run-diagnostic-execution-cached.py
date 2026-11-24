@@ -36,7 +36,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 DEFAULT_INSTRUMENTS = [
-    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD", "XAUUSD",
+    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD", "GBPUSD",
 ]
 SCRIPT_VERSION = "diagnostic-execution-cache-driver-v1"
 LIMITATIONS = (

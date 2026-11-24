@@ -18,7 +18,7 @@ fn main() {
     let mut corpus = Vec::new();
     for symbol in SYMBOLS {
         let p = Profile::synthetic(symbol).unwrap();
-        let base = if symbol == "XAUUSD" {
+        let base = if symbol == "GBPUSD" {
             250000
         } else if symbol == "USDJPY" {
             150000

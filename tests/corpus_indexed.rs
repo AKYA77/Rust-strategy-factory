@@ -286,7 +286,7 @@ fn all_eight_instruments_seven_frames_match_candle_oracle_exactly() {
 
 #[test]
 fn full_receipt_parity_versus_scalar_replay_is_nonzero() {
-    for symbol in ["EURUSD", "XAUUSD"] {
+    for symbol in ["EURUSD", "GBPUSD"] {
         let f = Fixture::new(symbol, 7);
         let strategy: rust_strategy_factory::strategies::Strategy =
             serde_json::from_value(serde_json::json!({

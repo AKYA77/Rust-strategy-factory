@@ -1,11 +1,22 @@
-//! Data validation for historical market data.
-//! Validates bid/ask integrity, timestamp ordering, duplicate detection,
-//! and gap detection. Structural import success is not sufficient for
-//! research approval — semantic quality must also be verified.
+//! Structural data validation for historical tick datasets.
+//!
+//! V2 mandate addendum (P0): equal timestamps are **not** inherently duplicates.
+//! The canonical source contract orders events by `(timestamp_ms, sequence)`;
+//! distinct events at the same timestamp are legitimate and identical prices are
+//! legitimate. Gaps are measured in time, never by comparing a price-unit profile
+//! tick against milliseconds, and market closure is not automatically a data gap.
+//!
+//! Validation is streaming and bounded: counters are exact, while issue examples
+//! are capped. Structural validity is NOT source/licensing/calendar/scientific
+//! approval — `passed` only means the structural invariants held.
 
 use crate::Result;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+
+/// Cap on retained example issues; aggregate counters remain exact.
+const MAX_EXAMPLES: usize = 64;
+/// Gaps above one hour are reported as informational evidence, not as a failure.
+const LARGE_GAP_MS: i64 = 3_600_000;
 
 /// Severity of a data quality issue.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -32,10 +43,15 @@ pub struct QualityReport {
     pub total_ticks: usize,
     pub valid_ticks: usize,
     pub invalid_ticks: usize,
+    /// Repeated `(timestamp_ms, sequence)` identities — NOT timestamp ties.
     pub duplicate_timestamps: usize,
+    /// Legitimate ordered events sharing a timestamp.
+    pub timestamp_ties: usize,
     pub non_chronological_transitions: usize,
     pub gap_count: usize,
     pub max_gap_ms: i64,
+    /// How many example issues were not retained by the bounded collector.
+    pub suppressed_examples: usize,
     pub issues: Vec<QualityIssue>,
     pub passed: bool,
 }
@@ -47,26 +63,39 @@ impl QualityReport {
             valid_ticks: 0,
             invalid_ticks: 0,
             duplicate_timestamps: 0,
+            timestamp_ties: 0,
             non_chronological_transitions: 0,
             gap_count: 0,
             max_gap_ms: 0,
+            suppressed_examples: 0,
             issues: Vec::new(),
             passed: false,
         }
     }
 
-    pub fn add_issue(&mut self, severity: IssueSeverity, category: &str, description: &str, timestamp_ms: Option<i64>, count: usize) {
-        self.issues.push(QualityIssue {
-            severity,
-            category: category.to_string(),
-            description: description.to_string(),
-            timestamp_ms,
-            count,
-        });
+    pub fn add_issue(
+        &mut self,
+        severity: IssueSeverity,
+        category: &str,
+        description: &str,
+        timestamp_ms: Option<i64>,
+        count: usize,
+    ) {
+        if self.issues.len() < MAX_EXAMPLES {
+            self.issues.push(QualityIssue {
+                severity,
+                category: category.to_string(),
+                description: description.to_string(),
+                timestamp_ms,
+                count,
+            });
+        } else {
+            self.suppressed_examples = self.suppressed_examples.saturating_add(1);
+        }
     }
 }
 
-/// Validate a dataset's tick data for quality issues.
+/// Validate a dataset in one bounded streaming pass.
 pub fn validate_dataset(dataset: &crate::data::Dataset) -> Result<QualityReport> {
     let ticks = &dataset.ticks;
     let profile = &dataset.profile;
@@ -84,42 +113,28 @@ pub fn validate_dataset(dataset: &crate::data::Dataset) -> Result<QualityReport>
     }
 
     let mut prev_timestamp: Option<i64> = None;
-    let mut seen_timestamps: HashSet<i64> = HashSet::new();
-    let mut prev_time_for_gap: Option<i64> = None;
-    let profile_tick = profile.tick;
+    let mut prev_sequence: u64 = 0;
+    let mut gap_anchor: Option<i64> = None;
 
     for tick in ticks.iter() {
-        // Validate bid/ask integrity
-        let tick_valid = tick.validate(profile).is_ok();
-        if !tick_valid {
-            report.invalid_ticks += 1;
+        if tick.validate(profile).is_ok() {
+            report.valid_ticks = report.valid_ticks.saturating_add(1);
+        } else {
+            report.invalid_ticks = report.invalid_ticks.saturating_add(1);
             report.add_issue(
                 IssueSeverity::Error,
                 "invalid_quote",
-                "Nonpositive, crossed, or off-grid quote",
-                Some(tick.timestamp_ms),
-                1,
-            );
-        } else {
-            report.valid_ticks += 1;
-        }
-
-        // Check for duplicate timestamps
-        if !seen_timestamps.insert(tick.timestamp_ms) {
-            report.duplicate_timestamps += 1;
-            report.add_issue(
-                IssueSeverity::Warning,
-                "duplicate_timestamp",
-                "Duplicate timestamp detected",
+                "Nonpositive, crossed, off-grid or otherwise invalid quote",
                 Some(tick.timestamp_ms),
                 1,
             );
         }
 
-        // Check chronological ordering
-        if let Some(prev) = prev_timestamp {
-            if tick.timestamp_ms < prev {
-                report.non_chronological_transitions += 1;
+        match prev_timestamp {
+            None => {}
+            Some(prev) if tick.timestamp_ms < prev => {
+                report.non_chronological_transitions =
+                    report.non_chronological_transitions.saturating_add(1);
                 report.add_issue(
                     IssueSeverity::Error,
                     "non_chronological",
@@ -127,68 +142,88 @@ pub fn validate_dataset(dataset: &crate::data::Dataset) -> Result<QualityReport>
                     Some(tick.timestamp_ms),
                     1,
                 );
-            } else if tick.timestamp_ms == prev {
-                // Duplicate already counted above
-            } else {
-                // Check for gaps
-                if let Some(prev_time) = prev_time_for_gap {
-                    let gap = tick.timestamp_ms - prev_time;
-                    if gap > profile_tick as i64 * 2 {
-                        // Gap larger than 2 ticks
-                        report.gap_count += 1;
-                        if gap > report.max_gap_ms {
-                            report.max_gap_ms = gap;
-                        }
-                        if gap > 3600_000 {
-                            // Gap larger than 1 hour
-                            report.add_issue(
-                                IssueSeverity::Warning,
-                                "large_gap",
-                                &format!("Gap of {} ms (>1 hour) between ticks", gap),
-                                Some(tick.timestamp_ms),
-                                1,
-                            );
-                        }
-                    }
+            }
+            Some(prev) => {
+                if tick.timestamp_ms == prev {
+                    report.timestamp_ties = report.timestamp_ties.saturating_add(1);
                 }
-                prev_time_for_gap = Some(tick.timestamp_ms);
+                // Canonical identity is (timestamp, sequence). A non-increasing
+                // sequence is a repeated identity or an out-of-order event.
+                if tick.sequence <= prev_sequence {
+                    report.duplicate_timestamps = report.duplicate_timestamps.saturating_add(1);
+                    report.add_issue(
+                        IssueSeverity::Error,
+                        "repeated_event_identity",
+                        "Event (timestamp, sequence) identity repeats or moves backward",
+                        Some(tick.timestamp_ms),
+                        1,
+                    );
+                }
+            }
+        }
+
+        // Time-based gap evidence between distinct timestamps. No price-unit
+        // threshold, no calendar assumption: a closed market is not a data gap.
+        if let Some(anchor) = gap_anchor {
+            if tick.timestamp_ms > anchor {
+                let gap = tick.timestamp_ms - anchor; // positive, cannot overflow
+                if gap > LARGE_GAP_MS {
+                    report.gap_count = report.gap_count.saturating_add(1);
+                    if gap > report.max_gap_ms {
+                        report.max_gap_ms = gap;
+                    }
+                    report.add_issue(
+                        IssueSeverity::Info,
+                        "large_time_gap",
+                        &format!("Time gap of {gap} ms between successive distinct events"),
+                        Some(tick.timestamp_ms),
+                        1,
+                    );
+                }
+                gap_anchor = Some(tick.timestamp_ms);
             }
         } else {
-            prev_time_for_gap = Some(tick.timestamp_ms);
+            gap_anchor = Some(tick.timestamp_ms);
         }
+
         prev_timestamp = Some(tick.timestamp_ms);
+        prev_sequence = tick.sequence;
     }
 
-    // Determine if validation passed
-    let has_critical_errors = report.invalid_ticks > 0
-        || report.non_chronological_transitions > 0
-        || report.issues.iter().any(|i| i.severity == IssueSeverity::Critical);
-
-    report.passed = !has_critical_errors && report.duplicate_timestamps == 0;
-
-    // Add manifest-level issues
+    // Structural success only. Manifest issues are carried as warnings; source,
+    // licensing, calendar and scientific approvals remain separate authorities.
     for issue in &dataset.manifest.issues {
+        report.add_issue(IssueSeverity::Warning, "manifest", issue, None, 1);
+    }
+    if report.suppressed_examples > 0 {
         report.add_issue(
-            IssueSeverity::Warning,
-            "manifest",
-            issue,
+            IssueSeverity::Info,
+            "examples_suppressed",
+            "Additional issue examples suppressed by the bounded collector",
             None,
-            1,
+            report.suppressed_examples,
         );
     }
 
+    report.passed = report.invalid_ticks == 0
+        && report.non_chronological_transitions == 0
+        && report.duplicate_timestamps == 0
+        && !report
+            .issues
+            .iter()
+            .any(|issue| issue.severity == IssueSeverity::Critical);
     Ok(report)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{contracts::Profile, data::Manifest, data::DataClass};
+    use crate::{contracts::Profile, data::DataClass, data::Manifest};
 
-    fn make_tick(timestamp_ms: i64, bid: i64, ask: i64) -> crate::data::Tick {
+    fn make_tick(timestamp_ms: i64, sequence: u64, bid: i64, ask: i64) -> crate::data::Tick {
         crate::data::Tick {
             timestamp_ms,
-            sequence: 0,
+            sequence,
             bid,
             ask,
         }
@@ -241,12 +276,11 @@ mod tests {
     #[test]
     fn test_valid_dataset_passes() {
         let ticks = vec![
-            make_tick(1000, 100000, 100010),
-            make_tick(2000, 100010, 100020),
-            make_tick(3000, 100020, 100030),
+            make_tick(1000, 1, 100000, 100010),
+            make_tick(2000, 2, 100010, 100020),
+            make_tick(3000, 3, 100020, 100030),
         ];
-        let dataset = make_dataset(ticks);
-        let report = validate_dataset(&dataset).unwrap();
+        let report = validate_dataset(&make_dataset(ticks)).unwrap();
         assert!(report.passed);
         assert_eq!(report.valid_ticks, 3);
         assert_eq!(report.invalid_ticks, 0);
@@ -254,26 +288,50 @@ mod tests {
     }
 
     #[test]
-    fn test_duplicate_timestamps_detected() {
+    fn test_ordered_timestamp_tie_is_legitimate() {
         let ticks = vec![
-            make_tick(1000, 100000, 100010),
-            make_tick(1000, 100005, 100015), // duplicate timestamp
-            make_tick(2000, 100010, 100020),
+            make_tick(1000, 1, 100000, 100010),
+            make_tick(1000, 2, 100000, 100010), // identical price, distinct event
+            make_tick(2000, 3, 100010, 100020),
         ];
-        let dataset = make_dataset(ticks);
-        let report = validate_dataset(&dataset).unwrap();
+        let report = validate_dataset(&make_dataset(ticks)).unwrap();
+        assert!(report.passed, "a timestamp tie is not a duplicate");
+        assert_eq!(report.timestamp_ties, 1);
+        assert_eq!(report.duplicate_timestamps, 0);
+    }
+
+    #[test]
+    fn test_repeated_event_identity_is_rejected() {
+        let ticks = vec![
+            make_tick(1000, 1, 100000, 100010),
+            make_tick(1000, 1, 100000, 100010),
+            make_tick(2000, 3, 100010, 100020),
+        ];
+        let report = validate_dataset(&make_dataset(ticks)).unwrap();
         assert!(!report.passed);
+        assert_eq!(report.timestamp_ties, 1);
+        assert_eq!(report.duplicate_timestamps, 1);
+    }
+
+    #[test]
+    fn test_out_of_order_sequence_is_rejected() {
+        let ticks = vec![
+            make_tick(1000, 5, 100000, 100010),
+            make_tick(2000, 4, 100010, 100020),
+        ];
+        let report = validate_dataset(&make_dataset(ticks)).unwrap();
+        assert!(!report.passed);
+        assert_eq!(report.non_chronological_transitions, 0);
         assert_eq!(report.duplicate_timestamps, 1);
     }
 
     #[test]
     fn test_non_chronological_detected() {
         let ticks = vec![
-            make_tick(2000, 100010, 100020),
-            make_tick(1000, 100000, 100010), // goes backward
+            make_tick(2000, 1, 100010, 100020),
+            make_tick(1000, 2, 100000, 100010),
         ];
-        let dataset = make_dataset(ticks);
-        let report = validate_dataset(&dataset).unwrap();
+        let report = validate_dataset(&make_dataset(ticks)).unwrap();
         assert!(!report.passed);
         assert_eq!(report.non_chronological_transitions, 1);
     }
@@ -281,19 +339,76 @@ mod tests {
     #[test]
     fn test_invalid_quote_detected() {
         let ticks = vec![
-            make_tick(1000, 100000, 100010),
-            make_tick(2000, 0, 100020), // bid = 0, invalid
+            make_tick(1000, 1, 100000, 100010),
+            make_tick(2000, 2, 0, 100020),
         ];
-        let dataset = make_dataset(ticks);
-        let report = validate_dataset(&dataset).unwrap();
+        let report = validate_dataset(&make_dataset(ticks)).unwrap();
         assert!(!report.passed);
         assert_eq!(report.invalid_ticks, 1);
     }
 
     #[test]
+    fn test_time_gap_is_evidence_not_a_failure() {
+        let ticks = vec![
+            make_tick(1000, 1, 100000, 100010),
+            make_tick(1000 + 7_200_000, 2, 100000, 100010),
+        ];
+        let report = validate_dataset(&make_dataset(ticks)).unwrap();
+        assert!(
+            report.passed,
+            "market closure must not fail structural validation"
+        );
+        assert_eq!(report.gap_count, 1);
+        assert_eq!(report.max_gap_ms, 7_200_000);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|i| i.severity == IssueSeverity::Info && i.category == "large_time_gap")
+        );
+    }
+
+    #[test]
+    fn test_examples_are_bounded_and_counters_exact() {
+        let ticks: Vec<_> = (1..=200)
+            .map(|i| make_tick(i * 1000, i as u64, 0, 100020))
+            .collect();
+        let report = validate_dataset(&make_dataset(ticks)).unwrap();
+        assert_eq!(report.invalid_ticks, 200);
+        assert_eq!(report.total_ticks, 200);
+        assert!(report.issues.len() <= MAX_EXAMPLES);
+        assert!(report.suppressed_examples > 0);
+    }
+
+    #[test]
     fn test_empty_dataset_fails() {
-        let dataset = make_dataset(Vec::new());
-        let report = validate_dataset(&dataset).unwrap();
+        let report = validate_dataset(&make_dataset(Vec::new())).unwrap();
         assert!(!report.passed);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|i| i.severity == IssueSeverity::Critical)
+        );
+    }
+
+    #[test]
+    fn test_manifest_issue_is_not_approval() {
+        let mut dataset = make_dataset(vec![
+            make_tick(1000, 1, 100000, 100010),
+            make_tick(2000, 2, 100010, 100020),
+        ]);
+        dataset
+            .manifest
+            .issues
+            .push("source provenance pending".into());
+        let report = validate_dataset(&dataset).unwrap();
+        assert!(report.passed, "structural pass is not source approval");
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|i| i.category == "manifest" && i.severity == IssueSeverity::Warning)
+        );
     }
 }

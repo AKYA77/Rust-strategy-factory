@@ -21,7 +21,7 @@ REPORT_PATHS = [
     "work/continuous-USDCAD.json",
     "work/continuous-AUDUSD.json",
     "work/continuous-NZDUSD.json",
-    "work/continuous-XAUUSD.json",
+    "work/continuous-GBPUSD.json",
 ]
 
 

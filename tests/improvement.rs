@@ -1117,23 +1117,36 @@ fn opt_in_queue_is_bounded_pauses_and_recovers_a_committed_review() {
     assert_eq!(status.executed, first.executed);
     assert_eq!(status.rejected, first.rejected);
     assert_eq!(driver.registry.counts().unwrap().attempts, attempts);
-    // CandleScreen experiments cannot be authorized for improvement
-    // (authorize() rejects Stage::CandleScreen), so the post-recovery
-    // CandleScreen step enqueues no job. IndependentValidation fails without a
-    // pre-reserved holdout; queueing resumes at the next TickVerification
-    // experiment.
+    // V2 mandate P0.2 removed the candidate_index % 3 rotation: every training
+    // candidate enters explicitly at TickVerification, which is authorizable for
+    // improvement. Queueing therefore resumes at each training experiment and the
+    // queue stays bounded (one job per experiment, depth cap unchanged).
     assert!(driver.step(7).unwrap());
-    let after_cs = research::status(&driver.registry, &driver.id, 8).unwrap();
-    assert_eq!(after_cs.cursor, 2);
-    assert_eq!(after_cs.improvements.queued, 0);
-    assert!(driver.step(9).unwrap());
-    let after_iv = research::status(&driver.registry, &driver.id, 10).unwrap();
-    assert_eq!(after_iv.cursor, 3);
-    assert_eq!(after_iv.improvements.queued, 0);
-    assert!(driver.step(11).unwrap());
-    let after_tv = research::status(&driver.registry, &driver.id, 12).unwrap();
-    assert_eq!(after_tv.cursor, 4);
-    assert_eq!(after_tv.improvements.queued, 1);
+    let after_first = research::status(&driver.registry, &driver.id, 8).unwrap();
+    assert_eq!(after_first.cursor, 2);
+    assert_eq!(after_first.improvements.queued, 1);
+    // Incremental review commits evidence over several steps; the job stays queued
+    // until its report completes. No evidence, attempt or committed child is lost.
+    let mut now = 9i64;
+    while research::status(&driver.registry, &driver.id, now)
+        .unwrap()
+        .improvements
+        .queued
+        > 0
+        && now < 60
+    {
+        assert!(driver.step(now).unwrap());
+        now += 2;
+    }
+    let after_drain = research::status(&driver.registry, &driver.id, now + 1).unwrap();
+    assert_eq!(after_drain.cursor, 2);
+    assert_eq!(after_drain.improvements.queued, 0);
+    assert_eq!(after_drain.improvements.completed, 2);
+    assert_eq!(after_drain.improvements.failed, 0);
+    assert!(driver.step(now + 2).unwrap());
+    let after_next = research::status(&driver.registry, &driver.id, now + 3).unwrap();
+    assert_eq!(after_next.cursor, 3);
+    assert_eq!(after_next.improvements.queued, 1);
     driver.registry.integrity().unwrap();
     drop(driver);
     std::fs::remove_dir_all(d).unwrap();

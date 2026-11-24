@@ -10,7 +10,7 @@ use serde_json::json;
 use std::{sync::Arc, time::Instant};
 fn fixture(symbol: &str) -> Dataset {
     let p = Profile::synthetic(symbol).unwrap();
-    let base = if symbol == "XAUUSD" {
+    let base = if symbol == "GBPUSD" {
         2500 * p.price_scale
     } else if symbol == "USDJPY" {
         150 * p.price_scale
