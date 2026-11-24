@@ -1051,8 +1051,59 @@ pub fn execute_continuous(
     budget: crate::tick_engine::CorpusBudget,
 ) -> Result<ContinuousExecution> {
     verify(spec)?;
-    let mut months = Vec::with_capacity(spec.months.len());
+    let mut executed_months = Vec::with_capacity(spec.months.len());
     let mut refusals = Vec::new();
+    for index in 0..spec.months.len() {
+        let (year, month) = (spec.months[index].year, spec.months[index].month);
+        match execute_month(spec, index, strategy, costs, budget) {
+            Ok(executed) => executed_months.push(executed),
+            Err(reason) => refusals.push(MonthRefusal {
+                year,
+                month,
+                reason,
+            }),
+        }
+    }
+    let (months, totals) = aggregate_continuous(&executed_months, &refusals)?;
+    Ok(ContinuousExecution {
+        instrument: spec.instrument.clone(),
+        identity: spec.identity.clone(),
+        strategy_identity: strategy.identity()?,
+        classification: CONTINUOUS_CLASSIFICATION.into(),
+        eligibility: CONTINUOUS_ELIGIBILITY.into(),
+        conversion_policy: conversion_policy(&spec.profile).into(),
+        months,
+        totals,
+        limitations: CONTINUOUS_LIMITATIONS.into(),
+    })
+}
+
+/// Chain one month's closed-trade outcomes into the continuous full-period losing streak.
+///
+/// A month containing a net-winning closed trade breaks any run carried from the previous
+/// month: `ending_streak` is measured from that month's last win, so it replaces the carried
+/// run instead of extending it. A month with no wins — breakeven-only, loss-only, or with no
+/// closed trades — extends the carried run by its trailing losses. This matches
+/// `validation::assess`, where a breakeven neither resets nor extends a streak.
+fn chain_losing_streak(continuous: usize, outcomes: &TradeOutcomeStats) -> usize {
+    if outcomes.wins > 0 {
+        outcomes.ending_streak
+    } else {
+        continuous.saturating_add(outcomes.ending_streak)
+    }
+}
+
+/// Continuous full-period accounting over executed months: compounded equity, a cross-month
+/// losing streak and a full-period drawdown. Pure (no engine, no I/O) so the accounting is
+/// unit-testable directly from `MonthExecution` values, mirroring [`aggregate_totals`].
+///
+/// Every engine month starts at `contracts::INITIAL_EQUITY`, so a month's contribution to the
+/// continuous equity is exactly its closed-trade net P&L; there is no starting-equity offset.
+fn aggregate_continuous(
+    executed_months: &[MonthExecution],
+    refusals: &[MonthRefusal],
+) -> Result<(Vec<ContinuousMonthExecution>, ContinuousTotals)> {
+    let mut months = Vec::with_capacity(executed_months.len());
     let mut running_equity = contracts::INITIAL_EQUITY;
     let mut peak_equity = contracts::INITIAL_EQUITY;
     let mut cumulative_wins = 0usize;
@@ -1067,31 +1118,9 @@ pub fn execute_continuous(
     let mut cumulative_rejections = 0usize;
     let mut cumulative_unresolved = 0usize;
 
-    for index in 0..spec.months.len() {
-        let (year, month) = (spec.months[index].year, spec.months[index].month);
-        let executed = match execute_month(spec, index, strategy, costs, budget) {
-            Ok(e) => e,
-            Err(reason) => {
-                refusals.push(MonthRefusal {
-                    year,
-                    month,
-                    reason,
-                });
-                continue;
-            }
-        };
-
+    for executed in executed_months {
         let month_starting = running_equity;
-        let monthly_pnl = executed
-            .outcomes
-            .net_micro_usd
-            .checked_add(
-                executed
-                    .initial_micro_usd
-                    .checked_sub(contracts::INITIAL_EQUITY)
-                    .unwrap_or(0),
-            )
-            .ok_or("continuous monthly P&L overflow")?;
+        let monthly_pnl = executed.outcomes.net_micro_usd;
         running_equity = running_equity
             .checked_add(monthly_pnl)
             .ok_or("continuous running equity overflow")?;
@@ -1102,14 +1131,8 @@ pub fn execute_continuous(
             .checked_sub(running_equity)
             .ok_or("continuous drawdown overflow")?;
 
-        // Chain losing streak across month boundary
-        if executed.outcomes.ending_streak == 0 {
-            // Month ended with a win or breakeven — reset continuous streak
-            continuous_streak = 0;
-        } else {
-            // Month ended with losses — chain the ending streak
-            continuous_streak = continuous_streak.saturating_add(executed.outcomes.ending_streak);
-        }
+        // Chain losing streak across month boundary.
+        continuous_streak = chain_losing_streak(continuous_streak, &executed.outcomes);
         max_continuous_streak = max_continuous_streak.max(continuous_streak);
 
         cumulative_wins = cumulative_wins
@@ -1141,8 +1164,8 @@ pub fn execute_continuous(
             .ok_or("continuous unresolved overflow")?;
 
         months.push(ContinuousMonthExecution {
-            year,
-            month,
+            year: executed.year,
+            month: executed.month,
             starting_micro_usd: month_starting,
             ending_micro_usd: running_equity,
             monthly_pnl_micro_usd: monthly_pnl,
@@ -1191,17 +1214,7 @@ pub fn execute_continuous(
         unresolved_positions: cumulative_unresolved,
     };
 
-    Ok(ContinuousExecution {
-        instrument: spec.instrument.clone(),
-        identity: spec.identity.clone(),
-        strategy_identity: strategy.identity()?,
-        classification: CONTINUOUS_CLASSIFICATION.into(),
-        eligibility: CONTINUOUS_ELIGIBILITY.into(),
-        conversion_policy: conversion_policy(&spec.profile).into(),
-        months,
-        totals,
-        limitations: CONTINUOUS_LIMITATIONS.into(),
-    })
+    Ok((months, totals))
 }
 
 /// USD-quoted instruments need no cross-currency conversion.
@@ -2059,6 +2072,199 @@ mod tests {
             receipt_hash: "d".repeat(64),
             outcomes,
         }
+    }
+
+    fn continuous_month(year: u32, month: u32, outcomes: TradeOutcomeStats) -> MonthExecution {
+        let net = outcomes.net_micro_usd;
+        MonthExecution {
+            year,
+            month,
+            classification: EXECUTION_CLASSIFICATION.into(),
+            eligibility: EXECUTION_ELIGIBILITY.into(),
+            corpus_identity: "a".repeat(64),
+            source_dataset_hash: "b".repeat(64),
+            replay_dataset_id: "e".repeat(64),
+            declared_class: "RealStructurallyValid".into(),
+            profile_id: "c".repeat(64),
+            conversion_policy: CONVERSION_POLICY_IDENTITY.into(),
+            initial_micro_usd: contracts::INITIAL_EQUITY,
+            realized_micro_usd: contracts::INITIAL_EQUITY + net,
+            final_marked_micro_usd: contracts::INITIAL_EQUITY + net,
+            maximum_drawdown_micro_usd: 0,
+            trades: outcomes.resolved,
+            rejections: 0,
+            receipt_hash: "d".repeat(64),
+            outcomes,
+        }
+    }
+
+    fn loss_month(resolved: usize, ending_streak: usize, net_micro_usd: i128) -> TradeOutcomeStats {
+        TradeOutcomeStats {
+            resolved,
+            wins: 0,
+            losses: resolved,
+            breakevens: 0,
+            max_losing_streak: ending_streak,
+            ending_streak,
+            gross_win_micro_usd: 0,
+            gross_loss_micro_usd: -net_micro_usd,
+            net_micro_usd,
+            unresolved_positions: 0,
+        }
+    }
+
+    fn breakeven_only_month(resolved: usize) -> TradeOutcomeStats {
+        TradeOutcomeStats {
+            resolved,
+            wins: 0,
+            losses: 0,
+            breakevens: resolved,
+            max_losing_streak: 0,
+            ending_streak: 0,
+            gross_win_micro_usd: 0,
+            gross_loss_micro_usd: 0,
+            net_micro_usd: 0,
+            unresolved_positions: 0,
+        }
+    }
+
+    #[test]
+    fn chain_losing_streak_keeps_run_across_breakeven_only_month() {
+        let loss_two = loss_month(2, 2, -2_000_000);
+        let breakevens = breakeven_only_month(3);
+        // A breakeven-only month neither resets nor extends the carried run.
+        assert_eq!(chain_losing_streak(2, &breakevens), 2);
+        // A loss-only month extends it.
+        assert_eq!(chain_losing_streak(2, &loss_two), 4);
+        // A month with no closed trades keeps the carried run.
+        assert_eq!(chain_losing_streak(4, &TradeOutcomeStats::default()), 4);
+        // A month containing a win breaks the carried run; its ending streak is measured from
+        // that win, so it replaces rather than extends the carried run.
+        let win_then_losses = TradeOutcomeStats {
+            resolved: 3,
+            wins: 1,
+            losses: 2,
+            breakevens: 0,
+            max_losing_streak: 2,
+            ending_streak: 2,
+            gross_win_micro_usd: 1_000_000,
+            gross_loss_micro_usd: 2_000_000,
+            net_micro_usd: -1_000_000,
+            unresolved_positions: 0,
+        };
+        assert_eq!(chain_losing_streak(4, &win_then_losses), 2);
+    }
+
+    #[test]
+    fn aggregate_continuous_chains_streak_over_breakeven_only_month() {
+        let months = vec![
+            continuous_month(2025, 1, loss_month(2, 2, -2_000_000)),
+            continuous_month(2025, 2, breakeven_only_month(3)),
+            continuous_month(2025, 3, loss_month(3, 3, -3_000_000)),
+        ];
+        let refusals = vec![MonthRefusal {
+            year: 2025,
+            month: 4,
+            reason: "unapproved FX conversion".into(),
+        }];
+        let (continuous, totals) = aggregate_continuous(&months, &refusals).unwrap();
+        // The breakeven-only month must not reset the run: 2 + 3 = 5.
+        assert_eq!(totals.continuous_max_losing_streak, 5);
+        assert_eq!(totals.months_executed, 3);
+        assert_eq!(totals.months_refused, 1);
+        // Financial totals are unchanged by the streak correction.
+        assert_eq!(totals.initial_micro_usd, contracts::INITIAL_EQUITY);
+        assert_eq!(
+            totals.ending_micro_usd,
+            contracts::INITIAL_EQUITY - 5_000_000
+        );
+        assert_eq!(totals.net_pnl_micro_usd, -5_000_000);
+        assert_eq!(totals.full_period_max_drawdown_micro_usd, 5_000_000);
+        assert_eq!((totals.wins, totals.losses, totals.breakevens), (0, 5, 3));
+        // Month P&L is exactly the closed-trade net; equity and drawdown chain.
+        let expected = [
+            (
+                contracts::INITIAL_EQUITY,
+                contracts::INITIAL_EQUITY - 2_000_000,
+            ),
+            (
+                contracts::INITIAL_EQUITY - 2_000_000,
+                contracts::INITIAL_EQUITY - 2_000_000,
+            ),
+            (
+                contracts::INITIAL_EQUITY - 2_000_000,
+                contracts::INITIAL_EQUITY - 5_000_000,
+            ),
+        ];
+        for (month, (starting, ending)) in continuous.iter().zip(expected) {
+            assert_eq!(month.starting_micro_usd, starting);
+            assert_eq!(month.ending_micro_usd, ending);
+        }
+        assert_eq!(
+            continuous
+                .iter()
+                .map(|m| m.monthly_pnl_micro_usd)
+                .collect::<Vec<_>>(),
+            vec![-2_000_000, 0, -3_000_000]
+        );
+        // The breakeven-only month's own ending streak is zero, but it did not break the run.
+        assert_eq!(continuous[1].month_ending_streak, 0);
+        assert_eq!(continuous[1].breakevens, 3);
+        assert_eq!(continuous[1].drawdown_from_peak_micro_usd, 2_000_000);
+    }
+
+    #[test]
+    fn aggregate_continuous_win_breaks_carried_streak() {
+        let win_then_losses = TradeOutcomeStats {
+            resolved: 3,
+            wins: 1,
+            losses: 2,
+            breakevens: 0,
+            max_losing_streak: 2,
+            ending_streak: 2,
+            gross_win_micro_usd: 1_000_000,
+            gross_loss_micro_usd: 2_000_000,
+            net_micro_usd: -1_000_000,
+            unresolved_positions: 0,
+        };
+        let months = vec![
+            continuous_month(2025, 1, loss_month(2, 2, -2_000_000)),
+            continuous_month(2025, 2, win_then_losses),
+        ];
+        let (_, totals) = aggregate_continuous(&months, &[]).unwrap();
+        assert_eq!(totals.continuous_max_losing_streak, 2);
+    }
+
+    #[test]
+    fn aggregate_continuous_month_pnl_is_closed_trade_net_without_equity_offset() {
+        // The removed `initial_micro_usd - INITIAL_EQUITY` term was identically zero for real
+        // engine months. Guard that a month whose engine starting equity differs from
+        // INITIAL_EQUITY still contributes exactly its closed-trade net to the continuous
+        // equity, with no starting-equity offset leaking into the P&L.
+        let mut month = continuous_month(
+            2025,
+            1,
+            TradeOutcomeStats {
+                resolved: 1,
+                wins: 1,
+                losses: 0,
+                breakevens: 0,
+                max_losing_streak: 0,
+                ending_streak: 0,
+                gross_win_micro_usd: 1_000_000,
+                gross_loss_micro_usd: 0,
+                net_micro_usd: 1_000_000,
+                unresolved_positions: 0,
+            },
+        );
+        month.initial_micro_usd += 7_000_000;
+        let (continuous, totals) = aggregate_continuous(&[month], &[]).unwrap();
+        assert_eq!(continuous[0].monthly_pnl_micro_usd, 1_000_000);
+        assert_eq!(
+            totals.ending_micro_usd,
+            contracts::INITIAL_EQUITY + 1_000_000
+        );
+        assert_eq!(totals.net_pnl_micro_usd, 1_000_000);
     }
 
     #[test]
