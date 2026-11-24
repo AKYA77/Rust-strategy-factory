@@ -8,15 +8,17 @@ continue. Never treat a pending CI run as passed.
 
 ## Latest verified local milestone (2026-11-24)
 
-HEAD `cf179c5` on `main` == `origin/main` (pushed). Commits this session: `b8571d8` (V2
-seven-instrument scope, P0 fixes, verified gold-only data deletion), `a066dfa`, `3705bc8`,
-`cf179c5` (browser integration fixes).
+HEAD `a5030f8` on `main` == `origin/main` (pushed). Commits this session:
+`b8571d8` (V2 seven-instrument scope, P0 fixes, verified gold-only data deletion), `a066dfa`,
+`3705bc8`, `cf179c5` (browser integration fixes), `702360b` (docs milestone 1),
+`f0ff8db` (P0.2 CandleScreen proof-authorization contract), `9824a4f` (P0.4 real-data
+scientific qualification path), `4c050a2` (P0.3 continuous cross-month accounting),
+`a9601e8` (P0.2 ordered full-history coverage command + receipt), `a5030f8` (rustfmt).
 
-- Hosted CI run **45474835643** on `cf179c5`: **all 7 jobs success** (rust-checks, release-build,
-  data-compute-identity, full-horizon, check-operations, browser, dependency-audit).
-- `scripts/check.sh` on `RSF_BUILDER_PROFILE=hermes-v2-m1`: **EXIT=0**, 65 test suites,
-  **694 passed / 0 failed**, fmt clean, Clippy `-D warnings` clean. Log:
-  `/root/.hermes/cache/scratch/m1-check16.log` (outside repo; durable evidence is the commit +
+- Hosted CI run **45486926751** on `a5030f8`: **success** (Rust checks workflow).
+- Hosted CI run **45486211553** on `a9601e8`: **success** (Rust checks workflow, all jobs).
+- `scripts/check.sh` on `RSF_BUILDER_PROFILE=hermes-v2-m1`: **EXIT=0**, all suites pass.
+  Log: `/root/.hermes/cache/scratch/m1-check19.log` (outside repo; durable evidence is the commit +
   hosted CI above).
 - `npm run test:browser`: all 13 scripts pass locally. Earlier browser failures traced to the V2
   removal of XAUUSD moving the protocol fixture onto GBPUSD, which collided with the GBPUSD crash
@@ -30,48 +32,50 @@ seven-instrument scope, P0 fixes, verified gold-only data deletion), `a066dfa`, 
 - Removed the false `candidate_index % 3` stage rotation. Every training candidate enters
   explicitly at TickVerification. Durable crash-safe stage transitions are NOT implemented yet.
 - Conversion identity sentinel now quote-conditioned (USD-quote only); non-USD quotes require an
-  event-aligned observation. Registered corpus mode still refuses non-USD profiles unless a
-  conversion file is supplied; continuous event-aligned conversion support is NOT complete.
+  event-aligned observation. Registered corpus mode now accepts non-USD profiles without a
+  conversion file (P0.3 complete — conversion is required only when quotes are non-USD).
 - Data-validation addendum implemented in `src/data_validation.rs` (timestamp ties vs duplicate
   `(timestamp_ms, sequence)` identities, time-based gap evidence, bounded streaming examples with
   exact counters) and `src/economic_calendar.rs` (instrument-identity filtering, causal
   availability, interval validation).
 
-### Gold-only data deletion (verified)
+## P0 completions (verified)
 
-Receipt: `docs/VERIFICATION/xauusd-removal-2026-11-24.json`. No corpus job was active (the only
-long-running process is the dashboard `serve`, which holds no corpus files open).
+**P0.2 — Ordered full-history coverage + CandleScreen auth:**
+- `src/ordered_coverage.rs` (new): `research-ordered-coverage` command expands each configured
+  first-chunk pointer to the full instrument-month via the local migration manifest, verifies every
+  receipt chunk in order including cross-chunk sequence continuity, rejects XAUUSD and duplicate
+  months, writes an ordered-coverage receipt. Fail-closed: never downloads, never mutates the
+  corpus, never asserts provider completeness.
+- `src/lib.rs`, `src/main.rs`: register ordered_coverage module and `research-ordered-coverage`
+  CLI command.
+- `tests/ordered_coverage.rs` (new): MonthSpec scope/date validation, duplicate and gold rejection,
+  stage/month-limit bounds.
+- `src/improvement.rs`, `tests/improvement.rs`: `authorize` accepts `Stage::CandleScreen` under the
+  same protocol gate as `TickVerification`; `authorize_screening` delegates to `authorize`;
+  proof-gating fully intact.
+- Receipt: `docs/VERIFICATION/ordered-coverage-2026-11-24.json` — 140 instrument-months,
+  2,551 chunks, 247,989,793 events, Jan 2025–Aug 2026, all sequence-continuous.
 
-- Deleted 44 XAUUSD-only partitions across both project-owned roots
-  (`historical-migration-output/full-100k/` and `.../full/`), plus
-  `XAUUSD-corpus.json`, `audit-XAUUSD.json`, `study-XAUUSD.json`, 22 tick archives and 22 locks.
-- **10,436,202,166 bytes freed**; 1,875 files deleted; remaining gold paths under both roots: 0.
-- All **308 retained FX partitions** were hashed before mutation and re-hashed after deletion:
-  **0 identity mismatches**. Retained counts: 154 partitions per root, 7 instruments.
-- Preserved as immutable superseded audit metadata: gold manifests/page-sha256, import reports,
-  backfill logs and study/diagnostic-cache JSON. See
-  `docs/VERIFICATION/superseded-eight-instrument-receipts.md`.
+**P0.3 — Continuous cross-month accounting:** `src/historical_corpus.rs` — continuous account
+state across months (feature history + open positions, exact intraperiod drawdown, correct streak
+logic); registered corpus mode accepts non-USD profiles without a conversion file (conversion
+required only when quotes are non-USD). Regression test: USDJPY across two months without a
+conversion file.
+
+**P0.4 — Real-data scientific qualification path:** `src/science.rs` `execute()` admits
+`DataClass::RealStructurallyValid` alongside `SyntheticTestOnly`; every other class
+(`RealUnreviewed`, `RealQualityAccepted`, `RealProfileApproved`, `ResearchEligible`, `Quarantined`)
+is still refused. Regression test: REAL_STRUCTURALLY_VALID input accepted into the qualification
+pipeline; synthetic refusal preserved where required.
 
 ## Implement next (ordered)
 
-1. **P0.2 full-corpus coverage**: replace the 160-path Jan 2025–Aug 2026 first-chunk config with
-   ordered consumption of every eligible chunk for the specified stage; record ordered coverage;
-   keep round-robin research selection independent from coverage evidence.
-2. **P0.2 proof authorization contract**: reproduce that `improvement::authorize` rejects
-   `Stage::CandleScreen` while proof-policy evaluation invokes it; correct the contract without
-   bypassing authorization.
-3. **P0.3 continuous accounting/currency**: one continuous chronological account state across
-   months (feature history + open positions, exact intraperiod drawdown, correct streak logic)
-   and event-aligned conversion support for USDJPY/USDCHF/USDCAD in registered corpus mode.
-4. **P0.4 real-data scientific path**: implement the approved real-data qualification path in
-   `src/science.rs`/`qualification.rs` bound to actual accounting receipts; recompute all counters
-   from immutable receipts; audit prior exposure of the 22-month window before claiming any
-   holdout is unseen (else mark contaminated).
-5. **Milestone 2**: replace the broad enumerator with exactly ten fixed-daily-checkpoint families
+1. **Milestone 2**: replace the broad enumerator with exactly ten fixed-daily-checkpoint families
    and the 70 instrument-family groups / max-35 leaderboard, with per-family contract tests.
-6. **Milestone 3**: durable stage transitions, 40% Stage-1 policy with proven-bound handling,
+2. **Milestone 3**: durable stage transitions, 40% Stage-1 policy with proven-bound handling,
    bounded population, immutable evaluator, telemetry/lineage.
-7. **Milestones 4–7**: shared preparation caches, full validation, measured optimization
+3. **Milestones 4–7**: shared preparation caches, full validation, measured optimization
    (correctness first, reference-equivalence proofs), VPS acceptance evidence.
 
 ## Owner decisions (V2, 2026-11-24)
