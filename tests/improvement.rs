@@ -1117,13 +1117,23 @@ fn opt_in_queue_is_bounded_pauses_and_recovers_a_committed_review() {
     assert_eq!(status.executed, first.executed);
     assert_eq!(status.rejected, first.rejected);
     assert_eq!(driver.registry.counts().unwrap().attempts, attempts);
+    // CandleScreen experiments cannot be authorized for improvement
+    // (authorize() rejects Stage::CandleScreen), so the post-recovery
+    // CandleScreen step enqueues no job. IndependentValidation fails without a
+    // pre-reserved holdout; queueing resumes at the next TickVerification
+    // experiment.
     assert!(driver.step(7).unwrap());
-    let status7 = research::status(&driver.registry, &driver.id, 8).unwrap();
-    // After stepping, at least one improvement job should be queued or completed
-    // (depending on whether the new experiment was completed/rejected/failed).
-    assert!(status7.improvements.queued + status7.improvements.completed >= 1,
-        "at least one improvement job should exist after stepping, got queued={} completed={}",
-        status7.improvements.queued, status7.improvements.completed);
+    let after_cs = research::status(&driver.registry, &driver.id, 8).unwrap();
+    assert_eq!(after_cs.cursor, 2);
+    assert_eq!(after_cs.improvements.queued, 0);
+    assert!(driver.step(9).unwrap());
+    let after_iv = research::status(&driver.registry, &driver.id, 10).unwrap();
+    assert_eq!(after_iv.cursor, 3);
+    assert_eq!(after_iv.improvements.queued, 0);
+    assert!(driver.step(11).unwrap());
+    let after_tv = research::status(&driver.registry, &driver.id, 12).unwrap();
+    assert_eq!(after_tv.cursor, 4);
+    assert_eq!(after_tv.improvements.queued, 1);
     driver.registry.integrity().unwrap();
     drop(driver);
     std::fs::remove_dir_all(d).unwrap();

@@ -1264,11 +1264,12 @@ impl Driver {
         let input_index = s.cursor as usize % self.inputs.len();
         let candidate_index = s.cursor / self.inputs.len() as u64;
         let (_, strategy) = candidate_at(candidate_index, self.config.seed)?;
-        // Cycle through improvable stages: TickVerification → IndependentValidation
-        // CandleScreen is a screening-only stage (no tick data) and cannot be
-        // authorized for improvement, so it is excluded from the research loop.
-        let stage = match candidate_index % 2 {
+        // Cycle through all 3 stages: TickVerification → CandleScreen → IndependentValidation
+        // Start with TickVerification (candidate_index=0) so the first experiment is
+        // immediately diagnosable (authorize() requires TickVerification or valid protocol).
+        let stage = match candidate_index % 3 {
             0 => Stage::TickVerification,
+            1 => Stage::CandleScreen,
             _ => Stage::IndependentValidation,
         };
         let stage_for_eval = stage.clone();
