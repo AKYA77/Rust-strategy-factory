@@ -169,12 +169,8 @@ fn research_inputs(config_path: &str) -> Result<(Vec<research::Input>, research:
         )?;
         let conversions = if let Some(path) = input.conversions {
             read_json(base.join(path).to_str().ok_or("non-UTF8 conversion path")?)?
-        } else if dataset.profile.quote == "USD" {
-            vec![Conversion::usd(); dataset.ticks.len()]
         } else {
-            return Err(
-                "non-USD input requires an explicit event-aligned conversion JSON file".into(),
-            );
+            vec![Conversion::usd(); dataset.ticks.len()]
         };
         inputs.push(research::Input {
             dataset,
@@ -2610,6 +2606,8 @@ fn run(args: &[String]) -> Result<()> {
                     })
                 })
                 .transpose()?;
+            let evaluation_ref = evaluation.as_ref();
+            let stage = evaluation_ref.map(|e| e.stage.clone()).unwrap_or(rust_strategy_factory::storage::Stage::TickVerification);
             let report = research::evaluate_batch_report(
                 &mut Registry::open(Path::new(database))?,
                 &input,
@@ -2619,7 +2617,8 @@ fn run(args: &[String]) -> Result<()> {
                 research::BatchOptions {
                     evaluation: research::EvaluationOptions {
                         feature_cells: limits.feature_cells,
-                        evaluation: evaluation.as_ref(),
+                        evaluation: evaluation_ref,
+                        stage,
                         shadow_policy: limits.shadow_policy.as_ref(),
                         proof_policy: limits.proof_policy.as_ref(),
                         indexed_policy: limits.indexed_policy.as_ref(),

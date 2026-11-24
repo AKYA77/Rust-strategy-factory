@@ -2,7 +2,7 @@ use rust_strategy_factory::{
     contracts::{Conversion, Profile},
     data::{self, Tick},
     research::{self, Config, Driver, Input},
-    storage::Registry,
+    storage::{Registry, Stage},
 };
 use std::{
     path::PathBuf,
@@ -91,6 +91,7 @@ fn configured_shadow_policy_separates_cache_identity_and_survives_driver_restart
         EvaluationOptions {
             feature_cells: 1_000_000,
             evaluation: None,
+            stage: Stage::TickVerification,
             shadow_policy: Some(&policy),
             proof_policy: None,
             indexed_policy: None,
@@ -127,6 +128,7 @@ fn configured_shadow_policy_separates_cache_identity_and_survives_driver_restart
         EvaluationOptions {
             feature_cells: 1_000_000,
             evaluation: None,
+            stage: Stage::TickVerification,
             shadow_policy: Some(&changed),
             proof_policy: None,
             indexed_policy: None,
