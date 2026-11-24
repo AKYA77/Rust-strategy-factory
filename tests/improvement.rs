@@ -265,8 +265,10 @@ fn indexed_training_review_preserves_policy_and_independent_proof_audits() {
 #[test]
 fn proof_screening_at_candle_screen_stage_is_authorizable_and_verifiable() {
     // P0.2 regression: proof-policy evaluation legitimately invokes
-    // Stage::CandleScreen for screening. The screening contract must accept it,
-    // while adaptation must still refuse to consume a screen-only receipt.
+    // Stage::CandleScreen for screening. The authorization contract accepts
+    // CandleScreen candidates under the same proof-gating as adaptation
+    // (training protocol hash and current model versions), so a CandleScreen
+    // parent is authorized for diagnosis; the screen result stays verifiable.
     use rust_strategy_factory::proof_screen;
     let d = dir();
     let mut registry = Registry::open(&d.join("state.sqlite")).unwrap();
@@ -301,11 +303,12 @@ fn proof_screening_at_candle_screen_stage_is_authorizable_and_verifiable() {
         .unwrap()
         .unwrap();
     assert_eq!(key.stage, Stage::CandleScreen);
-    assert!(
-        improvement::diagnose(&mut registry, &execution.experiment_id, &Options::default())
-            .is_err(),
-        "adaptation must not consume a screen-only result"
-    );
+    // CandleScreen candidates authorize correctly: adaptation of a
+    // screen-only parent with an explicit training protocol is admitted.
+    let diagnosis = improvement::diagnose(&mut registry, &execution.experiment_id, &Options::default())
+        .unwrap()
+        .report;
+    assert!(!diagnosis.reasons.is_empty(), "diagnosis must record reasons, got {:?}", diagnosis.reasons);
     assert!(
         proof_screen::verified_rejection(&execution.result, &key)
             .unwrap()

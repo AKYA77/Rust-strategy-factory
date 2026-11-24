@@ -239,6 +239,38 @@ fn run(args: &[String]) -> Result<()> {
         .collect::<Vec<_>>()
         .as_slice()
     {
+        ["research-ordered-coverage", config, stage, output, limit] => {
+            let limit = limit
+                .parse::<usize>()
+                .map_err(|_| "coverage month limit must be a positive integer")?;
+            let report = rust_strategy_factory::ordered_coverage::from_config(
+                Path::new(config),
+                stage,
+                Some(limit),
+            )?;
+            save_replace(output, &report)
+        }
+        ["research-ordered-coverage", config, stage, output] => {
+            let report = rust_strategy_factory::ordered_coverage::from_config(
+                Path::new(config),
+                stage,
+                None,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "stage": report.stage,
+                    "months": report.months,
+                    "chunks": report.chunks,
+                    "events": report.events,
+                    "first_ms": report.first_ms,
+                    "last_ms": report.last_ms,
+                    "limitations": report.limitations,
+                }))
+                .map_err(|e| e.to_string())?
+            );
+            save_replace(output, &report)
+        }
         ["validate-protocol", inputs, plan, database] => {
             let (inputs, limits) = research_inputs(inputs)?;
             if inputs.len() != 1 {

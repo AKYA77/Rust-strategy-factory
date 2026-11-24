@@ -63,6 +63,8 @@ pub mod historical_catalog;
 
 pub mod coverage;
 
+pub mod ordered_coverage;
+
 pub mod import_job;
 
 pub mod catalog;
