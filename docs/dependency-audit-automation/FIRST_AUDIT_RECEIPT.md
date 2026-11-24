@@ -45,6 +45,7 @@ deferred to separate changes that re-run this audit.
 | RUSTSEC-2026-0391 | zstd | 0.13.3 | vulnerability | — | 2026-10-16 | Ignored with justification (see below) |
 | RUSTSEC-2026-0459 | libsqlite3-sys | 0.35.0 | vulnerability (CVE-2026-119375) | 6.8 medium | 2026-10-30 | Ignored with justification (see below) |
 | RUSTSEC-2026-0543 | chrono | 0.4.45 | unmaintained | — | 2026-09-14 | Ignored with justification (see below) |
+| RUSTSEC-2026-0595 | parquet | 60.1.0 | advisory (unsound) | — | 2026-11 | Ignored with justification (see below) |
 
 Unfiltered `cargo audit` output concluded: `error: 2 vulnerabilities found! warning: 1
 allowed warning found`. With the documented ignores, both `cargo deny check` and
@@ -70,11 +71,18 @@ registry database files and never opens third-party DB files. Fix (libsqlite3-sy
 Used for wall-clock timestamps in research output. Advisory explicitly states no fixed
 upgrade exists. Migration (e.g. to jiff/time) deferred.
 
+**RUSTSEC-2026-0595 (parquet 60.1.0 — bloom filters plaintext in encrypted parquet).** The advisory
+applies to writing bloom filters into ENCRYPTED parquet files. The app's only parquet usage
+(`pack-parquet`, research dataset export) writes unencrypted datasets with no bloom filters, so
+the advisory does not apply to any executed path. `parquet = 60.1.0` is pinned per the bounded
+native-dataset contract; the dependency bump is deferred to a separate change that re-runs this
+audit.
+
 ## Stage results (this run)
 
 ```
-cargo deny check:   advisories ok (3 ignored w/ reasons), bans ok, licenses ok, sources ok
-cargo audit:        2 vulnerabilities + 1 unmaintained warning, all 3 documented + ignored
+cargo deny check:   advisories ok (4 ignored w/ reasons), bans ok, licenses ok, sources ok
+cargo audit:        2 vulnerabilities + 1 unmaintained warning, all 4 documented + ignored
 ```
 
 Duplicate-version warnings for zstd (0.13.3 / 0.14.4) and zstd-safe (7.4.1 / 8.3.0) are
@@ -94,7 +102,7 @@ intentional: app baseline vs parquet codec, per docs/SOURCE_REVIEW.
 
 ```
 flock -w 3600 /root/workspace/.rsf-heavy.lock cargo deny check
-cargo audit --ignore RUSTSEC-2026-0391 --ignore RUSTSEC-2026-0459 --ignore RUSTSEC-2026-0543
+cargo audit --ignore RUSTSEC-2026-0391 --ignore RUSTSEC-2026-0459 --ignore RUSTSEC-2026-0543 --ignore RUSTSEC-2026-0595
 ```
 
 The CI job `.github/workflows/ci.yml` `dependency-audit` runs the same stages in parallel
