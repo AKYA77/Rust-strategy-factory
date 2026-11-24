@@ -947,122 +947,157 @@ pub struct Candidate {
     pub strategy: Strategy,
 }
 /// Family metadata is not part of effective concept identity. Templates are bounded typed rules.
-pub fn family_templates() -> Vec<Candidate> {
-    let mut out = Vec::new();
-    for timeframe in Timeframe::ALL {
-        for side in [Side::Long, Side::Short] {
-            let long = side == Side::Long;
-            for window in [5, 10, 20] {
-                for stop_ticks in [150, 200] {
-                    for family in Family::ALL {
-                        let rule = match family {
-                            Family::MeanReversion => Rule::All(vec![
-                                if long {
-                                    Rule::BelowMean { window }
-                                } else {
-                                    Rule::AboveMean { window }
-                                },
-                                Rule::RsiThreshold {
-                                    window,
-                                    basis_points: if long { 3500 } else { 6500 },
-                                    above: !long,
-                                },
-                            ]),
-                            Family::Momentum => Rule::All(vec![
-                                if long {
-                                    Rule::Rising { lookback: window }
-                                } else {
-                                    Rule::Falling { lookback: window }
-                                },
-                                Rule::RsiThreshold {
-                                    window,
-                                    basis_points: if long { 5500 } else { 4500 },
-                                    above: long,
-                                },
-                            ]),
-                            Family::Breakout => Rule::Donchian {
-                                window,
-                                above: long,
-                            },
-                            Family::TrendFollowing => Rule::All(vec![
-                                Rule::MeanTrend {
-                                    fast: window,
-                                    slow: window * 3,
-                                    above: long,
-                                },
-                                if long {
-                                    Rule::AboveMean { window }
-                                } else {
-                                    Rule::BelowMean { window }
-                                },
-                            ]),
-                            Family::Reversal => Rule::RsiCross {
-                                window,
-                                basis_points: if long { 3000 } else { 7000 },
-                                above: long,
-                            },
-                            Family::RangeTrading => Rule::ChannelEdge {
-                                window,
-                                basis_points: 2000,
-                                upper: !long,
-                            },
-                            Family::Volatility => Rule::All(vec![
-                                Rule::RangeExpansion {
-                                    window,
-                                    multiple_bps: 15000,
-                                },
-                                if long {
-                                    Rule::Rising { lookback: 1 }
-                                } else {
-                                    Rule::Falling { lookback: 1 }
-                                },
-                            ]),
-                            Family::Session => Rule::All(vec![
-                                Rule::UtcSession {
-                                    start_hour: 7,
-                                    end_hour: 17,
-                                    weekdays: 31,
-                                },
-                                Rule::CrossMean {
-                                    window,
-                                    above: long,
-                                },
-                            ]),
-                            Family::Confluence => Rule::All(vec![
-                                Rule::MeanTrend {
-                                    fast: window,
-                                    slow: window * 2,
-                                    above: long,
-                                },
-                                Rule::Donchian {
-                                    window,
-                                    above: long,
-                                },
-                                Rule::RsiThreshold {
-                                    window,
-                                    basis_points: 5000,
-                                    above: long,
-                                },
-                            ]),
-                            Family::Orb => orb_rule(window, long),
-                        };
-                        out.push(Candidate {
-                            family,
-                            strategy: Strategy {
-                                stop_policy: None,
-                                timeframe,
-                                side,
-                                stop_ticks,
-                                rule,
-                                entry: None,
-                            },
-                        });
-                    }
-                }
+/// Exactly ten fixed-daily-checkpoint research families. One canonical,
+/// reproducible configuration per family. Replaces the broad Cartesian-product
+/// enumerator (timeframes × sides × windows × stop_ticks × families) that
+/// generated unbounded parameter sweeps. Each checkpoint is a fixed reference
+/// point, not a search dimension.
+pub fn family_checkpoints() -> Vec<Candidate> {
+    Family::ALL
+        .iter()
+        .copied()
+        .map(|family| {
+            let (rule, stop_ticks, timeframe, side) = match family {
+                Family::MeanReversion => (
+                    Rule::All(vec![
+                        Rule::BelowMean { window: 20 },
+                        Rule::RsiThreshold {
+                            window: 20,
+                            basis_points: 3500,
+                            above: false,
+                        },
+                    ]),
+                    150,
+                    Timeframe::M1,
+                    Side::Long,
+                ),
+                Family::Momentum => (
+                    Rule::All(vec![
+                        Rule::Rising { lookback: 20 },
+                        Rule::RsiThreshold {
+                            window: 20,
+                            basis_points: 5500,
+                            above: true,
+                        },
+                    ]),
+                    150,
+                    Timeframe::M1,
+                    Side::Long,
+                ),
+                Family::Breakout => (
+                    Rule::Donchian {
+                        window: 20,
+                        above: true,
+                    },
+                    150,
+                    Timeframe::M1,
+                    Side::Long,
+                ),
+                Family::TrendFollowing => (
+                    Rule::All(vec![
+                        Rule::MeanTrend {
+                            fast: 20,
+                            slow: 60,
+                            above: true,
+                        },
+                        Rule::AboveMean { window: 20 },
+                    ]),
+                    150,
+                    Timeframe::M1,
+                    Side::Long,
+                ),
+                Family::Reversal => (
+                    Rule::RsiCross {
+                        window: 20,
+                        basis_points: 3000,
+                        above: true,
+                    },
+                    150,
+                    Timeframe::M1,
+                    Side::Long,
+                ),
+                Family::RangeTrading => (
+                    Rule::ChannelEdge {
+                        window: 20,
+                        basis_points: 2000,
+                        upper: false,
+                    },
+                    150,
+                    Timeframe::M1,
+                    Side::Long,
+                ),
+                Family::Volatility => (
+                    Rule::All(vec![
+                        Rule::RangeExpansion {
+                            window: 20,
+                            multiple_bps: 15000,
+                        },
+                        Rule::Rising { lookback: 1 },
+                    ]),
+                    150,
+                    Timeframe::M1,
+                    Side::Long,
+                ),
+                Family::Session => (
+                    Rule::All(vec![
+                        Rule::UtcSession {
+                            start_hour: 7,
+                            end_hour: 17,
+                            weekdays: 31,
+                        },
+                        Rule::CrossMean {
+                            window: 20,
+                            above: true,
+                        },
+                    ]),
+                    150,
+                    Timeframe::M1,
+                    Side::Long,
+                ),
+                Family::Confluence => (
+                    Rule::All(vec![
+                        Rule::MeanTrend {
+                            fast: 20,
+                            slow: 40,
+                            above: true,
+                        },
+                        Rule::Donchian {
+                            window: 20,
+                            above: true,
+                        },
+                        Rule::RsiThreshold {
+                            window: 20,
+                            basis_points: 5000,
+                            above: true,
+                        },
+                    ]),
+                    150,
+                    Timeframe::M1,
+                    Side::Long,
+                ),
+                Family::Orb => (
+                    Rule::OrbLongBreakout {
+                        window_minutes: 30,
+                        session_hour: 7,
+                    },
+                    150,
+                    Timeframe::M1,
+                    Side::Long,
+                ),
+            };
+            Candidate {
+                family,
+                strategy: Strategy {
+                    stop_policy: None,
+                    timeframe,
+                    side,
+                    stop_ticks,
+                    rule,
+                    entry: None,
+                },
             }
-        }
-    }
-    out
+        })
+        .collect()
 }
 
 /// Build an ORB rule for the given window and side.
@@ -1071,6 +1106,7 @@ pub fn family_templates() -> Vec<Candidate> {
 /// of the first `window_minutes` after open, then fires when price breaks beyond
 /// the range on the strategy's side. Session is determined by `session_hour`:
 ///   0 = Asian (00:00 UTC), 8 = London (08:00 UTC), 13 = New York (13:00 UTC).
+#[allow(dead_code)]
 fn orb_rule(window: usize, long: bool) -> Rule {
     if long {
         Rule::OrbLongBreakout {
@@ -1085,7 +1121,10 @@ fn orb_rule(window: usize, long: bool) -> Rule {
     }
 }
 pub fn generate() -> Vec<Strategy> {
-    family_templates().into_iter().map(|c| c.strategy).collect()
+    family_checkpoints()
+        .into_iter()
+        .map(|c| c.strategy)
+        .collect()
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ScreenStatus {

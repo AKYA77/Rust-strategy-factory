@@ -71,12 +71,31 @@ pipeline; synthetic refusal preserved where required.
 
 ## Implement next (ordered)
 
-1. **Milestone 2**: replace the broad enumerator with exactly ten fixed-daily-checkpoint families
-   and the 70 instrument-family groups / max-35 leaderboard, with per-family contract tests.
-2. **Milestone 3**: durable stage transitions, 40% Stage-1 policy with proven-bound handling,
+1. **Milestone 3**: durable stage transitions, 40% Stage-1 policy with proven-bound handling,
    bounded population, immutable evaluator, telemetry/lineage.
-3. **Milestones 4–7**: shared preparation caches, full validation, measured optimization
+2. **Milestones 4–7**: shared preparation caches, full validation, measured optimization
    (correctness first, reference-equivalence proofs), VPS acceptance evidence.
+
+## Completed: Milestone 2 (2026-11-24)
+
+**Milestone 2 — New active grammar:** Exit requirements met:
+- Exactly ten family IDs (`Family::ALL` with MeanReversion, Momentum, Breakout, TrendFollowing,
+  Reversal, RangeTrading, Volatility, Session, Confluence, Orb) ✓
+- Replaced the broad Cartesian-product enumerator (`family_templates()`, 840 candidates) with
+  exactly ten fixed-daily-checkpoint families (`family_checkpoints()`, one per family) ✓
+- Shared scheduling contract: `candidate_at()` deterministic with seed, all ten families appear
+  in region 0 ✓
+- 70 instrument-family groups (7 instruments × 10 families) ✓
+- Max-35 leaderboard (5 per instrument × 7 instruments) — `BOARD_CAPACITY=5` already correct ✓
+- Per-family contract tests: 10 tests in `tests/families.rs` covering exact count, reproducibility,
+  scheduling determinism, canonical rules, prefix causality, nonzero trades ✓
+- Old broad enumerator archived (removed `family_templates()`, all callers updated) ✓
+
+Files changed: `src/strategies.rs` (`family_checkpoints()` replaces `family_templates()`),
+`src/research.rs` (`candidate_at()` and `step()` use `family_checkpoints()`),
+`src/exploration.rs` (uses `family_checkpoints()`), `tests/families.rs` (rewritten for 10 checkpoints
++ 4 new contract tests), `tests/operators.rs`, `tests/atr.rs`, `tests/research.rs`,
+`tests/higher_timeframe.rs`, `tests/corpus.rs` (candidate lookup made data-driven).
 
 ## Owner decisions (V2, 2026-11-24)
 

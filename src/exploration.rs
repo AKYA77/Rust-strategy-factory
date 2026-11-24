@@ -77,7 +77,7 @@ pub fn cases(parent: &Strategy, costs: &Costs, seed: u64) -> Result<Vec<Case>> {
         }
     }
     static TEMPLATES: std::sync::OnceLock<Vec<strategies::Candidate>> = std::sync::OnceLock::new();
-    let templates = TEMPLATES.get_or_init(strategies::family_templates);
+    let templates = TEMPLATES.get_or_init(strategies::family_checkpoints);
     let mut seen_rules = BTreeSet::from([data::hash(&parent.rule)?]);
     let mut donors = Vec::new();
     for donor in templates

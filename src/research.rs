@@ -847,7 +847,7 @@ mod stage_policy_tests {
 /// Bounded novel parameter regions; no cycling through already completed template ranges.
 pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strategy)> {
     static TEMPLATES: std::sync::OnceLock<Vec<strategies::Candidate>> = std::sync::OnceLock::new();
-    let templates = TEMPLATES.get_or_init(strategies::family_templates);
+    let templates = TEMPLATES.get_or_init(strategies::family_checkpoints);
     let count = templates.len() as u64;
     let region = index / count;
     let slot = ((index % count) + (seed % count)) % count;
@@ -1241,7 +1241,7 @@ impl Driver {
         let limit = self
             .config
             .max_regions
-            .checked_mul(strategies::family_templates().len() as u64)
+            .checked_mul(strategies::family_checkpoints().len() as u64)
             .and_then(|v| v.checked_mul(self.inputs.len() as u64))
             .ok_or("research budget overflow")?;
         let pending: Option<(i64,usize,String,u64)> = self.registry.connection.query_row("SELECT parent_cursor,input_index,parent_id,depth FROM improvement_jobs WHERE run_id=?1 AND state='queued'",[&self.id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get::<_,i64>(3)? as u64))).optional().map_err(|e|e.to_string())?;

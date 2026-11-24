@@ -165,7 +165,7 @@ fn expanded_regions_include_typed_macd_and_band_variants() {
             _ => (false, false),
         }
     }
-    let count = strategies::family_templates().len() as u64;
+    let count = strategies::family_checkpoints().len() as u64;
     let mut found = (false, false);
     for slot in 0..count {
         let (_, s) = research::candidate_at(6 * count + slot, 42).unwrap();

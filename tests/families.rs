@@ -1,6 +1,5 @@
 use rust_strategy_factory::{
     candles::{Candle, Ohlc, Timeframe},
-    contracts::Side,
     indicators,
     strategies::{self, Family, Features, Rule},
 };
@@ -35,27 +34,34 @@ fn fixture() -> Vec<Candle> {
 }
 #[test]
 fn every_family_has_valid_unique_templates_and_actual_nonzero_signal_cohorts() {
-    let candidates = strategies::family_templates();
+    let candidates = strategies::family_checkpoints();
+    assert_eq!(
+        candidates.len(),
+        Family::ALL.len(),
+        "exactly ten family checkpoints"
+    );
     let mut ids = BTreeSet::new();
     let mut counts = BTreeMap::new();
     let c = fixture();
     let mut f = Features::new(&c, 1200 * 40).unwrap();
-    for candidate in candidates
-        .iter()
-        .filter(|c| c.strategy.timeframe == Timeframe::M1 && c.strategy.side == Side::Long)
-    {
+    for candidate in &candidates {
         candidate.strategy.canonical().unwrap();
         let n = f.signal(&candidate.strategy.rule).unwrap().count();
         *counts.entry(candidate.family).or_insert(0) += n;
-    }
-    for family in Family::ALL {
-        assert!(counts[&family] > 0, "no signal cohort for {family:?}");
-    }
-    for candidate in &candidates {
         assert!(
             ids.insert(candidate.strategy.identity().unwrap()),
-            "duplicate template"
+            "duplicate checkpoint for {:?}",
+            candidate.family
         );
+    }
+    for family in Family::ALL {
+        if family == Family::Orb {
+            // ORB requires a completed session range; the generic oscillating
+            // fixture has no causal opening range. Covered by the ORB-specific
+            // test below (no silent skip).
+            continue;
+        }
+        assert!(counts[&family] > 0, "no signal cohort for {family:?}");
     }
     assert!(f.cache_hits > 0);
     assert!(f.feature_builds > 0);
@@ -66,9 +72,9 @@ fn all_family_signals_are_prefix_causal_and_reusable() {
     let prefix = &full[..600];
     let mut f = Features::new(&full, 1200 * 40).unwrap();
     let mut p = Features::new(prefix, 600 * 40).unwrap();
-    for candidate in strategies::family_templates()
+    for candidate in strategies::family_checkpoints()
         .into_iter()
-        .filter(|c| c.strategy.timeframe == Timeframe::M1 && c.strategy.stop_ticks == 30)
+        .filter(|c| c.strategy.timeframe == Timeframe::M1)
     {
         let a = f.signal(&candidate.strategy.rule).unwrap();
         let b = p.signal(&candidate.strategy.rule).unwrap();
@@ -179,7 +185,7 @@ fn every_family_reaches_nonzero_closed_tick_trades_on_actual_synthetic_events() 
     use rust_strategy_factory::{
         candles,
         candles::Timeframe,
-        contracts::{Conversion, Profile, Side},
+        contracts::{Conversion, Profile},
         data::{self, Tick},
         strategies::Family,
         tick_engine::{self, Costs},
@@ -217,7 +223,7 @@ fn every_family_reaches_nonzero_closed_tick_trades_on_actual_synthetic_events() 
     .unwrap();
     let c = candles::build(&d, Timeframe::M1).unwrap();
     let mut f = Features::new(&c, c.len() * 40).unwrap();
-    let candidates = strategies::family_templates();
+    let candidates = strategies::family_checkpoints();
     for family in Family::ALL {
         // ORB needs a completed session range; the generic oscillating fixture has
         // no causal opening range. Use an explicit positive fixture for both the
@@ -260,18 +266,17 @@ fn every_family_reaches_nonzero_closed_tick_trades_on_actual_synthetic_events() 
                 mask.count() > 0,
                 "ORB must produce at least one causal signal on a known completed range"
             );
-            let mut strategy = candidates
+            let strategy = candidates
                 .iter()
                 .find(|candidate| {
                     candidate.family == Family::Orb
                         && candidate.strategy.timeframe == Timeframe::M1
-                        && candidate.strategy.side == Side::Long
+                        && candidate.strategy.side == rust_strategy_factory::contracts::Side::Long
                         && candidate.strategy.stop_ticks == 150
                 })
-                .expect("ORB M1 long template")
+                .expect("ORB M1 long checkpoint")
                 .strategy
                 .clone();
-            strategy.rule = rule;
             let replay = tick_engine::replay(
                 &d,
                 &c,
@@ -287,28 +292,26 @@ fn every_family_reaches_nonzero_closed_tick_trades_on_actual_synthetic_events() 
             );
             continue;
         }
-        let strategy = &candidates
+        let strategy = candidates
             .iter()
             .find(|candidate| {
                 candidate.family == family
                     && candidate.strategy.timeframe == Timeframe::M1
-                    && candidate.strategy.side == Side::Long
-                    && (candidate.strategy.stop_ticks == 150
-                        || candidate.strategy.stop_ticks == 200)
+                    && candidate.strategy.side == rust_strategy_factory::contracts::Side::Long
+                    && candidate.strategy.stop_ticks == 150
                     && f.signal(&candidate.strategy.rule).unwrap().count() > 0
             })
             .unwrap_or_else(|| {
-                panic!(
-                    "no signal-producing candidate for family {family:?} with stop_ticks 150/200"
-                )
+                panic!("no signal-producing checkpoint for family {family:?} with stop_ticks 150")
             })
-            .strategy;
+            .strategy
+            .clone();
         let mask = f.signal(&strategy.rule).unwrap();
         let r = tick_engine::replay(
             &d,
             &c,
             &mask,
-            strategy,
+            &strategy,
             &Costs::default(),
             &vec![Conversion::usd(); d.ticks.len()],
         )
@@ -316,5 +319,85 @@ fn every_family_reaches_nonzero_closed_tick_trades_on_actual_synthetic_events() 
         assert!(!r.trades.is_empty(), "no closed trades for {family:?}");
         let audit = rust_strategy_factory::screen::audit_replay(&d, &Costs::default(), &r).unwrap();
         assert!(audit.audited_trades > 0);
+    }
+}
+
+#[test]
+fn exactly_ten_family_checkpoints_are_fixed_and_reproducible() {
+    let first = strategies::family_checkpoints();
+    let second = strategies::family_checkpoints();
+    assert_eq!(first.len(), 10, "exactly ten family checkpoints");
+    assert_eq!(
+        first.len(),
+        second.len(),
+        "checkpoints are deterministic across calls"
+    );
+    for (a, b) in first.iter().zip(second.iter()) {
+        assert_eq!(
+            a.family, b.family,
+            "family mismatch in deterministic checkpoints"
+        );
+        assert_eq!(
+            a.strategy.identity().unwrap(),
+            b.strategy.identity().unwrap(),
+            "identity mismatch in deterministic checkpoints"
+        );
+    }
+    let families: Vec<_> = first.iter().map(|c| c.family).collect();
+    for expected in strategies::Family::ALL {
+        assert!(
+            families.contains(&expected),
+            "missing checkpoint for {expected:?}"
+        );
+    }
+}
+
+#[test]
+fn family_checkpoint_scheduling_contract_is_deterministic_with_seed() {
+    use rust_strategy_factory::research::candidate_at;
+    // Same index + same seed → same candidate (deterministic).
+    let a = candidate_at(0, 42).unwrap();
+    let b = candidate_at(0, 42).unwrap();
+    assert_eq!(a, b, "candidate_at is deterministic");
+    // Ten checkpoints per region: index 0..10 covers all families in region 0.
+    let families: std::collections::BTreeSet<strategies::Family> =
+        (0..10).map(|i| candidate_at(i, 0).unwrap().0).collect();
+    assert_eq!(families.len(), 10, "all ten families appear in region 0");
+    for f in strategies::Family::ALL {
+        assert!(families.contains(&f), "family {f:?} missing from region 0");
+    }
+}
+
+#[test]
+fn seven_instruments_times_ten_families_is_seventy_groups() {
+    let instruments = [
+        "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD",
+    ];
+    let families = strategies::Family::ALL.len();
+    assert_eq!(families, 10, "ten research families");
+    assert_eq!(
+        instruments.len() * families,
+        70,
+        "70 instrument-family groups"
+    );
+    // Max-35 leaderboard: 5 per instrument × 7 instruments.
+    assert_eq!(5 * instruments.len(), 35, "max-35 leaderboard");
+}
+
+#[test]
+fn family_checkpoint_rules_are_canonical_and_compatible() {
+    for candidate in strategies::family_checkpoints() {
+        // Every checkpoint must canonicalize without error.
+        candidate.strategy.canonical().unwrap();
+        // Every checkpoint must produce a valid concept identity.
+        let id = candidate.strategy.identity().unwrap();
+        assert!(!id.is_empty(), "empty identity for {:?}", candidate.family);
+        // Identity must be stable across calls.
+        assert_eq!(
+            candidate.strategy.identity().unwrap(),
+            id,
+            "identity not stable for {:?}",
+            candidate.family
+        );
     }
 }

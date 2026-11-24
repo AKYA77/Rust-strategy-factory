@@ -318,7 +318,7 @@ fn unavailable_atr_and_excess_distance_never_fall_back_or_silently_clamp() {
 
 #[test]
 fn atr_policy_appears_in_autonomous_regions_and_frozen_parameter_probes() {
-    let count = rust_strategy_factory::strategies::family_templates().len() as u64;
+    let count = rust_strategy_factory::strategies::family_checkpoints().len() as u64;
     for slot in 0..count {
         let (_, s) = rust_strategy_factory::research::candidate_at(10 * count + slot, 42).unwrap();
         assert!(matches!(

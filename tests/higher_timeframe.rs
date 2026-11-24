@@ -216,7 +216,7 @@ fn autonomous_regions_include_bounded_higher_confirmations() {
             _ => false,
         }
     }
-    let count = rust_strategy_factory::strategies::family_templates().len() as u64;
+    let count = rust_strategy_factory::strategies::family_checkpoints().len() as u64;
     let mut confirmations = 0;
     for slot in 0..count {
         let (_, candidate) = research::candidate_at(4 * count + slot, 42).unwrap();
