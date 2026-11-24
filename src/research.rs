@@ -158,7 +158,7 @@ pub fn evaluate(
         EvaluationOptions {
             feature_cells,
             evaluation: None,
-            stage: Stage::CandleScreen,
+            stage: Stage::TickVerification,
             shadow_policy: None,
             proof_policy: None,
             indexed_policy: None,
@@ -329,18 +329,14 @@ fn evaluate_prepared<'data>(
     ];
     if proof_policy.is_some() {
         crate::proof_screen::guard(&registry.connection)?;
-        if key.stage == Stage::TickVerification {
-            crate::improvement::authorize(&key)?;
-        }
+        crate::improvement::authorize(&key)?;
         if !allowed_classes.contains(&d.manifest.class) && evaluation.is_none() {
             return Err("real proof screening requires explicit training scope".into());
         }
     }
     if indexed_policy.is_some() {
         crate::indexed_policy::guard(&registry.connection)?;
-        if key.stage == Stage::TickVerification {
-            crate::improvement::authorize(&key)?;
-        }
+        crate::improvement::authorize(&key)?;
         if !allowed_classes.contains(&d.manifest.class) && evaluation.is_none() {
             return Err("real indexed research requires explicit training scope".into());
         }
@@ -1268,10 +1264,12 @@ impl Driver {
         let input_index = s.cursor as usize % self.inputs.len();
         let candidate_index = s.cursor / self.inputs.len() as u64;
         let (_, strategy) = candidate_at(candidate_index, self.config.seed)?;
-        // Cycle through all 3 stages: CandleScreen → TickVerification → IndependentValidation
+        // Cycle through all 3 stages: TickVerification → CandleScreen → IndependentValidation
+        // Start with TickVerification (candidate_index=0) so the first experiment is
+        // immediately diagnosable (authorize() requires TickVerification or valid protocol).
         let stage = match candidate_index % 3 {
-            0 => Stage::CandleScreen,
-            1 => Stage::TickVerification,
+            0 => Stage::TickVerification,
+            1 => Stage::CandleScreen,
             _ => Stage::IndependentValidation,
         };
         let stage_for_eval = stage.clone();
