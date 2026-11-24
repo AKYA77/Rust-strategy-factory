@@ -284,11 +284,21 @@ fn bounds_reject_invalid_configuration_and_new_regions_are_not_repeats() {
     );
     let count = rust_strategy_factory::strategies::family_templates().len() as u64;
     let mut ids = std::collections::BTreeSet::new();
+    let mut dups = 0;
     for region in [0, 1, 2, 3, 4, 5, 6, 10, 34, 299, 300, 301, 9999] {
         for slot in 0..count {
-            let (_, s) = research::candidate_at(region * count + slot, 42).unwrap();
-            assert!(ids.insert(s.identity().unwrap()));
+            let (family, s) = research::candidate_at(region * count + slot, 42).unwrap();
+            let id = s.identity().unwrap();
+            if !ids.insert(id.clone()) {
+                dups += 1;
+                if dups <= 20 {
+                    eprintln!("DUP region={region} slot={slot} family={family:?} stop_ticks={} tf={:?} side={:?} rule={:?}", s.stop_ticks, s.timeframe, s.side, s.rule);
+                }
+            }
         }
+    }
+    if dups > 0 {
+        panic!("found {dups} duplicate strategy identities");
     }
     std::fs::remove_dir_all(d).unwrap();
 }
