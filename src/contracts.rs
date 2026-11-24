@@ -150,7 +150,6 @@ impl Conversion {
             || self.as_of_ms > event_ms
             || (p.quote == "USD" && (self.usd_num != self.quote_den))
             || (p.quote != "USD"
-                && self.as_of_ms != i64::MIN
                 && i128::from(event_ms) - i128::from(self.as_of_ms) > i128::from(max_age_ms))
         {
             return Err("missing, future, stale or invalid currency conversion".into());
