@@ -4,17 +4,13 @@ Status: SOFTWARE_INCOMPLETE. Use the existing checkout. Read AGENTS.md, PROJECT_
 
 ## Latest verified local milestone
 
-Current HEAD `0ba942e` on `main` == `origin/main` == `hermes/integration-codex-stack` (all identical and pushed). Commit `0ba942e` "feat: continuous full-period execution + scientific validation + completion metrics" merges PRs #44, #45, #47 and #48, all closed as superseded with history preserved. No open PRs remain; every PR head commit is an ancestor of `origin/main`; no force-push, no branch deletion.
+Current HEAD `ba66956` on `main` == `origin/main` (pushed). Merge commit `ba66956` "Merge pull request #52 from AKYA77/wt/registered-full-period" merges PR #52 (registered full-period real-data executor: execute_continuous + historical-corpus-execute-continuous CLI; classification continuous_diagnostic, eligibility none). PR #52 head 0cb5d5a66cccba8308ff2f0262d469d0f17b5eb4 is an ancestor of origin/main (containment proven via git merge-base --is-ancestor); no force-push, no branch deletion; PR #52 closed as merged with history preserved. One open PR remains: #51 (continuous diagnostic accounting hygiene: breakeven streak, dead term, unused constant).
 
-- Hosted CI run 45031961750 (push, main, head_sha 0ba942e) = success, completed 2026-11-22T14:16:56Z. Twin stack-branch run 45031941165 = success too. CI evidence is on the exact current SHA, not an ancestor. PROJECT_STATE.json hosted_ci records run 45031961750 conclusion=success on sha 0ba942e; tests_passed stays 619 (58 binaries, 0 failed, CI-verified suite).
+- Hosted CI run 45339910079 (push, main, head_sha ba66956) = success on all 7 jobs: release-build, data-compute-identity, check-operations, full-horizon, rust-checks, browser, dependency-audit. CI evidence is on the exact current SHA, not an ancestor. PROJECT_STATE.json hosted_ci records run 45339910079 conclusion=success on sha ba66956; tests_passed stays 619 (CI-verified suite).
 
-- PR #44 (scientific validation over the 22-month diagnostic corpus): owner-criteria checks (>=50.00% net win rate, <=5 consecutive losses, 3:1 planned RR, >=50 resolved exits in 2025 and in 2026, $500 equity objective). 8/8 instruments, 176 executed months, 0 refused, 21,104 trades, 1,094,379 rejections, P&L -3,077,229,124 uUSD. Every instrument REJECTED (diagnostic class plus failing numerical floors); 0 qualify. Evidence: docs/historical-migration/SCIENTIFIC_VALIDATION.md and SCIENTIFIC_VALIDATION_RECEIPT.json.
+- PR #52 (registered full-period real-data executor over the 22-month corpus): execute_continuous replays each registered month through execute_month, chains each month's ending marked equity into the next month's starting equity, and reports compounded full-period equity, cross-month continuous losing streak and full-period peak-to-trough max drawdown. All 8 instruments execute (176/176 months, 0 refused); diagnostic only, never registers or qualifies. Evidence: tests/registered_full_period.rs.
 
-- PR #45 (sparse signal-mask storage + opt-in controlled recursive acceptance): merged and closed.
-
-- PR #47 (item-10 ledger reconciliation: scheduler/resource controls via PR #27): merged and closed.
-
-- PR #48 (richer regimes, broader seeded exploration, behavioral diversity): merged and closed.
+- Prior milestone (historical, superseded): HEAD 0ba942e merged PRs #44, #45, #47, #48 via commit 0ba942e; hosted CI run 45031961750 success; those PRs closed as superseded with history preserved.
 
 ## Implement next
 
