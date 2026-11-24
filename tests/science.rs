@@ -842,14 +842,8 @@ fn real_structurally_valid_data_enters_frozen_protocol_pipeline() {
         feature_cells: 100000,
         ..Default::default()
     };
-    let result = science::execute(
-        &mut registry,
-        &input,
-        &p,
-        "real-data-revision",
-        &budget,
-    )
-    .unwrap();
+    let result =
+        science::execute(&mut registry, &input, &p, "real-data-revision", &budget).unwrap();
     assert!(!result.reused);
     assert_eq!(result.report.status, "INSUFFICIENT_EVIDENCE");
     assert_eq!(
@@ -857,7 +851,12 @@ fn real_structurally_valid_data_enters_frozen_protocol_pipeline() {
         data::DataClass::RealStructurallyValid
     );
     assert_eq!(result.report.candidates[0].experiments.len(), 6);
-    assert!(result.report.candidates[0].pooled_oos_reset_fold_stats.closed > 0);
+    assert!(
+        result.report.candidates[0]
+            .pooled_oos_reset_fold_stats
+            .closed
+            > 0
+    );
     assert_eq!(result.report.candidates[0].failed_windows, 0);
     assert_eq!(result.report.candidates[0].robustness.len(), 5);
     // Numerical execution alone never qualifies; the report states what is still missing.
@@ -892,7 +891,9 @@ fn real_data_below_the_structural_bar_is_still_refused() {
     assert!(error.contains("real protected-final execution blocked"));
     let conn = rusqlite::Connection::open(&path).unwrap();
     let count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM scientific_protocols", [], |r| r.get(0))
+        .query_row("SELECT COUNT(*) FROM scientific_protocols", [], |r| {
+            r.get(0)
+        })
         .unwrap();
     assert_eq!(count, 0);
     let count: i64 = conn

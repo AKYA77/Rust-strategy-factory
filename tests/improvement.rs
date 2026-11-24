@@ -305,10 +305,15 @@ fn proof_screening_at_candle_screen_stage_is_authorizable_and_verifiable() {
     assert_eq!(key.stage, Stage::CandleScreen);
     // CandleScreen candidates authorize correctly: adaptation of a
     // screen-only parent with an explicit training protocol is admitted.
-    let diagnosis = improvement::diagnose(&mut registry, &execution.experiment_id, &Options::default())
-        .unwrap()
-        .report;
-    assert!(!diagnosis.reasons.is_empty(), "diagnosis must record reasons, got {:?}", diagnosis.reasons);
+    let diagnosis =
+        improvement::diagnose(&mut registry, &execution.experiment_id, &Options::default())
+            .unwrap()
+            .report;
+    assert!(
+        !diagnosis.reasons.is_empty(),
+        "diagnosis must record reasons, got {:?}",
+        diagnosis.reasons
+    );
     assert!(
         proof_screen::verified_rejection(&execution.result, &key)
             .unwrap()

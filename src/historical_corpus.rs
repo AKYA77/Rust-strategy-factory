@@ -2102,7 +2102,11 @@ mod tests {
     /// applies to non-USD quotes. The continuous accounting never consults a conversion file:
     /// the policy is derived only from the profile quote, so a USD-base instrument such as
     /// USDJPY is accounted across month boundaries with no conversion file and no refusal.
-    fn continuous_month_non_usd(year: u32, month: u32, outcomes: TradeOutcomeStats) -> MonthExecution {
+    fn continuous_month_non_usd(
+        year: u32,
+        month: u32,
+        outcomes: TradeOutcomeStats,
+    ) -> MonthExecution {
         let net = outcomes.net_micro_usd;
         MonthExecution {
             year,
@@ -2319,10 +2323,22 @@ mod tests {
         assert_eq!(totals.months_refused, 0);
         // Equity compounds exactly across the boundary: February starts where January ended.
         assert_eq!(continuous[0].starting_micro_usd, contracts::INITIAL_EQUITY);
-        assert_eq!(continuous[0].ending_micro_usd, contracts::INITIAL_EQUITY - 2_000_000);
-        assert_eq!(continuous[1].starting_micro_usd, contracts::INITIAL_EQUITY - 2_000_000);
-        assert_eq!(continuous[1].ending_micro_usd, contracts::INITIAL_EQUITY - 5_000_000);
-        assert_eq!(totals.ending_micro_usd, contracts::INITIAL_EQUITY - 5_000_000);
+        assert_eq!(
+            continuous[0].ending_micro_usd,
+            contracts::INITIAL_EQUITY - 2_000_000
+        );
+        assert_eq!(
+            continuous[1].starting_micro_usd,
+            contracts::INITIAL_EQUITY - 2_000_000
+        );
+        assert_eq!(
+            continuous[1].ending_micro_usd,
+            contracts::INITIAL_EQUITY - 5_000_000
+        );
+        assert_eq!(
+            totals.ending_micro_usd,
+            contracts::INITIAL_EQUITY - 5_000_000
+        );
         assert_eq!(totals.net_pnl_micro_usd, -5_000_000);
         // The losing streak survives the month boundary: 2 + 3 = 5.
         assert_eq!(totals.continuous_max_losing_streak, 5);
