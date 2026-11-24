@@ -363,6 +363,7 @@ pub struct Features<'a> {
     max_cells: usize,
     pub cache_hits: usize,
     pub feature_builds: usize,
+    pub economic_calendar: Option<&'a crate::economic_calendar::EconomicCalendar>,
 }
 impl<'a> Features<'a> {
     pub fn new(candles: &'a [Candle], max_cells: usize) -> Result<Self> {
@@ -388,6 +389,7 @@ impl<'a> Features<'a> {
             max_cells,
             cache_hits: 0,
             feature_builds: 0,
+            economic_calendar: None,
         })
     }
     pub fn with_context(
@@ -663,6 +665,30 @@ impl<'a> Features<'a> {
         }
         self.evaluate(&canonical)
     }
+
+    /// Returns a mask where `true` means the candle is NOT near a high-impact
+    /// economic news event (safe to trade), `false` means avoid trading.
+    /// If no economic calendar is configured, all candles are safe (all true).
+    pub fn news_blackout_mask(&self, window_minutes: i64) -> SparseMask {
+        let window_ms = window_minutes as i64 * 60_000;
+        let mut bools = Vec::with_capacity(self.close.len());
+        for candle in self.candles.iter() {
+            let safe = match &self.economic_calendar {
+                Some(cal) => {
+                    let instrument = self
+                        .context
+                        .map(|(d, _)| d.profile.symbol.clone())
+                        .unwrap_or_default();
+                    cal.high_impact_near(&instrument, candle.start_ms, window_ms)
+                        .is_none()
+                }
+                None => true,
+            };
+            bools.push(safe);
+        }
+        SparseMask::from_bools(bools)
+    }
+
     fn evaluate(&mut self, rule: &Rule) -> Result<SparseMask> {
         if let Some(mask) = self.signals.get(rule) {
             self.cache_hits += 1;
