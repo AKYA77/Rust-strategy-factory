@@ -33,8 +33,11 @@ pub const DIVERSITY_VERSION: &str = "structural-diversity-v1";
 pub const BOARD_VERSION: &str = "qualification-board-v1";
 pub const STORE_SCHEMA_VERSION: u32 = 1;
 /// The authoritative engine freezes the 1:3 planned reward/risk target; achieved net results
-/// come from the full-period accounting evidence, never from the planned ratio.
-pub const FULL_PERIOD_CLASSIFICATION: &str = "registered_full_period_replay";
+/// come from the full-period accounting evidence, never from the planned ratio. The exact string
+/// is defined by the registered full-period executor so the gate and the only emitting pipeline
+/// cannot drift apart.
+pub const FULL_PERIOD_CLASSIFICATION: &str =
+    crate::historical_corpus::REGISTERED_FULL_PERIOD_CLASSIFICATION;
 const LIMIT: &str = "Independent local qualification decisions only. Operator-provisioned credentials and filesystem are the trust root; human scientific judgments are not mathematical proof. Board positions require complete approved evidence and an authenticated independent decision; synthetic/diagnostic data never qualifies. Database/file rollback by the trust-root operator is outside this boundary.";
 const MAX_DECISIONS: i64 = 10_000;
 const MAX_SCOPE_DECISIONS: usize = 1000;
@@ -166,6 +169,37 @@ pub struct AccountingEvidence {
     pub max_drawdown_micro_usd: i128,
     pub unresolved: usize,
 }
+impl AccountingEvidence {
+    /// Build the exact accounting evidence from a registered full-period execution. The
+    /// classification is checked exactly; diagnostic or unregistered output is refused instead
+    /// of being relabelled into the registered path.
+    pub fn from_registered_full_period(
+        execution: &crate::historical_corpus::RegisteredFullPeriodExecution,
+        experiment_id: &str,
+        result_hash: &str,
+        cutoff_ms: i64,
+    ) -> Result<Self> {
+        let accounting = execution.accounting(cutoff_ms)?;
+        if let Some(mismatch) = accounting_classification_mismatch(&accounting.classification) {
+            return Err(format!(
+                "registered accounting classification mismatch: {mismatch}"
+            ));
+        }
+        Ok(Self {
+            experiment_id: experiment_id.into(),
+            result_hash: result_hash.into(),
+            classification: accounting.classification,
+            cutoff_ms: accounting.cutoff_ms,
+            pooled: accounting.pooled,
+            year_2025: accounting.year_2025,
+            year_2026: accounting.year_2026,
+            net_micro_usd: accounting.net_micro_usd,
+            ending_micro_usd: accounting.ending_micro_usd,
+            max_drawdown_micro_usd: accounting.max_drawdown_micro_usd,
+            unresolved: accounting.unresolved,
+        })
+    }
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ScienceEvidence {
@@ -257,6 +291,19 @@ fn stats_consistent(s: &PeriodStats) -> bool {
         .and_then(|n| n.checked_add(s.breakeven))
         == Some(s.resolved)
         && s.max_losing_streak <= s.losses
+}
+/// Exact classification guard for the full-period accounting gate. Returns the precise mismatch
+/// when the presented classification is not [`FULL_PERIOD_CLASSIFICATION`]. Diagnostic
+/// simulation, continuous diagnostic and any unregistered label can never enter the registered
+/// qualification path.
+pub fn accounting_classification_mismatch(presented: &str) -> Option<String> {
+    if presented == FULL_PERIOD_CLASSIFICATION {
+        None
+    } else {
+        Some(format!(
+            "expected {FULL_PERIOD_CLASSIFICATION}, presented {presented}"
+        ))
+    }
 }
 fn win_rate_bps(s: &PeriodStats) -> Option<u16> {
     if s.resolved == 0 || s.resolved > 1_000_000 {
@@ -449,20 +496,27 @@ pub fn assess(bundle: &EvidenceBundle, policy: &Policy) -> Result<Assessment> {
     } else {
         GateState::Rejected
     };
+    let accounting_explanation = match accounting_state {
+        GateState::Passed => {
+            "Single-account full-period replay meets the exact win-rate, annual sample, losing-streak and equity floors with zero unresolved positions.".to_string()
+        }
+        GateState::Held => format!(
+            "Full-period registered accounting evidence is missing or incomplete; {}. Reset-fold sums and training backtests cannot substitute.",
+            accounting_classification_mismatch(&a.classification)
+                .as_deref()
+                .unwrap_or("the classification is absent")
+        ),
+        GateState::Rejected => format!(
+            "Diagnostic simulation or classification mismatch ({}); inconsistent counters, unresolved positions or failed numerical floors can never qualify.",
+            accounting_classification_mismatch(&a.classification)
+                .as_deref()
+                .unwrap_or("accounting evidence is incomplete")
+        ),
+    };
     add(
         "full-period-accounting",
         accounting_state,
-        match accounting_state {
-            GateState::Passed => {
-                "Single-account full-period replay meets the exact win-rate, annual sample, losing-streak and equity floors with zero unresolved positions."
-            }
-            GateState::Held => {
-                "Full-period registered accounting evidence is missing or incomplete; reset-fold sums and training backtests cannot substitute."
-            }
-            GateState::Rejected => {
-                "Diagnostic simulation, inconsistent counters, unresolved positions or failed numerical floors can never qualify."
-            }
-        },
+        &accounting_explanation,
     );
 
     // Independent scientific validation (frozen protocol evidence gates).
