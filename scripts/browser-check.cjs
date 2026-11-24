@@ -24,7 +24,7 @@ const runOutput=command(['research',path.join(dir,'research.json'),db,'20']);con
  command(['fixture','AUDUSD',path.join(dir,'second-protocol.json')]);fs.writeFileSync(path.join(dir,'second-protocol-input.json'),JSON.stringify({inputs:[{dataset:'second-protocol.json'}]}));const secondProtocol=JSON.parse(command(['validate-protocol',path.join(dir,'second-protocol-input.json'),path.join(dir,'plan.json'),db]));
 
  const crashProfile=JSON.parse(command(['profiles'])).find(p=>p.symbol==='GBPUSD');fs.writeFileSync(path.join(dir,'crash-profile.json'),JSON.stringify(crashProfile));
- const epoch=Date.parse('2025-01-01T00:00:00Z');
+ const epoch=Date.parse('2026-02-01T00:00:00Z');
  fs.writeFileSync(path.join(dir,'crash.csv'),'timestamp_ms,sequence,bid,ask\n'+[
  [epoch,0,'1.00000','1.00010'],[epoch+60000,1,'1.00020','1.00030'],[epoch+120000,2,'1.00040','1.00050'],[epoch+120000,3,'1.00050','1.00060'],[epoch+121000,4,'9000000000.00000','9000000000.00010'],[epoch+181000,5,'1.00000','1.00010']].map(row=>row.join(',')).join('\n')+'\n');
  command(['import',path.join(dir,'crash.csv'),path.join(dir,'crash-profile.json'),'SYNTHETIC_TEST_ONLY extreme browser loss',path.join(dir,'crash.json'),'synthetic']);
