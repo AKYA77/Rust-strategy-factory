@@ -8,13 +8,20 @@ continue. Never treat a pending CI run as passed.
 
 ## Latest verified local milestone (2026-11-24)
 
-Base HEAD `e772334` (== PDF-pinned remote HEAD). Working tree carries the V2 seven-instrument
-scope + P0 correctness changes; no commit has been made yet for this milestone.
+HEAD `cf179c5` on `main` == `origin/main` (pushed). Commits this session: `b8571d8` (V2
+seven-instrument scope, P0 fixes, verified gold-only data deletion), `a066dfa`, `3705bc8`,
+`cf179c5` (browser integration fixes).
 
+- Hosted CI run **45474835643** on `cf179c5`: **all 7 jobs success** (rust-checks, release-build,
+  data-compute-identity, full-horizon, check-operations, browser, dependency-audit).
 - `scripts/check.sh` on `RSF_BUILDER_PROFILE=hermes-v2-m1`: **EXIT=0**, 65 test suites,
   **694 passed / 0 failed**, fmt clean, Clippy `-D warnings` clean. Log:
   `/root/.hermes/cache/scratch/m1-check16.log` (outside repo; durable evidence is the commit +
-  hosted CI below).
+  hosted CI above).
+- `npm run test:browser`: all 13 scripts pass locally. Earlier browser failures traced to the V2
+  removal of XAUUSD moving the protocol fixture onto GBPUSD, which collided with the GBPUSD crash
+  fixture's protected fold windows; the synthetic crash fixture now sits in Feb 2026 (outside every
+  protected GBPUSD interval while still reaching the 2026 YTD assessment cutoff).
 - Scope: `Profile::SYMBOLS` = EURUSD GBPUSD AUDUSD NZDUSD USDJPY USDCAD USDCHF. XAUUSD submissions
   are rejected (`gold_submission_rejected`); gold calendar checks removed; the 2026-11-21 market
   calendar approval is WITHDRAWN (profile session weeks/hours only, addendum checks retained).
