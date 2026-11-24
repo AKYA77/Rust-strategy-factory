@@ -2098,6 +2098,34 @@ mod tests {
         }
     }
 
+    /// Same as [`continuous_month`] but tagged with the reciprocal conversion policy that
+    /// applies to non-USD quotes. The continuous accounting never consults a conversion file:
+    /// the policy is derived only from the profile quote, so a USD-base instrument such as
+    /// USDJPY is accounted across month boundaries with no conversion file and no refusal.
+    fn continuous_month_non_usd(year: u32, month: u32, outcomes: TradeOutcomeStats) -> MonthExecution {
+        let net = outcomes.net_micro_usd;
+        MonthExecution {
+            year,
+            month,
+            classification: EXECUTION_CLASSIFICATION.into(),
+            eligibility: EXECUTION_ELIGIBILITY.into(),
+            corpus_identity: "a".repeat(64),
+            source_dataset_hash: "b".repeat(64),
+            replay_dataset_id: "e".repeat(64),
+            declared_class: "RealStructurallyValid".into(),
+            profile_id: "c".repeat(64),
+            conversion_policy: CONVERSION_POLICY_RECIPROCAL.into(),
+            initial_micro_usd: contracts::INITIAL_EQUITY,
+            realized_micro_usd: contracts::INITIAL_EQUITY + net,
+            final_marked_micro_usd: contracts::INITIAL_EQUITY + net,
+            maximum_drawdown_micro_usd: 0,
+            trades: outcomes.resolved,
+            rejections: 0,
+            receipt_hash: "d".repeat(64),
+            outcomes,
+        }
+    }
+
     fn loss_month(resolved: usize, ending_streak: usize, net_micro_usd: i128) -> TradeOutcomeStats {
         TradeOutcomeStats {
             resolved,
@@ -2265,6 +2293,44 @@ mod tests {
             contracts::INITIAL_EQUITY + 1_000_000
         );
         assert_eq!(totals.net_pnl_micro_usd, 1_000_000);
+    }
+
+    #[test]
+    fn continuous_accounting_chains_non_usd_instrument_without_conversion_file() {
+        // Conversion policy is derived only from the profile quote: USD quotes use the
+        // identity conversion and every other quote requires the reciprocal convention.
+        // No conversion file exists anywhere in this path, and none is consulted.
+        let usdjpy = Profile::synthetic("USDJPY").unwrap();
+        assert_eq!(usdjpy.quote, "JPY");
+        assert_eq!(conversion_policy(&usdjpy), CONVERSION_POLICY_RECIPROCAL);
+        assert_eq!(
+            conversion_policy(&Profile::synthetic("EURUSD").unwrap()),
+            CONVERSION_POLICY_IDENTITY
+        );
+
+        // Two loss-only months of a non-USD instrument, back to back across a month
+        // boundary, with no conversion file involved.
+        let january = continuous_month_non_usd(2025, 1, loss_month(2, 2, -2_000_000));
+        let february = continuous_month_non_usd(2025, 2, loss_month(3, 3, -3_000_000));
+
+        let (continuous, totals) = aggregate_continuous(&[january, february], &[]).unwrap();
+        // No refusal: a non-USD profile without a conversion file is accounted, not rejected.
+        assert_eq!(totals.months_executed, 2);
+        assert_eq!(totals.months_refused, 0);
+        // Equity compounds exactly across the boundary: February starts where January ended.
+        assert_eq!(continuous[0].starting_micro_usd, contracts::INITIAL_EQUITY);
+        assert_eq!(continuous[0].ending_micro_usd, contracts::INITIAL_EQUITY - 2_000_000);
+        assert_eq!(continuous[1].starting_micro_usd, contracts::INITIAL_EQUITY - 2_000_000);
+        assert_eq!(continuous[1].ending_micro_usd, contracts::INITIAL_EQUITY - 5_000_000);
+        assert_eq!(totals.ending_micro_usd, contracts::INITIAL_EQUITY - 5_000_000);
+        assert_eq!(totals.net_pnl_micro_usd, -5_000_000);
+        // The losing streak survives the month boundary: 2 + 3 = 5.
+        assert_eq!(totals.continuous_max_losing_streak, 5);
+        assert_eq!(continuous[0].month_ending_streak, 2);
+        assert_eq!(continuous[1].month_ending_streak, 3);
+        assert_eq!(continuous[1].drawdown_from_peak_micro_usd, 5_000_000);
+        assert_eq!(totals.full_period_max_drawdown_micro_usd, 5_000_000);
+        assert_eq!((totals.wins, totals.losses, totals.breakevens), (0, 5, 0));
     }
 
     #[test]
