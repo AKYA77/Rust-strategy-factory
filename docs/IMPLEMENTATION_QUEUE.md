@@ -2,16 +2,7 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
-Integration state: all 13 open PRs were merged into `main` through #14 (merge commit `3d2d6f2`)
-with no conflicts — the Codex stack #8–#13, the independent campaign-owned ledger #1, the Hermes
-historical Parquet→native migration #6, and the earlier checkpoint PRs #2–#5/#7 the stack already
-carried. Every PR head commit is an ancestor of `main`; the 13 PRs were closed as superseded with
-their history preserved. Hosted CI is verified on the merge commit. Since then PR #53 (main CI
-restoration, commit 858a289) and PR #52 (registered full-period real-data executor, merge commit
-ba66956) were merged into `main` via non-force merge; PR #52 head 0cb5d5a is an ancestor of
-origin/main and hosted CI run 45339910079 concluded success on all 7 jobs on the exact combined
-SHA ba66956. One open PR remains: #51 (continuous diagnostic accounting hygiene). The converted
-legacy corpus is REAL_STRUCTURALLY_VALID only.
+Integration state: all open PRs have been merged into `main` — the Codex stack #8–#13, the independent campaign-owned ledger #1, the Hermes historical Parquet→native migration #6, and earlier checkpoint PRs #2–#5/#7 via #14 (merge commit `3d2d6f2`); PR #53 (main CI restoration, commit 858a289); PR #52 (registered full-period real-data executor, merge commit ba66956); and PR #54 (20-month training window + OOS holdout config; Conversion::usd sentinel contract restored, merge commit bda7fca). Every PR head commit is an ancestor of `origin/main`; all PRs were closed as merged with history preserved. `origin/main` is at `bda7fca`. Hosted CI run 45402952012 (push on main, bda7fca) is in progress — record its conclusion only after all 7 jobs complete. PR-level CI was green on the exact SHA for PR #51 (290b760) and PR #54 (f61bb6c). The converted legacy corpus is REAL_STRUCTURALLY_VALID only.
 
 1. Harden foundational arithmetic/import/replay with adversarial/property tests; extend normalized importer coverage and immutable atomic artifacts.
 2. Acquire legally usable short real quote windows for all eight symbols in 2025 and 2026; retain source terms/URLs/archive hashes. No actual source has been acquired yet.
