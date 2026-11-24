@@ -1273,6 +1273,7 @@ impl Driver {
             _ => Stage::IndependentValidation,
         };
         let stage_for_eval = stage.clone();
+        let stage_for_improvement = stage.clone();
         let evaluation = match stage_for_eval {
             Stage::CandleScreen => None,
             _ => self
@@ -1344,6 +1345,7 @@ impl Driver {
         if self.config.improvement_children > 0
             && (outcome == "completed" || outcome == "rejected")
             && let Some(id) = &id
+            && stage_for_improvement != Stage::CandleScreen
         {
             tx.execute("INSERT INTO improvement_jobs(run_id,parent_cursor,input_index,parent_id) VALUES(?1,?2,?3,?4)",params![self.id,s.cursor as i64,input_index as i64,id]).map_err(|e|e.to_string())?;
         }
