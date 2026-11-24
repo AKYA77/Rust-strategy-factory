@@ -8,7 +8,7 @@
     "state_budget_bytes": 8589934592,
     "training_window": {
       "start_ms": 1735689600000,
-      "end_exclusive_ms": 1738360797318
+      "end_exclusive_ms": 1788220800000
     },
     "improvement_children": 0,
     "improvement_max_depth": 0,
@@ -84,12 +84,6 @@
       "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202608/chunk-000000.rsf"
     },
     {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202609/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202610/chunk-000000.rsf"
-    },
-    {
       "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202501/chunk-000000.rsf"
     },
     {
@@ -148,12 +142,6 @@
     },
     {
       "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202608/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202609/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202610/chunk-000000.rsf"
     },
     {
       "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202501/chunk-000000.rsf"
@@ -216,12 +204,6 @@
       "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202608/chunk-000000.rsf"
     },
     {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202609/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202610/chunk-000000.rsf"
-    },
-    {
       "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202501/chunk-000000.rsf"
     },
     {
@@ -280,12 +262,6 @@
     },
     {
       "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202608/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202609/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202610/chunk-000000.rsf"
     },
     {
       "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202501/chunk-000000.rsf"
@@ -348,12 +324,6 @@
       "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202608/chunk-000000.rsf"
     },
     {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202609/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202610/chunk-000000.rsf"
-    },
-    {
       "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202501/chunk-000000.rsf"
     },
     {
@@ -412,12 +382,6 @@
     },
     {
       "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202608/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202609/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202610/chunk-000000.rsf"
     },
     {
       "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202501/chunk-000000.rsf"
@@ -480,12 +444,6 @@
       "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202608/chunk-000000.rsf"
     },
     {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202609/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202610/chunk-000000.rsf"
-    },
-    {
       "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202501/chunk-000000.rsf"
     },
     {
@@ -544,12 +502,6 @@
     },
     {
       "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202608/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202609/chunk-000000.rsf"
-    },
-    {
-      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202610/chunk-000000.rsf"
     }
   ]
 }
