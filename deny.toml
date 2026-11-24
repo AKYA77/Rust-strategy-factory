@@ -88,6 +88,7 @@ ignore = [
     # advisory. Used for wall-clock timestamps in research output; migration
     # (e.g. to jiff/time) is deferred to a separate change.
     { id = "RUSTSEC-2026-0543", reason = "Unmaintained, no safe upgrade available per advisory; chrono used for timestamps; migration deferred" },
+    { id = "RUSTSEC-2026-0595", reason = "parquet 60.1.0 pinned per the bounded native-dataset contract (Cargo.toml =60.1.0); advisory concerns bloom filters written into ENCRYPTED parquet files, which the app never produces - pack-parquet writes unencrypted datasets with no bloom filters; dependency bump deferred to a separate change that re-runs this audit" },
 ]
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.

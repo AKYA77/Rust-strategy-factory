@@ -74,10 +74,17 @@ pub(crate) fn authorize(key: &ExperimentKey) -> Result<()> {
         start_ms: key.start_ms,
         end_exclusive_ms: key.end_exclusive_ms,
     };
-    if key.stage != Stage::TickVerification
-        || (key.protocol_hash != data::hash(&"training-only-conservative-signals-v1")?
-            && key.protocol_hash != data::hash(&("training-window-v1", &window))?)
-    {
+    let valid_protocol = match key.stage {
+        Stage::TickVerification => {
+            key.protocol_hash == data::hash(&"training-only-conservative-signals-v1")?
+                || key.protocol_hash == data::hash(&("training-window-v1", &window))?
+        }
+        Stage::IndependentValidation => {
+            key.protocol_hash == data::hash(&("training-window-v1", &window))?
+        }
+        Stage::CandleScreen => false,
+    };
+    if !valid_protocol {
         return Err("adaptation requires explicit training protocol; scientific/OOS/final evidence is forbidden".into());
     }
     if key.engine_version != crate::ENGINE_VERSION

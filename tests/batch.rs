@@ -105,6 +105,7 @@ fn options<'a>(
         evaluation: EvaluationOptions {
             feature_cells: 100000,
             evaluation,
+            stage: Stage::TickVerification,
             shadow_policy: None,
             proof_policy,
             indexed_policy: None,
@@ -136,7 +137,7 @@ fn shared_batches_equal_independent_scalar_receipts_for_all_instruments_and_reus
                     s,
                     &costs,
                     &revision,
-                    settings.evaluation,
+                    settings.evaluation.clone(),
                 )
                 .unwrap()
             })
@@ -555,7 +556,7 @@ fn indexed_policy_health_blocks_cached_and_pending_publication_and_protects_scie
         &candidates[0],
         &costs,
         &revision,
-        settings.evaluation,
+        settings.evaluation.clone(),
     )
     .unwrap();
     let actual: rust_strategy_factory::tick_engine::Replay =
@@ -597,7 +598,7 @@ fn indexed_policy_health_blocks_cached_and_pending_publication_and_protects_scie
             &candidates[0],
             &costs,
             &revision,
-            settings.evaluation
+            settings.evaluation.clone()
         )
         .unwrap_err()
         .contains(indexed_policy::BLOCKED)

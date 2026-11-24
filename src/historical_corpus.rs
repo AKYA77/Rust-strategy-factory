@@ -12,6 +12,7 @@ use crate::{
     historical_migration::{self, Partition},
     native,
 };
+use chrono::Datelike;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -1537,6 +1538,447 @@ pub fn execute(
     budget: crate::tick_engine::CorpusBudget,
 ) -> Result<ExecutionReport> {
     execute_with_cache(spec, strategy, costs, budget, None)
+}
+
+// === Registered full-period real-data execution ===
+
+/// The only accounting classification the qualification full-period gate can accept. It is
+/// emitted solely by [`execute_registered_full_period`] through `ReplayMode::Registered`;
+/// diagnostic simulation and continuous diagnostic output can never be relabelled into it.
+pub const REGISTERED_FULL_PERIOD_CLASSIFICATION: &str = "registered_full_period_replay";
+/// Execution never grants eligibility. Only the independent approval chain can.
+pub const REGISTERED_FULL_PERIOD_ELIGIBILITY: &str = "none";
+const REGISTERED_FULL_PERIOD_LIMITATIONS: &str = "Registered full-period single-account replay over the owner-selected 22-month corpus through the authoritative sequential engine in ReplayMode::Registered (literal-USD identity conversion). The explicit training window is recorded so seen training evidence is never presented as unseen. Eligibility is none: no calendar/profile/legal/scientific approval, research eligibility or qualification is granted. A month that cannot be executed aborts the run, so a partial replay is never labelled registered_full_period_replay. Each monthly engine receipt starts at INITIAL_EQUITY; continuous equity chains the exact closed-trade net P&L, and the qualification gate separately requires zero unresolved end-of-period positions.";
+
+/// Frozen compute identity bound into every registered full-period report.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ComputeIdentity {
+    pub engine: String,
+    pub indicators: String,
+    pub signals: String,
+    pub compute_revision: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RegisteredMonthExecution {
+    pub year: u32,
+    pub month: u32,
+    /// Always [`REGISTERED_FULL_PERIOD_CLASSIFICATION`].
+    pub classification: String,
+    /// Always [`REGISTERED_FULL_PERIOD_ELIGIBILITY`].
+    pub eligibility: String,
+    pub corpus_identity: String,
+    pub source_dataset_hash: String,
+    pub replay_dataset_id: String,
+    pub declared_class: String,
+    pub profile_id: String,
+    pub conversion_policy: String,
+    pub initial_micro_usd: i128,
+    pub realized_micro_usd: i128,
+    pub final_marked_micro_usd: i128,
+    pub maximum_drawdown_micro_usd: i128,
+    pub trades: usize,
+    pub rejections: usize,
+    /// Exact hash of the month's authoritative `Replay` receipt.
+    pub receipt_hash: String,
+    pub outcomes: TradeOutcomeStats,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RegisteredTotals {
+    pub months_executed: usize,
+    pub trades: usize,
+    pub rejections: usize,
+    pub initial_micro_usd: i128,
+    pub ending_micro_usd: i128,
+    pub net_pnl_micro_usd: i128,
+    pub full_period_max_drawdown_micro_usd: i128,
+    pub wins: usize,
+    pub losses: usize,
+    pub breakevens: usize,
+    pub continuous_max_losing_streak: usize,
+    pub gross_win_micro_usd: i128,
+    pub gross_loss_micro_usd: i128,
+    pub net_win_rate_bps: u16,
+    pub unresolved_positions: usize,
+}
+
+/// Registered full-period single-account replay over the owner-selected research window.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RegisteredFullPeriodExecution {
+    pub instrument: String,
+    pub identity: String,
+    pub strategy_identity: String,
+    /// Always [`REGISTERED_FULL_PERIOD_CLASSIFICATION`].
+    pub classification: String,
+    /// Always [`REGISTERED_FULL_PERIOD_ELIGIBILITY`].
+    pub eligibility: String,
+    pub conversion_policy: String,
+    /// Explicit training window. Real-data runs cannot omit it.
+    pub training_window: crate::validation::Interval,
+    pub compute: ComputeIdentity,
+    pub months: Vec<RegisteredMonthExecution>,
+    pub totals: RegisteredTotals,
+    /// Exact hash binding the instrument, corpus, strategy, training window, compute identity,
+    /// every monthly receipt and the totals.
+    pub report_hash: String,
+    pub limitations: String,
+}
+
+/// Exact accounting counters derived from a registered full-period execution.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RegisteredAccounting {
+    pub classification: String,
+    pub cutoff_ms: i64,
+    pub pooled: crate::validation::PeriodStats,
+    pub year_2025: crate::validation::PeriodStats,
+    pub year_2026: crate::validation::PeriodStats,
+    pub net_micro_usd: i128,
+    pub ending_micro_usd: i128,
+    pub max_drawdown_micro_usd: i128,
+    pub unresolved: usize,
+}
+
+impl RegisteredFullPeriodExecution {
+    /// Bucket the registered months into the exact pooled/year counters the qualification gate
+    /// consumes. Months outside the owner-selected 2025/2026 research years are refused.
+    pub fn accounting(&self, cutoff_ms: i64) -> Result<RegisteredAccounting> {
+        let cutoff = chrono::DateTime::from_timestamp_millis(cutoff_ms)
+            .ok_or("invalid registered accounting cutoff")?;
+        if cutoff.year() != 2026 {
+            return Err("registered accounting cutoff must lie in 2026".into());
+        }
+        let mut pooled = crate::validation::PeriodStats::default();
+        let mut year_2025 = crate::validation::PeriodStats::default();
+        let mut year_2026 = crate::validation::PeriodStats::default();
+        for month in &self.months {
+            let bucket = match month.year {
+                2025 => &mut year_2025,
+                2026 => &mut year_2026,
+                other => {
+                    return Err(format!(
+                        "registered month {other}-{:02} is outside the approved 2025/2026 research years",
+                        month.month
+                    ));
+                }
+            };
+            bucket.resolved = bucket
+                .resolved
+                .checked_add(month.outcomes.resolved)
+                .ok_or("registered resolved overflow")?;
+            bucket.wins = bucket
+                .wins
+                .checked_add(month.outcomes.wins)
+                .ok_or("registered wins overflow")?;
+            bucket.losses = bucket
+                .losses
+                .checked_add(month.outcomes.losses)
+                .ok_or("registered losses overflow")?;
+            bucket.breakeven = bucket
+                .breakeven
+                .checked_add(month.outcomes.breakevens)
+                .ok_or("registered breakeven overflow")?;
+            bucket.max_losing_streak = bucket
+                .max_losing_streak
+                .max(month.outcomes.max_losing_streak);
+        }
+        pooled.resolved = year_2025
+            .resolved
+            .checked_add(year_2026.resolved)
+            .ok_or("registered pooled resolved overflow")?;
+        pooled.wins = year_2025
+            .wins
+            .checked_add(year_2026.wins)
+            .ok_or("registered pooled wins overflow")?;
+        pooled.losses = year_2025
+            .losses
+            .checked_add(year_2026.losses)
+            .ok_or("registered pooled losses overflow")?;
+        pooled.breakeven = year_2025
+            .breakeven
+            .checked_add(year_2026.breakeven)
+            .ok_or("registered pooled breakeven overflow")?;
+        // The continuous streak is the honest full-period streak and bounds both yearly streaks.
+        pooled.max_losing_streak = self.totals.continuous_max_losing_streak;
+        Ok(RegisteredAccounting {
+            classification: self.classification.clone(),
+            cutoff_ms,
+            pooled,
+            year_2025,
+            year_2026,
+            net_micro_usd: self.totals.net_pnl_micro_usd,
+            ending_micro_usd: self.totals.ending_micro_usd,
+            max_drawdown_micro_usd: self.totals.full_period_max_drawdown_micro_usd,
+            unresolved: self.totals.unresolved_positions,
+        })
+    }
+}
+
+/// Execute the owner-selected research window as a registered full-period single-account replay
+/// through `ReplayMode::Registered` (the four-class literal-USD input contract; identity
+/// conversion). This is the only pipeline that emits [`REGISTERED_FULL_PERIOD_CLASSIFICATION`].
+///
+/// `training_window` is required for real data so seen training evidence is never presented as
+/// unseen; it must lie inside the evaluated corpus. Synthetic input may omit it (the whole
+/// synthetic corpus is recorded as the declared window). A month that cannot be executed aborts
+/// the run: a partial replay is never labelled `registered_full_period_replay`. No eligibility,
+/// approval or qualification is granted.
+pub fn execute_registered_full_period(
+    spec: &HistoricalCorpus,
+    strategy: &crate::strategies::Strategy,
+    costs: &crate::tick_engine::Costs,
+    budget: crate::tick_engine::CorpusBudget,
+    training_window: Option<crate::validation::Interval>,
+) -> Result<RegisteredFullPeriodExecution> {
+    if spec.identity != identity(&spec.instrument, &spec.profile, &spec.months)? {
+        return Err("historical corpus identity mismatch".into());
+    }
+    validate_months(&spec.months, spec.months.len())?;
+    let window = ResearchWindow::OWNER_SELECTED;
+    let first = spec
+        .months
+        .first()
+        .ok_or("historical corpus has no months")?;
+    let last = spec
+        .months
+        .last()
+        .ok_or("historical corpus has no months")?;
+    if (first.year, first.month) != (window.start_year, window.start_month)
+        || (last.year, last.month) != (window.end_year, window.end_month)
+    {
+        return Err(format!(
+            "registered full-period replay requires the owner-selected research window {}; corpus covers {}-{:02}..{}-{:02}",
+            window.label(),
+            first.year,
+            first.month,
+            last.year,
+            last.month
+        ));
+    }
+    // Read the declared class from verified first-month chunks; the four-class contract is
+    // enforced here with an exact message before the engine re-checks it.
+    let first_dir = Path::new(&first.output_dir);
+    let first_file = first
+        .chunk_files
+        .first()
+        .ok_or("historical corpus month has no chunks")?;
+    let first_dataset = native::read(&first_dir.join(first_file))?;
+    let first_hash = first
+        .chunk_hashes
+        .first()
+        .ok_or("historical corpus month has no chunk hashes")?;
+    if data::hash(&first_dataset)? != *first_hash || first_dataset.profile != spec.profile {
+        return Err("historical corpus chunk mismatch during registered execution".into());
+    }
+    let declared_class = first_dataset.manifest.class;
+    let allowed_classes = [
+        crate::data::DataClass::SyntheticTestOnly,
+        crate::data::DataClass::RealStructurallyValid,
+        crate::data::DataClass::RealQualityAccepted,
+        crate::data::DataClass::RealProfileApproved,
+    ];
+    if !allowed_classes.contains(&declared_class) {
+        return Err(format!(
+            "registered full-period replay refuses data class {declared_class:?}; allowed classes are SyntheticTestOnly, RealStructurallyValid, RealQualityAccepted and RealProfileApproved"
+        ));
+    }
+    let corpus_end_exclusive_ms = last
+        .last_ms
+        .checked_add(1)
+        .ok_or("historical corpus end overflow")?;
+    let training_window = match training_window {
+        Some(window) => {
+            window.validate()?;
+            if window.start_ms < first.first_ms || window.end_exclusive_ms > corpus_end_exclusive_ms {
+                return Err(
+                    "registered training window must lie inside the evaluated corpus".into(),
+                );
+            }
+            window
+        }
+        None if declared_class == crate::data::DataClass::SyntheticTestOnly => {
+            crate::validation::Interval {
+                start_ms: first.first_ms,
+                end_exclusive_ms: corpus_end_exclusive_ms,
+            }
+        }
+        None => {
+            return Err(
+                "registered real-data full-period replay requires an explicit training_window (unseen-evidence preservation)".into(),
+            )
+        }
+    };
+    let compute = ComputeIdentity {
+        engine: crate::ENGINE_VERSION.into(),
+        indicators: crate::INDICATOR_VERSION.into(),
+        signals: crate::SIGNAL_VERSION.into(),
+        compute_revision: crate::research::compute_revision()?,
+    };
+    let strategy_identity = strategy.identity()?;
+    let mut months = Vec::with_capacity(spec.months.len());
+    let mut running_equity = contracts::INITIAL_EQUITY;
+    let mut peak_equity = contracts::INITIAL_EQUITY;
+    let mut max_drawdown = 0i128;
+    let mut continuous_streak = 0usize;
+    let mut max_continuous_streak = 0usize;
+    let mut cumulative_wins = 0usize;
+    let mut cumulative_losses = 0usize;
+    let mut cumulative_breakevens = 0usize;
+    let mut cumulative_gross_win = 0i128;
+    let mut cumulative_gross_loss = 0i128;
+    let mut cumulative_trades = 0usize;
+    let mut cumulative_rejections = 0usize;
+    let mut cumulative_unresolved = 0usize;
+    for month in &spec.months {
+        let dir = Path::new(&month.output_dir);
+        for (file, hash) in month.chunk_files.iter().zip(&month.chunk_hashes) {
+            let dataset = native::read(&dir.join(file))?;
+            if data::hash(&dataset)? != *hash
+                || dataset.profile != spec.profile
+                || dataset.manifest.class != declared_class
+            {
+                return Err("historical corpus chunk mismatch during registered execution".into());
+            }
+        }
+        let chunks: Vec<std::path::PathBuf> = month
+            .chunk_files
+            .iter()
+            .map(|file| dir.join(file))
+            .collect();
+        let corpus_spec =
+            crate::corpus::describe(&chunks, crate::historical_migration::MAX_CHUNK_EVENTS)?;
+        crate::corpus::inspect(dir, &corpus_spec)?;
+        let facts = crate::corpus::source_facts(dir, &corpus_spec)?;
+        if facts.declared_class() != declared_class || facts.profile() != &spec.profile {
+            return Err(
+                "historical corpus source facts mismatch during registered execution".into(),
+            );
+        }
+        // Registered mode: literal-USD identity conversion and the four-class input contract.
+        let replay = crate::tick_engine::replay_corpus(dir, &corpus_spec, strategy, costs, budget)?;
+        if replay.initial_micro_usd != contracts::INITIAL_EQUITY {
+            return Err("registered corpus replay must start from INITIAL_EQUITY".into());
+        }
+        let outcomes = trade_outcome_stats(&replay.trades, replay.unresolved.is_some())?;
+        running_equity = running_equity
+            .checked_add(outcomes.net_micro_usd)
+            .ok_or("registered running equity overflow")?;
+        if running_equity > peak_equity {
+            peak_equity = running_equity;
+        }
+        max_drawdown = max_drawdown.max(
+            peak_equity
+                .checked_sub(running_equity)
+                .ok_or("registered drawdown overflow")?,
+        );
+        if outcomes.ending_streak == 0 {
+            continuous_streak = 0;
+        } else {
+            continuous_streak = continuous_streak.saturating_add(outcomes.ending_streak);
+        }
+        max_continuous_streak = max_continuous_streak.max(continuous_streak);
+        cumulative_wins = cumulative_wins
+            .checked_add(outcomes.wins)
+            .ok_or("registered wins overflow")?;
+        cumulative_losses = cumulative_losses
+            .checked_add(outcomes.losses)
+            .ok_or("registered losses overflow")?;
+        cumulative_breakevens = cumulative_breakevens
+            .checked_add(outcomes.breakevens)
+            .ok_or("registered breakevens overflow")?;
+        cumulative_gross_win = cumulative_gross_win
+            .checked_add(outcomes.gross_win_micro_usd)
+            .ok_or("registered gross win overflow")?;
+        cumulative_gross_loss = cumulative_gross_loss
+            .checked_add(outcomes.gross_loss_micro_usd)
+            .ok_or("registered gross loss overflow")?;
+        cumulative_trades = cumulative_trades
+            .checked_add(replay.trades.len())
+            .ok_or("registered trades overflow")?;
+        cumulative_rejections = cumulative_rejections
+            .checked_add(replay.rejections.len())
+            .ok_or("registered rejections overflow")?;
+        cumulative_unresolved = cumulative_unresolved
+            .checked_add(outcomes.unresolved_positions)
+            .ok_or("registered unresolved overflow")?;
+        months.push(RegisteredMonthExecution {
+            year: month.year,
+            month: month.month,
+            classification: REGISTERED_FULL_PERIOD_CLASSIFICATION.into(),
+            eligibility: REGISTERED_FULL_PERIOD_ELIGIBILITY.into(),
+            corpus_identity: corpus_spec.identity()?,
+            source_dataset_hash: month.dataset_hash.clone(),
+            replay_dataset_id: replay.dataset_id.clone(),
+            declared_class: format!("{declared_class:?}"),
+            profile_id: crate::data::hash(&spec.profile)?,
+            conversion_policy: conversion_policy(&spec.profile).into(),
+            initial_micro_usd: replay.initial_micro_usd,
+            realized_micro_usd: replay.realized_micro_usd,
+            final_marked_micro_usd: replay.final_marked_micro_usd,
+            maximum_drawdown_micro_usd: replay.maximum_drawdown_micro_usd,
+            trades: replay.trades.len(),
+            rejections: replay.rejections.len(),
+            receipt_hash: crate::data::hash(&replay)?,
+            outcomes,
+        });
+    }
+    let resolved = cumulative_wins
+        .checked_add(cumulative_losses)
+        .and_then(|n| n.checked_add(cumulative_breakevens))
+        .ok_or("registered resolved overflow")?;
+    let net_win_rate_bps = if resolved > 0 {
+        (cumulative_wins as u128 * 10_000 / resolved as u128) as u16
+    } else {
+        0
+    };
+    let totals = RegisteredTotals {
+        months_executed: months.len(),
+        trades: cumulative_trades,
+        rejections: cumulative_rejections,
+        initial_micro_usd: contracts::INITIAL_EQUITY,
+        ending_micro_usd: running_equity,
+        net_pnl_micro_usd: running_equity
+            .checked_sub(contracts::INITIAL_EQUITY)
+            .ok_or("registered net P&L overflow")?,
+        full_period_max_drawdown_micro_usd: max_drawdown,
+        wins: cumulative_wins,
+        losses: cumulative_losses,
+        breakevens: cumulative_breakevens,
+        continuous_max_losing_streak: max_continuous_streak,
+        gross_win_micro_usd: cumulative_gross_win,
+        gross_loss_micro_usd: cumulative_gross_loss,
+        net_win_rate_bps,
+        unresolved_positions: cumulative_unresolved,
+    };
+    let report_hash = data::hash(&(
+        REGISTERED_FULL_PERIOD_CLASSIFICATION,
+        &spec.instrument,
+        &spec.identity,
+        &strategy_identity,
+        &training_window,
+        &compute,
+        &months,
+        &totals,
+    ))?;
+    Ok(RegisteredFullPeriodExecution {
+        instrument: spec.instrument.clone(),
+        identity: spec.identity.clone(),
+        strategy_identity,
+        classification: REGISTERED_FULL_PERIOD_CLASSIFICATION.into(),
+        eligibility: REGISTERED_FULL_PERIOD_ELIGIBILITY.into(),
+        conversion_policy: conversion_policy(&spec.profile).into(),
+        training_window,
+        compute,
+        months,
+        totals,
+        report_hash,
+        limitations: REGISTERED_FULL_PERIOD_LIMITATIONS.into(),
+    })
 }
 
 #[cfg(test)]

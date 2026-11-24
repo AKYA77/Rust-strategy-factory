@@ -6,8 +6,12 @@ Integration state: all 13 open PRs were merged into `main` through #14 (merge co
 with no conflicts — the Codex stack #8–#13, the independent campaign-owned ledger #1, the Hermes
 historical Parquet→native migration #6, and the earlier checkpoint PRs #2–#5/#7 the stack already
 carried. Every PR head commit is an ancestor of `main`; the 13 PRs were closed as superseded with
-their history preserved. Hosted CI is verified on the merge commit. The converted legacy corpus is
-REAL_STRUCTURALLY_VALID only.
+their history preserved. Hosted CI is verified on the merge commit. Since then PR #53 (main CI
+restoration, commit 858a289) and PR #52 (registered full-period real-data executor, merge commit
+ba66956) were merged into `main` via non-force merge; PR #52 head 0cb5d5a is an ancestor of
+origin/main and hosted CI run 45339910079 concluded success on all 7 jobs on the exact combined
+SHA ba66956. One open PR remains: #51 (continuous diagnostic accounting hygiene). The converted
+legacy corpus is REAL_STRUCTURALLY_VALID only.
 
 1. Harden foundational arithmetic/import/replay with adversarial/property tests; extend normalized importer coverage and immutable atomic artifacts.
 2. Acquire legally usable short real quote windows for all eight symbols in 2025 and 2026; retain source terms/URLs/archive hashes. No actual source has been acquired yet.

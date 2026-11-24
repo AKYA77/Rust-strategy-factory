@@ -93,6 +93,7 @@ fn comparable_children_preserve_explicit_shadow_policy_identity() {
         research::EvaluationOptions {
             feature_cells: 10000,
             evaluation: None,
+            stage: Stage::TickVerification,
             shadow_policy: Some(&policy),
             proof_policy: None,
             indexed_policy: None,
@@ -168,6 +169,7 @@ fn indexed_training_review_preserves_policy_and_independent_proof_audits() {
     let options = research::EvaluationOptions {
         feature_cells: 10000,
         evaluation: None,
+        stage: Stage::TickVerification,
         shadow_policy: None,
         proof_policy: None,
         indexed_policy: Some(&indexed),
@@ -178,7 +180,7 @@ fn indexed_training_review_preserves_policy_and_independent_proof_audits() {
         &strategy(),
         &Costs::default(),
         &revision,
-        options,
+        options.clone(),
     )
     .unwrap();
     let diagnosis = improvement::diagnose(
@@ -285,6 +287,7 @@ fn exact_proof_rejection_audits_and_comparable_children_preserve_real_evidence()
             research::EvaluationOptions {
                 feature_cells: 10000,
                 evaluation: None,
+                stage: Stage::TickVerification,
                 shadow_policy: None,
                 proof_policy: Some(&policy),
                 indexed_policy: None,
@@ -322,6 +325,7 @@ fn exact_proof_rejection_audits_and_comparable_children_preserve_real_evidence()
         research::EvaluationOptions {
             feature_cells: 10000,
             evaluation: None,
+            stage: Stage::TickVerification,
             shadow_policy: None,
             proof_policy: Some(&audited_policy),
             indexed_policy: None,
@@ -443,6 +447,7 @@ fn exact_proof_rejection_audits_and_comparable_children_preserve_real_evidence()
             research::EvaluationOptions {
                 feature_cells: 10000,
                 evaluation: None,
+                stage: Stage::TickVerification,
                 shadow_policy: None,
                 proof_policy: Some(&audited_policy),
                 indexed_policy: None,
@@ -516,6 +521,7 @@ fn proof_screening_cannot_hide_bad_conversions_or_adapt_scientific_windows() {
         research::EvaluationOptions {
             feature_cells: 10000,
             evaluation: None,
+            stage: Stage::TickVerification,
             shadow_policy: None,
             proof_policy: Some(&policy),
             indexed_policy: None,
@@ -547,6 +553,7 @@ fn proof_screening_cannot_hide_bad_conversions_or_adapt_scientific_windows() {
         research::EvaluationOptions {
             feature_cells: 10000,
             evaluation: Some(&training),
+            stage: Stage::TickVerification,
             shadow_policy: None,
             proof_policy: Some(&policy),
             indexed_policy: None,
@@ -573,6 +580,7 @@ fn proof_screening_cannot_hide_bad_conversions_or_adapt_scientific_windows() {
             research::EvaluationOptions {
                 feature_cells: 10000,
                 evaluation: Some(&evaluation),
+                stage: Stage::TickVerification,
                 shadow_policy: None,
                 proof_policy: Some(&policy),
                 indexed_policy: None,
@@ -600,6 +608,7 @@ fn proof_screening_cannot_hide_bad_conversions_or_adapt_scientific_windows() {
         research::EvaluationOptions {
             feature_cells: 10000,
             evaluation: None,
+            stage: Stage::TickVerification,
             shadow_policy: None,
             proof_policy: Some(&policy),
             indexed_policy: None,
@@ -1108,14 +1117,23 @@ fn opt_in_queue_is_bounded_pauses_and_recovers_a_committed_review() {
     assert_eq!(status.executed, first.executed);
     assert_eq!(status.rejected, first.rejected);
     assert_eq!(driver.registry.counts().unwrap().attempts, attempts);
+    // CandleScreen experiments cannot be authorized for improvement
+    // (authorize() rejects Stage::CandleScreen), so the post-recovery
+    // CandleScreen step enqueues no job. IndependentValidation fails without a
+    // pre-reserved holdout; queueing resumes at the next TickVerification
+    // experiment.
     assert!(driver.step(7).unwrap());
-    assert_eq!(
-        research::status(&driver.registry, &driver.id, 8)
-            .unwrap()
-            .improvements
-            .queued,
-        1
-    );
+    let after_cs = research::status(&driver.registry, &driver.id, 8).unwrap();
+    assert_eq!(after_cs.cursor, 2);
+    assert_eq!(after_cs.improvements.queued, 0);
+    assert!(driver.step(9).unwrap());
+    let after_iv = research::status(&driver.registry, &driver.id, 10).unwrap();
+    assert_eq!(after_iv.cursor, 3);
+    assert_eq!(after_iv.improvements.queued, 0);
+    assert!(driver.step(11).unwrap());
+    let after_tv = research::status(&driver.registry, &driver.id, 12).unwrap();
+    assert_eq!(after_tv.cursor, 4);
+    assert_eq!(after_tv.improvements.queued, 1);
     driver.registry.integrity().unwrap();
     drop(driver);
     std::fs::remove_dir_all(d).unwrap();

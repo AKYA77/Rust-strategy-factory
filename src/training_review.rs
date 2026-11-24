@@ -292,6 +292,8 @@ fn run(
             stage: key.stage.clone(),
             protocol_hash: key.protocol_hash.clone(),
         });
+        let evaluation_ref = evaluation.as_ref();
+        let stage = evaluation_ref.map(|e| e.stage.clone()).unwrap_or(crate::storage::Stage::TickVerification);
         let execution = research::evaluate_configured(
             registry,
             input,
@@ -300,7 +302,8 @@ fn run(
             &revision,
             research::EvaluationOptions {
                 feature_cells,
-                evaluation: evaluation.as_ref(),
+                evaluation: evaluation_ref,
+                stage,
                 shadow_policy: shadow_policy.as_ref(),
                 proof_policy: proof_policy.as_ref(),
                 indexed_policy: indexed_policy.as_ref(),

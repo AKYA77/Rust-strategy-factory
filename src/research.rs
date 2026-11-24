@@ -132,10 +132,11 @@ pub struct Evaluation {
     pub stage: Stage,
     pub protocol_hash: String,
 }
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct EvaluationOptions<'a> {
     pub feature_cells: usize,
     pub evaluation: Option<&'a Evaluation>,
+    pub stage: Stage,
     pub shadow_policy: Option<&'a crate::candidate_screen::ShadowPolicy>,
     pub proof_policy: Option<&'a crate::proof_screen::Policy>,
     pub indexed_policy: Option<&'a crate::indexed_policy::Policy>,
@@ -157,6 +158,7 @@ pub fn evaluate(
         EvaluationOptions {
             feature_cells,
             evaluation: None,
+            stage: Stage::TickVerification,
             shadow_policy: None,
             proof_policy: None,
             indexed_policy: None,
@@ -181,6 +183,7 @@ pub fn evaluate_window(
         EvaluationOptions {
             feature_cells,
             evaluation: Some(evaluation),
+            stage: evaluation.stage.clone(),
             shadow_policy: None,
             proof_policy: None,
             indexed_policy: None,
@@ -256,6 +259,7 @@ fn evaluate_prepared<'data>(
         shadow_policy,
         proof_policy,
         indexed_policy,
+        stage: eval_stage,
     } = options;
     if let Some(e) = evaluation {
         e.window.validate()?;
@@ -315,7 +319,7 @@ fn evaluate_prepared<'data>(
                 indexed_policy,
             )?
         },
-        stage: evaluation.map_or(Stage::TickVerification, |e| e.stage.clone()),
+        stage: eval_stage,
     };
     let allowed_classes = [
         crate::data::DataClass::SyntheticTestOnly,
@@ -787,7 +791,7 @@ pub fn evaluate_batch_report(
             strategy,
             costs,
             revision,
-            options.evaluation,
+            options.evaluation.clone(),
             Some(Prepared {
                 candles: &c,
                 features: &mut features,
@@ -1260,18 +1264,31 @@ impl Driver {
         let input_index = s.cursor as usize % self.inputs.len();
         let candidate_index = s.cursor / self.inputs.len() as u64;
         let (_, strategy) = candidate_at(candidate_index, self.config.seed)?;
-        let evaluation = self
-            .config
-            .training_window
-            .as_ref()
-            .map(|window| -> Result<Evaluation> {
-                Ok(Evaluation {
-                    window: window.clone(),
-                    stage: Stage::TickVerification,
-                    protocol_hash: data::hash(&("training-window-v1", window))?,
+        // Cycle through all 3 stages: TickVerification → CandleScreen → IndependentValidation
+        // Start with TickVerification (candidate_index=0) so the first experiment is
+        // immediately diagnosable (authorize() requires TickVerification or valid protocol).
+        let stage = match candidate_index % 3 {
+            0 => Stage::TickVerification,
+            1 => Stage::CandleScreen,
+            _ => Stage::IndependentValidation,
+        };
+        let stage_for_eval = stage.clone();
+        let stage_for_improvement = stage.clone();
+        let evaluation = match stage_for_eval {
+            Stage::CandleScreen => None,
+            _ => self
+                .config
+                .training_window
+                .as_ref()
+                .map(move |window| -> Result<Evaluation> {
+                    Ok(Evaluation {
+                        window: window.clone(),
+                        stage: stage_for_eval,
+                        protocol_hash: data::hash(&("training-window-v1", window))?,
+                    })
                 })
-            })
-            .transpose()?;
+                .transpose()?,
+        };
         let execution = evaluate_configured(
             &mut self.registry,
             &self.inputs[input_index],
@@ -1281,6 +1298,7 @@ impl Driver {
             EvaluationOptions {
                 feature_cells: self.config.feature_cells,
                 evaluation: evaluation.as_ref(),
+                stage,
                 shadow_policy: self.config.shadow_policy.as_ref(),
                 proof_policy: self.config.proof_policy.as_ref(),
                 indexed_policy: self.config.indexed_policy.as_ref(),
@@ -1327,6 +1345,7 @@ impl Driver {
         if self.config.improvement_children > 0
             && (outcome == "completed" || outcome == "rejected")
             && let Some(id) = &id
+            && stage_for_improvement != Stage::CandleScreen
         {
             tx.execute("INSERT INTO improvement_jobs(run_id,parent_cursor,input_index,parent_id) VALUES(?1,?2,?3,?4)",params![self.id,s.cursor as i64,input_index as i64,id]).map_err(|e|e.to_string())?;
         }

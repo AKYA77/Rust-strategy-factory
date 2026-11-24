@@ -2,7 +2,7 @@
   "limits": {
     "seed": 42,
     "feature_cells": 1000000,
-    "max_total_events": 20000000,
+    "max_total_events": 200000000,
     "max_regions": 50000,
     "lease_ms": 300000,
     "state_budget_bytes": 8589934592,
@@ -13,55 +13,543 @@
     "improvement_children": 0,
     "improvement_max_depth": 0,
     "shadow_policy": null,
-    "proof_policy": null,
+    "proof_policy": {
+      "version": "fixed-market-proof-screen-v1",
+      "audit_bps": 1000,
+      "seed": 42
+    },
     "indexed_policy": null,
     "resource_guard": null,
     "cpu_guard": null
   },
   "inputs": [
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202501/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202502/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202503/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202504/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202505/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202506/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202507/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202508/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202509/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202510/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202511/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202512/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202601/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202602/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202603/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202604/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202605/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202606/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202607/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202608/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202609/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202610/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202501/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202502/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202503/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202504/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202505/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202506/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202507/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202508/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202509/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202510/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202511/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202512/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202601/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202602/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202603/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202604/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202605/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202606/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202607/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202608/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202609/chunk-000000.rsf"},
-    {"dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202610/chunk-000000.rsf"}
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202501/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202502/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202503/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202504/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202505/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202506/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202507/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202508/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202509/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202510/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202511/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202512/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202601/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202602/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202603/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202604/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202605/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202606/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202607/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202608/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202609/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/AUDUSD-202610/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202501/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202502/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202503/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202504/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202505/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202506/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202507/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202508/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202509/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202510/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202511/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202512/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202601/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202602/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202603/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202604/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202605/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202606/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202607/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202608/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202609/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/EURUSD-202610/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202501/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202502/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202503/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202504/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202505/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202506/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202507/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202508/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202509/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202510/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202511/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202512/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202601/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202602/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202603/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202604/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202605/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202606/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202607/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202608/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202609/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/GBPUSD-202610/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202501/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202502/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202503/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202504/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202505/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202506/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202507/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202508/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202509/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202510/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202511/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202512/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202601/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202602/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202603/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202604/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202605/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202606/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202607/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202608/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202609/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/NZDUSD-202610/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202501/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202502/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202503/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202504/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202505/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202506/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202507/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202508/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202509/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202510/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202511/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202512/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202601/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202602/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202603/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202604/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202605/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202606/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202607/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202608/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202609/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCAD-202610/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202501/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202502/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202503/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202504/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202505/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202506/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202507/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202508/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202509/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202510/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202511/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202512/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202601/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202602/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202603/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202604/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202605/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202606/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202607/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202608/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202609/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDCHF-202610/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202501/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202502/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202503/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202504/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202505/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202506/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202507/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202508/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202509/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202510/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202511/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202512/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202601/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202602/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202603/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202604/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202605/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202606/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202607/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202608/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202609/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/USDJPY-202610/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202501/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202502/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202503/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202504/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202505/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202506/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202507/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202508/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202509/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202510/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202511/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202512/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202601/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202602/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202603/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202604/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202605/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202606/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202607/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202608/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202609/chunk-000000.rsf"
+    },
+    {
+      "dataset": "/root/workspace/historical-migration-output/full-100k/XAUUSD-202610/chunk-000000.rsf"
+    }
   ]
 }

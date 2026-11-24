@@ -169,12 +169,8 @@ fn research_inputs(config_path: &str) -> Result<(Vec<research::Input>, research:
         )?;
         let conversions = if let Some(path) = input.conversions {
             read_json(base.join(path).to_str().ok_or("non-UTF8 conversion path")?)?
-        } else if dataset.profile.quote == "USD" {
-            vec![Conversion::usd(); dataset.ticks.len()]
         } else {
-            return Err(
-                "non-USD input requires an explicit event-aligned conversion JSON file".into(),
-            );
+            vec![Conversion::usd(); dataset.ticks.len()]
         };
         inputs.push(research::Input {
             dataset,
@@ -934,6 +930,67 @@ fn run(args: &[String]) -> Result<()> {
                 "breakevens": execution.totals.breakevens,
                 "continuous_max_losing_streak": execution.totals.continuous_max_losing_streak,
                 "net_win_rate_bps": execution.totals.net_win_rate_bps,
+            }))
+        }
+        [
+            "historical-corpus-execute-registered-full-period",
+            root,
+            output_root,
+            instrument,
+            strategy,
+            costs,
+            max_candles,
+            feature_cells,
+            max_receipts,
+            training_window,
+            report,
+        ] => {
+            let spec = rust_strategy_factory::historical_corpus::register_research_window(
+                Path::new(root),
+                Path::new(output_root),
+                instrument,
+                &rust_strategy_factory::historical_corpus::ResearchWindow::OWNER_SELECTED,
+            )?;
+            let strategy: rust_strategy_factory::strategies::Strategy = read_json(strategy)?;
+            let costs: rust_strategy_factory::tick_engine::Costs = read_json(costs)?;
+            let max_candles: usize = max_candles.parse().map_err(|_| "invalid candle budget")?;
+            let feature_cells: usize = feature_cells
+                .parse()
+                .map_err(|_| "invalid feature budget")?;
+            let max_receipts: usize = max_receipts.parse().map_err(|_| "invalid receipt budget")?;
+            let training_window: rust_strategy_factory::validation::Interval =
+                read_json(training_window)?;
+            let execution =
+                rust_strategy_factory::historical_corpus::execute_registered_full_period(
+                    &spec,
+                    &strategy,
+                    &costs,
+                    rust_strategy_factory::tick_engine::CorpusBudget {
+                        max_candles,
+                        feature_cells,
+                        max_receipts,
+                    },
+                    Some(training_window),
+                )?;
+            save_replace(report, &execution)?;
+            print(&serde_json::json!({
+                "identity": execution.identity,
+                "instrument": execution.instrument,
+                "classification": execution.classification,
+                "eligibility": execution.eligibility,
+                "training_window": execution.training_window,
+                "months_executed": execution.totals.months_executed,
+                "trades": execution.totals.trades,
+                "ending_micro_usd": execution.totals.ending_micro_usd,
+                "net_pnl_micro_usd": execution.totals.net_pnl_micro_usd,
+                "full_period_max_drawdown_micro_usd": execution.totals.full_period_max_drawdown_micro_usd,
+                "wins": execution.totals.wins,
+                "losses": execution.totals.losses,
+                "breakevens": execution.totals.breakevens,
+                "continuous_max_losing_streak": execution.totals.continuous_max_losing_streak,
+                "net_win_rate_bps": execution.totals.net_win_rate_bps,
+                "unresolved_positions": execution.totals.unresolved_positions,
+                "report_hash": execution.report_hash,
             }))
         }
         ["scientific-validation", report @ ..] if !report.is_empty() => {
@@ -2610,6 +2667,8 @@ fn run(args: &[String]) -> Result<()> {
                     })
                 })
                 .transpose()?;
+            let evaluation_ref = evaluation.as_ref();
+            let stage = evaluation_ref.map(|e| e.stage.clone()).unwrap_or(rust_strategy_factory::storage::Stage::TickVerification);
             let report = research::evaluate_batch_report(
                 &mut Registry::open(Path::new(database))?,
                 &input,
@@ -2619,7 +2678,8 @@ fn run(args: &[String]) -> Result<()> {
                 research::BatchOptions {
                     evaluation: research::EvaluationOptions {
                         feature_cells: limits.feature_cells,
-                        evaluation: evaluation.as_ref(),
+                        evaluation: evaluation_ref,
+                        stage,
                         shadow_policy: limits.shadow_policy.as_ref(),
                         proof_policy: limits.proof_policy.as_ref(),
                         indexed_policy: limits.indexed_policy.as_ref(),
