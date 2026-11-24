@@ -68,7 +68,10 @@ pub fn verified_rejection(
     if result["proof_rejection"] != true {
         return Ok(None);
     }
-    crate::improvement::authorize(key)?;
+    // Recomputing a stored screening proof needs the screening contract; the
+    // parent may legitimately carry Stage::CandleScreen, which adaptation
+    // authorization must continue to refuse.
+    crate::improvement::authorize_screening(key)?;
     let policy: Policy =
         serde_json::from_value(result["proof_policy"].clone()).map_err(|e| e.to_string())?;
     policy.validate()?;

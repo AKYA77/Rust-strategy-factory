@@ -329,14 +329,16 @@ fn evaluate_prepared<'data>(
     ];
     if proof_policy.is_some() {
         crate::proof_screen::guard(&registry.connection)?;
-        crate::improvement::authorize(&key)?;
+        // Screening a proof may legitimately run at CandleScreen; adaptation
+        // authorization would reject that stage, so use the screening contract.
+        crate::improvement::authorize_screening(&key)?;
         if !allowed_classes.contains(&d.manifest.class) && evaluation.is_none() {
             return Err("real proof screening requires explicit training scope".into());
         }
     }
     if indexed_policy.is_some() {
         crate::indexed_policy::guard(&registry.connection)?;
-        crate::improvement::authorize(&key)?;
+        crate::improvement::authorize_screening(&key)?;
         if !allowed_classes.contains(&d.manifest.class) && evaluation.is_none() {
             return Err("real indexed research requires explicit training scope".into());
         }

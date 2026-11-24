@@ -69,6 +69,19 @@ fn identity(r: &Report) -> Result<String> {
 fn edge(r: &Report, concept: &str, operator: &str) -> Result<String> {
     data::hash(&(&r.id, concept, operator, r.options.seed))
 }
+fn current_model_versions(key: &ExperimentKey) -> Result<()> {
+    if key.engine_version != crate::ENGINE_VERSION
+        || key.indicator_version != crate::INDICATOR_VERSION
+        || key.signal_version != crate::SIGNAL_VERSION
+    {
+        return Err("new diagnostics require current model versions".into());
+    }
+    Ok(())
+}
+/// Adaptation authorization: a candidate may only be adapted from an explicit
+/// training result. A `CandleScreen` receipt is screening-only evidence, so it
+/// must never seed adaptation even though the proof screen itself may run at
+/// that stage.
 pub(crate) fn authorize(key: &ExperimentKey) -> Result<()> {
     let window = Interval {
         start_ms: key.start_ms,
@@ -87,13 +100,31 @@ pub(crate) fn authorize(key: &ExperimentKey) -> Result<()> {
     if !valid_protocol {
         return Err("adaptation requires explicit training protocol; scientific/OOS/final evidence is forbidden".into());
     }
-    if key.engine_version != crate::ENGINE_VERSION
-        || key.indicator_version != crate::INDICATOR_VERSION
-        || key.signal_version != crate::SIGNAL_VERSION
-    {
-        return Err("new diagnostics require current model versions".into());
+    current_model_versions(key)
+}
+/// Screening authorization for proof/indexed evaluations.
+///
+/// Proof-policy evaluation legitimately invokes `Stage::CandleScreen` when a
+/// caller drives an explicit screen-only transition, while adaptation must
+/// still reject that stage. Every other stage has identical protocol and
+/// model-version requirements for screening and adaptation, so it delegates to
+/// `authorize`; only the screen-only stage gets the distinct screening
+/// contract below. This is not a bypass: protected/OOS/final protocol hashes
+/// and stale model versions remain refused.
+pub(crate) fn authorize_screening(key: &ExperimentKey) -> Result<()> {
+    if key.stage != Stage::CandleScreen {
+        return authorize(key);
     }
-    Ok(())
+    let window = Interval {
+        start_ms: key.start_ms,
+        end_exclusive_ms: key.end_exclusive_ms,
+    };
+    let valid_protocol = key.protocol_hash == data::hash(&"training-only-conservative-signals-v1")?
+        || key.protocol_hash == data::hash(&("training-window-v1", &window))?;
+    if !valid_protocol {
+        return Err("screening requires explicit training protocol; scientific/OOS/final evidence is forbidden".into());
+    }
+    current_model_versions(key)
 }
 pub fn read_report(registry: &Registry, id: &str) -> Result<Option<Report>> {
     let row: Option<(String, String, String)> = registry
@@ -394,5 +425,25 @@ mod authorization_tests {
         // consume a screen-only result as training evidence. This is a deliberate
         // authorization boundary, not a missing case to be bypassed.
         assert!(authorize(&key(Stage::CandleScreen)).is_err());
+    }
+
+    #[test]
+    fn candle_screen_is_authorizable_for_screening_only() {
+        // P0.2: proof-policy evaluation legitimately runs at CandleScreen. The
+        // screening contract accepts that stage while the adaptation contract
+        // above still refuses it.
+        let key = key(Stage::CandleScreen);
+        assert!(authorize_screening(&key).is_ok());
+        assert!(authorize(&key).is_err());
+    }
+
+    #[test]
+    fn screening_refuses_protected_protocol_and_stale_models() {
+        let mut protected = key(Stage::CandleScreen);
+        protected.protocol_hash = data::hash(&"protected-oos-v1").unwrap();
+        assert!(authorize_screening(&protected).is_err());
+        let mut stale = key(Stage::TickVerification);
+        stale.engine_version = "stale-engine".into();
+        assert!(authorize_screening(&stale).is_err());
     }
 }

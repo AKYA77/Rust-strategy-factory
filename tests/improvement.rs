@@ -263,6 +263,59 @@ fn indexed_training_review_preserves_policy_and_independent_proof_audits() {
 }
 
 #[test]
+fn proof_screening_at_candle_screen_stage_is_authorizable_and_verifiable() {
+    // P0.2 regression: proof-policy evaluation legitimately invokes
+    // Stage::CandleScreen for screening. The screening contract must accept it,
+    // while adaptation must still refuse to consume a screen-only receipt.
+    use rust_strategy_factory::proof_screen;
+    let d = dir();
+    let mut registry = Registry::open(&d.join("state.sqlite")).unwrap();
+    let input = input(99800);
+    let revision = research::compute_revision().unwrap();
+    let mut s = strategy();
+    s.stop_ticks = 30;
+    let policy = proof_screen::Policy {
+        audit_bps: 10000,
+        ..Default::default()
+    };
+    let execution = research::evaluate_configured(
+        &mut registry,
+        &input,
+        &s,
+        &Costs::default(),
+        &revision,
+        research::EvaluationOptions {
+            feature_cells: 10000,
+            evaluation: None,
+            stage: Stage::CandleScreen,
+            shadow_policy: None,
+            proof_policy: Some(&policy),
+            indexed_policy: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(execution.outcome, "rejected");
+    assert_eq!(execution.result["proof_audited"], true);
+    let key = registry
+        .experiment_key(&execution.experiment_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(key.stage, Stage::CandleScreen);
+    assert!(
+        improvement::diagnose(&mut registry, &execution.experiment_id, &Options::default())
+            .is_err(),
+        "adaptation must not consume a screen-only result"
+    );
+    assert!(
+        proof_screen::verified_rejection(&execution.result, &key)
+            .unwrap()
+            .is_some()
+    );
+    drop(registry);
+    std::fs::remove_dir_all(d).unwrap();
+}
+
+#[test]
 fn exact_proof_rejection_audits_and_comparable_children_preserve_real_evidence() {
     use rust_strategy_factory::{proof_screen, training_review};
     let d = dir();
