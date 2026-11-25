@@ -9,9 +9,10 @@ on that SHA was green despite the broken local gate. Fixed with the exact rustfm
 (whitespace only) and a `cargo fmt --all -- --check` step in `.github/workflows/ci.yml`.
 Post-fix ladder: fmt/clippy EXIT=0, `scripts/check.sh` EXIT=0, **744 passed / 0 failed over
 69 binaries** (lib 276), zero named test failures — correcting the earlier unverified
-746/70 figure. Evidence: `docs/VERIFICATION/fmt-gate-regression-2026-11-25.md`. Commit SHA
-and terminal CI conclusion are stamped in the follow-up reconciliation. No V2 scientific
-rule or seven-instrument scope changed. V2 milestones 1–6 evidenced; Milestone 7 still NOT
+746/70 figure. Evidence: `docs/VERIFICATION/fmt-gate-regression-2026-11-25.md`.
+Increment commit `e92934ce57a4e84654f5f0a2df4275557c60aa30`; hosted CI run **45640484836**
+on that exact SHA concluded terminal `success` on all 7 jobs including the new format gate.
+No V2 scientific rule or seven-instrument scope changed. V2 milestones 1–6 evidenced; Milestone 7 still NOT
 accepted (only external-evidence gates 3–4 remain: saved dashboard credentials and owner
 manual reboot). No further software milestone is unachieved.
 

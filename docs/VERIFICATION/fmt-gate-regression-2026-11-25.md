@@ -95,5 +95,9 @@ Counts are corrected in this change rather than carrying forward the unverified 
   dashboard endpoints (no saved credentials) and a fresh owner-executed reboot are external
   evidence gates. See `docs/VERIFICATION/milestone7-vps-acceptance.md` §7.
 - Percentages are not claimed here; see the final report for the rubric-based status.
-- Hosted CI on the pushed commit: recorded in `docs/PROJECT_STATE.json` only after the run
-  reaches a terminal conclusion; an `in_progress` run is never called a pass.
+- Hosted CI on the pushed commit `e92934ce57a4e84654f5f0a2df4275557c60aa30`: run
+**45640484836** reached terminal `completed` / `success` on all 7 jobs
+(release-build, browser, rust-checks, data-compute-identity, full-horizon,
+check-operations, dependency-audit). `rust-checks` includes the newly added format
+step and passed. Recorded only after the run terminated; no `in_progress` job was
+called a pass.

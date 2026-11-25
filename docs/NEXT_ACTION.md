@@ -18,8 +18,11 @@ and adding `cargo fmt --all -- --check` to `.github/workflows/ci.yml` `rust-chec
 Verified after: `cargo fmt --all -- --check` EXIT=0, clippy `-D warnings` EXIT=0, full
 `scripts/check.sh` EXIT=0 with **744 passed / 0 failed across 69 binaries** (lib 276), zero
 failing test names. Evidence: `docs/VERIFICATION/fmt-gate-regression-2026-11-25.md`.
-Commit SHA and hosted CI conclusion are stamped into this file in the follow-up
-reconciliation entry; no `in_progress` run is called a pass. No financial/scientific/data
+Verified increment commit: `e92934ce57a4e84654f5f0a2df4275557c60aa30`. Hosted CI run
+**45640484836** on that exact SHA reached terminal `completed` / `success` on all 7 jobs
+(release-build, browser, rust-checks, data-compute-identity, full-horizon,
+check-operations, dependency-audit); `rust-checks` includes the new format gate. No
+`in_progress` run was called a pass. No financial/scientific/data
 rule changed. V2 milestones 1–6 remain evidenced; Milestone 7 remains NOT accepted.
 
 ## Latest verified local milestone (2026-11-25)
