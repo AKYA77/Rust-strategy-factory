@@ -75,9 +75,11 @@ the committed tree contains no such artifact.
 
 - Prior terminal baseline: `origin/main` `8a363fc`, run `45537391935`,
   `Rust checks` conclusion `success` (inspected before this change).
-- Exact pushed HEAD (the docs reconciliation commit on top of `767f777`): the CI
-  run ID and terminal conclusion are recorded by the milestone continuity job
-  after push; never reported as passed while in progress.
+- Exact pushed HEAD `80b76654dce9d7470f4cddfa867e43aaa31cb273` (docs reconciliation
+  commit on top of `767f777`): CI run **45591831853** concluded **success** on all
+  seven jobs (release-build, browser, rust-checks, data-compute-identity,
+  full-horizon, check-operations, dependency-audit), recorded only after the run
+  reached a terminal conclusion.
 
 ## Remaining
 

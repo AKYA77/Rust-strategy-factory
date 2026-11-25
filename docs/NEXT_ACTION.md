@@ -13,7 +13,9 @@ integrating nine previously unpushed bot commits; parent `4b52ea4`). Before:
 `scripts/check.sh` EXIT=101 at `4b52ea4`, failing
 `tests/research_cli.rs::independent_rust_process_runs_pauses_resumes_and_stops_at_durable_checkpoints`
 (`QueryReturnedNoRows` on a stale `state='completed'` query). After: full ladder
-EXIT=0, **744 passed / 0 failed across 67 test binaries** (lib 276). Evidence:
+EXIT=0, **744 passed / 0 failed across 67 test binaries** (lib 276). Hosted CI
+run **45591831853** on the exact pushed SHA `80b7665` reached a terminal
+**success on all 7 jobs**. Evidence:
 `docs/VERIFICATION/stage1-cli-regression-2026-11-25.md`. The inherited bot line
 adds `src/daily_checkpoint.rs`, family renames, CandleScreen entry gating, prep-cache
 integration in `Driver::step`, and `improvement_children=1`/`max_depth=1` in both

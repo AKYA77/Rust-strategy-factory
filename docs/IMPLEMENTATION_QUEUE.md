@@ -16,7 +16,8 @@ REAL_STRUCTURALLY_VALID only.
 
 Cursor 2026-11-25: `767f777` corrected the Stage-1 CandleScreen CLI regression
 (failing before: `QueryReturnedNoRows` in `tests/research_cli.rs`; passing after:
-full `scripts/check.sh` EXIT=0, 744 passed / 0 failed over 67 binaries). Evidence:
+full `scripts/check.sh` EXIT=0, 744 passed / 0 failed over 67 binaries; hosted CI
+run 45591831853 concluded success on all 7 jobs at `80b7665`. Evidence:
 `docs/VERIFICATION/stage1-cli-regression-2026-11-25.md`. M7 status unchanged (NOT accepted).
 
 1. Harden foundational arithmetic/import/replay with adversarial/property tests; extend normalized importer coverage and immutable atomic artifacts.
