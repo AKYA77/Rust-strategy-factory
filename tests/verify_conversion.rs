@@ -2,7 +2,7 @@
 //! Tests that usd_account_from_usd_base_price produces exact, event-aligned
 //! conversions for USDJPY, USDCHF, USDCAD and that P&L/sizing work with them.
 
-use rust_strategy_factory::contracts::{pnl, size, Conversion, Profile};
+use rust_strategy_factory::contracts::{Conversion, Profile, pnl, size};
 
 #[test]
 fn usdjpy_conversion_is_exact_and_event_aligned() {
@@ -80,7 +80,10 @@ fn pnl_with_non_usd_conversion_works() {
     let conv = Conversion::usd_account_from_usd_base_price(&usdjpy, price, 1735689600000).unwrap();
     // Long 1000 micro-lots, price moves up 10 ticks (1 pip)
     let profit = pnl(&usdjpy, 10, 1000, conv).unwrap();
-    assert!(profit > 0, "long position should be profitable on upward move");
+    assert!(
+        profit > 0,
+        "long position should be profitable on upward move"
+    );
     println!("USDJPY P&L: {} micro-USD", profit);
 }
 
@@ -90,7 +93,10 @@ fn sizing_with_non_usd_conversion_works() {
     let entry = usdjpy.price("150.10").unwrap();
     let conv = Conversion::usd_account_from_usd_base_price(&usdjpy, entry, 1735689600000).unwrap();
     let lots = size(&usdjpy, 20_000_000, entry, 100, conv).unwrap();
-    assert!(lots >= usdjpy.min_micro_lots, "size should meet minimum volume");
+    assert!(
+        lots >= usdjpy.min_micro_lots,
+        "size should meet minimum volume"
+    );
     println!("USDJPY size: {} micro-lots", lots);
 }
 
