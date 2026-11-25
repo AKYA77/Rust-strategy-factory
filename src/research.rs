@@ -943,13 +943,11 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
             }),
             strategies::Family::BollingerBandReversion
             | strategies::Family::DailyPivotReversal
-            | strategies::Family::PreviousDayLiquiditySweep => {
-                Some(Rule::BollingerCross {
-                    window: 20,
-                    multiple_bps: 20000,
-                    upper: !long,
-                })
-            }
+            | strategies::Family::PreviousDayLiquiditySweep => Some(Rule::BollingerCross {
+                window: 20,
+                multiple_bps: 20000,
+                upper: !long,
+            }),
             strategies::Family::OpeningRangeBreakout
             | strategies::Family::PreviousDayHighLowBreakout
             | strategies::Family::CrossPairDivergence => Some(Rule::BollingerCross {
@@ -1390,18 +1388,17 @@ impl Driver {
             stage: prep_cache::Stage::Candle,
             protection: Protection::Standard,
         };
-        let (candles_artifact, _candle_status) = self
-            .prep_cache
-            .get_or_fill(&candle_scope, || {
+        let (candles_artifact, _candle_status) =
+            self.prep_cache.get_or_fill(&candle_scope, || {
                 let c = candles::build(d, strategy.timeframe)?;
-                let value =
-                    serde_json::to_value(&c).map_err(|e| e.to_string())?;
+                let value = serde_json::to_value(&c).map_err(|e| e.to_string())?;
                 Ok(prep_cache::encode(&value)?)
             })?;
-        let value: serde_json::Value =
-            prep_cache::decode(&candles_artifact.data, &candles_artifact.receipt.content_hash)?;
-        let c: Vec<candles::Candle> =
-            serde_json::from_value(value).map_err(|e| e.to_string())?;
+        let value: serde_json::Value = prep_cache::decode(
+            &candles_artifact.data,
+            &candles_artifact.receipt.content_hash,
+        )?;
+        let c: Vec<candles::Candle> = serde_json::from_value(value).map_err(|e| e.to_string())?;
         let visible = evaluation.as_ref().map_or(c.len(), |e| {
             c.partition_point(|c| c.available_ms < e.window.end_exclusive_ms)
         });

@@ -18,7 +18,7 @@
 //! sufficient history) and finalize each admitted checkpoint as an entry, a
 //! no-entry evaluation, or a failure.
 
-use crate::{data::hash, Result};
+use crate::{Result, data::hash};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -70,9 +70,15 @@ pub enum CheckpointDecision {
     Admit { session_day: i64 },
     /// The candidate was skipped; the reason is recorded durably. Not retried
     /// later the same day.
-    Skip { session_day: i64, reason: SkipReason },
+    Skip {
+        session_day: i64,
+        reason: SkipReason,
+    },
     /// A prior checkpoint this session-day forbids any further attempt.
-    RefusedRetry { session_day: i64, reason: SkipReason },
+    RefusedRetry {
+        session_day: i64,
+        reason: SkipReason,
+    },
 }
 
 /// One durable daily-checkpoint record.
@@ -100,8 +106,8 @@ impl DailyCheckpointStore {
     /// Open (or create) the store at `path`. The `daily_checkpoints` table is
     /// created if absent. Existing rows are never altered or deleted by open.
     pub fn open(path: &Path) -> Result<Self> {
-        let connection =
-            Connection::open(path).map_err(|e| format!("failed to open daily-checkpoint store: {e}"))?;
+        let connection = Connection::open(path)
+            .map_err(|e| format!("failed to open daily-checkpoint store: {e}"))?;
         connection
             .execute_batch(
                 "PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;
