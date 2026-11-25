@@ -461,7 +461,7 @@ mod tests {
     #[test]
     fn session_day_is_utc_and_dst_stable() {
         // Same UTC instant, same session-day regardless of local DST rules.
-        let a = DailyCheckpointStore::session_day(1773067200000).unwrap(); // 2026-03-08T12:00:00Z
+        let a = DailyCheckpointStore::session_day(1773067200000).unwrap(); // base UTC day
         let b = DailyCheckpointStore::session_day(1773067200000).unwrap();
         assert_eq!(a, b, "session-day must be deterministic");
         // One UTC day apart differs by exactly one.
@@ -479,9 +479,10 @@ mod tests {
             dst_day, same_utc_day_later,
             "same UTC day across local clock change"
         );
-        // Midnight UTC boundary: 2026-03-07T23:30Z vs 2026-03-08T00:30Z.
-        let before = DailyCheckpointStore::session_day(1773063600000).unwrap(); // 2026-03-07T23:30:00Z
-        let after = DailyCheckpointStore::session_day(1773067200000).unwrap(); // 2026-03-08T12:00:00Z
+        // Midnight UTC boundary: one minute either side of UTC midnight.
+        let midnight = 20521 * MS_PER_DAY;
+        let before = DailyCheckpointStore::session_day(midnight - 60_000).unwrap();
+        let after = DailyCheckpointStore::session_day(midnight + 60_000).unwrap();
         assert_eq!(after, before + 1, "UTC midnight boundary advances one day");
     }
 
