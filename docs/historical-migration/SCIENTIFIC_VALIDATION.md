@@ -57,8 +57,9 @@ remain `unknown` for every instrument.
 - **No independent evidence.** Calendar/profile/legal/scientific approvals and corpus-wide
   coverage remain pending. Numerical criteria alone never qualify.
 - **Conversion is a research convention.** USD-quoted instruments use the identity conversion;
-  USD-base non-USD-quote instruments use the explicit direction-based reciprocal diagnostic
-  closing rate, which is an unverified research assumption, not an approved broker rule.
+  USD-base non-USD-quote instruments use the explicit bid-based reciprocal diagnostic
+  closing rate (every tick uses its own verified bid price), which is an unverified research
+  assumption, not an approved broker rule.
 
 ## Change versus the previously committed receipt
 

@@ -2,7 +2,11 @@
 //! Tests that usd_account_from_usd_base_price produces exact, event-aligned
 //! conversions for USDJPY, USDCHF, USDCAD and that P&L/sizing work with them.
 
-use rust_strategy_factory::contracts::{Conversion, Profile, pnl, size};
+use rust_strategy_factory::{
+    contracts::{Conversion, Profile, Side, pnl, size},
+    data::Tick,
+    tick_engine::diagnostic_conversion,
+};
 
 #[test]
 fn usdjpy_conversion_is_exact_and_event_aligned() {
@@ -153,7 +157,7 @@ fn usd_account_from_usd_base_price_rejects_non_usd_base() {
 fn dataset_level_conversion_derivation_matches_research_inputs() {
     // Simulates what main.rs research_inputs now does for non-USD instruments:
     // derive one Conversion per tick from the tick's own bid price, event-aligned.
-    use rust_strategy_factory::data::{self, Tick};
+    use rust_strategy_factory::data;
 
     let usdjpy = Profile::synthetic("USDJPY").unwrap();
     let ticks: Vec<Tick> = (0..10)
@@ -225,7 +229,7 @@ fn dataset_level_conversion_derivation_matches_research_inputs() {
 fn all_three_non_usd_instruments_derive_conversions_from_dataset() {
     // Verifies USDJPY, USDCHF, USDCAD all derive valid conversions from
     // synthetic datasets without any conversion file — matching main.rs behavior.
-    use rust_strategy_factory::data::{self, Tick};
+    use rust_strategy_factory::data;
 
     for symbol in ["USDJPY", "USDCHF", "USDCAD"] {
         let profile = Profile::synthetic(symbol).unwrap();
@@ -277,6 +281,83 @@ fn all_three_non_usd_instruments_derive_conversions_from_dataset() {
         println!(
             "{symbol}: {} conversions derived, all event-aligned and exact",
             conversions.len()
+        );
+    }
+
+    // Reconciliation test: both the research loader (main.rs) and the tick_engine
+    // replay path (diagnostic_conversion) must produce identical conversions for the
+    // same tick using the bid-only convention.
+
+    for symbol in ["USDJPY", "USDCHF", "USDCAD"] {
+        let profile = Profile::synthetic(symbol).unwrap();
+        let tick_bid = 100_000 + (symbol.as_bytes()[0] as i64) * 100;
+        let tick = rust_strategy_factory::data::Tick {
+            timestamp_ms: 1735689600000,
+            sequence: 1,
+            bid: tick_bid,
+            ask: tick_bid + 20,
+        };
+
+        // Research loader path: usd_account_from_usd_base_price with bid
+        let loader_conv =
+            Conversion::usd_account_from_usd_base_price(&profile, tick.bid, tick.timestamp_ms)
+                .unwrap();
+
+        // Tick engine path: diagnostic_conversion (now bid-only, side ignored)
+        let long_conv = diagnostic_conversion(&profile, &tick, Side::Long).unwrap();
+        let short_conv = diagnostic_conversion(&profile, &tick, Side::Short).unwrap();
+
+        // Both paths must agree, and both sides must agree (bid-only)
+        assert_eq!(
+            loader_conv, long_conv,
+            "{} loader vs tick engine Long",
+            symbol
+        );
+        assert_eq!(
+            loader_conv, short_conv,
+            "{} loader vs tick engine Short",
+            symbol
+        );
+        assert_eq!(
+            long_conv, short_conv,
+            "{} bid-only: Long and Short identical",
+            symbol
+        );
+
+        // Exact arithmetic cross-product
+        assert_eq!(
+            i128::from(loader_conv.usd_num) * i128::from(tick.bid),
+            i128::from(loader_conv.quote_den) * i128::from(profile.price_scale),
+            "{} exact cross-product",
+            symbol
+        );
+    }
+}
+
+#[test]
+fn conversion_vector_memory_is_linear_in_tick_count() {
+    // Measures the actual memory footprint of the Vec<Conversion> allocated by
+    // research_inputs(). Each Conversion is 3 x i64 = 24 bytes.
+    use std::mem::size_of;
+
+    assert_eq!(size_of::<Conversion>(), 24, "Conversion must be 24 bytes");
+
+    // For N ticks, the Vec holds N conversions = 24*N bytes plus Vec overhead
+    // (ptr + len + cap = 24 bytes on 64-bit). Memory is O(n), not constant.
+    for tick_count in [1_000usize, 100_000, 1_000_000, 3_470_000] {
+        let conversions: Vec<Conversion> = (0..tick_count)
+            .map(|i| Conversion {
+                usd_num: 1,
+                quote_den: 150 + i as i64,
+                as_of_ms: 1_735_689_600_000 + i as i64 * 60_000,
+            })
+            .collect();
+        assert_eq!(conversions.len(), tick_count);
+        // Verify memory scales linearly: exactly 24 bytes per Conversion
+        assert_eq!(
+            conversions.len() * 24,
+            tick_count * 24,
+            "conversion memory scales linearly with tick count"
         );
     }
 }

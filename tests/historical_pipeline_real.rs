@@ -113,11 +113,11 @@ fn real_historical_study_report() {
 
 /// Diagnostic bridge from verified historical source data to the authoritative sequential engine.
 /// Structural/diagnostic only: the report is labelled `diagnostic_simulation` with `none`
-/// eligibility and is never registered research evidence. All eight instruments execute in
+/// eligibility and is never registered research evidence. All seven instruments execute in
 /// diagnostic mode: USD-quoted instruments use the identity conversion, and USD-base
-/// non-USD-quote instruments (USDJPY/USDCHF/USDCAD) use the explicit direction-based
-/// reciprocal diagnostic convention (long -> bid, short -> ask; USD per quote currency =
-/// price_scale / price).
+/// non-USD-quote instruments (USDJPY/USDCHF/USDCAD) use the explicit bid-based reciprocal
+/// diagnostic convention (every tick uses its own verified bid price; USD per quote currency =
+/// price_scale / bid_price). This is offline simulation only, not an approved broker rule.
 #[test]
 fn real_historical_diagnostic_execution() {
     let catalog_root = Path::new("/var/lib/hermes-factory");

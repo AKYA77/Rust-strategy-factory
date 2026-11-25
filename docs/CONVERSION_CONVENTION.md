@@ -83,7 +83,11 @@ The identity sentinel `Conversion::usd()` (usd_num=1, quote_den=1, as_of_ms=i64:
 
 ## Resource assessment
 
-**No large duplicate JSON files are generated.** The conversion is computed on-the-fly from each tick's verified quote price during research execution. The memory footprint is a single `Conversion` struct (3 integers) per active step. No per-instrument conversion files are written to disk.
+**No large duplicate JSON files are generated.** Conversion rates are derived from each tick's verified bid price at runtime using exact integer arithmetic. The research loader (`research_inputs`) allocates one `Conversion` per tick — a `Vec<Conversion>` of 24 bytes per tick (3 × i64 fields) plus Vec allocation overhead. This is O(n) memory where n is the dataset tick count, not constant memory.
+
+Example measured overhead for USDJPY M1 data (~3.47M ticks per one-month partition): approximately 83 MB per loaded partition for the conversion vector alone (24 bytes/tick × 3.47M ticks), before any tick data, candles, or feature buffers. Across 22 months, one instrument's conversion vector totals ~1.8 GB. The full research input byte budget is capped at 2 GiB by `research_inputs()` to bound total loaded memory; loading multiple instruments or partitions simultaneously requires careful budget management.
+
+No per-instrument conversion files are written to disk.
 
 If owner approval is granted for USDJPY/USDCHF/USDCAD inclusion, the changes would be:
 1. Add 3 instruments × 20 months = 60 new inputs to `config/research.json` (each input is a small JSON object referencing existing corpus partitions)

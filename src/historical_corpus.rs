@@ -900,7 +900,9 @@ pub struct MonthExecution {
     pub declared_class: String,
     pub profile_id: String,
     /// Explicit USD-account conversion convention used for this month (`identity_usd_v1` or
-    /// `diagnostic_reciprocal_closing_rate_v1_long_bid_short_ask`).
+    /// `diagnostic_reciprocal_closing_rate_v1_bid_only`). The policy string is part of the
+    /// execution report and is bound to the corpus identity receipt; changing the convention
+    /// changes the policy string and invalidates comparison with prior reports.
     pub conversion_policy: String,
     pub initial_micro_usd: i128,
     /// The engine's `realized_micro_usd` field, which is the ending account balance (it starts at
@@ -1219,12 +1221,15 @@ fn aggregate_continuous(
 
 /// USD-quoted instruments need no cross-currency conversion.
 pub const CONVERSION_POLICY_IDENTITY: &str = "identity_usd_v1";
-/// USD-base non-USD-quote instruments use the direction-based reciprocal closing rate derived
-/// from the instrument's own verified quote: long -> bid, short -> ask; USD per quote currency is
-/// `price_scale / price`. Explicit unverified research convention, not an approved broker rule.
-pub const CONVERSION_POLICY_RECIPROCAL: &str =
-    "diagnostic_reciprocal_closing_rate_v1_long_bid_short_ask";
-const EXECUTION_LIMITATIONS: &str = "Diagnostic simulation only. The authoritative sequential engine and frozen financial rules are applied to real structurally-valid history using explicit test-convention profiles, so results are not broker-approved execution. USD-quoted instruments use the identity conversion; USD-base non-USD-quote instruments (USDJPY/USDCHF/USDCAD) use a diagnostic direction-based reciprocal closing rate derived from the instrument's own verified quote (long -> bid, short -> ask; USD per quote currency = price_scale / price). That conversion convention is an explicit unverified research assumption, not an approved broker conversion rule; the documented MT5 profitability-based variant is not implemented. Cross-currency pairs and eligibility-bearing data classes are refused. No research eligibility, calendar/profile/licensing approval, scientific validity or qualification is granted. Counts and money figures are observations, not performance evidence.";
+/// USD-base non-USD-quote instruments use the bid-based reciprocal closing rate derived
+/// from the instrument's own verified quote price: every tick uses its own verified bid,
+/// USD per quote currency is `price_scale / bid_price`. Direction-dependent bid/ask selection
+/// is intentionally NOT used — the research loader computes conversions at load time before
+/// any strategy side is known, and batch evaluation shares one conversion vector across
+/// strategies with potentially different sides. Bid-only keeps both paths identical and
+/// deterministic. Explicit unverified research convention, not an approved broker rule.
+pub const CONVERSION_POLICY_RECIPROCAL: &str = "diagnostic_reciprocal_closing_rate_v1_bid_only";
+const EXECUTION_LIMITATIONS: &str = "Diagnostic simulation only. The authoritative sequential engine and frozen financial rules are applied to real structurally-valid history using explicit test-convention profiles, so results are not broker-approved execution. USD-quoted instruments use the identity conversion; USD-base non-USD-quote instruments (USDJPY/USDCHF/USDCAD) use a diagnostic bid-based reciprocal closing rate derived from the instrument's own verified quote (USD per quote currency = price_scale / bid_price). That conversion convention is an explicit unverified research assumption, not an approved broker conversion rule. Cross-currency pairs and eligibility-bearing data classes are refused. No research eligibility, calendar/profile/licensing approval, scientific validity or qualification is granted. Counts and money figures are observations, not performance evidence.";
 
 /// The explicit USD-account conversion convention applied to an instrument's diagnostic replay.
 pub fn conversion_policy(profile: &Profile) -> &'static str {

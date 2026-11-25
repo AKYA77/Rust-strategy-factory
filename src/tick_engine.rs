@@ -811,7 +811,7 @@ pub enum ReplayMode {
     Registered,
     /// Explicitly non-eligible diagnostic simulation over real structurally-valid corpora.
     /// USD-quoted instruments use the identity conversion; USD-base non-USD-quote instruments
-    /// use a direction-based reciprocal closing rate derived from their own quote. Runs the
+    /// use a bid-based reciprocal closing rate derived from their own quote. Runs the
     /// identical engine and accounting as `Registered`; the result must never be presented as
     /// research evidence, eligibility or qualification.
     Diagnostic,
@@ -989,9 +989,9 @@ pub fn replay_corpus(
 /// historical corpus can be exercised end-to-end for diagnosis. The result is **not** research
 /// evidence: it must never be registered as an experiment, presented as eligibility, or used for
 /// qualification. USD-quoted instruments use the identity conversion; USD-base non-USD-quote
-/// instruments use the direction-based reciprocal closing rate derived from their own quote
-/// (long -> bid, short -> ask). Cross-currency conversion streams and eligibility-bearing data
-/// classes are refused.
+/// instruments use the bid-based reciprocal closing rate derived from their own quote
+/// (every tick uses its own verified bid price). Cross-currency conversion streams and
+/// eligibility-bearing data classes are refused.
 pub(crate) fn replay_corpus_diagnostic(
     base: &std::path::Path,
     spec: &crate::corpus::Specification,
@@ -1017,18 +1017,20 @@ pub(crate) fn replay_corpus_diagnostic(
 /// Diagnostic USD-account conversion for one corpus event.
 ///
 /// USD-quoted instruments use the identity conversion. USD-base non-USD-quote instruments use
-/// the direction-based reciprocal closing rate derived from the instrument's own quote: the bid
-/// for a long and the ask for a short. This is an explicit, unverified research convention, not
-/// an approved broker conversion rule.
-fn diagnostic_conversion(p: &Profile, tick: &Tick, side: Side) -> Result<Conversion> {
+/// Bid-based reciprocal conversion derived from the instrument's own quote price.
+/// This is the single documented simulation convention for offline historical
+/// simulation: every tick uses its own verified bid price, producing an exact
+/// integer (usd_num, quote_den) rate with event-aligned as_of_ms. Direction-dependent
+/// bid/ask selection is intentionally NOT used — the research loader computes
+/// conversions at load time before any strategy side is known, and batch evaluation
+/// shares one conversion vector across strategies with potentially different sides.
+/// Bid-only keeps both paths identical and deterministic. This is an explicit,
+/// unverified research convention, not an approved broker conversion rule.
+pub fn diagnostic_conversion(p: &Profile, tick: &Tick, _side: Side) -> Result<Conversion> {
     if p.quote == "USD" {
         return Ok(Conversion::usd());
     }
-    let price = match side {
-        Side::Long => tick.bid,
-        Side::Short => tick.ask,
-    };
-    Conversion::usd_account_from_usd_base_price(p, price, tick.timestamp_ms)
+    Conversion::usd_account_from_usd_base_price(p, tick.bid, tick.timestamp_ms)
 }
 fn replay_corpus_internal(
     run: CorpusRun<'_>,
@@ -2119,7 +2121,7 @@ mod worker_preparation_tests {
         assert!(error.contains("real structurally-valid"), "{error}");
     }
     #[test]
-    fn diagnostic_conversion_is_direction_based_reciprocal() {
+    fn diagnostic_conversion_is_bid_based_reciprocal() {
         let jpy = Profile::synthetic("USDJPY").unwrap();
         let tick = Tick {
             timestamp_ms: 5_000,
@@ -2127,17 +2129,21 @@ mod worker_preparation_tests {
             bid: 150_000,
             ask: 150_100,
         };
+        // Both sides use the same bid price — direction-independent convention.
         let long = diagnostic_conversion(&jpy, &tick, Side::Long).unwrap();
         assert_eq!(
             (long.usd_num, long.quote_den, long.as_of_ms),
             (1, 150, 5_000)
         );
         let short = diagnostic_conversion(&jpy, &tick, Side::Short).unwrap();
-        assert_eq!((short.usd_num, short.quote_den), (10, 1_501));
-        // The rate is exactly USD per quote currency: 1 / 150.1.
+        assert_eq!((short.usd_num, short.quote_den), (1, 150));
+        // Bid-only: same rate regardless of side.
+        assert_eq!(long.usd_num, short.usd_num);
+        assert_eq!(long.quote_den, short.quote_den);
+        // The rate is exactly USD per quote currency: 1 / 150.
         assert_eq!(
-            i128::from(short.usd_num) * 150_100,
-            i128::from(short.quote_den) * 1_000
+            i128::from(long.usd_num) * 150_000,
+            i128::from(long.quote_den) * 1_000
         );
         let eur = Profile::synthetic("EURUSD").unwrap();
         assert_eq!(
@@ -2159,14 +2165,15 @@ mod worker_preparation_tests {
                     .expect("USD-base non-USD-quote corpus must execute in diagnostic mode");
             let mut expected = crate::corpus::SequenceHash::new();
             for tick in &source.data.ticks {
+                // Bid-only convention: identical conversion for both sides.
                 expected
-                    .push(&diagnostic_conversion(&source.data.profile, tick, side).unwrap())
+                    .push(&diagnostic_conversion(&source.data.profile, tick, Side::Long).unwrap())
                     .unwrap();
             }
             assert_eq!(
                 replay_report.conversion_id,
                 expected.finish(),
-                "diagnostic replay must use the exact direction-based conversion sequence"
+                "diagnostic replay must use the exact bid-based conversion sequence"
             );
             // The corpus path must match the materialized explicit-conversion engine exactly.
             let candles = crate::candles::build(&source.data, direction.timeframe).unwrap();
