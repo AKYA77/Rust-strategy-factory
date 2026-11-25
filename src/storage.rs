@@ -750,6 +750,8 @@ impl Registry {
             &mut connection,
         ))?;
         crate::research::initialize_recursion(&mut connection, version)?;
+        init_classified(crate::stage_machine::initialize(&connection))?;
+        init_classified(crate::telemetry::initialize(&connection))?;
         let writer_gate = writer_gate_for(connection.path());
         Ok(Self {
             connection,

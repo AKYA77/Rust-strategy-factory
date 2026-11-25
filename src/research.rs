@@ -344,6 +344,17 @@ fn evaluate_prepared<'data>(
         }
     }
     let id = registry.register(&key)?;
+    // Explicit durable lineage: record the stage this candidate entered and emit
+    // a bounded telemetry event binding the identity to the entry decision.
+    crate::stage_machine::record_entry(registry, &key)?;
+    crate::telemetry::record(
+        registry,
+        &id,
+        "research",
+        "experiment-entered",
+        chrono::Utc::now().timestamp_millis(),
+        &serde_json::json!({"stage": format!("{:?}", key.stage)}),
+    )?;
     match registry.claim(&id, chrono::Utc::now().timestamp_millis(), 300000)? {
         Claim::Busy => Err("experiment is leased to another worker".into()),
         Claim::Reused(result) => Ok(Execution {

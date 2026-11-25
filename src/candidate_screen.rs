@@ -32,7 +32,8 @@ impl Default for ShadowPolicy {
     fn default() -> Self {
         Self {
             version: "m1-shadow-promotion-v1".into(),
-            threshold_bps: 5000,
+            // Stage-1 screening floor: exactly 40.00% is inclusive.
+            threshold_bps: 4000,
             minimum_closed_trades: 20,
             promote_uncertain: true,
             audit_sample_bps: 1000,
@@ -92,6 +93,73 @@ impl ShadowPolicy {
             "selected_for_sampled_audit":would_reject && bucket < u64::from(self.audit_sample_bps),
             "execution":"shadow-only-all-candidates-still-replayed", "proven_failure":false}),
         )
+    }
+
+    /// Explicit Stage-1 decision against the 40.00% screening floor.
+    ///
+    /// - [`Stage1Decision::Pass`]: estimate is at or above the floor (>= 40%,
+    ///   inclusive) and carries no unresolved ambiguity.
+    /// - [`Stage1Decision::Reject`]: estimate is below the floor with sufficient
+    ///   eligible signals and no ambiguity that could flip the result; or the
+    ///   conservative optimistic bound is itself below the floor (proven).
+    /// - [`Stage1Decision::Hold`]: the estimate is ambiguous, unsupported, or the
+    ///   sample is too thin. A hold is never a pass and never a proven reject.
+    ///
+    /// This is a screening diagnostic; it does not grant qualification and all
+    /// candidates still escalate to exact replay.
+    pub fn stage1_decision(&self, e: &Estimate) -> Result<Stage1Decision> {
+        self.validate()?;
+        if e.version != VERSION || e.estimated_net_wins > e.estimated_closed_trades {
+            return Err("invalid/version-mismatched candle estimate".into());
+        }
+        let ambiguous = !e.uncertainties.is_empty();
+        let sufficient =
+            e.status == "estimated" && e.estimated_closed_trades >= self.minimum_closed_trades;
+        // Proven failure: the most favourable resolution allowed by the candle
+        // model cannot reach the floor. Sound for the whole reference execution.
+        let proven_bound_failure = sufficient
+            && e.net_bounds.as_ref().is_some_and(|b| {
+                b.optimistic_win_rate_bps
+                    .is_some_and(|r| r < self.threshold_bps)
+            });
+        if proven_bound_failure {
+            return Ok(Stage1Decision::Reject);
+        }
+        if !sufficient {
+            return Ok(Stage1Decision::Hold);
+        }
+        let below_floor = e.estimated_net_wins as u128 * 10000
+            < self.threshold_bps as u128 * e.estimated_closed_trades as u128;
+        if ambiguous {
+            // The estimate can be wrong when both barriers occur inside one bar
+            // or execution is ambiguous: hold, do not pass and do not prove fail.
+            return Ok(Stage1Decision::Hold);
+        }
+        Ok(if below_floor {
+            Stage1Decision::Reject
+        } else {
+            Stage1Decision::Pass
+        })
+    }
+}
+
+/// Stage-1 outcome relative to the 40.00% screening floor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Stage1Decision {
+    /// At or above the floor (>= 40%, inclusive) with no unresolved ambiguity.
+    Pass,
+    /// Below the floor with a sound case, or proven by the optimistic bound.
+    Reject,
+    /// Ambiguous/unsupported/thin: held for exact replay, never a pass.
+    Hold,
+}
+impl Stage1Decision {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Pass => "PASS",
+            Self::Reject => "REJECT",
+            Self::Hold => "HOLD",
+        }
     }
 }
 
@@ -643,6 +711,9 @@ pub fn compare(
     policy: &ShadowPolicy,
 ) -> Result<serde_json::Value> {
     let decision = policy.decision(estimate, experiment_id)?;
+    // Explicit Stage-1 award against the versioned 40.00% floor: exactly 40.00%
+    // passes, below never passes, and ambiguous/unsupported estimates hold.
+    let stage1 = policy.stage1_decision(estimate)?;
     let wins = replay.trades.iter().filter(|t| t.net_micro_usd > 0).count();
     let actual_unresolved = replay.unresolved.is_some() || replay.pending_entry.is_some();
     let false_negative = if decision["would_reject"] == true && !actual_unresolved {
@@ -655,6 +726,7 @@ pub fn compare(
     };
     Ok(serde_json::json!({
         "version":"m1-estimate-vs-tick-v1", "estimated":estimate,
+        "stage1_decision":stage1.as_str(),
         "actual_closed_trades":replay.trades.len(), "actual_net_wins":wins,
         "actual_net_win_rate_bps":if replay.trades.is_empty(){None}else{Some(wins * 10000 / replay.trades.len())},
         "actual_unresolved":actual_unresolved, "shadow_decision":decision,
@@ -662,4 +734,91 @@ pub fn compare(
         "candidate_rejected":false, "false_negative_audit":"all-candidates-replayed-sample-selection-diagnostic-only",
         "qualification_evidence":false
     }))
+}
+
+#[cfg(test)]
+mod stage1_policy_tests {
+    use super::*;
+
+    fn estimate(wins: usize, trades: usize, uncertainties: &[&str]) -> Estimate {
+        Estimate {
+            version: VERSION.into(),
+            interpretation: String::new(),
+            status: "estimated".into(),
+            estimated_closed_trades: trades,
+            estimated_net_wins: wins,
+            estimated_net_micro_usd: 0,
+            estimated_net_win_rate_bps: Some((wins * 10000) / trades),
+            estimated_sizing_rejections: 0,
+            unavailable_stop_signals: 0,
+            overlapping_signals_skipped: 0,
+            bar_visits: trades,
+            uncertainties: uncertainties.iter().map(|s| (*s).into()).collect(),
+            promotes_to_tick: true,
+            net_bounds: None,
+            optimistic_net_micro_usd: 0,
+            optimistic_wins: wins,
+        }
+    }
+
+    #[test]
+    fn stage1_floor_is_exactly_40_percent_inclusive() {
+        let policy = ShadowPolicy::default();
+        assert_eq!(policy.threshold_bps, 4000);
+        // Exactly 40% passes.
+        assert_eq!(
+            policy.stage1_decision(&estimate(40, 100, &[])).unwrap(),
+            Stage1Decision::Pass
+        );
+        // Just below the floor rejects.
+        assert_eq!(
+            policy.stage1_decision(&estimate(39, 100, &[])).unwrap(),
+            Stage1Decision::Reject
+        );
+    }
+
+    #[test]
+    fn ambiguous_and_thin_estimates_hold_not_pass() {
+        let policy = ShadowPolicy::default();
+        // Ambiguity holds even when the point estimate is above the floor.
+        assert_eq!(
+            policy
+                .stage1_decision(&estimate(
+                    60,
+                    100,
+                    &["SL-TP-order-unknown-stop-proxy-selected"]
+                ))
+                .unwrap(),
+            Stage1Decision::Hold
+        );
+        // A thin sample holds rather than passing or rejecting.
+        assert_eq!(
+            policy.stage1_decision(&estimate(1, 1, &[])).unwrap(),
+            Stage1Decision::Hold
+        );
+        // Unsupported status holds.
+        let mut unsupported = estimate(40, 100, &[]);
+        unsupported.status = "unsupported".into();
+        assert_eq!(
+            policy.stage1_decision(&unsupported).unwrap(),
+            Stage1Decision::Hold
+        );
+    }
+
+    #[test]
+    fn proven_optimistic_bound_below_floor_rejects() {
+        let policy = ShadowPolicy::default();
+        let mut e = estimate(50, 100, &[]);
+        e.net_bounds = Some(NetBounds {
+            version: "candidate-net-bounds-v1".into(),
+            closed_trades: 100,
+            pessimistic_net_micro_usd: 0,
+            optimistic_net_micro_usd: 0,
+            pessimistic_wins: 30,
+            optimistic_wins: 30,
+            pessimistic_win_rate_bps: Some(3000),
+            optimistic_win_rate_bps: Some(3000),
+        });
+        assert_eq!(policy.stage1_decision(&e).unwrap(), Stage1Decision::Reject);
+    }
 }

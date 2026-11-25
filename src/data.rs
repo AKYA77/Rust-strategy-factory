@@ -73,6 +73,10 @@ pub fn hash<T: Serialize>(value: &T) -> Result<String> {
             .to_string(),
     )
 }
+/// Hash raw bytes directly (used by content-addressed preparation caches).
+pub fn hash_raw(bytes: &[u8]) -> Result<String> {
+    Ok(blake3::hash(bytes).to_hex().to_string())
+}
 /// Provenance identity excludes the time this same immutable archive was re-imported.
 pub fn dataset_identity(m: &Manifest) -> Result<String> {
     hash(&(

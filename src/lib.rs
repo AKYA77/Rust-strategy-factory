@@ -65,6 +65,10 @@ pub mod coverage;
 
 pub mod ordered_coverage;
 
+pub mod stage_machine;
+
+pub mod telemetry;
+
 pub mod import_job;
 
 pub mod catalog;
