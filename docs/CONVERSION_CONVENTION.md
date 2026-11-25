@@ -62,6 +62,15 @@ The resulting conversion rate is `usd_num / quote_den` USD per 1 unit of quote c
 
 All rate relationships verified: `usd_num * price_units == quote_den * price_scale` (cross-product equality, exact integer arithmetic).
 
+**Real-corpus profiles differ from these synthetic fixtures.** The retained corpus manifests
+(2025-03, verified 2026-11-25) use `price_scale=1000000` for all three instruments, with
+`tick=1000` for USDJPY and `tick=10` for USDCHF/USDCAD. The synthetic table above
+(`price_scale=1000`/`tick=1` for USDJPY) is a test fixture convention only and must never be
+applied to retained corpus ticks: doing so silently yields a 1000x-wrong USDJPY rate that still
+passes `Conversion::validate`. The real-corpus evidence, exact rates and the permanent negative
+control are in `docs/VERIFICATION/real-corpus-conversion-2026-11-25.md` and
+`tests/real_conversion_evidence.rs`.
+
 ## Historical timestamp alignment
 
 Each `Conversion` record carries `as_of_ms` set to the tick's `timestamp_ms`. Validation enforces:

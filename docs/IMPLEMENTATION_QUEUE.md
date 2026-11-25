@@ -2,6 +2,19 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-25 (real-corpus conversion evidence): baseline clean `main` `18bba89`
+had `scripts/check.sh` EXIT=0, 755 passed / 0 failed over 70 binaries (lib 276). Added
+`tests/real_conversion_evidence.rs` (2 tests) and
+`docs/VERIFICATION/real-corpus-conversion-2026-11-25.md`, and corrected
+`docs/CONVERSION_CONVENTION.md` to distinguish synthetic fixtures from the real corpus profile.
+Verified USDJPY/USDCHF/USDCAD on actual 2025-03 `.rsf` chunks: 100,000 events each, 64 samples
+each, exact cross-product rates, strict event alignment, all validation safeguards, no identity
+conversion, bound provenance hashes. Red control failed with a 1000x synthetic-scale rate that
+still passed validation; green invariant passed 2/2. Post-increment full `scripts/check.sh`
+EXIT=0, 757 passed / 0 failed over 71 binaries (lib 276), new target 2/2. Commit SHA / CI ID
+recorded after publication. No financial, scientific, data-scope or security rule changed; M7 external gates
+still open. No further software milestone is unachieved.
+
 Continuity run 2026-11-25 (formatting gate): baseline clean `main` `f8e4eaf` had
 `scripts/check.sh` EXIT=1 at `cargo fmt --all -- --check` on `src/research.rs:1474`
 (introduced by `2177da0`); hosted `rust-checks` ran only `cargo test`, so CI run 45634655873

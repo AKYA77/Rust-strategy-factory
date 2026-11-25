@@ -25,6 +25,25 @@ check-operations, dependency-audit); `rust-checks` includes the new format gate.
 `in_progress` run was called a pass. No financial/scientific/data
 rule changed. V2 milestones 1–6 remain evidenced; Milestone 7 remains NOT accepted.
 
+## Real-corpus non-USD conversion evidence (2026-11-25 continuity run)
+
+Baseline clean `main` `18bba89` (== `origin/main`): `scripts/check.sh` EXIT=0,
+**755 passed / 0 failed over 70 binaries** (lib 276), no named failures. Increment:
+`tests/real_conversion_evidence.rs` (2 tests) verifies USDJPY/USDCHF/USDCAD against actual
+retained `.rsf` ticks and the real manifest profile — exact integer cross-product, strict
+`as_of_ms == tick.timestamp_ms`, all `Conversion::validate` safeguards, no identity rate for
+non-USD quotes, and provenance hashes (source/dataset/quote-stream/output/chunk + deterministic
+consumed-byte blake3). Red/green: with the *wrong* synthetic-vs-corpus expectation the negative
+control FAILED (`250/37661` vs `1/150644`, a silent 1000x divergence); with the true `assert_ne!`
+invariant both tests passed (EXIT=0, 2/2). Evidence:
+`docs/VERIFICATION/real-corpus-conversion-2026-11-25.md`; `docs/CONVERSION_CONVENTION.md` now
+states that synthetic fixtures are not the real corpus scale. Commit SHA / CI ID recorded after
+publication. No financial, scientific, provenance or security rule changed; class remains
+REAL_STRUCTURALLY_VALID with eligibility none. M7 external gates unchanged.
+
+Post-increment full ladder on the corrected tree: `scripts/check.sh` **EXIT=0**, **757 passed /
+0 failed over 71 binaries** (lib 276), including the new target 2/2; fmt and clippy clean.
+
 ## Latest verified local milestone (2026-11-25)
 
 Cursor 2026-11-25: `main` HEAD `767f777` (Stage-1 CandleScreen CLI regression fix,
