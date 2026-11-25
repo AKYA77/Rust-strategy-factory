@@ -347,7 +347,7 @@ fn evaluate_prepared<'data>(
     let id = registry.register(&key)?;
     // Explicit durable lineage: record the stage this candidate entered and emit
     // a bounded telemetry event binding the identity to the entry decision.
-    crate::stage_machine::record_entry(registry, &key, false, "research-entry")?;
+    crate::stage_machine::record_entry(registry, &key)?;
     crate::telemetry::record(
         registry,
         &id,

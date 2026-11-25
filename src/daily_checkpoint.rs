@@ -18,7 +18,8 @@
 //! sufficient history) and finalize each admitted checkpoint as an entry, a
 //! no-entry evaluation, or a failure.
 
-use crate::{Result, data::hash};
+use crate::Result;
+use rusqlite::OptionalExtension;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -156,7 +157,7 @@ impl DailyCheckpointStore {
                 "SELECT entry_taken, failed FROM daily_checkpoints
                  WHERE candidate_id=?1 AND session_day=?2",
                 rusqlite::params![candidate_id, session_day],
-                |r| Ok((r.get::<_, i32>(0) != 0, r.get::<_, i32>(1) != 0)),
+                |r| Ok((r.get::<_, i32>(0)? != 0, r.get::<_, i32>(1)? != 0)),
             )
             .optional()
             .map_err(|e| format!("daily-checkpoint read failed: {e}"))?;
@@ -342,7 +343,7 @@ impl DailyCheckpointStore {
                             "already_checkpointed" => SkipReason::AlreadyCheckpointed,
                             "prior_failed_checkpoint" => SkipReason::PriorFailedCheckpoint,
                             "entry_limit_reached" => SkipReason::EntryLimitReached,
-                            _ => return Err(rusqlite::Error::InvalidParameter),
+                            _ => return Err(rusqlite::Error::InvalidQuery),
                         }),
                         None => None,
                     };
@@ -391,7 +392,7 @@ impl DailyCheckpointStore {
                         "already_checkpointed" => SkipReason::AlreadyCheckpointed,
                         "prior_failed_checkpoint" => SkipReason::PriorFailedCheckpoint,
                         "entry_limit_reached" => SkipReason::EntryLimitReached,
-                        _ => return Err(rusqlite::Error::InvalidParameter),
+                        _ => return Err(rusqlite::Error::InvalidQuery),
                     }),
                     None => None,
                 };
@@ -672,10 +673,10 @@ mod tests {
     #[test]
     fn checkpoint_survives_process_restart_and_chunk_boundary() {
         let path = temp_path();
+        let day = DailyCheckpointStore::session_day(now_ms(0)).unwrap();
         {
             let mut store = DailyCheckpointStore::open(&path).unwrap();
             let candidate = "strategy-v1::restart-case";
-            let day = DailyCheckpointStore::session_day(now_ms(0)).unwrap();
             let decision = store
                 .decision(candidate, day, now_ms(0), true, true, true, true)
                 .unwrap();
@@ -785,7 +786,7 @@ mod tests {
     fn candidate_ids_bind_to_daily_checkpoint_identity() {
         // The daily checkpoint is keyed by candidate identity, so a hash derived
         // from the candidate binds the checkpoint to its strategy identity.
-        let id = hash(&("daily-checkpoint-v1", "eurusd", "opening-range-breakout")).unwrap();
+        let id = crate::data::hash(&("daily-checkpoint-v1", "eurusd", "opening-range-breakout")).unwrap();
         assert!(!id.is_empty());
         let _ = id;
     }
