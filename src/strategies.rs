@@ -916,29 +916,49 @@ impl<'a> Features<'a> {
 }
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Family {
-    MeanReversion,
-    Momentum,
-    Breakout,
-    TrendFollowing,
-    Reversal,
-    RangeTrading,
-    Volatility,
-    Session,
-    Confluence,
-    Orb,
+    /// Opening Range Breakout: session opening range (first window after open) is
+    /// frozen causally, then a long entry fires on a break above the range high.
+    OpeningRangeBreakout,
+    /// Previous-Day High/Low Breakout: long entry on a break above the previous
+    /// session-day's high.
+    PreviousDayHighLowBreakout,
+    /// Previous-Day Liquidity Sweep: price sweeps below the previous day's low
+    /// (taking out resting liquidity) then reverses, confirmed by RSI crossing
+    /// back above an oversold threshold.
+    PreviousDayLiquiditySweep,
+    /// Daily Pivot Reversal: long entry at the previous day's support/pivot (lower
+    /// channel edge), expecting a mean-reversion bounce.
+    DailyPivotReversal,
+    /// EMA Pullback Continuation: price above the slow EMA (uptrend context) and
+    /// crossing back above the fast EMA after a pullback.
+    EmaPullbackContinuation,
+    /// RSI Momentum: RSI above a bullish threshold, trend-following momentum.
+    RsiMomentum,
+    /// Bollinger Band Reversion: price at the lower Bollinger band edge, expecting
+    /// a mean-reversion bounce.
+    BollingerBandReversion,
+    /// ATR Expansion: true range expands beyond a multiple of its recent average
+    /// (volatility expansion).
+    AtrExpansion,
+    /// Cross-Pair Divergence: price makes a new low while momentum (RSI) crosses
+    /// back up - a bullish divergence approximation using single-pair primitives.
+    CrossPairDivergence,
+    /// First-Hour Momentum: price inside the first session hour and rising through
+    /// it.
+    FirstHourMomentum,
 }
 impl Family {
     pub const ALL: [Self; 10] = [
-        Self::MeanReversion,
-        Self::Momentum,
-        Self::Breakout,
-        Self::TrendFollowing,
-        Self::Reversal,
-        Self::RangeTrading,
-        Self::Volatility,
-        Self::Session,
-        Self::Confluence,
-        Self::Orb,
+        Self::OpeningRangeBreakout,
+        Self::PreviousDayHighLowBreakout,
+        Self::PreviousDayLiquiditySweep,
+        Self::DailyPivotReversal,
+        Self::EmaPullbackContinuation,
+        Self::RsiMomentum,
+        Self::BollingerBandReversion,
+        Self::AtrExpansion,
+        Self::CrossPairDivergence,
+        Self::FirstHourMomentum,
     ];
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]

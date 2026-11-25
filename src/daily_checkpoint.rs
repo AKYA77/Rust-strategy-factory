@@ -537,7 +537,7 @@ mod tests {
                 )
                 .unwrap();
             assert!(
-                matches!(decision, CheckpointDecision::Skip { ref r, .. } if *r == reason),
+                matches!(decision, CheckpointDecision::Skip { reason: ref r, .. } if *r == reason),
                 "{decision:?} expected {reason:?}"
             );
             // The skip is durable: reopening the store still sees it.
