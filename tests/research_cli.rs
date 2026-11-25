@@ -130,16 +130,38 @@ fn independent_rust_process_runs_pauses_resumes_and_stops_at_durable_checkpoints
     let registry =
         rusqlite::Connection::open_with_flags(&db, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
             .unwrap();
-    let result: String = registry
+    // V2 stage contract: every training candidate enters at CandleScreen. A
+    // Stage-1 screen has no authoritative tick replay, so its result is a
+    // terminal `rejected` outcome, not `completed`. Assert the shadow-policy
+    // configuration is still published on that terminal result, and that a
+    // candidate without a passing Stage-1 audit never advances to
+    // TickVerification.
+    let (state, result): (String, String) = registry
         .query_row(
-            "SELECT result_json FROM experiments WHERE state='completed' ORDER BY rowid LIMIT 1",
+            "SELECT state,result_json FROM experiments \
+             WHERE state IN ('completed','rejected') ORDER BY rowid LIMIT 1",
             [],
-            |r| r.get(0),
+            |r| Ok((r.get(0)?, r.get(1)?)),
         )
         .unwrap();
     let result: serde_json::Value = serde_json::from_str(&result).unwrap();
+    assert_eq!(
+        state, "rejected",
+        "no-signal Stage-1 screen is not a completed replay"
+    );
+    assert!(
+        result["tick_replay"].is_null(),
+        "CandleScreen result must not carry a tick replay"
+    );
     assert_eq!(result["shadow_policy"]["threshold_bps"], 7000);
     assert_eq!(result["shadow_policy"]["seed"], 19);
+    let transitions: i64 = registry
+        .query_row("SELECT COUNT(*) FROM stage_transitions", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(
+        transitions, 0,
+        "a Stage-1 candidate with no passing audit must not advance"
+    );
     drop(registry);
     fs::remove_dir_all(dir).unwrap();
 }

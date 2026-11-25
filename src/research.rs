@@ -1343,12 +1343,13 @@ impl Driver {
         let input_index = s.cursor as usize % self.inputs.len();
         let candidate_index = s.cursor / self.inputs.len() as u64;
         let (_, strategy) = candidate_at(candidate_index, self.config.seed)?;
-        // V2 mandate P0.2: the former `candidate_index % 3` rotation labelled
-        // training-window experiments as IndependentValidation. A training window
-        // is not independent evidence, so a candidate index may never select a
-        // protected stage. Every training candidate enters explicitly at
-        // TickVerification; promotion to CandleScreen and any protected
-        // validation are separately authorized stage transitions.
+        // V2 mandate P0.2 and stage control: the former `candidate_index % 3`
+        // rotation labelled training-window experiments as IndependentValidation.
+        // A candidate index may never select a protected stage. Every training
+        // candidate enters explicitly at CandleScreen; promotion to
+        // TickVerification is recorded by the stage machine only after a
+        // passing Stage-1 audit, and protected validation remains a separately
+        // authorized transition.
         let stage = training_stage(candidate_index);
         let stage_for_eval = stage.clone();
         let _stage_for_improvement = stage.clone();
