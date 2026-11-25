@@ -3,6 +3,7 @@ use crate::{
     Result, candles,
     contracts::Conversion,
     data::{self, Dataset},
+    prep_cache::{self as prep_cache, PrepCache, Protection, Scope},
     storage::{Claim, ExperimentKey, Outcome, Registry, Stage},
     strategies::{self, Features, Rule, Strategy},
     tick_engine::{self, Costs},
@@ -346,7 +347,7 @@ fn evaluate_prepared<'data>(
     let id = registry.register(&key)?;
     // Explicit durable lineage: record the stage this candidate entered and emit
     // a bounded telemetry event binding the identity to the entry decision.
-    crate::stage_machine::record_entry(registry, &key)?;
+    crate::stage_machine::record_entry(registry, &key, false, "research-entry")?;
     crate::telemetry::record(
         registry,
         &id,
@@ -932,22 +933,26 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
     if region % 7 == 6 {
         let long = s.side == crate::contracts::Side::Long;
         let extra = match candidate.family {
-            strategies::Family::Momentum
-            | strategies::Family::TrendFollowing
-            | strategies::Family::Confluence => Some(Rule::MacdCross {
+            strategies::Family::RsiMomentum
+            | strategies::Family::EmaPullbackContinuation
+            | strategies::Family::FirstHourMomentum => Some(Rule::MacdCross {
                 fast: 12,
                 slow: 26,
                 signal_window: 9,
                 above: long,
             }),
-            strategies::Family::MeanReversion | strategies::Family::RangeTrading => {
+            strategies::Family::BollingerBandReversion
+            | strategies::Family::DailyPivotReversal
+            | strategies::Family::PreviousDayLiquiditySweep => {
                 Some(Rule::BollingerCross {
                     window: 20,
                     multiple_bps: 20000,
                     upper: !long,
                 })
             }
-            strategies::Family::Breakout => Some(Rule::BollingerCross {
+            strategies::Family::OpeningRangeBreakout
+            | strategies::Family::PreviousDayHighLowBreakout
+            | strategies::Family::CrossPairDivergence => Some(Rule::BollingerCross {
                 window: 20,
                 multiple_bps: 20000,
                 upper: long,
@@ -964,10 +969,11 @@ pub fn candidate_at(index: u64, seed: u64) -> Result<(strategies::Family, Strate
             multiple_bps: 20000,
         });
     }
-    // Stop distance ramp: non-ORB families use per-300-region steps; ORB uses
-    // per-region steps so each region gets a distinct stop distance within its
-    // session_hour group (regions 0-299 all share session_hour=0, etc.).
-    if candidate.family == strategies::Family::Orb {
+    // Stop distance ramp: non-OpeningRangeBreakout families use per-300-region
+    // steps; OpeningRangeBreakout uses per-region steps so each region gets a
+    // distinct stop distance within its session_hour group (regions 0-299 all
+    // share session_hour=0, etc.).
+    if candidate.family == strategies::Family::OpeningRangeBreakout {
         s.stop_ticks += region as i64;
         if let Some(session_hour) = s.rule.orb_session_mut() {
             *session_hour = match region % 3 {
@@ -1111,6 +1117,13 @@ pub struct Driver {
     config: Config,
     revision: String,
     token: Option<String>,
+    /// Durable shared preparation cache: M1-D1 candle preparation (and the
+    /// feature build that consumes it) is content-addressed here so an
+    /// identical preparation scope reuses cached bytes across checkpoints and
+    /// runs instead of being rebuilt. Kept separate from the experiment
+    /// registry: a cache hit proves identical preparation bytes for an
+    /// identical scope, never a reused experiment result.
+    prep_cache: PrepCache,
 }
 impl Driver {
     pub fn open(path: &Path, inputs: Vec<Input>, config: Config, revision: String) -> Result<Self> {
@@ -1201,6 +1214,15 @@ impl Driver {
                 )
                 .map_err(|e| e.to_string())?;
         }
+        // Durable shared preparation cache lives next to the registry. One handle
+        // per Driver; standard (unprotected/training) scopes only here — protected
+        // OOS preparation uses its own isolated handle and is never served from
+        // this cache, and vice versa (protection is part of the scope identity).
+        let cache_root = path
+            .parent()
+            .ok_or("registry parent directory missing")?
+            .join("prep-cache");
+        let prep_cache = PrepCache::open(&cache_root)?;
         let old: String = registry
             .connection
             .query_row(
@@ -1219,6 +1241,7 @@ impl Driver {
             config,
             revision,
             token: None,
+            prep_cache,
         })
     }
     pub fn acquire(&mut self, now: i64) -> Result<()> {
@@ -1327,11 +1350,72 @@ impl Driver {
                 })
                 .transpose()?,
         };
-        let execution = evaluate_configured(
+        // Integrated shared preparation cache: the M1-D1 candle preparation is
+        // content-addressed and reused for an identical preparation scope, so a
+        // checkpoint (or a later run) that re-prepares the same instrument /
+        // dataset / timeframe / window reads cached bytes instead of rebuilding.
+        // The scope identity is preparation-level (feature-level), distinct from
+        // the complete experiment identity used by the registry; a cache hit
+        // proves identical preparation bytes, never a reused experiment result.
+        let input = &self.inputs[input_index];
+        let d = &input.dataset;
+        d.verify()?;
+        let costs = Costs::default();
+        let config_hash = configuration_hash(
+            input,
+            &costs,
+            self.config.feature_cells,
+            self.config.shadow_policy.as_ref(),
+            self.config.proof_policy.as_ref(),
+            self.config.indexed_policy.as_ref(),
+        )?;
+        let strategy_hash = strategy.identity()?;
+        let costs_hash = data::hash(&costs)?;
+        let (window_start, window_end) = match &evaluation {
+            Some(e) => (e.window.start_ms, e.window.end_exclusive_ms),
+            None => (
+                d.manifest.first_ms,
+                d.manifest.last_ms.checked_add(1).ok_or("range overflow")?,
+            ),
+        };
+        let candle_scope = Scope {
+            instrument: d.profile.symbol.clone(),
+            dataset_hash: d.manifest.content_hash.clone(),
+            strategy_hash: strategy_hash.clone(),
+            costs_hash: costs_hash.clone(),
+            engine_version: crate::ENGINE_VERSION.into(),
+            config_hash: config_hash.clone(),
+            start_ms: window_start,
+            end_exclusive_ms: window_end,
+            stage: prep_cache::Stage::Candle,
+            protection: Protection::Standard,
+        };
+        let (candles_artifact, _candle_status) = self
+            .prep_cache
+            .get_or_fill(&candle_scope, || {
+                let c = candles::build(d, strategy.timeframe)?;
+                let value =
+                    serde_json::to_value(&c).map_err(|e| e.to_string())?;
+                Ok(prep_cache::encode(&value)?)
+            })?;
+        let value: serde_json::Value =
+            prep_cache::decode(&candles_artifact.data, &candles_artifact.receipt.content_hash)?;
+        let c: Vec<candles::Candle> =
+            serde_json::from_value(value).map_err(|e| e.to_string())?;
+        let visible = evaluation.as_ref().map_or(c.len(), |e| {
+            c.partition_point(|c| c.available_ms < e.window.end_exclusive_ms)
+        });
+        let mut features = Features::with_context(
+            &c[..visible],
+            self.config.feature_cells,
+            d,
+            strategy.timeframe,
+        )?;
+        let execution = evaluate_prepared(
             &mut self.registry,
-            &self.inputs[input_index],
+            input,
             &strategy,
-            &Costs::default(),
+            &costs,
             &self.revision,
             EvaluationOptions {
                 feature_cells: self.config.feature_cells,
@@ -1341,6 +1425,13 @@ impl Driver {
                 proof_policy: self.config.proof_policy.as_ref(),
                 indexed_policy: self.config.indexed_policy.as_ref(),
             },
+            Some(Prepared {
+                candles: &c,
+                features: &mut features,
+                visible,
+                configuration_hash: &config_hash,
+                index: None,
+            }),
         );
         let (id, outcome, reused, error) = match execution {
             Ok(e) => (

@@ -1,0 +1,76 @@
+{
+  "note": "Archived V1 family checkpoints (historical evidence). Replaced by the ten V2-mandated fixed-daily-checkpoint families in src/strategies.rs; do not delete.",
+  "superseded_by": "src/strategies.rs::family_checkpoints (V2)",
+  "families": [
+    {
+      "family": "MeanReversion",
+      "rules": "All[BelowMean{20}, RsiThreshold{20,3500,false}]",
+      "stop_ticks": 150,
+      "timeframe": "M1",
+      "side": "Long"
+    },
+    {
+      "family": "Momentum",
+      "rules": "All[Rising{20}, RsiThreshold{20,5500,true}]",
+      "stop_ticks": 150,
+      "timeframe": "M1",
+      "side": "Long"
+    },
+    {
+      "family": "Breakout",
+      "rules": "Donchian{20,true}",
+      "stop_ticks": 150,
+      "timeframe": "M1",
+      "side": "Long"
+    },
+    {
+      "family": "TrendFollowing",
+      "rules": "All[MeanTrend{20,60,true}, AboveMean{20}]",
+      "stop_ticks": 150,
+      "timeframe": "M1",
+      "side": "Long"
+    },
+    {
+      "family": "Reversal",
+      "rules": "RsiCross{20,3000,true}",
+      "stop_ticks": 150,
+      "timeframe": "M1",
+      "side": "Long"
+    },
+    {
+      "family": "RangeTrading",
+      "rules": "ChannelEdge{20,2000,false}",
+      "stop_ticks": 150,
+      "timeframe": "M1",
+      "side": "Long"
+    },
+    {
+      "family": "Volatility",
+      "rules": "All[RangeExpansion{20,15000}, Rising{1}]",
+      "stop_ticks": 150,
+      "timeframe": "M1",
+      "side": "Long"
+    },
+    {
+      "family": "Session",
+      "rules": "All[UtcSession{7,17,31}, CrossMean{20,true}]",
+      "stop_ticks": 150,
+      "timeframe": "M1",
+      "side": "Long"
+    },
+    {
+      "family": "Confluence",
+      "rules": "All[MeanTrend{20,40,true}, Donchian{20,true}, RsiThreshold{20,5000,true}]",
+      "stop_ticks": 150,
+      "timeframe": "M1",
+      "side": "Long"
+    },
+    {
+      "family": "Orb",
+      "rules": "OrbLongBreakout{30,7}",
+      "stop_ticks": 150,
+      "timeframe": "M1",
+      "side": "Long"
+    }
+  ]
+}

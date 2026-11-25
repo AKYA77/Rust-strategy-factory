@@ -55,7 +55,7 @@ fn every_family_has_valid_unique_templates_and_actual_nonzero_signal_cohorts() {
         );
     }
     for family in Family::ALL {
-        if family == Family::Orb {
+        if family == Family::OpeningRangeBreakout {
             // ORB requires a completed session range; the generic oscillating
             // fixture has no causal opening range. Covered by the ORB-specific
             // test below (no silent skip).
@@ -228,7 +228,7 @@ fn every_family_reaches_nonzero_closed_tick_trades_on_actual_synthetic_events() 
         // ORB needs a completed session range; the generic oscillating fixture has
         // no causal opening range. Use an explicit positive fixture for both the
         // signal and the tick replay (no silent skip).
-        if family == Family::Orb {
+        if family == Family::OpeningRangeBreakout {
             let base_ms = 1736146200000i64; // 2025-01-06T06:50:00Z
             let ticks: Vec<Tick> = (0..70)
                 .map(|i| {
@@ -269,7 +269,7 @@ fn every_family_reaches_nonzero_closed_tick_trades_on_actual_synthetic_events() 
             let strategy = candidates
                 .iter()
                 .find(|candidate| {
-                    candidate.family == Family::Orb
+                    candidate.family == Family::OpeningRangeBreakout
                         && candidate.strategy.timeframe == Timeframe::M1
                         && candidate.strategy.side == rust_strategy_factory::contracts::Side::Long
                         && candidate.strategy.stop_ticks == 150

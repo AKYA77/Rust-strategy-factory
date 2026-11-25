@@ -958,25 +958,33 @@ pub fn family_checkpoints() -> Vec<Candidate> {
         .copied()
         .map(|family| {
             let (rule, stop_ticks, timeframe, side) = match family {
-                Family::MeanReversion => (
+                Family::OpeningRangeBreakout => (
+                    Rule::OrbLongBreakout {
+                        window_minutes: 30,
+                        session_hour: 7,
+                    },
+                    150,
+                    Timeframe::M1,
+                    Side::Long,
+                ),
+                Family::PreviousDayHighLowBreakout => (
+                    Rule::Donchian {
+                        window: 1440,
+                        above: true,
+                    },
+                    150,
+                    Timeframe::M1,
+                    Side::Long,
+                ),
+                Family::PreviousDayLiquiditySweep => (
                     Rule::All(vec![
-                        Rule::BelowMean { window: 20 },
-                        Rule::RsiThreshold {
-                            window: 20,
-                            basis_points: 3500,
+                        Rule::Donchian {
+                            window: 1440,
                             above: false,
                         },
-                    ]),
-                    150,
-                    Timeframe::M1,
-                    Side::Long,
-                ),
-                Family::Momentum => (
-                    Rule::All(vec![
-                        Rule::Rising { lookback: 20 },
-                        Rule::RsiThreshold {
+                        Rule::RsiCross {
                             window: 20,
-                            basis_points: 5500,
+                            basis_points: 3000,
                             above: true,
                         },
                     ]),
@@ -984,39 +992,41 @@ pub fn family_checkpoints() -> Vec<Candidate> {
                     Timeframe::M1,
                     Side::Long,
                 ),
-                Family::Breakout => (
-                    Rule::Donchian {
-                        window: 20,
-                        above: true,
-                    },
-                    150,
-                    Timeframe::M1,
-                    Side::Long,
-                ),
-                Family::TrendFollowing => (
+                Family::DailyPivotReversal => (
                     Rule::All(vec![
-                        Rule::MeanTrend {
-                            fast: 20,
-                            slow: 60,
+                        Rule::AboveMean { window: 50 },
+                        Rule::CrossMean {
+                            window: 20,
                             above: true,
                         },
-                        Rule::AboveMean { window: 20 },
                     ]),
                     150,
                     Timeframe::M1,
                     Side::Long,
                 ),
-                Family::Reversal => (
-                    Rule::RsiCross {
+                Family::EmaPullbackContinuation => (
+                    Rule::All(vec![
+                        Rule::AboveMean { window: 50 },
+                        Rule::CrossMean {
+                            window: 20,
+                            above: true,
+                        },
+                    ]),
+                    150,
+                    Timeframe::M1,
+                    Side::Long,
+                ),
+                Family::RsiMomentum => (
+                    Rule::RsiThreshold {
                         window: 20,
-                        basis_points: 3000,
+                        basis_points: 5500,
                         above: true,
                     },
                     150,
                     Timeframe::M1,
                     Side::Long,
                 ),
-                Family::RangeTrading => (
+                Family::BollingerBandReversion => (
                     Rule::ChannelEdge {
                         window: 20,
                         basis_points: 2000,
@@ -1026,7 +1036,7 @@ pub fn family_checkpoints() -> Vec<Candidate> {
                     Timeframe::M1,
                     Side::Long,
                 ),
-                Family::Volatility => (
+                Family::AtrExpansion => (
                     Rule::All(vec![
                         Rule::RangeExpansion {
                             window: 20,
@@ -1038,48 +1048,28 @@ pub fn family_checkpoints() -> Vec<Candidate> {
                     Timeframe::M1,
                     Side::Long,
                 ),
-                Family::Session => (
+                Family::CrossPairDivergence => (
+                    Rule::All(vec![
+                        Rule::RsiCross {
+                            window: 20,
+                            basis_points: 3000,
+                            above: true,
+                        },
+                        Rule::Rising { lookback: 20 },
+                    ]),
+                    150,
+                    Timeframe::M1,
+                    Side::Long,
+                ),
+                Family::FirstHourMomentum => (
                     Rule::All(vec![
                         Rule::UtcSession {
                             start_hour: 7,
-                            end_hour: 17,
+                            end_hour: 8,
                             weekdays: 31,
                         },
-                        Rule::CrossMean {
-                            window: 20,
-                            above: true,
-                        },
+                        Rule::Rising { lookback: 20 },
                     ]),
-                    150,
-                    Timeframe::M1,
-                    Side::Long,
-                ),
-                Family::Confluence => (
-                    Rule::All(vec![
-                        Rule::MeanTrend {
-                            fast: 20,
-                            slow: 40,
-                            above: true,
-                        },
-                        Rule::Donchian {
-                            window: 20,
-                            above: true,
-                        },
-                        Rule::RsiThreshold {
-                            window: 20,
-                            basis_points: 5000,
-                            above: true,
-                        },
-                    ]),
-                    150,
-                    Timeframe::M1,
-                    Side::Long,
-                ),
-                Family::Orb => (
-                    Rule::OrbLongBreakout {
-                        window_minutes: 30,
-                        session_hour: 7,
-                    },
                     150,
                     Timeframe::M1,
                     Side::Long,
@@ -1100,26 +1090,6 @@ pub fn family_checkpoints() -> Vec<Candidate> {
         .collect()
 }
 
-/// Build an ORB rule for the given window and side.
-///
-/// ORB (Opening Range Breakout): detects the session open, measures the high/low
-/// of the first `window_minutes` after open, then fires when price breaks beyond
-/// the range on the strategy's side. Session is determined by `session_hour`:
-///   0 = Asian (00:00 UTC), 8 = London (08:00 UTC), 13 = New York (13:00 UTC).
-#[allow(dead_code)]
-fn orb_rule(window: usize, long: bool) -> Rule {
-    if long {
-        Rule::OrbLongBreakout {
-            window_minutes: window,
-            session_hour: 0, // Asian; region ramp will rotate sessions
-        }
-    } else {
-        Rule::OrbShortBreakout {
-            window_minutes: window,
-            session_hour: 0,
-        }
-    }
-}
 pub fn generate() -> Vec<Strategy> {
     family_checkpoints()
         .into_iter()
