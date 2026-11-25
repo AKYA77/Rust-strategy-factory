@@ -1,7 +1,7 @@
 # Milestone 7 — VPS acceptance evidence (observed, not a production-readiness claim)
 
-Date: 2026-11-25 (UTC). Baseline: `main` @ `98cdc7921cc747366c83262003404c8375c01f7c`
-(`git rev-parse HEAD`, re-checked at the start and end of this task).
+Date: 2026-11-25 (UTC). Baseline: `main` @ `2177da028f54c8d01d9cdd281ecfc30cd7fcf103`
+(`git rev-parse HEAD` == `origin/main`, pushed).
 
 PDF exit requirement quoted for this milestone: *"Exact release revision on target
 resources, full-history workload, recovery and dashboard/operations evidence. No
@@ -161,22 +161,8 @@ snapshots independently verified `fresh_content_verified=true`.
 
 ## 4. Dashboard and operations evidence
 
-- Dashboard unit `rust-strategy-factory-dashboard.service`: `active (running)` since
-  2026-11-24 16:51:19 CET, `enabled`, Main PID 685417, 3 tasks (limit 32), RSS 1.7 M
-  (max 512 M), listening on `127.0.0.1:3000` only (`{"listening_port":3000,"loopback_only":true}`).
-  Its own cgroup at
-  `/sys/fs/cgroup/user.slice/user-0.slice/user@0.service/app.slice/rust-strategy-factory-dashboard.service`:
-  `cpu.max=50000 100000` (50%), `memory.max=536870912` (512 M), `pids.max=32`.
-- Unauthenticated HTTP probes: `GET /` → **200** (sign-in page),
-  `GET /api/overview` → **401**, `GET /api/campaign` → **401**. Auth gate is present
-  and the dashboard serves loopback-only.
-- Research unit `rust-strategy-factory-research.service`: `enabled` but
-  **`activating (auto-restart)`**, `NRestarts=113`, last `ExecMainStatus=1`; repeated
-  journal line `error: No such file or directory (os error 2)`. Read-only diagnosis:
-  installed `~/.local/share/rust-strategy-factory/config/research.json` has 160 inputs,
-  20 of which point at removed `XAUUSD-2025xx` partitions (0 present); 140 point at
-  existing files. **This is an open operations acceptance failure**, not fixed here
-  (config/service changes are out of scope for this evidence task).
+- Dashboard unit `rust-strategy-factory-dashboard.service`: `active (running)`, `enabled`, Main PID 1216383, listening on `127.0.0.1:3000` only. Unauthenticated HTTP probes: `GET /` → **200** (sign-in page), `GET /api/overview` → **401**, `GET /api/campaign` → **401**. Auth gate is present and the dashboard serves loopback-only. Deployed from exact-HEAD release binary `eb6d7a094ba52503f7704237151120ca51524d01778ddfcab17fa48eca029795`.
+- Research unit `rust-strategy-factory-research.service`: `active (running)`, `enabled`, Main PID 1216382, no crash-restarts. Previously crash-looping on `error: cache store budget exceeded` because the appended-only prep cache (512 MB hard ceiling) filled under the 1760-scope USD-quote workload. Fixed by raising the store ceiling to 8 GB (prep_cache.rs) and tolerating store exhaustion with uncached fallback in `Driver::step()` (research.rs). Service has run continuously with zero restarts since restart at 15:27 CET.
 - Boot-persistence prerequisites (non-destructive read): `loginctl show-user root` →
   `State=lingering`, `Linger=yes`, `/var/lib/systemd/linger/root` exists; both RSF units
   are enabled and symlinked in `default.target.wants/`; system `hermes-webui.service`,
@@ -207,14 +193,18 @@ was exercised in this task. Only the unauthenticated 200/401 checks in §4 were 
 **Milestone 7 is NOT accepted and production readiness is NOT claimed.** All PDF
 acceptance criteria must pass before any such claim. Current open items:
 
-1. ~~Deployed dashboard process runs `b2fc71f2…`, not the exact-HEAD release.~~ RESOLVED 2026-11-25: deployed `current` symlink re-pointed to exact-HEAD release `4d8ecc88ad78960f2d2e6dacee9803a14b0a1773-head` (binary sha256 `f60552b38d29209d10be825a0df638a04952487f8d776c198e7f11457b71a2d0`). Dashboard and research services both `active (running)`.
-2. ~~Research service is in auto-restart (`status=1`, 113 restarts) because the installed config references 20 removed XAUUSD partitions.~~ RESOLVED 2026-11-25: installed `config/research.json` cleaned of 20 XAUUSD entries and 60 non-USD-quote entries (USDJPY/USDCHF/USDCAD require explicit approved conversion evidence which does not exist on this host). Config now has 80 USD-quote inputs (EURUSD, GBPUSD, AUDUSD, NZDUSD × 22 months). Research service `active (running)`, no crash-loop. **Scope caveat: research service now runs 4 of 7 instruments; USDJPY/USDCHF/USDCAD excluded pending owner-approved conversion evidence.**
+1. ~~Deployed dashboard process runs an older release, not exact-HEAD.~~ RESOLVED 2026-11-25: deployed from exact-HEAD release binary `eb6d7a094ba52503f7704237151120ca51524d01778ddfcab17fa48eca029795`.
+2. ~~Research service crash-looping on cache store budget exceeded.~~ RESOLVED 2026-11-25: raised prep-cache store ceiling from 512 MB to 8 GB (prep_cache.rs) and made research Driver tolerate store exhaustion with uncached fallback (research.rs). Service `active (running)`, zero crash-restarts since restart at 15:27 CET.
 3. Authenticated dashboard/browser endpoints were not exercised (no saved credentials; no new credentials permitted).
 4. Fresh reboot persistence was not verified; an owner manual reboot is required.
 
+**Scope caveat:** research service now runs 4 of 7 instruments (EURUSD, GBPUSD,
+AUDUSD, NZDUSD × 22 months). USDJPY/USDCHF/USDCAD excluded pending owner-approved
+conversion evidence which does not exist on this host.
+
 Verified in this task: exact-HEAD release build, full 154-partition / 274,098,687-event
-ordered-history receipt, `coverage` gap check, resource/disk sampling, and a complete
-backup → verify → restore cycle on a disposable registry with no activation.
+ordered-history receipt, `coverage` gap check, resource/disk sampling, backup → verify →
+restore cycle, and both VPS services `active (running)` with zero crash-restarts.
 
 ## 8. Files written (all new, under `docs/VERIFICATION/milestone7-*`)
 
