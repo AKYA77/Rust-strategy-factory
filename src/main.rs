@@ -2714,7 +2714,7 @@ fn run(args: &[String]) -> Result<()> {
                 .map(|window| -> Result<research::Evaluation> {
                     Ok(research::Evaluation {
                         window: window.clone(),
-                        stage: rust_strategy_factory::storage::Stage::TickVerification,
+                        stage: rust_strategy_factory::storage::Stage::CandleScreen,
                         protocol_hash: data::hash(&("training-window-v1", window))?,
                     })
                 })
@@ -2722,7 +2722,7 @@ fn run(args: &[String]) -> Result<()> {
             let evaluation_ref = evaluation.as_ref();
             let stage = evaluation_ref
                 .map(|e| e.stage.clone())
-                .unwrap_or(rust_strategy_factory::storage::Stage::TickVerification);
+                .unwrap_or(rust_strategy_factory::storage::Stage::CandleScreen);
             let report = research::evaluate_batch_report(
                 &mut Registry::open(Path::new(database))?,
                 &input,

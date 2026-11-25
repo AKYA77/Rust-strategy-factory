@@ -1876,11 +1876,7 @@ pub fn execute_registered_full_period(
                 .checked_sub(running_equity)
                 .ok_or("registered drawdown overflow")?,
         );
-        if outcomes.ending_streak == 0 {
-            continuous_streak = 0;
-        } else {
-            continuous_streak = continuous_streak.saturating_add(outcomes.ending_streak);
-        }
+        continuous_streak = chain_losing_streak(continuous_streak, &outcomes);
         max_continuous_streak = max_continuous_streak.max(continuous_streak);
         cumulative_wins = cumulative_wins
             .checked_add(outcomes.wins)

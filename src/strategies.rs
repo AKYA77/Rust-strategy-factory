@@ -1053,9 +1053,9 @@ pub fn family_checkpoints() -> Vec<Candidate> {
                     Side::Long,
                 ),
                 Family::BollingerBandReversion => (
-                    Rule::ChannelEdge {
+                    Rule::BollingerCross {
                         window: 20,
-                        basis_points: 2000,
+                        multiple_bps: 200,
                         upper: false,
                     },
                     150,

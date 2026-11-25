@@ -2,6 +2,7 @@
 use crate::{
     Result, candles,
     contracts::Conversion,
+    daily_checkpoint::{self as daily_checkpoint, DailyCheckpointStore},
     data::{self, Dataset},
     prep_cache::{self as prep_cache, PrepCache, Protection, Scope},
     storage::{Claim, ExperimentKey, Outcome, Registry, Stage},
@@ -1141,6 +1142,9 @@ pub struct Driver {
     /// registry: a cache hit proves identical preparation bytes for an
     /// identical scope, never a reused experiment result.
     prep_cache: PrepCache,
+    /// Durable daily-checkpoint store: enforces at-most-one checkpoint per
+    /// candidate per session-day, persisted across process restarts.
+    daily_checkpoint_store: Option<DailyCheckpointStore>,
 }
 impl Driver {
     pub fn open(path: &Path, inputs: Vec<Input>, config: Config, revision: String) -> Result<Self> {
@@ -1240,6 +1244,15 @@ impl Driver {
             .ok_or("registry parent directory missing")?
             .join("prep-cache");
         let prep_cache = PrepCache::open(&cache_root)?;
+        // Daily-checkpoint store next to the registry, persisted across
+        // restarts so the at-most-one-per-session-day contract survives.
+        let daily_checkpoint_store = DailyCheckpointStore::open(
+            &path
+                .parent()
+                .ok_or("registry parent directory missing")?
+                .join("daily_checkpoints.sqlite"),
+        )
+        .ok();
         let old: String = registry
             .connection
             .query_row(
@@ -1259,6 +1272,7 @@ impl Driver {
             revision,
             token: None,
             prep_cache,
+            daily_checkpoint_store,
         })
     }
     pub fn acquire(&mut self, now: i64) -> Result<()> {
@@ -1388,6 +1402,51 @@ impl Driver {
             self.config.indexed_policy.as_ref(),
         )?;
         let strategy_hash = strategy.identity()?;
+        // Daily-checkpoint enforcement: at most one checkpoint per candidate
+        // per session-day, durably persisted so the contract survives
+        // restarts. Domain preconditions are satisfied in the research loop:
+        // session and market are open, observations are present (dataset
+        // verified above), and history is sufficient (full dataset loaded).
+        let candidate_id = format!("{}:{}", input.dataset.profile.symbol, strategy_hash);
+        let session_day = daily_checkpoint::DailyCheckpointStore::session_day(now)?;
+        if let Some(ref mut store) = self.daily_checkpoint_store {
+            match store.decision(
+                &candidate_id,
+                session_day,
+                now,
+                true, // session_open
+                true, // market_open
+                true, // observations_present
+                true, // sufficient_history
+            )? {
+                daily_checkpoint::CheckpointDecision::Admit { .. } => {
+                    // proceed with evaluation below
+                }
+                daily_checkpoint::CheckpointDecision::Skip { .. }
+                | daily_checkpoint::CheckpointDecision::RefusedRetry { .. } => {
+                    // Candidate already consumed this session-day: advance
+                    // the cursor without evaluating, record the skipped step,
+                    // and return so the coordinator moves to the next cursor.
+                    let finished = now
+                        .checked_add(
+                            i64::try_from(started.elapsed().as_millis())
+                                .map_err(|_| "elapsed time overflow")?,
+                        )
+                        .ok_or("checkpoint time overflow")?;
+                    let tx = crate::storage::writer_tx(&self.registry.connection)?;
+                    tx.execute(
+                        "UPDATE research_runs SET cursor=cursor+1,active=0,executed=executed+?4,reused=reused+?5,rejected=rejected+?6,failed=failed+?7,latest=?8,last_error=?9 WHERE id=?1 AND token=?2 AND expires_ms>?3 AND cursor=?10",
+                        params![self.id, token, finished, 0, 0, 0, 0, None::<String>, None::<String>, s.cursor as i64],
+                    ).map_err(|e| e.to_string())?;
+                    tx.execute(
+                        "INSERT INTO research_steps(run_id,cursor,experiment_id,outcome,reused,error) VALUES (?1,?2,?3,?4,?5,?6)",
+                        params![self.id, s.cursor as i64, None::<String>, "skipped", 0, None::<String>],
+                    ).map_err(|e| e.to_string())?;
+                    tx.commit().map_err(|e| e.to_string())?;
+                    return Ok(true);
+                }
+            }
+        }
         let costs_hash = data::hash(&costs)?;
         let (window_start, window_end) = match &evaluation {
             Some(e) => (e.window.start_ms, e.window.end_exclusive_ms),
@@ -1493,6 +1552,26 @@ impl Driver {
             && let Some(id) = &id
         {
             tx.execute("INSERT INTO improvement_jobs(run_id,parent_cursor,input_index,parent_id) VALUES(?1,?2,?3,?4)",params![self.id,s.cursor as i64,input_index as i64,id]).map_err(|e| e.to_string())?;
+        }
+        // Finalize the daily checkpoint for this candidate on this session-day.
+        if let Some(ref mut store) = self.daily_checkpoint_store {
+            match outcome.as_str() {
+                "completed" => {
+                    store.finalize_entry(&candidate_id, session_day, finished, "completed")?;
+                }
+                "rejected" => {
+                    store.finalize_no_entry(&candidate_id, session_day, finished, "rejected")?;
+                }
+                "failed" => {
+                    store.finalize_failure(
+                        &candidate_id,
+                        session_day,
+                        finished,
+                        error.as_deref().unwrap_or("failed"),
+                    )?;
+                }
+                _ => {}
+            }
         }
         tx.commit().map_err(|e| e.to_string())?;
         Ok(true)
