@@ -8,19 +8,29 @@ continue. Never treat a pending CI run as passed.
 
 ## Latest verified local milestone (2026-11-25)
 
-HEAD `98cdc79` on `main` == `origin/main` (pushed). Milestone chain:
+HEAD `2ced8fe` on `main` == `origin/main` (pushed). Milestone chain:
 `b8571d8` (V2 seven-instrument scope, P0 fixes, verified gold-only data deletion),
 `a5030f8`/`a9601e8` (P0.2–P0.4), `e1b1356` (state), `18d6e9b` (M2 ten families),
-`57c13fc` (M5 contract suite + evidence), `98cdc79` (M3 stage machine + telemetry).
+`57c13fc` (M5 contract suite + evidence), `98cdc79` (M3 stage machine + telemetry),
+`2ced8fe` (M4 prep caches + M6 measured baseline + M7 evidence + browser repair).
 
-- Full `scripts/check.sh` ladder on `RSF_BUILDER_PROFILE=hermes-v2-m1`: **EXIT=0**
-  (`/root/.hermes/cache/scratch/m3-check1.log`), including the M5 contract suite and
-  `tests/stage_machine.rs` (4/4). `cargo clippy --locked --all-targets -- -D warnings`: EXIT=0.
+- Full `scripts/check.sh` ladder on `RSF_BUILDER_PROFILE=hermes-v2-m1` at `2ced8fe`:
+  **EXIT=0**, 733 passed / 0 failed across 69 test binaries (8m40s), including the M5
+  contract suite, `tests/stage_machine.rs` (4/4) and `tests/prep_cache.rs` (10/10).
+  `cargo clippy --locked --all-targets -- -D warnings`: EXIT=0.
+- Hosted CI run **45528848345** on the exact push SHA `2ced8fe`: **all 7 jobs success**
+  (release-build, browser, rust-checks, data-compute-identity, full-horizon,
+  check-operations, dependency-audit). Earlier `98cdc79`/`57c13fc`/`18d6e9b` push runs
+  failed only the browser job (runs 45521997695/45519520343/45504435877); `2ced8fe`
+  repairs `scripts/browser-check.cjs` and `scripts/browser-long-ledger-check.cjs`.
 - Milestone 3: append-only immutable stage lineage with holdout-gated protected
   stage, bounded telemetry replay, exactly-40% inclusive Stage-1 policy with
   proven-bound rejection. CLI `machine advance <registry> <experiment-key.json>`.
-- Hosted CI: see the run for `98cdc79` below once concluded; `a5030f8` was success
-  (run 45486926751). Never treat a pending run as passed.
+- Milestone 7 evidence was re-pinned from the superseded `98cdc79` to the exact HEAD
+  `2ced8fe` (see `docs/VERIFICATION/milestone7b-*`): release build EXIT=0
+  (binary sha256 `2a731ea1…`) and full-history ordered coverage EXIT=0 over 154
+  partitions / 2,819 chunks / 274,098,687 events in 64 s. **Milestone 7 is still NOT
+  accepted** — see the corrected status below.
 - `npm run test:browser`: all 13 scripts pass locally. Earlier browser failures traced to the V2
   removal of XAUUSD moving the protocol fixture onto GBPUSD, which collided with the GBPUSD crash
   fixture's protected fold windows; the synthetic crash fixture now sits in Feb 2026 (outside every
@@ -72,10 +82,16 @@ pipeline; synthetic refusal preserved where required.
 
 ## Implement next (ordered)
 
-1. **Milestone 7 final owner step**: reboot persistence on the target host requires an
-   explicit owner manual reboot (agent blocklist). Everything else is captured below.
+1. **Milestone 7 remaining items are owner-gated**: reboot persistence on the target host
+   requires an explicit owner manual reboot (agent blocklist); deploying the exact-HEAD
+   release and clearing the 20 stale XAUUSD entries from the *installed*
+   `~/.local/share/rust-strategy-factory/config/research.json` are production cutover /
+   service actions requiring owner authorization. The repo itself is clean of gold
+   references; only the installed copy is stale and it is crash-looping the research unit.
+2. Re-run the M7 evidence ladder after any owner-authorized cutover, then update
+   `docs/VERIFICATION/milestone7*` and this file.
 
-## Completed: Milestones 4, 6, 7 (2026-11-25)
+## Completed: Milestones 4 and 6 (2026-11-25)
 
 **M4 shared preparation caches:** `src/prep_cache.rs` + `tests/prep_cache.rs` (10/10) with
 exact scope identity over instrument/dataset/strategy/costs/engine/config/window/stage,
@@ -88,10 +104,20 @@ deduplication, cold/warm parity, protected isolation and partial-write recovery.
 cold/warm isolated build timings, clippy `-D warnings` clean, dependency/license/advisory
 review, and honest hosted-CI status. Evidence: `docs/VERIFICATION/milestone6-*`.
 
-**M7 VPS acceptance evidence:** full-history ordered-coverage run of all 154 partitions
-(2,819 chunks), release build, recovery verify/restore parity and dashboard/operations checks
-at exact revision `98cdc79`. Reboot persistence not re-verified; requires owner manual action.
-Evidence: `docs/VERIFICATION/milestone7-*`.
+**M7 VPS acceptance — NOT accepted.** The first evidence pass ran at `98cdc79`, a revision
+whose hosted CI browser job failed (run 45521997695). `docs/VERIFICATION/milestone7-vps-acceptance.md`
+itself records four open items: deployed dashboard runs an older release; the research unit is
+crash-looping on 20 stale installed XAUUSD config entries; authenticated dashboard endpoints were
+not exercised (no saved credentials); reboot persistence needs an owner manual reboot.
+
+**M7 re-pin to HEAD `2ced8fe` (this run):** exact-HEAD release build EXIT=0 (binary sha256
+`2a731ea1d8c88bded1ecf7b18e649e9644de53d1270f2c6155d039af13c21caf`) and full-history ordered
+coverage EXIT=0 over 154 partitions / 2,819 chunks / 274,098,687 events in 64 s, independently
+re-checked (154 rows = 22 months × 7 instruments, 0 missing chunk files, per-month sequence/event
+consistency). Evidence: `docs/VERIFICATION/milestone7b-build.log`,
+`milestone7b-ordered-coverage-run.log`, `milestone7b-ordered-coverage-full.json`
+(sha256 `0aecece4…`). This supersedes the `98cdc79` coverage receipt only; it does not close the
+four open items above.
 
 **Browser suite repaired for the new grammar:** `scripts/browser-check.cjs` now asserts the
 proof contract (`ProvenNoMarketEntry` + `fixed-market-stop-infeasible-v1`) instead of the

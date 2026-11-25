@@ -234,3 +234,36 @@ Note: the shared checkout also carried uncommitted files owned by other agents
 (`docs/NEXT_ACTION.md`, `scripts/browser-check.cjs`, `scripts/browser-long-ledger-check.cjs`,
 later `src/lib.rs`, `src/prep_cache.rs`, `tests/prep_cache.rs`, and `milestone6-*` artifacts).
 None was created, modified or committed by this task.
+
+## 9. Re-pin of the full-history workload to HEAD `2ced8fe` (later run, 2026-11-25)
+
+§1–§8 were captured at `98cdc79`. That revision's hosted CI browser job **failed**
+(run 45521997695), and `main` has since advanced to `2ced8fe`
+(`2ced8fe52c22e44e1df008ddba6aa98483a20cf2`, == `origin/main`), whose push run
+**45528848345 is green on all seven jobs**. Because §2's coverage receipt was therefore
+pinned to a superseded, non-green revision, the full-history workload was re-run at the
+exact current HEAD. No production/service state was touched; this is read-only research.
+
+| Item | Observed value |
+|---|---|
+| Git revision | `2ced8fe52c22e44e1df008ddba6aa98483a20cf2` |
+| Build command | `scripts/cargo-locked.sh build --locked --release` (`RSF_BUILDER_PROFILE=hermes-v2-m1`) |
+| Build result | EXIT=0, `Finished release profile ... in 2m 33s` |
+| Binary sha256 | `2a731ea1d8c88bded1ecf7b18e649e9644de53d1270f2c6155d039af13c21caf` |
+| Config | `milestone7-full-corpus-research-config.json`, sha256 `eac14b524e391b44aec8919fffb7341592a38cc0fc0626c1d9b3b8c93ef8b2aa` (unchanged) |
+| Command | `research-ordered-coverage <config> milestone7-full-history-2ced8fe docs/VERIFICATION/milestone7b-ordered-coverage-full.json` |
+| Result | EXIT=0, 64 s; `months=154`, `chunks=2819`, `events=274098687`, `first_ms=1735768814647`, `last_ms=1793393999000` |
+| Receipt sha256 | `0aecece43c77ad04db37f7fc6fd5c129faeacc69f3537a52243e8c20cd3c3bb9` |
+
+Independent post-check of the new receipt (separate Python pass): 154 `ordered` rows =
+exactly 22 months × the 7 instruments; 2,819 listed chunk files all present on disk
+(0 missing); for every row `last_sequence − first_sequence + 1 == events`; totals
+re-sum to 2,819 chunks / 274,098,687 events.
+
+Files: `milestone7b-build.log`, `milestone7b-ordered-coverage-run.log`,
+`milestone7b-ordered-coverage-full.json`.
+
+This re-pin supersedes only the §2 coverage receipt. **The §7 verdict is unchanged:
+Milestone 7 remains NOT accepted** — items 1–4 there are untouched (deployed release,
+crash-looping research unit on stale installed gold config entries, unexercised
+authenticated endpoints, owner reboot).
