@@ -85,14 +85,41 @@ The identity sentinel `Conversion::usd()` (usd_num=1, quote_den=1, as_of_ms=i64:
 
 **No large duplicate JSON files are generated.** Conversion rates are derived from each tick's verified bid price at runtime using exact integer arithmetic. The research loader (`research_inputs`) allocates one `Conversion` per tick — a `Vec<Conversion>` of 24 bytes per tick (3 × i64 fields) plus Vec allocation overhead. This is O(n) memory where n is the dataset tick count, not constant memory.
 
-Example measured overhead for USDJPY M1 data (~3.47M ticks per one-month partition): approximately 83 MB per loaded partition for the conversion vector alone (24 bytes/tick × 3.47M ticks), before any tick data, candles, or feature buffers. Across 22 months, one instrument's conversion vector totals ~1.8 GB. The full research input byte budget is capped at 2 GiB by `research_inputs()` to bound total loaded memory; loading multiple instruments or partitions simultaneously requires careful budget management.
+**Measured conversion memory per partition (real corpus, 22 months each):**
+
+| Instrument | 202504 (peak) | 202608 (typical) | 22-month total (conversion vectors only) |
+|------------|---------------|------------------|------------------------------------------|
+| USDJPY | 133.0 MB | 49.9 MB | ~1.49 GB |
+| USDCHF | 73.3 MB | 26.2 MB | ~0.77 GB |
+| USDCAD | 81.0 MB | 26.0 MB | ~1.14 GB |
+| EURUSD | 94.0 MB | 25.3 MB | ~1.03 GB |
+| GBPUSD | 87.1 MB | 38.8 MB | ~1.19 GB |
+| AUDUSD | 73.5 MB | 22.0 MB | ~0.93 GB |
+| NZDUSD | 59.5 MB | 28.0 MB | ~0.70 GB |
+| **All 7 × 22 months** | — | — | **~6.58 GB** |
+
+**Critical distinction — input-file budget vs RAM budget:**
+
+The 2 GiB input-file budget in `research_inputs()` bounds the **on-disk file size** of loaded corpus partitions, **not** RAM allocation. Conversion vectors are allocated **after** file load, in addition to the raw tick data, candles, feature buffers, and index structures. For the full 7-instrument × 22-month corpus:
+
+- Conversion vectors alone: ~6.58 GB
+- Plus tick data: ~9-11 GB additional
+- Plus candles, features, masks, indexes: multiple GB more
+
+**This exceeds the 8 GB RAM target.** The full corpus cannot be loaded simultaneously within 8 GB RAM. Instruments or partitions must be loaded sequentially, one at a time, with conversion vectors dropped between instruments. The current 20-month dev config (4 USD-quoted instruments) is the maximum that fits within the RAM target when loaded sequentially.
 
 No per-instrument conversion files are written to disk.
 
-If owner approval is granted for USDJPY/USDCHF/USDCAD inclusion, the changes would be:
-1. Add 3 instruments × 20 months = 60 new inputs to `config/research.json` (each input is a small JSON object referencing existing corpus partitions)
-2. No new corpus data — all 22 months of data for each instrument already exists in `/root/workspace/historical-migration-output/full-100k/`
-3. No new conversion files — rates are derived from tick prices at runtime
+## Coverage reconciliation — 20-month dev config vs 22-month corpus
+
+| | Current dev config | Full corpus | Gap |
+|------------|-------------------|-------------|-----|
+| Instruments | 4 (EURUSD, GBPUSD, AUDUSD, NZDUSD) | 7 (+USDJPY, USDCHF, USDCAD) | 3 instruments |
+| Months per instrument | 20 (202501–202608) | 22 (202501–202610) | 2 months (202609, 202610) |
+| Total inputs | 80 | 154 | 74 inputs |
+| Conversion memory (sequential) | ~2.0 GB peak | ~6.58 GB cumulative | Exceeds 8 GB RAM if simultaneous |
+
+The dev configuration intentionally limits coverage to 4 USD-quoted instruments × 20 months to stay within the 8 GB RAM target when loading sequentially. Adding USDJPY/USDCHF/USDCAD (owner approval required) and extending to 22 months would exceed the RAM target if loaded simultaneously; sequential loading with per-instrument conversion vector release is required.
 
 ## Limitations
 
@@ -102,6 +129,8 @@ If owner approval is granted for USDJPY/USDCHF/USDCAD inclusion, the changes wou
 4. **Owner approval required** — USDJPY/USDCHF/USDCAD are currently excluded from the research service (80 inputs = 4 USD-quoted instruments × 20 months). Adding them requires explicit owner approval of this conversion convention.
 5. **No scientific qualification** — no strategy has yet achieved 50+ trades for scientific qualification on any instrument, including those using this conversion convention.
 6. **Economic calendar data not implemented** — conversion-based P&L does not account for news events or calendar-driven volatility.
+7. **RAM budget exceeded by full corpus** — conversion vectors alone total ~6.58 GB for all 7 instruments × 22 months, exceeding the 8 GB RAM target when loaded simultaneously. The 2 GiB input-file budget bounds file size, not RAM. Sequential per-instrument loading with conversion vector release is required. The current 20-month dev config (4 USD-quoted instruments) is the maximum that fits within 8 GB RAM.
+8. **Conversion correctness ≠ pipeline completeness** — verified conversion implementation does not imply the research pipeline is complete. The full-history ordered coverage, registered full-period executor, scientific qualification (50+ trades per strategy), and authenticated dashboard acceptance remain separate, unverified milestones.
 
 ## Validation safeguards (all enforced in code)
 
@@ -114,4 +143,4 @@ If owner approval is granted for USDJPY/USDCHF/USDCAD inclusion, the changes wou
 | Identity sentinel rejected for non-USD | `Conversion::validate` | Yes |
 | `usd_account_from_usd_base_price` rejects USD-quoted | `src/contracts.rs` | Yes |
 | `usd_account_from_usd_base_price` rejects non-USD-base | `src/contracts.rs` | Yes |
-| Exact integer cross-product equality | `tests/verify_conversion.rs` | 11 tests, all passing |
+| Exact integer cross-product equality | `tests/verify_conversion.rs` | 14 tests, all passing |
