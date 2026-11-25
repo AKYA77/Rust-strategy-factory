@@ -1,0 +1,34 @@
+{
+  "parser_version": "normalized-csv-v1",
+  "source": "SYNTHETIC_TEST_ONLY generated-fixture-v1; two short artificial 2025/2026 windows",
+  "imported_at": "2026-11-25T01:26:01.285363993+00:00",
+  "archive_hash": "generated-no-raw-archive",
+  "content_hash": "92cb260970290bc24b624b3ca2c44c25672586e07be235b1a93a91d02ba4e9d2",
+  "profile_hash": "1b2055877eb8f36766f09ea73af9d226d99420905a711bd5e004cc2a08088e50",
+  "symbol": "EURUSD",
+  "class": "SYNTHETIC_TEST_ONLY",
+  "events": 2000,
+  "first_ms": 1735689600000,
+  "last_ms": 1767235590000,
+  "timestamp_ties": 0,
+  "identical_quote_events": 0,
+  "gaps_over_hour": 1,
+  "issues": []
+}
+{
+  "parser_version": "normalized-csv-v1",
+  "source": "SYNTHETIC_TEST_ONLY generated-fixture-v1; two short artificial 2025/2026 windows",
+  "imported_at": "2026-11-25T01:26:01.285363993+00:00",
+  "archive_hash": "generated-no-raw-archive",
+  "content_hash": "92cb260970290bc24b624b3ca2c44c25672586e07be235b1a93a91d02ba4e9d2",
+  "profile_hash": "1b2055877eb8f36766f09ea73af9d226d99420905a711bd5e004cc2a08088e50",
+  "symbol": "EURUSD",
+  "class": "SYNTHETIC_TEST_ONLY",
+  "events": 2000,
+  "first_ms": 1735689600000,
+  "last_ms": 1767235590000,
+  "timestamp_ties": 0,
+  "identical_quote_events": 0,
+  "gaps_over_hour": 1,
+  "issues": []
+}

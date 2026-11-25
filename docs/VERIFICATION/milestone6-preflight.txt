@@ -1,0 +1,50 @@
+# Milestone 6 preflight — captured 2026-11-25T01:06:15Z
+## git
+$ git rev-parse HEAD
+98cdc7921cc747366c83262003404c8375c01f7c
+EXIT=0
+$ git branch --show-current
+main
+EXIT=0
+$ git status --short
+ M docs/NEXT_ACTION.md
+ M scripts/browser-check.cjs
+ M scripts/browser-long-ledger-check.cjs
+?? docs/VERIFICATION/milestone6-preflight.txt
+EXIT=0
+$ git diff --stat
+ docs/NEXT_ACTION.md                   | 50 ++++++++++++++++++++++-------------
+ scripts/browser-check.cjs             |  4 +--
+ scripts/browser-long-ledger-check.cjs |  2 +-
+ 3 files changed, 35 insertions(+), 21 deletions(-)
+EXIT=0
+## toolchain
+$ rustc --version
+rustc 1.100.0 (0ef1bc386 2026-11-09)
+EXIT=0
+$ cargo --version
+cargo 1.100.0 (3acc79c0c 2026-11-05)
+EXIT=0
+$ rustup show active-toolchain
+1.100.0-x86_64-unknown-linux-gnu (overridden by '/root/workspace/Rust-strategy-factory/rust-toolchain.toml')
+EXIT=0
+## artifact hashes
+d6f42d8d80578b945c7be4a576029cbb3c8e5284bfcfd65f1c125aad0e3e716b  Cargo.toml
+e5308e42eb38c93a8fa5e65dc58b8d990bc5a23ef13e14069fd109a1b24cea52  Cargo.lock
+266aca31779bfd41be267853d42193a8ae25129040127b6b7b29e79019a1b8b0  target/debug/rust-strategy-factory
+## pinned toolchain file
+[toolchain]
+channel = "1.100.0"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
+## env
+CARGO_HOME=/workspace/.cargo RUSTUP_HOME=/workspace/.rustup RSF_BUILDER_PROFILE=hermes-v2-m1
+## stamp before
+{
+  "checkout_path": "/root/workspace/Rust-strategy-factory",
+  "head_sha": "57c13fc8b821506faa0379725cb79131495f6063",
+  "dirty_hash": "7a4352ea4781f96f519a223d7920fad91ed43e84f0bf8b9395f771f47d76dac7",
+  "command": "test --locked --lib --bins --tests",
+  "builder": "hermes-v2-m1",
+  "written_at": "2026-11-25T00:56:28.712919+00:00"
+}

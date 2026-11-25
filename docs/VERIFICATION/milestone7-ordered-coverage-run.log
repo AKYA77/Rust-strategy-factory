@@ -1,0 +1,14 @@
+START 2026-11-25T01:08:21Z
+BIN_SHA256 533dd74ac2970728fafff930affaf127c0bf94448d582b7684ea94fce0cc1eca
+CFG_SHA256 eac14b524e391b44aec8919fffb7341592a38cc0fc0626c1d9b3b8c93ef8b2aa
+{
+  "chunks": 2819,
+  "events": 274098687,
+  "first_ms": 1735768814647,
+  "last_ms": 1793393999000,
+  "limitations": "Every configured instrument-month was verified against its local migration receipt and every receipt chunk was read in order. Observed migrated events do not establish provider calendar completeness, research eligibility or scientific qualification.",
+  "months": 154,
+  "stage": "milestone7-full-history"
+}
+EXIT=0
+END 2026-11-25T01:10:03Z

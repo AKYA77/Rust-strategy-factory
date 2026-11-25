@@ -1,0 +1,144 @@
+{
+  "binary_sha256": "39ece2dd091d679c4dd55ef873677fe55703908e5c6b2f0ad01ec09496d90e9d",
+  "config": {
+    "inputs": [
+      {
+        "dataset": "/root/.hermes/cache/scratch/rsf-m6.PuP6NJ/input.rsf"
+      }
+    ],
+    "limits": {
+      "cpu_guard": null,
+      "feature_cells": 1000000,
+      "improvement_children": 0,
+      "improvement_max_depth": 0,
+      "indexed_policy": null,
+      "lease_ms": 300000,
+      "max_regions": 20,
+      "max_total_events": 500000,
+      "proof_policy": {
+        "audit_bps": 1000,
+        "seed": 42,
+        "version": "fixed-market-proof-screen-v1"
+      },
+      "resource_guard": null,
+      "seed": 42,
+      "shadow_policy": null,
+      "state_budget_bytes": 268435456
+    }
+  },
+  "config_sha256": "ef52474ffddabe172db6b8a6aa17bf60ec400a662350821a1bac6aebd5444090",
+  "dataset_sha256": "5e7fab15ec798db54421dab4135e70421a2d0295ec7107017271440086499e01",
+  "exact_parity": true,
+  "fixture_sha256": "8b69c11d220a39f270d56441e0b1f2aadc7d9167c152cf1b8cb4c19983e15bb1",
+  "passes": {
+    "A": {
+      "cache_hit_rate": 0.0,
+      "cache_reads": 0,
+      "canonical_bytes": 1368202,
+      "canonical_sha256": "8374878e0af88393955b5f11ca283b64eb782496668fa46b7c0222fb638e87db",
+      "event_counts": {
+        "claimed": 200,
+        "completed": 199,
+        "rejected": 1
+      },
+      "exit_code": 0,
+      "final_status": {
+        "active": false,
+        "cursor": 200,
+        "executed": 199,
+        "failed": 0,
+        "id": "5d2908975ecd14adc9d9345f5f2044670726889de489a7891df3302eba26652e",
+        "improvements": {
+          "accepted_descendants": 0,
+          "child_receipt_links": 0,
+          "completed": 0,
+          "failed": 0,
+          "max_depth": 0,
+          "queued": 0
+        },
+        "last_error": null,
+        "latest": "fecd5d591ebc71cc2f4b978a0535442099f1c434835d82ce0ce37b8c7a7a8f62",
+        "rejected": 1,
+        "reused": 0,
+        "state": "running"
+      },
+      "proof_audited_true": 0,
+      "proof_rejection_true": 1,
+      "recovery_counts": "{\n  \"maximum_bytes\": \"2147483648\",\n  \"maximum_snapshots\": \"16\",\n  \"rows\": []\n}",
+      "registry_bytes": {
+        "": 1826816
+      },
+      "run_id": "5d2908975ecd14adc9d9345f5f2044670726889de489a7891df3302eba26652e",
+      "screening_contradictions": {},
+      "time": {
+        "fs_inputs": 0.0,
+        "fs_outputs": 49680.0,
+        "involuntary_ctx": 0.0,
+        "major_faults": 0.0,
+        "max_rss_kb": 15104.0,
+        "minor_faults": 1475.0,
+        "system_cpu_s": 0.16,
+        "user_cpu_s": 0.81,
+        "voluntary_ctx": 3253.0,
+        "wall_s": 1.85
+      },
+      "unique_completed": 199,
+      "unique_completed_per_hour": 387243.24324324325
+    },
+    "B": {
+      "cache_hit_rate": 0.0,
+      "cache_reads": 0,
+      "canonical_bytes": 1368202,
+      "canonical_sha256": "8374878e0af88393955b5f11ca283b64eb782496668fa46b7c0222fb638e87db",
+      "event_counts": {
+        "claimed": 200,
+        "completed": 199,
+        "rejected": 1
+      },
+      "exit_code": 0,
+      "final_status": {
+        "active": false,
+        "cursor": 200,
+        "executed": 199,
+        "failed": 0,
+        "id": "5d2908975ecd14adc9d9345f5f2044670726889de489a7891df3302eba26652e",
+        "improvements": {
+          "accepted_descendants": 0,
+          "child_receipt_links": 0,
+          "completed": 0,
+          "failed": 0,
+          "max_depth": 0,
+          "queued": 0
+        },
+        "last_error": null,
+        "latest": "fecd5d591ebc71cc2f4b978a0535442099f1c434835d82ce0ce37b8c7a7a8f62",
+        "rejected": 1,
+        "reused": 0,
+        "state": "running"
+      },
+      "proof_audited_true": 0,
+      "proof_rejection_true": 1,
+      "recovery_counts": "{\n  \"maximum_bytes\": \"2147483648\",\n  \"maximum_snapshots\": \"16\",\n  \"rows\": []\n}",
+      "registry_bytes": {
+        "": 1826816
+      },
+      "run_id": "5d2908975ecd14adc9d9345f5f2044670726889de489a7891df3302eba26652e",
+      "screening_contradictions": {},
+      "time": {
+        "fs_inputs": 0.0,
+        "fs_outputs": 49680.0,
+        "involuntary_ctx": 1.0,
+        "major_faults": 0.0,
+        "max_rss_kb": 14848.0,
+        "minor_faults": 1469.0,
+        "system_cpu_s": 0.16,
+        "user_cpu_s": 0.73,
+        "voluntary_ctx": 3262.0,
+        "wall_s": 1.63
+      },
+      "unique_completed": 199,
+      "unique_completed_per_hour": 439509.20245398773
+    }
+  },
+  "steps_requested": 200
+}

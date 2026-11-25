@@ -1,0 +1,42 @@
+{
+  "version": "ordered-full-history-coverage-v1",
+  "stage": "milestone7-wiring-check",
+  "config": "docs/VERIFICATION/milestone7-full-corpus-research-config.json",
+  "months": 1,
+  "chunks": 17,
+  "events": 1668426,
+  "first_ms": 1735769041721,
+  "last_ms": 1738360734122,
+  "ordered": [
+    {
+      "instrument": "AUDUSD",
+      "month": "202501",
+      "chunks": 17,
+      "events": 1668426,
+      "first_ms": 1735769041721,
+      "last_ms": 1738360734122,
+      "first_sequence": 0,
+      "last_sequence": 1668425,
+      "chunk_files": [
+        "chunk-000000.rsf",
+        "chunk-000001.rsf",
+        "chunk-000002.rsf",
+        "chunk-000003.rsf",
+        "chunk-000004.rsf",
+        "chunk-000005.rsf",
+        "chunk-000006.rsf",
+        "chunk-000007.rsf",
+        "chunk-000008.rsf",
+        "chunk-000009.rsf",
+        "chunk-000010.rsf",
+        "chunk-000011.rsf",
+        "chunk-000012.rsf",
+        "chunk-000013.rsf",
+        "chunk-000014.rsf",
+        "chunk-000015.rsf",
+        "chunk-000016.rsf"
+      ]
+    }
+  ],
+  "limitations": "PARTIAL AUDIT: configured month limit truncates the corpus. Verified chunks are complete and ordered within each included instrument-month only. Observed migrated events do not establish provider calendar completeness, research eligibility or scientific qualification."
+}

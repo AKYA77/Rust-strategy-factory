@@ -1,0 +1,220 @@
+### list-before :: recovery-list /root/.hermes/cache/scratch/m7/recovery-test.sqlite
+{
+  "maximum_bytes": "2147483648",
+  "maximum_snapshots": "16",
+  "rows": []
+}
+### EXIT=0
+### backup :: recovery-backup /root/.hermes/cache/scratch/m7/recovery-test.sqlite m7-before-change
+{
+  "activation_performed": false,
+  "artifact_bytes": "0",
+  "artifact_files": "0",
+  "compatibility": "current schema; full registry integrity checked when fresh",
+  "compute_revision": "compute-blake3:f7521dc58d7a6416387ec7f0b6aa51e30d571c98f3e053d34f09728c6fa56ecc",
+  "counts": {
+    "attempts": "1",
+    "completed": "0",
+    "registered": "1",
+    "running": "0"
+  },
+  "created_at_ms": "1795568933336",
+  "database_bytes": "421888",
+  "database_hash": "754e2a568ce746449fc514a06263f3809d6a90adb22f97c5ef615d2deb8d93b6",
+  "fresh_content_verified": true,
+  "id": "m7-before-change",
+  "manifest_hash": "639a525e51317232788e98c08e6bbc7fe2955678653087c6decc927742bf3dc2",
+  "operation": "backup",
+  "parent_id": null,
+  "revoked_leases": "0",
+  "schema_version": "24",
+  "scope": "Registry and referenced receipt artifacts only. Source archives, credentials and deployment configuration are separate. Unclosed process observations remain unknown; no PID ownership or active cutover is granted.",
+  "status": "complete",
+  "verified_at_ms": "1795568933351"
+}
+### EXIT=0
+### list-after-backup :: recovery-list /root/.hermes/cache/scratch/m7/recovery-test.sqlite
+{
+  "maximum_bytes": "2147483648",
+  "maximum_snapshots": "16",
+  "rows": [
+    {
+      "activation_performed": false,
+      "artifact_bytes": "0",
+      "artifact_files": "0",
+      "compatibility": "current schema; full registry integrity checked when fresh",
+      "compute_revision": "compute-blake3:f7521dc58d7a6416387ec7f0b6aa51e30d571c98f3e053d34f09728c6fa56ecc",
+      "counts": {
+        "attempts": "1",
+        "completed": "0",
+        "registered": "1",
+        "running": "0"
+      },
+      "created_at_ms": "1795568933336",
+      "database_bytes": "421888",
+      "database_hash": "754e2a568ce746449fc514a06263f3809d6a90adb22f97c5ef615d2deb8d93b6",
+      "fresh_content_verified": false,
+      "id": "m7-before-change",
+      "manifest_hash": "639a525e51317232788e98c08e6bbc7fe2955678653087c6decc927742bf3dc2",
+      "operation": "backup",
+      "parent_id": null,
+      "revoked_leases": "0",
+      "schema_version": "24",
+      "scope": "Registry and referenced receipt artifacts only. Source archives, credentials and deployment configuration are separate. Unclosed process observations remain unknown; no PID ownership or active cutover is granted.",
+      "status": "complete",
+      "verified_at_ms": null
+    }
+  ],
+  "scope": "Manifest inventory only; verify rechecks actual snapshot bytes and registry integrity. No automatic deletion or active service cutover."
+}
+### EXIT=0
+### verify :: recovery-verify /root/.hermes/cache/scratch/m7/recovery-test.sqlite m7-before-change
+{
+  "activation_performed": false,
+  "artifact_bytes": "0",
+  "artifact_files": "0",
+  "compatibility": "current schema; full registry integrity checked when fresh",
+  "compute_revision": "compute-blake3:f7521dc58d7a6416387ec7f0b6aa51e30d571c98f3e053d34f09728c6fa56ecc",
+  "counts": {
+    "attempts": "1",
+    "completed": "0",
+    "registered": "1",
+    "running": "0"
+  },
+  "created_at_ms": "1795568933336",
+  "database_bytes": "421888",
+  "database_hash": "754e2a568ce746449fc514a06263f3809d6a90adb22f97c5ef615d2deb8d93b6",
+  "fresh_content_verified": true,
+  "id": "m7-before-change",
+  "manifest_hash": "639a525e51317232788e98c08e6bbc7fe2955678653087c6decc927742bf3dc2",
+  "operation": "backup",
+  "parent_id": null,
+  "revoked_leases": "0",
+  "schema_version": "24",
+  "scope": "Registry and referenced receipt artifacts only. Source archives, credentials and deployment configuration are separate. Unclosed process observations remain unknown; no PID ownership or active cutover is granted.",
+  "status": "complete",
+  "verified_at_ms": "1795568933392"
+}
+### EXIT=0
+### path :: recovery-path /root/.hermes/cache/scratch/m7/recovery-test.sqlite m7-before-change
+{
+  "path": "/root/.hermes/cache/scratch/m7/recovery-test.sqlite.recovery/m7-before-change/registry.sqlite"
+}
+### EXIT=0
+### restore :: recovery-restore /root/.hermes/cache/scratch/m7/recovery-test.sqlite m7-before-change m7-restored
+{
+  "activation_performed": false,
+  "artifact_bytes": "0",
+  "artifact_files": "0",
+  "compatibility": "current schema; full registry integrity checked when fresh",
+  "compute_revision": "compute-blake3:f7521dc58d7a6416387ec7f0b6aa51e30d571c98f3e053d34f09728c6fa56ecc",
+  "counts": {
+    "attempts": "1",
+    "completed": "0",
+    "registered": "1",
+    "running": "0"
+  },
+  "created_at_ms": "1795568933455",
+  "database_bytes": "421888",
+  "database_hash": "7a4fdac606f2c7607ec4c9cae862144fb3ac9d7c068dd5835abd487ad6009161",
+  "fresh_content_verified": true,
+  "id": "m7-restored",
+  "manifest_hash": "55ddc4eb0da0777fcc12cee25c63d35d32850b51af1c7a388e819630efe5ff89",
+  "operation": "restore",
+  "parent_id": "m7-before-change",
+  "revoked_leases": "0",
+  "schema_version": "24",
+  "scope": "Registry and referenced receipt artifacts only. Source archives, credentials and deployment configuration are separate. Unclosed process observations remain unknown; no PID ownership or active cutover is granted.",
+  "status": "complete",
+  "verified_at_ms": "1795568933471"
+}
+### EXIT=0
+### list-after-restore :: recovery-list /root/.hermes/cache/scratch/m7/recovery-test.sqlite
+{
+  "maximum_bytes": "2147483648",
+  "maximum_snapshots": "16",
+  "rows": [
+    {
+      "activation_performed": false,
+      "artifact_bytes": "0",
+      "artifact_files": "0",
+      "compatibility": "current schema; full registry integrity checked when fresh",
+      "compute_revision": "compute-blake3:f7521dc58d7a6416387ec7f0b6aa51e30d571c98f3e053d34f09728c6fa56ecc",
+      "counts": {
+        "attempts": "1",
+        "completed": "0",
+        "registered": "1",
+        "running": "0"
+      },
+      "created_at_ms": "1795568933336",
+      "database_bytes": "421888",
+      "database_hash": "754e2a568ce746449fc514a06263f3809d6a90adb22f97c5ef615d2deb8d93b6",
+      "fresh_content_verified": false,
+      "id": "m7-before-change",
+      "manifest_hash": "639a525e51317232788e98c08e6bbc7fe2955678653087c6decc927742bf3dc2",
+      "operation": "backup",
+      "parent_id": null,
+      "revoked_leases": "0",
+      "schema_version": "24",
+      "scope": "Registry and referenced receipt artifacts only. Source archives, credentials and deployment configuration are separate. Unclosed process observations remain unknown; no PID ownership or active cutover is granted.",
+      "status": "complete",
+      "verified_at_ms": null
+    },
+    {
+      "activation_performed": false,
+      "artifact_bytes": "0",
+      "artifact_files": "0",
+      "compatibility": "current schema; full registry integrity checked when fresh",
+      "compute_revision": "compute-blake3:f7521dc58d7a6416387ec7f0b6aa51e30d571c98f3e053d34f09728c6fa56ecc",
+      "counts": {
+        "attempts": "1",
+        "completed": "0",
+        "registered": "1",
+        "running": "0"
+      },
+      "created_at_ms": "1795568933455",
+      "database_bytes": "421888",
+      "database_hash": "7a4fdac606f2c7607ec4c9cae862144fb3ac9d7c068dd5835abd487ad6009161",
+      "fresh_content_verified": false,
+      "id": "m7-restored",
+      "manifest_hash": "55ddc4eb0da0777fcc12cee25c63d35d32850b51af1c7a388e819630efe5ff89",
+      "operation": "restore",
+      "parent_id": "m7-before-change",
+      "revoked_leases": "0",
+      "schema_version": "24",
+      "scope": "Registry and referenced receipt artifacts only. Source archives, credentials and deployment configuration are separate. Unclosed process observations remain unknown; no PID ownership or active cutover is granted.",
+      "status": "complete",
+      "verified_at_ms": null
+    }
+  ],
+  "scope": "Manifest inventory only; verify rechecks actual snapshot bytes and registry integrity. No automatic deletion or active service cutover."
+}
+### EXIT=0
+### verify-restored :: recovery-verify /root/.hermes/cache/scratch/m7/recovery-test.sqlite m7-restored
+{
+  "activation_performed": false,
+  "artifact_bytes": "0",
+  "artifact_files": "0",
+  "compatibility": "current schema; full registry integrity checked when fresh",
+  "compute_revision": "compute-blake3:f7521dc58d7a6416387ec7f0b6aa51e30d571c98f3e053d34f09728c6fa56ecc",
+  "counts": {
+    "attempts": "1",
+    "completed": "0",
+    "registered": "1",
+    "running": "0"
+  },
+  "created_at_ms": "1795568933455",
+  "database_bytes": "421888",
+  "database_hash": "7a4fdac606f2c7607ec4c9cae862144fb3ac9d7c068dd5835abd487ad6009161",
+  "fresh_content_verified": true,
+  "id": "m7-restored",
+  "manifest_hash": "55ddc4eb0da0777fcc12cee25c63d35d32850b51af1c7a388e819630efe5ff89",
+  "operation": "restore",
+  "parent_id": "m7-before-change",
+  "revoked_leases": "0",
+  "schema_version": "24",
+  "scope": "Registry and referenced receipt artifacts only. Source archives, credentials and deployment configuration are separate. Unclosed process observations remain unknown; no PID ownership or active cutover is granted.",
+  "status": "complete",
+  "verified_at_ms": "1795568933520"
+}
+### EXIT=0

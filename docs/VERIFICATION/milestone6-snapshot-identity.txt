@@ -1,0 +1,8 @@
+# Snapshot byte-identity proof — 2026-11-25T01:12:26Z
+source: git archive 98cdc7921cc747366c83262003404c8375c01f7c
+tracked_files 521 missing 0
+snapshot_tree_sha256 46c69acdb9ff0d9d4af93931fb8f9994e5917dbee1a1b9a1652d7f48707a33f1
+$ git rev-parse HEAD (synthetic snapshot commit)
+1a98ae868e3ee3334571a0d2989753b739c75554
+$ git status --short
+EXIT=0

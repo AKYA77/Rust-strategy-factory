@@ -1,0 +1,18 @@
+START_UTC=2026-11-25T01:06:24Z
+cargo-locked: provenance mismatch:head_sha -> forcing 'cargo clean -p rust-strategy-factory' (project artifacts only)
+     Removed 10040 files, 3.6GiB total
+   Compiling rust-strategy-factory v0.1.0 (/root/workspace/Rust-strategy-factory)
+warning: variable does not need to be mutable
+   --> src/prep_cache.rs:286:13
+    |
+286 |         let mut connection = Connection::open(&database).map_err(|e| e.to_string())?;
+    |             ----^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rust-strategy-factory` (lib) generated 1 warning (run `cargo fix --lib -p rust-strategy-factory` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 24.12s
+EXIT=0
+END_UTC=2026-11-25T01:07:50Z

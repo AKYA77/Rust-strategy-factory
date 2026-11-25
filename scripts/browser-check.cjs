@@ -112,11 +112,11 @@ const overview=await (await context.request.get(base+'/api/overview')).json();as
  await page.route('**/api/experiment-history*',async route=>{if(!delayedHistory&&new URL(route.request().url()).searchParams.get('instrument')==='EURUSD'){delayedHistory=true;historyStarted();await historyGate;}await route.continue();});
  await page.getByLabel('Instrument',{exact:true}).selectOption('EURUSD');await historyDelayed;await selectInstrument('GBPUSD');const lateHistory=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/experiment-history'&&new URL(r.url()).searchParams.get('instrument')==='EURUSD');releaseHistory();await (await lateHistory).finished();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));assert.equal(await page.locator('#history-status').getAttribute('data-instrument'),'GBPUSD');assert((await page.locator('#results').textContent()).includes('GBPUSD'));await page.unroute('**/api/experiment-history*');
  fs.writeFileSync(path.join(dir,'proof-research.json'),JSON.stringify({inputs:[{dataset:'input.parquet'}],limits:{seed:0,proof_policy:{version:'fixed-market-proof-screen-v1',audit_bps:1,seed:42}}}));
- command(['research',path.join(dir,'proof-research.json'),db,'1']);
+ command(['research',path.join(dir,'proof-research.json'),db,'10']);
  const proofHistory=await historyGet('instrument=EURUSD&limit=100');let proofReceipt,proofRaw,proofId;
  for(const row of proofHistory.rows){const text=await(await context.request.get(base+'/api/experiments/'+row.id)).text();const receipt=JSON.parse(text);if(receipt.result.proof_rejection===true&&receipt.result.tick_replay===null){proofReceipt=receipt;proofRaw=text;proofId=row.id;break;}}
  assert(proofReceipt,'actual proof-screening campaign must persist an unaudited proven rejection');
- assert.equal(proofReceipt.result.screen.status,'ProvenNoMarketEntry');assert(proofReceipt.result.screen.signals>0);
+ assert.equal(proofReceipt.result.screen.status,'ProvenNoMarketEntry');assert.equal(proofReceipt.result.market_stop_proof.version,'fixed-market-stop-infeasible-v1');assert.equal(proofReceipt.result.proof_audited,false);assert.equal(proofReceipt.result.tick_replay,null);
  await selectInstrument('EURUSD');await page.getByRole('button',{name:'Newest experiments',exact:true}).click();await page.locator('#history-status').filter({hasText:'Page 1'}).waitFor();
  assert(proofId);
  await page.getByRole('button',{name:proofId.slice(0,12),exact:true}).click();await page.locator('#detail-label').filter({hasText:proofId}).waitFor();

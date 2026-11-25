@@ -1,0 +1,577 @@
+# Milestone 6 dependency review — 2026-11-25T01:11:15Z
+## cargo tree (locked, normal+build+dev edges)
+$ cargo tree --locked --edges normal,build,dev --prefix none
+rust-strategy-factory v0.1.0 (/root/.hermes/cache/scratch/m6-head)
+argon2 v0.5.3
+base64ct v1.8.3
+blake2 v0.10.6
+digest v0.10.7
+block-buffer v0.10.4
+generic-array v0.14.7
+typenum v1.20.1
+version_check v0.9.5
+crypto-common v0.1.7
+generic-array v0.14.7 (*)
+typenum v1.20.1
+subtle v2.6.1
+cpufeatures v0.2.17
+password-hash v0.5.0
+base64ct v1.8.3
+rand_core v0.6.4
+subtle v2.6.1
+axum v0.8.9
+axum-core v0.5.6
+bytes v1.12.1
+futures-core v0.3.34
+http v1.5.0
+bytes v1.12.1
+itoa v1.0.19
+http-body v1.1.0
+bytes v1.12.1
+http v1.5.0 (*)
+http-body-util v0.1.5
+bytes v1.12.1
+futures-core v0.3.34
+http v1.5.0 (*)
+http-body v1.1.0 (*)
+pin-project-lite v0.2.17
+mime v0.3.18
+pin-project-lite v0.2.17
+sync_wrapper v1.0.2
+tower-layer v0.3.3
+tower-service v0.3.3
+tracing v0.1.44
+log v0.4.35
+pin-project-lite v0.2.17
+tracing-core v0.1.36
+once_cell v1.21.4
+bytes v1.12.1
+form_urlencoded v1.2.2
+percent-encoding v2.3.2
+futures-util v0.3.34
+futures-core v0.3.34
+futures-task v0.3.34
+pin-project-lite v0.2.17
+slab v0.4.12
+http v1.5.0 (*)
+http-body v1.1.0 (*)
+http-body-util v0.1.5 (*)
+hyper v1.12.0
+atomic-waker v1.1.2
+bytes v1.12.1
+futures-core v0.3.34
+http v1.5.0 (*)
+http-body v1.1.0 (*)
+httparse v1.10.1
+httpdate v1.0.3
+itoa v1.0.19
+pin-project-lite v0.2.17
+smallvec v1.16.5
+tokio v1.54.1
+libc v0.2.191
+mio v1.2.4
+libc v0.2.191
+pin-project-lite v0.2.17
+signal-hook-registry v1.4.8
+errno v0.3.15
+libc v0.2.191
+libc v0.2.191
+socket2 v0.6.5
+libc v0.2.191
+tokio-macros v2.7.2 (proc-macro)
+proc-macro2 v1.0.107
+unicode-ident v1.0.27
+quote v1.0.47
+proc-macro2 v1.0.107 (*)
+syn v3.0.10
+proc-macro2 v1.0.107 (*)
+quote v1.0.47 (*)
+unicode-ident v1.0.27
+hyper-util v0.1.21
+bytes v1.12.1
+http v1.5.0 (*)
+http-body v1.1.0 (*)
+hyper v1.12.0 (*)
+pin-project-lite v0.2.17
+tokio v1.54.1 (*)
+tower-service v0.3.3
+itoa v1.0.19
+matchit v0.8.4
+memchr v2.8.3
+mime v0.3.18
+percent-encoding v2.3.2
+pin-project-lite v0.2.17
+serde_core v1.0.229
+serde_json v1.0.154
+itoa v1.0.19
+memchr v2.8.3
+serde_core v1.0.229
+zmij v1.0.23
+serde_path_to_error v0.1.20
+itoa v1.0.19
+serde_core v1.0.229
+serde_urlencoded v0.7.1
+form_urlencoded v1.2.2 (*)
+itoa v1.0.19
+ryu v1.0.23
+serde v1.0.229
+serde_core v1.0.229
+serde_derive v1.0.229 (proc-macro)
+proc-macro2 v1.0.107 (*)
+quote v1.0.47 (*)
+syn v3.0.10 (*)
+sync_wrapper v1.0.2
+tokio v1.54.1 (*)
+tower v0.5.3
+futures-core v0.3.34
+futures-util v0.3.34 (*)
+pin-project-lite v0.2.17
+sync_wrapper v1.0.2
+tokio v1.54.1 (*)
+tower-layer v0.3.3
+tower-service v0.3.3
+tracing v0.1.44 (*)
+tower-layer v0.3.3
+tower-service v0.3.3
+tracing v0.1.44 (*)
+blake3 v1.8.7
+arrayvec v0.7.8
+cfg-if v1.0.5
+constant_time_eq v0.4.2
+cpufeatures v0.3.1
+cc v1.11.1
+find-msvc-tools v0.1.15
+jobserver v0.1.35
+libc v0.2.191
+libc v0.2.191
+shlex v2.0.1
+bytes v1.12.1
+chrono v0.4.45
+iana-time-zone v0.1.65
+num-traits v0.2.19
+libm v0.2.16
+autocfg v1.5.1
+serde v1.0.229 (*)
+constant_time_eq v0.4.2
+csv v1.4.0
+csv-core v0.1.13
+memchr v2.8.3
+itoa v1.0.19
+ryu v1.0.23
+serde_core v1.0.229
+fs2 v0.4.3
+libc v0.2.191
+getrandom v0.3.4
+cfg-if v1.0.5
+libc v0.2.191
+parquet v60.1.0
+ahash v0.8.12
+cfg-if v1.0.5
+getrandom v0.3.4 (*)
+once_cell v1.21.4
+zerocopy v0.8.63
+zerocopy-derive v0.8.63 (proc-macro)
+proc-macro2 v1.0.107 (*)
+quote v1.0.47 (*)
+syn v2.0.119
+proc-macro2 v1.0.107 (*)
+quote v1.0.47 (*)
+unicode-ident v1.0.27
+version_check v0.9.5
+bytes v1.12.1
+chrono v0.4.45 (*)
+half v2.7.1
+cfg-if v1.0.5
+num-traits v0.2.19 (*)
+zerocopy v0.8.63 (*)
+hashbrown v0.17.1
+num-bigint v0.5.1
+num-integer v0.1.47
+num-traits v0.2.19 (*)
+num-traits v0.2.19 (*)
+num-integer v0.1.47 (*)
+num-traits v0.2.19 (*)
+seq-macro v0.3.6 (proc-macro)
+twox-hash v2.1.5
+zstd v0.14.4
+zstd-safe v8.3.0
+zstd-sys v2.1.3+zstd.1.5.7
+cc v1.11.1 (*)
+pkg-config v0.3.34
+rusqlite v0.37.0
+bitflags v2.13.2
+fallible-iterator v0.3.0
+fallible-streaming-iterator v0.1.9
+hashlink v0.10.0
+hashbrown v0.15.5
+foldhash v0.1.5
+libsqlite3-sys v0.35.0
+cc v1.11.1 (*)
+pkg-config v0.3.34
+vcpkg v0.2.15
+smallvec v1.16.5
+serde v1.0.229 (*)
+serde_json v1.0.154 (*)
+sha2 v0.11.1
+cfg-if v1.0.5
+cpufeatures v0.3.1
+digest v0.11.3
+block-buffer v0.12.1
+hybrid-array v0.4.15
+typenum v1.20.1
+const-oid v0.10.3
+crypto-common v0.2.2
+hybrid-array v0.4.15 (*)
+tokio v1.54.1 (*)
+zstd v0.13.3
+zstd-safe v7.4.1
+zstd-sys v2.1.3+zstd.1.5.7 (*)
+blake3 v1.8.7 (*)
+EXIT=0
+## duplicate versions
+$ cargo tree --locked -d --prefix none
+block-buffer v0.10.4
+digest v0.10.7
+blake2 v0.10.6
+argon2 v0.5.3
+rust-strategy-factory v0.1.0 (/root/.hermes/cache/scratch/m6-head)
+
+block-buffer v0.12.1
+digest v0.11.3
+sha2 v0.11.1
+rust-strategy-factory v0.1.0 (/root/.hermes/cache/scratch/m6-head)
+
+cpufeatures v0.2.17
+argon2 v0.5.3 (*)
+
+cpufeatures v0.3.1
+blake3 v1.8.7
+rust-strategy-factory v0.1.0 (/root/.hermes/cache/scratch/m6-head)
+rust-strategy-factory v0.1.0 (/root/.hermes/cache/scratch/m6-head)
+sha2 v0.11.1 (*)
+
+crypto-common v0.1.7
+digest v0.10.7 (*)
+
+crypto-common v0.2.2
+digest v0.11.3 (*)
+
+digest v0.10.7 (*)
+
+digest v0.11.3 (*)
+
+hashbrown v0.15.5
+hashlink v0.10.0
+rusqlite v0.37.0
+rust-strategy-factory v0.1.0 (/root/.hermes/cache/scratch/m6-head)
+
+hashbrown v0.17.1
+parquet v60.1.0
+rust-strategy-factory v0.1.0 (/root/.hermes/cache/scratch/m6-head)
+
+syn v2.0.119
+zerocopy-derive v0.8.63 (proc-macro)
+zerocopy v0.8.63
+ahash v0.8.12
+parquet v60.1.0 (*)
+half v2.7.1
+parquet v60.1.0 (*)
+
+syn v3.0.10
+serde_derive v1.0.229 (proc-macro)
+serde v1.0.229
+chrono v0.4.45
+parquet v60.1.0 (*)
+rust-strategy-factory v0.1.0 (/root/.hermes/cache/scratch/m6-head)
+rust-strategy-factory v0.1.0 (/root/.hermes/cache/scratch/m6-head)
+serde_urlencoded v0.7.1
+axum v0.8.9
+rust-strategy-factory v0.1.0 (/root/.hermes/cache/scratch/m6-head)
+tokio-macros v2.7.2 (proc-macro)
+tokio v1.54.1
+axum v0.8.9 (*)
+hyper v1.12.0
+axum v0.8.9 (*)
+hyper-util v0.1.21
+axum v0.8.9 (*)
+hyper-util v0.1.21 (*)
+rust-strategy-factory v0.1.0 (/root/.hermes/cache/scratch/m6-head)
+tower v0.5.3
+axum v0.8.9 (*)
+
+zstd v0.13.3
+rust-strategy-factory v0.1.0 (/root/.hermes/cache/scratch/m6-head)
+
+zstd v0.14.4
+parquet v60.1.0 (*)
+
+zstd-safe v7.4.1
+zstd v0.13.3 (*)
+
+zstd-safe v8.3.0
+zstd v0.14.4 (*)
+EXIT=0
+## cargo audit (CI ignores)
+$ cargo audit --ignore RUSTSEC-2026-0391 --ignore RUSTSEC-2026-0459 --ignore RUSTSEC-2026-0543
+    Fetching advisory database from `https://github.com/RustSec/advisory-db.git`
+      Loaded 1567 security advisories (from /workspace/.cargo/advisory-db)
+    Updating crates.io index
+    Scanning Cargo.lock for vulnerabilities (145 crate dependencies)
+Crate:     parquet
+Version:   60.1.0
+Warning:   unsound
+Title:     Apache Arrow Rust: Bloom filters written as plaintext when writing encrypted Parquet
+Date:      2026-11-23
+ID:        RUSTSEC-2026-0595
+URL:       https://rustsec.org/advisories/RUSTSEC-2026-0595
+Solution:  Upgrade to >=60.2.0 OR >=59.3.3, <60.0.0 OR >=58.4.2, <59.0.0 OR >=57.3.3, <58.0.0 (patched)
+
+warning: 1 allowed warning found
+EXIT=0
+## cargo deny check
+$ cargo deny check
+warning[duplicate]: found 2 duplicate entries for crate 'block-buffer'
+   ┌─ /root/.hermes/cache/scratch/m6-head/Cargo.lock:13:1
+   │  
+13 │ ╭ block-buffer 0.10.4 registry+https://github.com/rust-lang/crates.io-index
+14 │ │ block-buffer 0.12.1 registry+https://github.com/rust-lang/crates.io-index
+   │ ╰─────────────────────────────────────────────────────────────────────────┘ lock entries
+   │  
+   ├ block-buffer v0.10.4
+     └── digest v0.10.7
+         └── blake2 v0.10.6
+             └── argon2 v0.5.3
+                 └── rust-strategy-factory v0.1.0
+   ├ block-buffer v0.12.1
+     └── digest v0.11.3
+         └── sha2 v0.11.1
+             └── rust-strategy-factory v0.1.0
+
+warning[duplicate]: found 2 duplicate entries for crate 'cpufeatures'
+   ┌─ /root/.hermes/cache/scratch/m6-head/Cargo.lock:25:1
+   │  
+25 │ ╭ cpufeatures 0.2.17 registry+https://github.com/rust-lang/crates.io-index
+26 │ │ cpufeatures 0.3.1 registry+https://github.com/rust-lang/crates.io-index
+   │ ╰───────────────────────────────────────────────────────────────────────┘ lock entries
+   │  
+   ├ cpufeatures v0.2.17
+     └── argon2 v0.5.3
+         └── rust-strategy-factory v0.1.0
+   ├ cpufeatures v0.3.1
+     ├── blake3 v1.8.7
+     │   └── (build) rust-strategy-factory v0.1.0
+     └── sha2 v0.11.1
+         └── rust-strategy-factory v0.1.0 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'crypto-common'
+   ┌─ /root/.hermes/cache/scratch/m6-head/Cargo.lock:28:1
+   │  
+28 │ ╭ crypto-common 0.1.7 registry+https://github.com/rust-lang/crates.io-index
+29 │ │ crypto-common 0.2.2 registry+https://github.com/rust-lang/crates.io-index
+   │ ╰─────────────────────────────────────────────────────────────────────────┘ lock entries
+   │  
+   ├ crypto-common v0.1.7
+     └── digest v0.10.7
+         └── blake2 v0.10.6
+             └── argon2 v0.5.3
+                 └── rust-strategy-factory v0.1.0
+   ├ crypto-common v0.2.2
+     └── digest v0.11.3
+         └── sha2 v0.11.1
+             └── rust-strategy-factory v0.1.0
+
+warning[duplicate]: found 2 duplicate entries for crate 'digest'
+   ┌─ /root/.hermes/cache/scratch/m6-head/Cargo.lock:32:1
+   │  
+32 │ ╭ digest 0.10.7 registry+https://github.com/rust-lang/crates.io-index
+33 │ │ digest 0.11.3 registry+https://github.com/rust-lang/crates.io-index
+   │ ╰───────────────────────────────────────────────────────────────────┘ lock entries
+   │  
+   ├ digest v0.10.7
+     └── blake2 v0.10.6
+         └── argon2 v0.5.3
+             └── rust-strategy-factory v0.1.0
+   ├ digest v0.11.3
+     └── sha2 v0.11.1
+         └── rust-strategy-factory v0.1.0
+
+warning[duplicate]: found 3 duplicate entries for crate 'getrandom'
+   ┌─ /root/.hermes/cache/scratch/m6-head/Cargo.lock:45:1
+   │  
+45 │ ╭ getrandom 0.2.17 registry+https://github.com/rust-lang/crates.io-index
+46 │ │ getrandom 0.3.4 registry+https://github.com/rust-lang/crates.io-index
+47 │ │ getrandom 0.4.3 registry+https://github.com/rust-lang/crates.io-index
+   │ ╰─────────────────────────────────────────────────────────────────────┘ lock entries
+   │  
+   ├ getrandom v0.2.17
+     └── const-random-macro v0.1.16
+         └── const-random v0.1.18
+             └── ahash v0.8.12
+                 └── parquet v60.1.0
+                     └── rust-strategy-factory v0.1.0
+   ├ getrandom v0.3.4
+     ├── ahash v0.8.12
+     │   └── parquet v60.1.0
+     │       └── rust-strategy-factory v0.1.0
+     └── rust-strategy-factory v0.1.0 (*)
+   ├ getrandom v0.4.3
+     └── jobserver v0.1.35
+         └── cc v1.11.1
+             ├── (build) blake3 v1.8.7
+             │   └── (build) rust-strategy-factory v0.1.0
+             ├── (build) iana-time-zone-haiku v0.1.2
+             │   └── iana-time-zone v0.1.65
+             │       └── chrono v0.4.45
+             │           ├── parquet v60.1.0
+             │           │   └── rust-strategy-factory v0.1.0 (*)
+             │           └── rust-strategy-factory v0.1.0 (*)
+             ├── (build) libsqlite3-sys v0.35.0
+             │   └── rusqlite v0.37.0
+             │       └── rust-strategy-factory v0.1.0 (*)
+             └── (build) zstd-sys v2.1.3+zstd.1.5.7
+                 ├── zstd-safe v7.4.1
+                 │   └── zstd v0.13.3
+                 │       └── rust-strategy-factory v0.1.0 (*)
+                 └── zstd-safe v8.3.0
+                     └── zstd v0.14.4
+                         └── parquet v60.1.0 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'hashbrown'
+   ┌─ /root/.hermes/cache/scratch/m6-head/Cargo.lock:49:1
+   │  
+49 │ ╭ hashbrown 0.15.5 registry+https://github.com/rust-lang/crates.io-index
+50 │ │ hashbrown 0.17.1 registry+https://github.com/rust-lang/crates.io-index
+   │ ╰──────────────────────────────────────────────────────────────────────┘ lock entries
+   │  
+   ├ hashbrown v0.15.5
+     └── hashlink v0.10.0
+         └── rusqlite v0.37.0
+             └── rust-strategy-factory v0.1.0
+   ├ hashbrown v0.17.1
+     └── parquet v60.1.0
+         └── rust-strategy-factory v0.1.0
+
+warning[duplicate]: found 2 duplicate entries for crate 'r-efi'
+   ┌─ /root/.hermes/cache/scratch/m6-head/Cargo.lock:84:1
+   │  
+84 │ ╭ r-efi 5.3.0 registry+https://github.com/rust-lang/crates.io-index
+85 │ │ r-efi 6.0.0 registry+https://github.com/rust-lang/crates.io-index
+   │ ╰─────────────────────────────────────────────────────────────────┘ lock entries
+   │  
+   ├ r-efi v5.3.0
+     └── getrandom v0.3.4
+         ├── ahash v0.8.12
+         │   └── parquet v60.1.0
+         │       └── rust-strategy-factory v0.1.0
+         └── rust-strategy-factory v0.1.0 (*)
+   ├ r-efi v6.0.0
+     └── getrandom v0.4.3
+         └── jobserver v0.1.35
+             └── cc v1.11.1
+                 ├── (build) blake3 v1.8.7
+                 │   └── (build) rust-strategy-factory v0.1.0
+                 ├── (build) iana-time-zone-haiku v0.1.2
+                 │   └── iana-time-zone v0.1.65
+                 │       └── chrono v0.4.45
+                 │           ├── parquet v60.1.0
+                 │           │   └── rust-strategy-factory v0.1.0 (*)
+                 │           └── rust-strategy-factory v0.1.0 (*)
+                 ├── (build) libsqlite3-sys v0.35.0
+                 │   └── rusqlite v0.37.0
+                 │       └── rust-strategy-factory v0.1.0 (*)
+                 └── (build) zstd-sys v2.1.3+zstd.1.5.7
+                     ├── zstd-safe v7.4.1
+                     │   └── zstd v0.13.3
+                     │       └── rust-strategy-factory v0.1.0 (*)
+                     └── zstd-safe v8.3.0
+                         └── zstd v0.14.4
+                             └── parquet v60.1.0 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'syn'
+    ┌─ /root/.hermes/cache/scratch/m6-head/Cargo.lock:105:1
+    │  
+105 │ ╭ syn 2.0.119 registry+https://github.com/rust-lang/crates.io-index
+106 │ │ syn 3.0.10 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰────────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ syn v2.0.119
+      ├── windows-implement v0.60.2
+      │   └── windows-core v0.62.2
+      │       └── iana-time-zone v0.1.65
+      │           └── chrono v0.4.45
+      │               ├── parquet v60.1.0
+      │               │   └── rust-strategy-factory v0.1.0
+      │               └── rust-strategy-factory v0.1.0 (*)
+      ├── windows-interface v0.59.3
+      │   └── windows-core v0.62.2 (*)
+      └── zerocopy-derive v0.8.63
+          └── zerocopy v0.8.63
+              ├── ahash v0.8.12
+              │   └── parquet v60.1.0 (*)
+              └── half v2.7.1
+                  └── parquet v60.1.0 (*)
+    ├ syn v3.0.10
+      ├── serde_derive v1.0.229
+      │   └── serde v1.0.229
+      │       ├── chrono v0.4.45
+      │       │   ├── parquet v60.1.0
+      │       │   │   └── rust-strategy-factory v0.1.0
+      │       │   └── rust-strategy-factory v0.1.0 (*)
+      │       ├── rust-strategy-factory v0.1.0 (*)
+      │       └── serde_urlencoded v0.7.1
+      │           └── axum v0.8.9
+      │               └── rust-strategy-factory v0.1.0 (*)
+      ├── tokio-macros v2.7.2
+      │   └── tokio v1.54.1
+      │       ├── axum v0.8.9 (*)
+      │       ├── hyper v1.12.0
+      │       │   ├── axum v0.8.9 (*)
+      │       │   └── hyper-util v0.1.21
+      │       │       └── axum v0.8.9 (*)
+      │       ├── hyper-util v0.1.21 (*)
+      │       ├── rust-strategy-factory v0.1.0 (*)
+      │       └── tower v0.5.3
+      │           └── axum v0.8.9 (*)
+      └── wasm-bindgen-macro-support v0.2.130
+          └── wasm-bindgen-macro v0.2.130
+              └── wasm-bindgen v0.2.130
+                  ├── iana-time-zone v0.1.65
+                  │   └── chrono v0.4.45 (*)
+                  └── js-sys v0.3.107
+                      └── iana-time-zone v0.1.65 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'zstd'
+    ┌─ /root/.hermes/cache/scratch/m6-head/Cargo.lock:141:1
+    │  
+141 │ ╭ zstd 0.13.3 registry+https://github.com/rust-lang/crates.io-index
+142 │ │ zstd 0.14.4 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰─────────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ zstd v0.13.3
+      └── rust-strategy-factory v0.1.0
+    ├ zstd v0.14.4
+      └── parquet v60.1.0
+          └── rust-strategy-factory v0.1.0
+
+warning[duplicate]: found 2 duplicate entries for crate 'zstd-safe'
+    ┌─ /root/.hermes/cache/scratch/m6-head/Cargo.lock:143:1
+    │  
+143 │ ╭ zstd-safe 7.4.1 registry+https://github.com/rust-lang/crates.io-index
+144 │ │ zstd-safe 8.3.0 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰─────────────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ zstd-safe v7.4.1
+      └── zstd v0.13.3
+          └── rust-strategy-factory v0.1.0
+    ├ zstd-safe v8.3.0
+      └── zstd v0.14.4
+          └── parquet v60.1.0
+              └── rust-strategy-factory v0.1.0
+
+advisories ok, bans ok, licenses ok, sources ok
+EXIT=0
+## versions
+cargo-audit-audit 0.23.0
+EXIT=0
+cargo-deny 0.22.0
+EXIT=0

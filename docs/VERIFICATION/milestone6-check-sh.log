@@ -1,0 +1,1148 @@
+START_UTC=2026-11-25T01:12:34Z
+snapshot_synthetic_HEAD=1a98ae868e3ee3334571a0d2989753b739c75554
+source_HEAD=98cdc7921cc747366c83262003404c8375c01f7c
+CARGO_TARGET_DIR=/root/.hermes/cache/scratch/m6-target
+cargo-locked: provenance no-stamp -> forcing 'cargo clean -p rust-strategy-factory' (project artifacts only)
+     Removed 2256 files, 907.0MiB total
+   Compiling rust-strategy-factory v0.1.0 (/root/.hermes/cache/scratch/m6-head)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 14.67s
+   Compiling rust-strategy-factory v0.1.0 (/root/.hermes/cache/scratch/m6-head)
+    Finished `test` profile [optimized + debuginfo] target(s) in 1m 10s
+     Running unittests src/lib.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/cc508c73a14a3352/out/rust_strategy_factory-cc508c73a14a3352)
+
+running 266 tests
+test blocked_native::tests::unpinned_outside_and_mutated_block_ranges_refuse_without_partial_rows ... ok
+test blocked_native::tests::visitor_requires_complete_success_and_rechecks_every_touched_block ... ok
+test blocked_native::tests::resigned_payload_cannot_bypass_quote_or_complete_manifest_verification ... ok
+test candidate_screen::stage1_policy_tests::ambiguous_and_thin_estimates_hold_not_pass ... ok
+test candidate_screen::stage1_policy_tests::proven_optimistic_bound_below_floor_rejects ... ok
+test candidate_screen::stage1_policy_tests::stage1_floor_is_exactly_40_percent_inclusive ... ok
+test corpus::direct_arrays::tests::changed_chunk_bytes_refuse_direct_array_binding ... ok
+test blocked_native::tests::malformed_headers_lengths_caps_and_atomic_no_replace_are_refused ... ok
+test corpus::direct_arrays::tests::direct_arrays_match_scalar_ticks_with_provenance_bindings ... ok
+test corpus::mmap_guard::tests::guard_budget_refusal_reads_nothing ... ok
+test corpus::mmap_guard::tests::guard_detects_artifact_replacement_after_mapping ... ok
+test corpus::mmap_guard::tests::guard_slice_exposes_only_shared_read_only_views ... ok
+test corpus::direct_arrays::tests::out_of_range_chunk_and_blocked_chunk_refuse ... ok
+test campaign_rotation::tests::reviewed_rotation_epoch_rejects_stale_idempotence_and_preserves_current_nonce ... ok
+test corpus::replay_range_tests::final_range_verification_refuses_skipped_prefix_and_future_changes_during_callbacks ... ok
+test campaign_rotation::tests::automatic_idle_resume_requires_same_epoch_and_cannot_override_operator_intent ... ok
+test campaign_rotation::tests::rotation_epoch_and_actual_schema_fence_competing_and_stale_actors ... ok
+test campaign_rotation::tests::scheduler_idle_operator_override_and_resigned_fake_process_counts_refuse ... ok
+test corpus_campaign::tests::malformed_campaign_order_duplicates_scope_and_overflow_refuse ... ok
+test corpus_campaign::tests::campaign_immutability_corruption_missing_schema_and_quota_are_verified ... ok
+test corpus_campaign::tests::campaign_epoch_controls_competing_leases_and_publication_rollback_are_fenced ... ok
+test corpus_campaign::tests::expected_epoch_controls_and_bounded_inventory_preserve_holds_and_active_nonce ... ok
+test corpus_campaign::tests::long_ledger_migration_preserves_legacy_shape_and_revokes_only_prior_parent ... ok
+test corpus_failure::tests::only_sqlite_codes_not_human_text_can_mark_busy_admission ... ok
+test corpus_campaign::tests::campaign_cpu_guard_refuses_before_any_lease_claim ... ok
+test corpus_campaign::tests::schema19_campaigns_migrate_held_without_rewriting_frozen_scope ... ok
+test corpus_fleet::tests::omitted_disk_guard_preserves_legacy_fleet_definition_bytes ... ok
+test corpus_campaign::tests::schema20_upgrade_revokes_old_parent_without_revoking_a_later_current_actor ... ok
+test corpus_fleet::tests::corrupt_rotation_or_source_keys_refuse_verified_status ... ok
+test corpus_campaign::tests::publication_failure_rolls_back_advance_and_reuses_completed_source_on_restart ... ok
+test corpus_campaign::tests::managed_restore_revokes_only_copied_campaign_parent_lease ... ok
+test corpus_fleet::tests::replaced_fleet_coordinators_cannot_publish_or_clear_new_leases ... ok
+test corpus_fleet::tests::child_progress_before_rotation_publication_is_recovered_without_new_attempts ... ok
+test corpus_search::tests::child_publication_before_queue_update_recovers_without_new_experiment_attempts ... ok
+test corpus_search::tests::epoch_fence_rejects_old_nonce_even_if_token_columns_are_restored ... ok
+test corpus_search::tests::concurrent_requeue_requests_have_one_atomic_winner ... ok
+test corpus_search::tests::failed_decision_append_rolls_back_requeue_and_control_epoch ... ok
+test corpus_search::tests::concurrent_policy_admission_has_one_winner_and_preserves_lifetime_budget ... ok
+test corpus_search::tests::legacy_requeue_bodies_keep_their_original_hash_without_a_kind_field ... ok
+test corpus_search::tests::failure_kinds_survive_backup_and_requeue_and_tampering_is_refused ... ok
+test corpus_search::tests::frozen_range_preserves_legacy_bytes_and_binds_deterministic_later_candidates ... ok
+test corpus_search::tests::foreground_supervised_step_retries_same_key_and_matches_scalar_receipt ... ok
+test corpus_search::tests::job_identity_corruption_and_cursor_changes_refuse_status_and_backup_integrity ... ok
+test corpus_search::tests::pause_intent_epochs_and_backup_preserve_operator_override ... ok
+test corpus_search::tests::migration_revokes_inflight_coordinators_without_changing_search_keys ... ok
+test corpus_search::tests::range_overflow_and_grammar_exhaustion_refuse_before_registry_creation ... ok
+test corpus_search::tests::policy_holds_active_and_terminal_children_without_resetting_them ... ok
+test corpus_search::tests::policy_freeze_backoff_epoch_clock_and_backup_are_exact ... ok
+test corpus_search::tests::racing_operator_pause_always_overrides_fenced_worker_error_publication ... ok
+test corpus_search::tests::replaced_coordinators_and_controls_fence_progress_without_clearing_new_tokens ... ok
+test corpus_search::tests::policy_never_overrides_operator_or_retries_unknown_failures ... ok
+test corpus_search::tests::full_control_history_is_explicit_and_never_blocks_stop ... ok
+test corpus_search::tests::requeue_budget_retains_prior_errors_in_immutable_verified_history_and_backups ... ok
+test corpus_search::tests::requeue_preserves_active_child_leases_and_yields_busy_without_spinning ... ok
+test corpus_search::tests::resigned_valid_candidate_from_another_range_cannot_replace_a_frozen_slot ... ok
+test corpus_search::tests::requeue_respects_frozen_width_when_other_slots_are_pending ... ok
+test corpus_search::tests::requeue_of_published_child_receipts_recovers_without_new_attempts ... ok
+test corpus_search::tests::retry_decision_history_is_atomic_immutable_and_backup_verified ... ok
+test dashboard::history_tests::history_keeps_full_sqlite_cursor_range_and_empty_boundaries_exact ... ok
+test corpus_search::tests::retry_history_pages_bind_source_and_immutable_rows_across_appends ... ok
+test corpus_search::tests::schema10_pauses_migrate_unknown_and_current_missing_heads_are_not_repaired ... ok
+test corpus_search::tests::retry_wakeup_preview_is_pure_exact_and_excludes_nonretryable_or_owned_children ... ok
+test corpus_search::tests::schema11_error_kinds_migrate_unknown_without_rewriting_frozen_bodies ... ok
+test dashboard::ledger_page_tests::protocol_page_refuses_corrupted_definition_identity ... ok
+test dashboard::operations_tests::activation_requires_catalog_and_valid_confirmation_fields ... ok
+test dashboard::operations_tests::coverage_reports_are_exact_bounded_and_labelled_observations ... ok
+test dashboard::operations_tests::operations_config_enforces_names_duplicates_bounds_and_intervals ... ok
+test dashboard::operations_tests::redaction_keeps_exact_reasons_without_local_paths ... ok
+test dashboard::operations_tests::corrupt_decision_history_refuses_actions_and_uninitialized_imports_report_no_state ... ok
+test dashboard::operations_tests::resource_observations_extend_with_exact_peak_and_cpu_strings ... ok
+test dashboard::operations_tests::registry_audit_observes_integrity_and_refuses_corruption ... ok
+test dashboard::operations_tests::import_activation_lifecycle_verifies_confirms_and_registers_observation_only ... ok
+test dashboard::trade_page_tests::malformed_trade_cursors_and_missing_replays_remain_explicit ... ok
+test dashboard::trade_page_tests::receipt_bound_pages_cover_all_trades_and_exact_unsigned_ids ... ok
+test corpus_search::tests::retry_history_capacity_holds_admission_but_not_operator_stop ... ok
+test data_validation::tests::test_empty_dataset_fails ... ok
+test data_validation::tests::test_examples_are_bounded_and_counters_exact ... ok
+test data_validation::tests::test_invalid_quote_detected ... ok
+test data_validation::tests::test_manifest_issue_is_not_approval ... ok
+test data_validation::tests::test_non_chronological_detected ... ok
+test data_validation::tests::test_ordered_timestamp_tie_is_legitimate ... ok
+test data_validation::tests::test_out_of_order_sequence_is_rejected ... ok
+test data_validation::tests::test_repeated_event_identity_is_rejected ... ok
+test data_validation::tests::test_time_gap_is_evidence_not_a_failure ... ok
+test data_validation::tests::test_valid_dataset_passes ... ok
+test disk::tests::exact_disk_reserve_boundary_and_unsupported_observations ... ok
+test economic_calendar::tests::all_scope_applies_to_every_instrument_only_when_requested ... ok
+test economic_calendar::tests::causal_availability_requires_known_publication_time ... ok
+test economic_calendar::tests::filters_events_by_actual_instrument_identity ... ok
+test economic_calendar::tests::negative_or_overflowing_windows_are_rejected ... ok
+test economic_calendar::tests::repeated_timestamps_are_not_duplicated ... ok
+test economic_calendar::tests::unsorted_insertion_and_boundary_inclusivity ... ok
+test evidence_gates::tests::absent_annual_fold_unresolved_and_execution_evidence_hold_independently ... ok
+test evidence_gates::tests::all_abstract_numeric_criteria_still_never_qualify_or_remove_independent_blockers ... ok
+test evidence_gates::tests::forged_final_pass_unknown_probes_and_inconsistent_counts_cannot_pass ... ok
+test evidence_gates::tests::policies_refuse_weaker_contracts_and_multiplicity_or_method_mismatch_holds ... ok
+test dashboard::operations_tests::import_refusal_retains_evidence_and_preserves_artifacts ... ok
+test dashboard::operations_tests::tampered_chunk_refuses_inventory_detail_and_activation ... ok
+test dashboard::operations_tests::unconfigured_operations_report_explicit_absence ... ok
+test dashboard::training_lineage_tests::training_pages_follow_verified_lineage_and_refuse_tampered_evidence ... ok
+test fleet_control::tests::failed_transition_write_rolls_back_state_epoch_and_coordinator_nonce ... ok
+test historical_catalog::tests::acceptance_requires_retained_evidence ... ok
+test historical_catalog::tests::bind_review_refuses_forged_or_tampered_report ... ok
+test historical_catalog::tests::bind_review_updates_gates_and_keeps_legal_pending ... ok
+test historical_catalog::tests::evidence_counts_match_legacy_shape ... ok
+test historical_catalog::tests::explicit_gates_control_eligibility ... ok
+test historical_catalog::tests::pending_gates_never_grant_eligibility ... ok
+test historical_catalog::tests::rejected_review_blocks_eligibility ... ok
+test historical_catalog::tests::scan_partition_marks_missing_and_noncanonical ... ok
+test historical_corpus::tests::accepts_contiguous_ordered_months ... ok
+test historical_corpus::tests::aggregate_continuous_chains_streak_over_breakeven_only_month ... ok
+test historical_corpus::tests::aggregate_continuous_month_pnl_is_closed_trade_net_without_equity_offset ... ok
+test historical_corpus::tests::aggregate_continuous_win_breaks_carried_streak ... ok
+test historical_corpus::tests::aggregate_totals_refuses_overflow ... ok
+test historical_corpus::tests::aggregate_totals_sums_only_additive_quantities ... ok
+test historical_corpus::tests::aggregate_totals_sums_outcome_statistics ... ok
+test historical_corpus::tests::chain_losing_streak_keeps_run_across_breakeven_only_month ... ok
+test historical_corpus::tests::continuous_accounting_chains_non_usd_instrument_without_conversion_file ... ok
+test historical_corpus::tests::execution_cache_key_binds_every_result_input ... ok
+test historical_corpus::tests::execution_cache_roundtrips_and_refuses_corruption ... ok
+test historical_corpus::tests::identity_is_deterministic_and_content_bound ... ok
+test fleet_control::tests::competing_idle_resumes_have_one_winner_and_operator_pause_wins_either_order ... ok
+test historical_corpus::tests::owner_selected_window_is_exactly_22_months_2025_01_to_2026_10 ... ok
+test historical_corpus::tests::refuses_gap_overlap_duplicate_and_wrong_count ... ok
+test historical_corpus::tests::research_window_refuses_invalid_calendar_and_reversed_order ... ok
+test historical_corpus::tests::trade_outcome_stats_counts_wins_losses_breakevens_and_streak ... ok
+test historical_corpus::tests::research_window_enumerates_subwindows_and_roundtrips_json ... ok
+test historical_corpus::tests::trade_outcome_stats_refuses_overflow ... ok
+test historical_corpus::tests::trade_outcome_stats_streak_counts_consecutive_net_losses_only ... ok
+test historical_corpus::tests::validate_months_rejects_out_of_range_calendar ... ok
+test historical_corpus::tests::verify_refuses_full_length_specs_outside_the_owner_window ... ok
+test dashboard::ledger_page_tests::bounded_run_and_protocol_pages_keep_exact_cursors_across_inserts ... ok
+test historical_migration::tests::codex_review_completed_conversion_must_bind_requested_profile_and_source ... ok
+test historical_migration::tests::codex_review_partial_resume_must_reject_self_hashed_different_prices ... ok
+test fleet_control::tests::actual_scheduler_idle_epoch_preserves_operator_override_and_terminal_backup ... ok
+test historical_migration::tests::converted_timestamp_ties_are_preserved_and_admissible ... ok
+test historical_migration::tests::adopted_chunk_above_corpus_cap_is_refused ... ok
+test historical_migration::tests::converts_with_profile_scale_reduction ... ok
+test historical_migration::tests::converts_exact_values_and_chunks_deterministically ... ok
+test historical_migration::tests::instrument_profile_mismatch_is_refused ... ok
+test fleet_control::tests::migration_retains_unknown_pause_and_keys_and_current_missing_heads_are_not_repaired ... ok
+test historical_migration::tests::migrated_chunks_are_admissible_to_native_corpus ... ok
+test historical_migration::tests::deterministic_across_output_directories ... ok
+test historical_migration::tests::refuses_corrupted_chunk_and_changed_source ... ok
+test historical_migration::tests::refuses_crossed_and_nonmillisecond_source_rows ... ok
+test historical_migration::tests::no_manifest_conversion_is_verifiable ... ok
+test historical_migration::tests::distinct_months_remain_distinct_single_source_corpora ... ok
+test historical_migration::tests::refuses_wrong_manifest_identity ... ok
+test historical_migration::tests::restart_from_committed_chunks_is_safe ... ok
+test historical_migration::tests::resume_rejects_changed_source_data_with_updated_manifest ... ok
+test improvement::authorization_tests::candle_screen_authorizes_adaptation_with_training_protocol ... ok
+test improvement::authorization_tests::candle_screen_refuses_protected_protocol_and_stale_models ... ok
+test improvement::authorization_tests::screening_refuses_protected_protocol_and_stale_models ... ok
+test indexed_policy::tests::indexed_sampling_is_reproducible_and_requires_reference_coverage ... ok
+test indexed_replay::tests::ordered_range_summaries_match_independent_all_pairs_oracle ... ok
+test native::indexed_native_tests::indexed_reader_binds_hash_identity_and_bounds_every_block ... ok
+test historical_migration::tests::reuse_rejects_changed_manifest_identity ... ok
+test os_enforcement::tests::cgroup_observation_reads_v2_files_and_refuses_v1_or_missing_state ... ok
+test os_enforcement::tests::cpu_stat_parses_required_counters_and_delta_requires_monotonicity ... ok
+test os_enforcement::tests::live_cgroup_observation_is_bounded_and_never_panics ... ok
+test os_enforcement::tests::unit_templates_parse_to_exact_declared_limits ... ok
+test native::indexed_native_tests::indexed_reader_refuses_budget_magic_length_checksum_and_order_violations ... ok
+test os_enforcement::tests::verdicts_require_readable_finite_kernel_limits_at_or_below_declared ... ok
+test historical_migration::tests::reuse_rejects_different_source_bytes_at_same_output ... ok
+test historical_migration::tests::refuses_oversized_row_group ... ok
+test fleet_control::tests::bounded_transition_omission_holds_automatic_resume_but_never_operator_stop ... ok
+test owned_history::resource_tests::legacy_limit_digests_and_monotonic_owned_resource_backup_remain_verifiable ... ok
+test owned_history::tests::input_pin_summary_bindings_refuse_forgery_and_preserve_legacy_reports ... ok
+test owned_process::tests::capture_bounds_every_byte_and_preserves_split_handshake ... ok
+test owned_process::tests::owned_limits_are_bounded ... ok
+test owned_history::tests::owner_attachment_terminal_and_backup_fences_preserve_bounded_observations ... ok
+test qualification::tests::complete_abstract_evidence_passes_gates_but_never_grants_qualification ... ok
+test owned_history::tests::terminal_write_failure_rolls_back_then_corruption_is_refused ... ok
+test qualification::tests::diversity_class_groups_parameter_tweaks_and_ranking_is_exact ... ok
+test qualification::tests::each_missing_evidence_requirement_holds_or_rejects_independently ... ok
+test qualification::tests::exact_numerical_boundaries_pass_and_one_notch_below_fails ... ok
+test qualification::tests::decisions_are_immutable_and_head_fenced ... ok
+test owned_history::tests::inventory_cap_refuses_start_but_preserves_existing_completion ... ok
+test qualification::tests::policy_floors_and_owner_window_are_exact ... ok
+test qualification::tests::boards_enforce_capacity_diversity_and_never_fill_with_unqualified ... ok
+test qualification::tests::synthetic_diagnostic_and_structurally_valid_only_evidence_never_completes ... ok
+test qualification::tests::qualify_refuses_without_complete_gates_or_live_revalidation ... ok
+test qualification::tests::full_positive_flow_qualifies_ranks_revokes_and_retains_history ... ok
+test qualification::tests::live_binding_mismatches_refuse_qualification ... ok
+test historical_migration::tests::refuses_string_column_beyond_decoded_byte_budget ... ok
+test recovery::tests::incomplete_capacity_byte_pressure_and_concurrent_operation_never_delete_evidence ... ok
+test recovery::tests::corruption_and_live_sidecars_refuse_before_any_restore_destination ... ok
+test recovery::tests::invalid_names_private_modes_and_no_replace_preserve_existing_bytes ... ok
+test recovery::tests::committed_wal_and_file_receipts_restore_with_new_actor_fences_and_unchanged_snapshot ... ok
+test regimes::tests::momentum_bins_use_fixed_descriptive_thresholds ... ok
+test research::stage_policy_tests::candidate_index_never_selects_a_protected_stage ... ok
+test resource::allocation_tests::allocation_keeps_unknown_workers_unknown ... ok
+test resource::allocation_tests::allocation_reports_exact_unequal_shares_without_equalising ... ok
+test resource::allocation_tests::allocation_zero_host_window_and_observation_errors_stay_unknown ... ok
+test resource::allocation_tests::from_samples_brackets_the_observed_worker_lifetime ... ok
+test recovery::tests::symlink_managed_roots_are_refused_without_touching_the_target ... ok
+test resource::cpu_guard_tests::cpu_guard_compares_exact_shares_with_checked_cross_products ... ok
+test resource::cpu_guard_tests::cpu_guard_fails_closed_on_empty_or_regressed_windows ... ok
+test resource::cpu_guard_tests::cpu_guard_validates_exact_share_bounds_and_window ... ok
+test resource::host_cpu_tests::host_cpu_busy_and_total_are_checked_sums ... ok
+test resource::host_cpu_tests::host_cpu_parses_exact_aggregate_line_and_rejects_malformed ... ok
+test resource::host_cpu_tests::host_cpu_window_requires_monotonic_counters ... ok
+test resource::host_cpu_tests::observe_host_cpu_returns_positive_monotonic_totals ... ok
+test resource::process_tests::actual_current_process_rss_and_cpu_observations_are_positive_and_stable ... ok
+test resource::process_tests::process_counters_preserve_command_parentheses_full_u64_and_exact_identity ... ok
+test resource::cpu_guard_tests::cpu_guard_check_refuses_deterministically_at_zero_threshold ... ok
+test recovery::tests::restored_unclosed_sessions_remain_unknown_without_fabricated_terminal_receipts ... ok
+test resource::tests::bounded_observations_require_exact_fields_units_and_checked_bytes ... ok
+test resource::tests::pressure_boundaries_preserve_unknown_and_do_not_claim_hard_enforcement ... ok
+test recovery::tests::reviewed_manifest_mismatch_cannot_create_a_restore_destination ... ok
+test resource::thread_cpu_tests::observe_thread_cpu_reads_the_current_main_thread_monotonically ... ok
+test resource::thread_cpu_tests::named_worker_threads_find_exact_live_prefix_matches_only ... ok
+test result_artifact::tests::serialization_budget_counts_encoded_bytes_and_bounded_summary_fields ... ok
+test resource::thread_cpu_tests::thread_stat_reuses_strict_identity_and_full_u64_counters ... ok
+test recovery::tests::older_snapshot_schema_migrates_only_the_new_copy ... ok
+test resource::sampler_tests::sampler_with_no_matching_threads_reports_empty_windows ... ok
+test resource::sampler_tests::sampler_observes_live_burner_threads_with_positive_deltas ... ok
+test storage::writer_admission_tests::reentrant_writer_neither_deadlocks_nor_consumes_a_slot ... ok
+test storage::writer_admission_tests::gates_are_per_file_and_observations_are_runtime_only ... ok
+test streaming::tests::checkpoint_chain_is_hash_bound ... ok
+test storage::writer_admission_tests::refusal_provenance_survives_successful_cleanup_writes ... ok
+test streaming::tests::describe_binds_fingerprints_and_identity_is_deterministic ... ok
+test streaming::tests::decode_resume_advances_and_persists_checkpoint ... ok
+test streaming::tests::empty_and_budget_inputs_are_refused ... ok
+test streaming::tests::resume_refuses_tampered_consumed_prefix ... ok
+test streaming::tests::stream_coverage_reports_per_chunk ... ok
+test streaming::tests::verify_refuses_tampered_artifact ... ok
+test streaming::tests::verify_refuses_out_of_order_chunks ... ok
+test storage::writer_admission_tests::writer_policy_outside_declared_bounds_is_refused ... ok
+test storage::writer_admission_tests::concurrent_writers_wait_within_budget_and_all_commit ... ok
+test storage::writer_admission_tests::saturated_gate_refuses_typed_and_the_refused_thread_recovers ... ok
+test supervision_session::tests::failed_terminal_receipt_insert_rolls_back_and_unclosed_is_not_liveness ... ok
+test supervision_session::tests::owner_counter_stop_and_terminal_receipt_fences_survive_backup ... ok
+test tick_engine::account_checkpoint_tests::serialized_account_boundaries_preserve_complete_state ... ok
+test tick_engine::worker_preparation_tests::cancelled_startup_reservations_and_concurrent_stealing_execute_each_job_exactly_once ... ok
+test tick_engine::worker_preparation_tests::affinity_prefers_latest_private_cursor_when_idle_slots_contain_stale_duplicates ... ok
+test tick_engine::worker_preparation_tests::cold_inventory_key_rechecks_current_bytes_before_registration_and_cached_reuse ... ok
+test supervision_session::tests::full_session_inventory_blocks_new_start_but_keeps_stop_and_finish ... ok
+test tick_engine::worker_preparation_tests::diagnostic_conversion_is_direction_based_reciprocal ... ok
+test tick_engine::worker_preparation_tests::diagnostic_replay_executes_usd_base_non_usd_quote_with_exact_reciprocal_conversions ... ok
+test tick_engine::worker_preparation_tests::diagnostic_replay_refuses_synthetic_inputs ... ok
+test owned_history::tests::finished_lifetime_history_pages_are_stable_indexed_and_fully_verified ... ok
+test tick_engine::worker_preparation_tests::diagnostic_replay_usd_quote_uses_identity_conversion ... ok
+test tick_engine::worker_preparation_tests::retained_worker_reservations_cover_dynamic_reassignment_or_release_before_work ... ok
+test tick_engine::worker_preparation_tests::worker_preparation_binds_paths_timeframe_and_cap_and_releases_failed_replacement ... ok
+test tick_engine::worker_preparation_tests::combined_warm_checkpoint_still_refuses_consumed_source_mutation_after_key_admission ... ok
+test tick_engine::worker_preparation_tests::cold_inventory_never_grants_real_or_non_usd_execution_authority ... ok
+test win_evidence::roundtrip_tests::log_evidence_and_numerical_margin_preserve_exact_report_hash_on_json_roundtrip ... ok
+test win_evidence::tests::exact_finite_null_trees_obey_wealth_and_anytime_multiplicity_bounds ... ok
+test win_evidence::tests::extreme_scores_keep_finite_logs_and_refuse_invalid_policy_clock_and_order ... ok
+test win_evidence::tests::final_gate_never_uses_early_crossing_or_weaker_trial_correction ... ok
+test worker_selection::tests::alternating_windows_never_oscillate_under_hysteresis ... ok
+test worker_selection::tests::dead_band_holds_and_resets_streaks ... ok
+test worker_selection::tests::exact_boundary_comparisons_use_checked_cross_products ... ok
+test worker_selection::tests::initial_state_starts_at_declared_cap_clamped_to_policy ... ok
+test worker_selection::tests::invalid_state_is_refused ... ok
+test worker_selection::tests::policy_validation_rejects_unbounded_or_inverted_thresholds ... ok
+test worker_selection::tests::selection_is_deterministic_and_pure ... ok
+test worker_selection::tests::sustained_idle_steps_up_to_declared_policy_and_parallelism_caps ... ok
+test worker_selection::tests::sustained_pressure_steps_down_to_floor_and_never_below ... ok
+test worker_selection::tests::unknown_or_empty_observations_hold_and_memory_pressure_floors ... ok
+test tick_engine::worker_preparation_tests::worker_preparation_mutation_after_admission_cannot_publish_checkpoint_or_receipt ... ok
+test tick_engine::worker_preparation_tests::worker_preparation_refuses_mutation_before_registration_and_recovers_after_restore ... ok
+test tick_engine::worker_preparation_tests::affinity_reuses_every_available_worker_checkpoint_with_parallel_receipt_parity ... ok
+test supervision_session::tests::finished_lifetime_history_pages_are_stable_indexed_and_fully_verified ... ok
+test tick_engine::worker_preparation_tests::saturated_writer_gate_refuses_batch_typed_and_recovers_after_pressure ... ok
+
+test result: ok. 266 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.34s
+
+     Running unittests src/main.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/daf466963a5184c7/out/rust_strategy_factory-daf466963a5184c7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/archive_evidence.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/f3faee510b055b6d/out/archive_evidence-f3faee510b055b6d)
+
+running 1 test
+test consumed_archive_and_full_quote_consistency_survive_chunk_export_without_approval ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/atr.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/40e2b214425ba8ab/out/atr-40e2b214425ba8ab)
+
+running 6 tests
+test atr_policy_appears_in_autonomous_regions_and_frozen_parameter_probes ... ok
+test misspelled_stop_or_rule_fields_cannot_silently_select_a_different_model ... ok
+test atr_market_stop_has_independently_calculated_risk_volume_and_three_r_target ... ok
+test pending_order_freezes_atr_distance_and_quantity_before_later_volatility_and_fill ... ok
+test outward_wilder_atr_and_grid_distance_match_independent_integer_fixture ... ok
+test unavailable_atr_and_excess_distance_never_fall_back_or_silently_clamp ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/batch.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/185bf1508bdfd8ef/out/batch-185bf1508bdfd8ef)
+
+running 7 tests
+test shared_batch_preflight_refuses_invalid_budgets_or_mixed_primary_frames ... ok
+test actual_batch_cli_reports_shared_compilation_and_separate_cached_reuse ... ok
+test indexed_policy_health_blocks_cached_and_pending_publication_and_protects_science ... ok
+test busy_member_preserves_committed_prefix_and_retry_reuses_other_worker_receipt ... ok
+test shared_window_atr_pending_and_proof_contexts_keep_exact_scalar_results ... ok
+test indexed_training_batches_preserve_financial_receipts_and_audit_supported_cases ... ok
+test shared_batches_equal_independent_scalar_receipts_for_all_instruments_and_reuse ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s
+
+     Running tests/behavior.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/dcfc3cbd8ebb51bc/out/behavior-dcfc3cbd8ebb51bc)
+
+running 4 tests
+test decision_vectors_are_causal_prefixes_within_budget ... ok
+test identical_rules_have_zero_distance_and_duplicates_are_reported ... ok
+test population_and_bar_budgets_are_refused_not_truncated ... ok
+test diversity_is_exact_deterministic_and_reports_complete_distances ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/blocked_native.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/67be562ed362ae4c/out/blocked_native-67be562ed362ae4c)
+
+running 2 tests
+test actual_cli_roundtrip_and_pinned_range_export_keep_exact_integer_strings ... ok
+test all_instruments_layouts_preserve_exact_identity_ties_full_width_order_and_ranges ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running tests/calendar_evidence.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/0225bc108a280e8d/out/calendar_evidence-0225bc108a280e8d)
+
+running 1 test
+test exact_half_open_calendar_counts_match_point_oracle_and_bind_receipts ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/candidate_screen.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/d22f591d5c453809/out/candidate_screen-d22f591d5c453809)
+
+running 15 tests
+test exclusive_window_does_not_consume_future_bar_or_exit ... ok
+test audit_coverage_aggregates_bound_rejections_and_false_negatives ... ok
+test bound_proven_failure_uses_optimistic_bound_not_point_estimate ... ok
+test net_bounds_bracket_the_adverse_resolution ... ok
+test net_bounds_stop_only_resolution_dominates_adverse_proxy ... ok
+test adverse_stop_proxy_keeps_uncapped_gap_loss_and_collision_uncertainty ... ok
+test real_tick_target_before_same_bar_stop_is_a_detected_shadow_false_negative ... ok
+test deadline_uses_first_actual_quote_without_inventing_a_tick_at_24_hours ... ok
+test target_model_uses_next_quote_entry_two_fees_and_net_wins ... ok
+test unresolved_estimate_has_no_net_bounds ... ok
+test unsupported_and_unclosed_models_escalate_without_fabricating_trades ... ok
+test shadow_policy_preserves_uncertainty_and_reproducibly_selects_audits ... ok
+test model_budget_exhaustion_remains_a_partial_promoted_result ... ok
+test registry_coverage_reports_marker_absence_as_never_covered ... ok
+test registry_coverage_bound_is_explicit_and_corrupt_registry_refuses ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/catalog.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/d99ee6e12d7d11bb/out/catalog-d99ee6e12d7d11bb)
+
+running 10 tests
+test existing_mode_preserves_unrelated_databases_and_never_creates_missing_files ... ok
+test immutable_registration_reuses_reimports_and_separates_provenance_revisions ... ok
+test actual_cli_record_list_detail_and_reimport_reuse ... ok
+test exact_sequence_boundaries_and_stable_identity_pagination_survive_insertions ... ok
+test invalid_data_metadata_and_tampered_receipts_refuse_without_overwriting ... ok
+test correction_lineage_is_immutable_scoped_and_survives_snapshot ... ok
+test metadata_quota_refusal_preserves_existing_rows ... ok
+test invalid_or_unknown_snapshot_state_never_publishes_and_preserves_unrelated_files ... ok
+error: catalog backup destination must be new
+test actual_cli_snapshot_and_new_path_restore_preserve_all_receipts ... ok
+test online_snapshot_includes_committed_wal_and_restores_exact_immutable_receipts ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+     Running tests/checkpoint_history.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/d597ef97a54b0d7a/out/checkpoint_history-d597ef97a54b0d7a)
+
+running 2 tests
+test checkpoint_history_continues_after1000_with_complete_chain_backup_and_old_corruption_refusal ... ok
+test checkpoint_global_row_limit_remains_atomic_at10000_and_full_history_is_verified ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running tests/checkpoint_rehash_integration.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/9c03a72e7da6e6c9/out/checkpoint_rehash_integration-9c03a72e7da6e6c9)
+
+running 6 tests
+test preflight_churn_with_more_physical_source_bindings_than_workers_keeps_exact_receipts ... ok
+test cold_range_continuation_recomputes_account_prefix_but_does_not_decode_future_artifacts ... ok
+test combined_reuse_never_authenticates_rehashed_checkpoint_json_or_changed_consumed_artifacts ... ok
+test retained_preflight_never_bypasses_changed_operational_caps_or_missing_source_paths ... ok
+test retained_preflight_checks_consumed_middle_future_bytes_and_cold_restoration_exactly ... ok
+test combined_private_checkpoints_and_current_source_proofs_preserve_complete_order_receipts ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.51s
+
+     Running tests/cli.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/c3bf1bcd90aa2fe0/out/cli-c3bf1bcd90aa2fe0)
+
+running 1 test
+test import_inspect_evaluate_and_overwrite_protection ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+     Running tests/compressed.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/249cc20ff163aeb0/out/compressed-249cc20ff163aeb0)
+
+running 3 tests
+test malformed_outer_and_inner_checksums_lengths_frames_and_output_caps_are_refused ... ok
+test structural_validation_and_no_replace_publication_remain_mandatory ... ok
+test all_eight_profiles_round_trip_byte_exact_with_provenance_and_u64_sequences ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/core.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/e73ad4e3cc3eb44d/out/core-e73ad4e3cc3eb44d)
+
+running 17 tests
+test an_already_crossed_initial_stop_cannot_later_be_counted_as_a_target ... ok
+test contradictory_rules_and_extreme_sizing_fail_safely ... ok
+test conversion_never_uses_future_or_stale_quotes ... ok
+test candles_are_closed_causal_and_never_fill_gaps ... ok
+test canonical_identity_and_bounded_shared_features ... ok
+test deadline_requires_a_real_subsequent_event_and_unresolved_stays_open ... ok
+test gap_stop_losses_are_not_capped_to_ten_percent ... ok
+test minimum_lot_and_adverse_rounding ... ok
+test long_target_uses_subsequent_tied_event_and_no_limit_slippage ... ok
+test indicators_are_causal_and_masks_preserve_tail ... ok
+test profiles_and_exact_decimals ... ok
+test quarantine_preserves_bad_events_and_timestamp_ties ... ok
+test replay_rejects_candle_and_signal_tampering ... ok
+test spread_floor_never_improves_prices_and_wider_spread_remains ... ok
+test short_uses_ask_for_exit_and_adverse_sell_slippage ... ok
+test usd_account_reciprocal_conversion_is_exact_and_direction_based ... ok
+test uncapped_extreme_losses_remain_exact_in_public_json_receipts ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/corpus.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/c0179138e04dcc9b/out/corpus-c0179138e04dcc9b)
+
+running 96 tests
+test actual_disk_observation_resolves_parent_and_refuses_unknown_targets ... ok
+test actual_cli_creation_inventory_and_relocation_preserve_identity_and_original_artifacts ... ok
+test block_account_replay_preserves_every_market_stop_limit_receipt_and_nonzero_trades ... ok
+test actual_block_corpus_cli_and_materialized_loader_preserve_canonical_experiment_reuse ... ok
+test batch_cli_resumes_multiple_jobs_across_processes_and_stops_when_paused ... ok
+test batch_cli_sigterm_finishes_one_bounded_round_and_remains_resumable ... ok
+test blocked_late_corruption_preserves_committed_checkpoint_and_attempt_counts ... ok
+test bounded_candle_context_matches_all_batch_frames_and_refuses_partial_outputs ... ok
+test block_corpora_preserve_all_instrument_contexts_signals_and_legacy_identity ... ok
+test blocked_artifact_above_legacy_chunk_cap_has_bounded_resident_quotes ... ok
+test campaign_owned_permanent_execution_error_is_not_retried_or_relaunched ... ok
+test campaign_owned_lease_refusal_backoff_and_operator_holds_start_no_children ... ok
+test campaign_foreground_cli_replenishes_frozen_regions_preserves_holds_and_restarts ... ok
+test all_profiles_and_chunk_boundaries_preserve_exact_events_and_seven_candle_streams ... ok
+test campaign_rotation_pressure_and_outer_publication_failure_preserve_inner_evidence ... ok
+test chunk_visitor_preserves_state_and_stops_before_invalid_or_failed_callbacks ... ok
+test corpus_account_replay_matches_all_materialized_receipt_fields ... ok
+test campaign_owned_regions_link_actual_parents_and_scalar_receipts_with_restart_and_backup ... ok
+test corpus_primary_signals_equal_batch_compilation_and_enforce_feature_budget ... ok
+test corpus_resource_pressure_exits_before_claim_and_resumes_after_policy_change ... ok
+test corpus_search_cli_later_range_reopens_and_reuses_exact_scalar_receipts ... ok
+test corpus_search_worker_errors_pause_without_becoming_completed_evidence ... ok
+test corpus_terminal_failures_are_not_success_and_invalid_budgets_do_not_register ... ok
+test corpus_window_keeps_prior_warmup_and_excludes_end_publication ... ok
+test corpus_search_cli_reopens_controls_replenishes_and_exhausts_without_extra_attempts ... ok
+test declared_corpus_candle_ceiling_is_consistent_across_preparation_signals_and_registry_keys ... ok
+test corpus_workers_report_job_failures_without_losing_other_checkpoints ... ok
+test durable_corpus_search_reopens_drains_then_replenishes_and_matches_scalar_receipts ... ok
+test disk_pressure_sessions_refuse_before_registration_and_resume_with_unchanged_keys ... ok
+test durable_search_backup_and_terminal_controls_preserve_original_queue ... ok
+test fleet_backup_rotation_and_terminal_control_are_durable ... ok
+test campaign_owned_publication_failure_preserves_unlinked_parent_and_completed_source ... ok
+test fleet_duplicate_inputs_and_global_resource_pressure_do_not_start_searches ... ok
+test fleet_cli_restarts_at_next_input_and_stops_with_terminal_budget ... ok
+test fleet_loop_operator_pause_interrupts_wait_without_resuming_or_spawning_more_children ... ok
+test fleet_disk_guard_preserves_cursor_and_isolates_one_source_until_policy_restored ... ok
+test campaign_rotation_isolates_unavailable_input_preserves_fair_cursor_then_recovers_with_exact_costs ... ok
+test fleet_loop_ready_retry_executes_once_then_preserves_new_permanent_failure_hold ... ok
+test fleet_loop_refuses_policy_retuning_and_invalid_wait_before_new_work ... ok
+test fleet_source_identity_changes_block_one_input_but_runtime_worker_changes_do_not ... ok
+test foreground_pressure_and_argument_limits_refuse_before_registry_creation ... ok
+test foreground_session_crash_stays_unclosed_and_restart_gets_new_identity ... ok
+test foreground_session_stop_is_cooperative_and_receipted ... ok
+test fleet_loop_sigterm_interrupts_wait_without_fabricating_progress ... ok
+test foreground_supervision_sigterm_reaps_its_foreground_session_at_wait_boundary ... ok
+test frozen_campaign_cli_binds_complete_trial_scope_preserves_holds_and_rejects_retuning ... ok
+test foreground_supervision_bounds_wait_and_preserves_operator_pause_across_processes ... ok
+test hash_consistent_but_fabricated_account_checkpoint_is_not_trusted ... ok
+test killed_corpus_process_waiting_for_writer_preserves_committed_checkpoint ... ok
+test fleet_loop_wait_budget_restart_and_pure_polling_preserve_frozen_deadline ... ok
+test mixed_block_native_reopen_checkpoints_advance_only_complete_artifacts ... ok
+test generated_search_sigterm_exits_at_a_round_boundary_and_restarts ... ok
+test killed_search_process_waiting_for_writer_preserves_generated_queue_and_checkpoints ... ok
+test mixed_budget_sessions_drop_prior_slots_before_parallel_resume_without_new_refusal ... ok
+test native_caller_cap_precedes_allocation_and_consumed_file_fingerprint_matches ... ok
+test oversized_operator_configs_refuse_before_registry_creation ... ok
+test multi_round_cli_preparation_session_reuses_after_restart_and_preserves_full_receipts ... ok
+test owned_child_output_overflow_is_bounded_and_reaped_without_partial_json ... ok
+test owned_child_rss_threshold_cancels_and_preserves_actual_resource_observations ... ok
+test owned_child_survives_sustained_cross_process_writer_pressure ... ok
+test owned_fleet_link_failure_keeps_child_evidence_and_rolls_back_rotation_prefix ... ok
+test owned_fleet_isolates_missing_input_and_never_overrides_operator_source_pause ... ok
+test owned_fleet_rejects_insufficient_coordinator_lease_before_claim_or_spawn ... ok
+test multi_corpus_fleet_rotates_after_each_round_and_preserves_full_scalar_receipts ... ok
+test owned_parent_refuses_pressure_and_bad_limits_before_creating_registry_or_child ... ok
+test missing_corpus_is_isolated_while_other_input_finishes_then_restores ... ok
+test owned_parent_signal_escalates_only_its_actual_child_and_reaps_it ... ok
+test owned_region_process_pins_effective_identity_and_preserves_base_operator_file ... ok
+test owned_foreground_child_exit_and_wall_budget_are_reaped_with_exact_receipts ... ok
+test pinned_child_rejects_retuned_inputs_before_registry_creation_and_keeps_operator_files ... ok
+test paused_corpus_backup_restores_without_mutating_original_job ... ok
+test parallel_corpus_rounds_match_serial_receipts_and_reject_aggregate_overcommit ... ok
+test prepared_corpus_causal_signals_match_materialized_and_block_layouts ... ok
+test prepared_snapshot_is_not_current_byte_eligibility_and_mutated_artifacts_refuse_replay ... ok
+test preparation_sessions_preserve_independent_ownership_holds_caps_and_current_sources ... ok
+test registered_corpus_driver_yields_publishes_once_and_reuses_exact_receipt ... ok
+test prepared_corpus_matches_every_instrument_frame_and_aggregate_budget ... ok
+test registered_corpus_identity_binds_exact_artifacts_policy_and_budgets ... ok
+test retry_policy_cli_is_bounded_frozen_and_never_resumes_operator_pause ... ok
+test rotation_wait_budget_restarts_preserve_frozen_deadline_without_process_or_journal_spam ... ok
+test separate_cli_processes_resume_registered_corpus_and_reuse_completion ... ok
+test actual_sqlite_writer_contention_has_typed_admission_failures_and_no_child_claims ... ok
+test rotation_wait_operator_and_sigterm_intervention_leave_retries_held ... ok
+test shared_worker_preparation_actual_cli_matches_full_order_receipts_and_cached_restart ... ok
+test source_bound_account_steps_reopen_and_match_complete_replay ... ok
+test source_revisions_reordering_mixed_profiles_and_oversized_chunks_fail_closed ... ok
+test stream_refuses_bad_quotes_order_and_dates_without_advancing_state ... ok
+test source_facts_match_full_inspection_all_symbols_native_blocked_and_exact_cli_keys ... ok
+test trusted_session_external_valid_progress_and_operator_hold_discard_warm_authority ... ok
+test verified_no_frame_inventory_preserves_inspection_and_refuses_missing_context_or_changed_paths ... ok
+test warm_preparation_session_still_recomputes_and_refuses_self_hashed_account_forgery ... ok
+test trusted_session_rejects_same_cursor_rehashed_forgery_and_changed_old_source_bytes ... ok
+test rotation_wait_wakes_once_then_holds_actual_permanent_execution_failure ... ok
+test owned_fleet_rotation_preserves_scalar_receipts_exact_cost_observations_and_backup ... ok
+test trusted_session_accounts_skip_only_worker_produced_prefix_and_preserve_complete_receipts ... ok
+test campaign_ledgers_exceed_global128_without_cross_campaign_quota_or_extra_children_at_own_cap ... ok
+
+test result: ok. 96 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.34s
+
+     Running tests/corpus_indexed.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/b53eb89f7546f9c5/out/corpus_indexed-b53eb89f7546f9c5)
+
+running 6 tests
+test cli_corpus_inspect_and_context_publish_exact_checksums ... ok
+test full_receipt_parity_versus_scalar_replay_is_nonzero ... ok
+test mmap_guard_bounds_budget_and_staleness_are_fail_closed ... ok
+test direct_arrays_bind_provenance_and_refuse_revision ... ok
+test indexed_blocks_bind_provenance_and_order_for_all_symbols_and_splits ... ok
+test all_eight_instruments_seven_frames_match_candle_oracle_exactly ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 51.23s
+
+     Running tests/corpus_lifecycle.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/6983020b347ec71d/out/corpus_lifecycle-6983020b347ec71d)
+
+running 3 tests
+test returned_old_worker_failure_never_yields_replacement_actor_or_masks_lease_error ... ok
+test cleanup_database_refusal_preserves_original_error_and_expiry_recovery ... ok
+test returned_postclaim_source_failure_yields_current_lease_for_immediate_exact_retry ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/coverage.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/db71a5bcb924b98a/out/coverage-db71a5bcb924b98a)
+
+running 3 tests
+test empty_scope_bounds_tamper_and_calendar_refusals ... ok
+test observed_partial_months_empty_month_ties_and_exact_latest_sequence ... ok
+test scoped_counts_and_gaps_match_independent_filtered_oracle ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/crash_injection.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/67749ffdaf0e88e0/out/crash_injection-67749ffdaf0e88e0)
+
+running 3 tests
+test disk_full_wal_growth_preserves_committed_data_and_resumes ... ok
+test disk_full_receipt_publication_rolls_back_and_resumes_after_space_freed ... ok
+test sigkill_during_checkpoint_write_preserves_chain_and_resumes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running tests/data_approval.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/eb16ad98cc422949/out/data_approval-eb16ad98cc422949)
+
+running 7 tests
+test concurrent_reviewers_cannot_overwrite_a_revocation_from_a_stale_head ... ok
+test history_and_signatures_survive_snapshot_and_forgery_cannot_open_gate ... ok
+test actual_cli_decisions_use_stdin_credentials_and_source_corrections_block_old_gates ... ok
+test exact_scoped_authentication_five_gates_revocation_and_artifact_changes_fail_closed ... ok
+test source_area_symbol_permissions_and_owner_only_secret_files_are_enforced ... ok
+test permissions_are_exact_independent_expiring_and_policy_rotation_invalidates_old_approvals ... ok
+test synthetic_data_and_research_profiles_cannot_receive_approval ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/data_review.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/76a8759f47e76347/out/data_review-76a8759f47e76347)
+
+running 4 tests
+test review_scope_and_evidence_integrity_refuse_missing_or_conflicting_inputs ... ok
+test scoped_history_has_stable_cursors_validated_reports_and_indexed_lookup ... ok
+test legacy_catalog_upgrade_and_actual_cli_review_roundtrip ... ok
+test retained_evidence_states_are_immutable_and_survive_snapshot_without_granting_approval ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/diagnostics.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/2b3cc49f79f755c7/out/diagnostics-2b3cc49f79f755c7)
+
+running 2 tests
+test empty_breakeven_order_and_overflow_remain_explicit ... ok
+test exact_year_session_breakdown_and_uncapped_realized_cash_drawdown ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/exploration.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/e9dba2e15f1c3805/out/exploration-e9dba2e15f1c3805)
+
+running 3 tests
+test crossover_refuses_mismatched_scope_contradiction_and_excess_complexity ... ok
+test seeded_structure_is_bounded_canonical_distinct_and_preserves_execution ... ok
+test higher_timeframe_coverage_spans_every_strictly_higher_timeframe ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/families.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/ff7744ed674b69de/out/families-ff7744ed674b69de)
+
+running 10 tests
+test family_checkpoint_rules_are_canonical_and_compatible ... ok
+test family_checkpoint_scheduling_contract_is_deterministic_with_seed ... ok
+test prior_extrema_exclude_current_bar_and_match_brute_force ... ok
+test exactly_ten_family_checkpoints_are_fixed_and_reproducible ... ok
+test seven_instruments_times_ten_families_is_seventy_groups ... ok
+test utc_session_masks_use_publication_hour_and_weekday_and_support_overnight ... ok
+test every_family_has_valid_unique_templates_and_actual_nonzero_signal_cohorts ... ok
+test all_family_signals_are_prefix_causal_and_reusable ... ok
+test shared_cache_evicts_without_changing_results_and_rejects_oversized_roots ... ok
+test every_family_reaches_nonzero_closed_tick_trades_on_actual_synthetic_events ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/higher_timeframe.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/6f91cda0e3c1b375/out/higher_timeframe-6f91cda0e3c1b375)
+
+running 5 tests
+test autonomous_regions_include_bounded_higher_confirmations ... ok
+test timeframe_hierarchy_and_nested_complexity_are_validated ... ok
+test higher_confirmation_matches_closed_candle_join_and_actual_tick_replay ... ok
+test future_quotes_do_not_change_higher_masks_and_warmup_does_not_guess ... ok
+test authoritative_mask_verification_accepts_valid_complex_bounded_graphs ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/historical_corpus_real.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/da95cd4a64196fab/out/historical_corpus_real-da95cd4a64196fab)
+
+running 5 tests
+test catalog_refuses_foreign_receipt ... ok
+test research_window_refuses_months_beyond_completed_corpus ... ok
+test configurable_window_refuses_shortfall_and_selects_latest_months ... ok
+test owner_selected_research_window_pins_2025_01_to_2026_10 has been running for over 60 seconds
+test real_corpus_end_to_end has been running for over 60 seconds
+test owner_selected_research_window_pins_2025_01_to_2026_10 ... ok
+test real_corpus_end_to_end ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 86.52s
+
+     Running tests/historical_migration_real.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/66e59ab256e44535/out/historical_migration_real-66e59ab256e44535)
+
+running 1 test
+test real_samples_convert_and_verify ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.28s
+
+     Running tests/historical_pipeline_real.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/2468daff28e920aa/out/historical_pipeline_real-2468daff28e920aa)
+
+running 3 tests
+test real_historical_structural_pipeline ... ok
+test real_historical_diagnostic_execution has been running for over 60 seconds
+test real_historical_study_report has been running for over 60 seconds
+test real_historical_study_report ... ok
+test real_historical_diagnostic_execution ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 197.91s
+
+     Running tests/import_job.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/29fbbce469c17997/out/import_job-29fbbce469c17997)
+
+running 12 tests
+test changed_revision_profile_category_source_or_chunk_configuration_refuses ... ok
+test checkpoint_corruption_and_unrelated_ledger_are_preserved_and_refused ... ok
+test checkpoint_resume_preserves_complete_source_order_and_category_without_republication ... ok
+test complete_assembly_recomputes_cross_chunk_diagnostics_and_refuses_partial_or_damaged ... ok
+test assembled_source_preserves_nonzero_authoritative_replay_across_chunks_and_gaps ... ok
+test crash_window_orphan_is_reused_exactly_and_conflicts_or_missing_artifacts_refuse ... ok
+test csv_quoted_crlf_blank_tail_and_no_final_newline_resume_exactly ... ok
+test failed_tail_and_cross_chunk_order_never_advance_or_publish_bad_rows ... ok
+test separate_cli_processes_resume_and_inspect_the_same_job ... ok
+test empty_and_budget_refusals_and_real_parsing_never_imply_approval ... ok
+test actual_sigkill_after_checkpoint_initialization_recovers_the_exact_source ... ok
+test competing_writer_refuses_without_advancing_checkpoint ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.41s
+
+     Running tests/improvement.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/bd2046f5be12279a/out/improvement-bd2046f5be12279a)
+
+running 21 tests
+test automatic_improvement_limits_and_build_identity_are_enforced ... ok
+test declared_stop_probe_preserves_policies_and_refuses_noop_and_grammar_overflow ... ok
+test actual_v1_diagnosis_fixture_remains_hash_readable_after_optional_extension ... ok
+test declared_floor_is_not_a_wide_spread_guarantee ... ok
+test comparable_children_preserve_explicit_shadow_policy_identity ... ok
+test competing_connections_publish_one_deterministic_report ... ok
+test exact_proof_rejection_audits_and_comparable_children_preserve_real_evidence ... ok
+test comparable_training_review_replays_and_retains_exact_evaluation_edges ... ok
+test indexed_training_review_preserves_policy_and_independent_proof_audits ... ok
+test proof_screening_at_candle_screen_stage_is_authorizable_and_verifiable ... ok
+test no_signals_unresolved_and_failed_receipts_remain_explicit ... ok
+test proof_screening_cannot_hide_bad_conversions_or_adapt_scientific_windows ... ok
+test incremental_review_yields_after_each_missing_experiment_and_matches_full_report ... ok
+test opt_in_queue_is_bounded_pauses_and_recovers_a_committed_review ... ok
+test rejected_parent_gets_declared_floor_probe_with_exact_child_tick_accounting ... ok
+test real_loss_proposals_are_bounded_immutable_and_survive_backup ... ok
+test review_refuses_changed_context_before_registering_and_keeps_scoped_window ... ok
+test structural_dropout_executes_a_real_child_and_small_budgets_keep_mutation_classes ... ok
+test queued_work_obeys_fencing_and_state_pressure_without_losing_the_job ... ok
+test worker_pause_and_restart_between_children_preserve_progress_and_counters ... ok
+test scientific_stages_cannot_authorize_adaptation_but_explicit_training_can ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.82s
+
+     Running tests/indexed_replay.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/01c6c7f6c2c50057/out/indexed_replay-01c6c7f6c2c50057)
+
+running 5 tests
+test deadline_precedes_gap_target_and_full_u64_tied_event_order_is_preserved ... ok
+test forged_masks_and_future_fx_scope_match_authoritative_boundaries ... ok
+test pending_fractional_and_nonliteral_usd_cases_use_exact_sequential_fallback ... ok
+test long_unresolved_paths_use_ordered_block_drawdown_and_excursion_summaries ... ok
+test seeded_full_accounting_matches_all_profiles_sides_costs_windows_and_atr ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s
+
+     Running tests/machine_evidence.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/b12730a3c6cc3c88/out/machine_evidence-b12730a3c6cc3c88)
+
+running 4 tests
+test actual_cli_admission_requires_recomputation_and_preserves_source_bytes ... ok
+test changed_sources_claims_calendars_and_revisions_cannot_reuse_old_admission ... ok
+test corruption_is_rejected_on_read_and_snapshot_without_partial_publication ... ok
+test admission_is_exact_immutable_idempotent_and_survives_backup_and_process_readback ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/market_stop_proof.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/8e021ff0b2e972df/out/market_stop_proof-8e021ff0b2e972df)
+
+running 3 tests
+test proof_refuses_pending_adaptive_and_tampered_contexts ... ok
+test independent_necessary_condition_matches_reserve_for_all_profiles_sides_and_costs ... ok
+test proof_audits_are_deterministic_and_cannot_be_disabled ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/mask_prefix.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/1c6fe46887532f77/out/mask_prefix-1c6fe46887532f77)
+
+running 2 tests
+test exact_words_partial_words_empty_bounds_and_malformed_storage_are_checked ... ok
+test seeded_packed_prefix_checks_match_an_independent_boolean_oracle ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/milestone5_full_validation.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/989dce7c51d8acd6/out/milestone5_full_validation-989dce7c51d8acd6)
+
+running 9 tests
+test req2_boundary_leakage_is_rejected_by_the_training_observation_contract ... ok
+test req3_continuous_accounting_reconciles_exact_exit_year_counts ... ok
+test req2_walk_forward_folds_are_prior_only_with_a_24h_purge_embargo ... ok
+test req5_scientific_gates_pin_the_owner_criteria_exactly ... ok
+test req5_synthetic_evidence_is_rejected_at_the_gate_regardless_of_numbers ... ok
+test req2_prior_exposure_is_treated_as_contaminated_never_unseen ... ok
+test req1_classes_below_the_structural_bar_are_refused_before_reservation ... ok
+test req1_real_structurally_valid_is_admitted_and_never_granted_qualification ... ok
+test req4_all_ten_active_families_are_evaluated_in_one_frozen_protocol ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.32s
+
+     Running tests/native.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/beba45de0931808c/out/native-beba45de0931808c)
+
+running 4 tests
+test checksum_does_not_replace_event_and_profile_validation ... ok
+test native_rejects_corruption_truncation_trailing_bytes_and_hostile_lengths ... ok
+test column_chunk_boundaries_and_full_unsigned_sequences_roundtrip_exactly ... ok
+test native_roundtrip_preserves_all_seven_profiles_provenance_and_tied_order ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/neighborhood.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/2d7d08da90ee0748/out/neighborhood-2d7d08da90ee0748)
+
+running 4 tests
+test flattened_boolean_rules_must_remain_within_the_canonical_arity_budget ... ok
+test invalid_windows_thresholds_and_fixed_session_fields_are_not_invented ... ok
+test scalar_probes_are_exact_bounded_deterministic_and_canonical ... ok
+test seeded_nested_boolean_normalization_is_idempotent_when_accepted ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/operators.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/e106d32912d44764/out/operators-e106d32912d44764)
+
+running 4 tests
+test macd_matches_independent_rational_fixture_and_bands_match_population_variance ... ok
+test expanded_regions_include_typed_macd_and_band_variants ... ok
+test new_crosses_produce_actual_subsequent_quote_trades_with_independent_accounting ... ok
+test operators_are_prefix_and_large_integer_translation_invariant_and_fail_closed ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/orb_causality.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/4641ce01f2bba470/out/orb_causality-4641ce01f2bba470)
+
+running 4 tests
+test opening_range_is_published_only_after_the_window_completes ... ok
+test short_breakout_uses_the_same_completed_range ... ok
+test session_hour_argument_selects_the_session ... ok
+test appending_future_data_does_not_change_the_prefix ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ordered_coverage.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/56738ec23933d5da/out/ordered_coverage-56738ec23933d5da)
+
+running 3 tests
+test month_spec_requires_one_of_the_seven_instruments ... ok
+test ordered_coverage_refuses_duplicate_months_and_gold ... ok
+test ordered_coverage_rejects_bad_stage_and_month_limit ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/orders.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/a2c8a535cf545eca/out/orders-a2c8a535cf545eca)
+
+running 6 tests
+test market_orders_wait_for_next_event_even_when_timestamps_tie ... ok
+test repeated_sequence_with_conflicting_prices_is_rejected ... ok
+test pending_and_filled_order_snapshots_resume_without_duplicate_fills ... ok
+test expiry_and_cancellation_never_fabricate_fills ... ok
+test order_contracts_and_quote_chronology_are_immutable ... ok
+test stops_trigger_on_correct_quote_side_and_gap_fill_is_not_capped ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/parquet.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/fc304e757fbec3f9/out/parquet-fc304e757fbec3f9)
+
+running 5 tests
+test exact_logical_schema_and_original_dataset_hash_are_required ... ok
+test forged_page_allocation_sizes_are_rejected_before_the_parquet_decoder ... ok
+test truncation_magic_and_footer_budgets_fail_before_decoding ... ok
+test row_group_boundaries_are_lossless_and_publication_never_replaces_existing_paths ... ok
+test all_eight_profiles_preserve_exact_arrays_metadata_ties_and_unsigned_sequence ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/pending_replay.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/654c2f0aae5de76c/out/pending_replay-654c2f0aae5de76c)
+
+running 7 tests
+test legacy_market_identity_is_unchanged_and_entry_policy_is_not_deduplicated ... ok
+test changed_closed_signal_cancels_surviving_intent_after_quote_processing ... ok
+test cancellation_decided_from_publication_quote_cannot_undo_its_triggered_fill ... ok
+test long_pending_stop_reserves_at_publication_then_trades_with_3r_accounting ... ok
+test adverse_entry_gap_cannot_silently_resize_reserved_quantity ... ok
+test no_quote_does_not_fill_and_deadline_precedes_trigger ... ok
+test short_stop_uses_bid_entry_ask_exit ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/recovery.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/af65e3e5bc285be1/out/recovery-af65e3e5bc285be1)
+
+running 1 test
+test actual_cli_backup_verify_restore_and_path_keep_primary_inactive_and_private ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running tests/recursive_improvement.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/d5fb38fb047a2cb6/out/recursive_improvement-d5fb38fb047a2cb6)
+
+running 5 tests
+test recursive_configuration_bounds_are_enforced ... ok
+test schema23_jobs_migrate_additively_with_depth_zero ... ok
+test depth_zero_preserves_the_historical_no_descendant_behaviour ... ok
+test queued_recursive_generation_survives_reopen ... ok
+test controlled_recursion_advances_depths_and_stops_at_cap ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+     Running tests/regimes.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/c00a234dcc08ef53/out/regimes-c00a234dcc08ef53)
+
+running 3 tests
+test gaps_reset_history_and_expanded_ranges_are_closed_prior_evidence ... ok
+test labels_use_strictly_prior_publications_and_remain_prefix_causal ... ok
+test momentum_bins_are_prior_only_and_share_the_freshness_gate ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/registered_full_period.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/ca5b0641bc339558/out/registered_full_period-ca5b0641bc339558)
+
+running 6 tests
+test diagnostic_output_cannot_be_relabelled_into_the_registered_path ... ok
+test qualification_gate_accepts_registered_classification_and_rejects_diagnostic_with_exact_mismatch ... ok
+test real_class_input_without_training_window_is_refused ... ok
+test training_window_outside_the_corpus_is_refused ... ok
+test data_class_outside_the_four_allowed_classes_is_refused ... ok
+test registered_full_period_real_data_run_emits_the_registered_classification ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+     Running tests/research.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/331d2e9e7eb114f0/out/research-331d2e9e7eb114f0)
+
+running 9 tests
+test bounds_reject_invalid_configuration_and_new_regions_are_not_repeats ... ok
+test completed_experiment_before_cursor_commit_is_reused_without_new_simulation ... ok
+test real_data_loop_requires_explicit_chronological_training_scope ... ok
+test dataset_provenance_changes_identity_but_reimport_time_does_not ... ok
+test coordinators_are_exclusive_and_stale_owner_cannot_advance_cursor ... ok
+test configured_shadow_policy_separates_cache_identity_and_survives_driver_restart ... ok
+test pause_resume_stop_and_cursor_survive_restart ... ok
+test backup_restores_cursor_and_controls_with_fenced_lease_recovery ... ok
+test state_pressure_pauses_before_new_experiment_and_preserves_cursor ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running tests/research_cli.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/9756ae530ee13155/out/research_cli-9756ae530ee13155)
+
+running 2 tests
+test independent_rust_process_runs_pauses_resumes_and_stops_at_durable_checkpoints ... ok
+test signals_release_the_coordinator_and_restart_running_or_paused_state_immediately ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s
+
+     Running tests/restore_cutover.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/08abcba31a368a6b/out/restore_cutover-08abcba31a368a6b)
+
+running 3 tests
+test restore_cutover_rollback_on_failure_leaves_original_untouched ... ok
+test cli_restore_cutover_registry_check_passes_on_restored_copy ... ok
+test restore_cutover_fences_copied_actors_and_revives_on_restored_copy ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests/risk.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/b856c858577c4c2b/out/risk-b856c858577c4c2b)
+
+running 7 tests
+test initial_margin_includes_entry_mark_and_largest_feasible_grid_volume ... ok
+test margin_uses_contract_scale_and_event_aligned_conversion ... ok
+test commissions_reduce_size_instead_of_rejecting_a_smaller_feasible_order ... ok
+test minimum_volume_is_not_mistaken_for_a_nonmonotone_binary_search ... ok
+test protective_distance_is_measured_from_executable_mark_including_minimum_grid ... ok
+test reservation_rejects_off_grid_prices_and_distance_without_rounding_a_request ... ok
+test all_eight_profiles_match_independent_exhaustive_grid_sizing_oracle ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/robustness.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/67d089731c1c98e1/out/robustness-67d089731c1c98e1)
+
+running 5 tests
+test strategy_probes_preserve_costs_at_stress_ceiling ... ok
+test probes_obey_stop_domain_and_reject_unrepresentable_cost_stress ... ok
+test frozen_probes_change_exactly_prespecified_cost_or_stop_fields ... ok
+test incomplete_and_forged_probe_evidence_never_passes ... ok
+test frozen_probe_policy_has_exact_numeric_boundaries_without_qualification ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/scheduler_resources.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/bcb488c574d74431/out/scheduler_resources-bcb488c574d74431)
+
+running 6 tests
+test resource_enforcement_cli_reports_valid_evidence_for_deploy_templates ... ok
+test fleet_without_cpu_guard_keeps_legacy_definition_bytes ... ok
+test resource_allocation_cli_measures_a_bounded_live_window ... ok
+test driver_resource_guard_pauses_before_registering_experiments ... ok
+test fleet_cpu_guard_refuses_before_any_lease_claim ... ok
+test adaptive_batch_measures_cpu_and_adapts_workers_without_changing_receipts ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.75s
+
+     Running tests/science.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/511ef67ee7eb3384/out/science-511ef67ee7eb3384)
+
+running 17 tests
+test bad_calendar_fold_embargo_selection_and_overlap_fail_structural_validation ... ok
+test absent_win_policy_preserves_legacy_shapes_and_invalid_policy_creates_no_evidence ... ok
+test frozen_protocol_executes_all_windows_and_reuses_an_immutable_report ... ok
+test frozen_conditional_win_policy_binds_actual_oos_receipts_reopen_and_prevents_retuning ... ok
+test frozen_protocol_replays_actual_higher_timeframe_candidates ... ok
+test frozen_oos_evidence_gates_hold_real_receipt_shortfalls_and_preserve_reopen_policy ... ok
+test frozen_protocol_executes_atr_stops_and_includes_all_policy_probes_in_trial_budget ... ok
+test real_data_below_the_structural_bar_is_still_refused ... ok
+test incomplete_protocol_cannot_spend_real_protected_final_data ... ok
+test retrospective_oos_exposure_is_rejected_before_final_reservation ... ok
+test revised_quote_history_cannot_hide_prior_out_of_sample_exposure ... ok
+test frozen_time_blocks_bind_protocol_identity_and_preserve_conditional_status ... ok
+test real_structurally_valid_data_enters_frozen_protocol_pipeline ... ok
+test report_tampering_is_detected_and_equal_reservations_are_idempotent ... ok
+test identical_numeric_histories_on_different_instruments_have_independent_holdouts ... ok
+test scientific_summary_preserves_full_width_counts_and_net_without_qualification ... ok
+test robustness_policy_is_frozen_before_oos_and_survives_reopen ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s
+
+     Running tests/scientific_validation.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/1ac925e32b322afd/out/scientific_validation-1ac925e32b322afd)
+
+running 7 tests
+test summarize_computes_owner_criteria_descriptively ... ok
+test months_outside_the_approved_years_are_refused ... ok
+test numeric_failure_rejects_even_with_an_eligible_class ... ok
+test eligible_class_with_unknown_continuous_accounting_is_never_qualified ... ok
+test summarize_all_aggregates_and_never_qualifies ... ok
+test totals_that_do_not_reconcile_with_months_are_refused ... ok
+test win_rate_is_zero_when_nothing_resolved ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/screen.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/ea9a6d0985372b44/out/screen-ea9a6d0985372b44)
+
+running 4 tests
+test collisions_are_not_resolved_by_guessing_ohlc_order ... ok
+test ask_floor_minimum_does_not_assume_unknown_bid_ask_correlation ... ok
+test entry_and_deadline_ambiguity_preserve_all_possible_outcomes ... ok
+test conservative_sets_contain_sequential_first_hits_for_seeded_quote_streams ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source_rehash.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/b156e0333fdcfcd9/out/source_rehash-b156e0333fdcfcd9)
+
+running 2 tests
+test rehash_proofs_enforce_artifact_event_caps_and_resolved_paths_not_only_semantic_identity ... ok
+test retained_proofs_rehash_every_current_native_blocked_and_mixed_artifact_byte ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/sparse_mask.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/fef1c66174e1c162/out/sparse_mask-fef1c66174e1c162)
+
+running 2 tests
+test malformed_sparse_backing_and_padding_refuse_before_iteration ... ok
+test sparse_indices_match_scalar_oracle_for_boundaries_densities_and_seeded_masks ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/sparse_mask_storage.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/d74d6f1d755c8879/out/sparse_mask_storage-d74d6f1d755c8879)
+
+running 6 tests
+test prefix_comparison_detects_only_active_bit_differences ... ok
+test malformed_backing_and_padding_refuse_before_iteration ... ok
+test shared_feature_cache_retains_sparse_session_masks_logically_equal ... ok
+test boolean_combinations_and_complement_match_the_dense_oracle ... ok
+test representation_choice_is_density_boundaried_and_canonical ... ok
+test sparse_and_dense_backing_match_the_dense_oracle ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/stage_machine.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/467529761d9ade0d/out/stage_machine-467529761d9ade0d)
+
+running 4 tests
+test stage_lineage_and_telemetry_are_immutable ... ok
+test stage_advances_durably_and_resumes_from_lineage ... ok
+test stage_machine_refuses_tampered_lineage ... ok
+test reserved_holdout_authorizes_protected_stage ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running tests/storage.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/9f1e907a7fbb3fe6/out/storage-9f1e907a7fbb3fe6)
+
+running 27 tests
+test artifact_symlinks_and_quota_pressure_refuse_without_deleting_evidence ... ok
+test checkpoint_worker_yield_allows_immediate_reclaim_and_fences_prior_token ... ok
+test artifact_corruption_missing_file_and_summary_tampering_fail_closed ... ok
+test checkpoint_publication_rejects_wrong_attempt_without_writing_or_consuming_current_authority ... ok
+test compatible_event_lookup_upgrade_preserves_history_and_marker_semantics ... ok
+test concurrent_claims_never_both_acquire ... ok
+test competing_checkpoint_publication_never_accepts_wrong_attempt_with_a_current_nonce ... ok
+test concurrent_oos_reservation_and_outside_registration_cannot_both_succeed ... ok
+test concurrent_large_completion_has_one_receipt_and_preserves_terminal_evidence ... ok
+test corpus_status_is_verified_bounded_metadata_without_lease_tokens ... ok
+test dataset_aliases_cannot_bypass_protection_or_retroactively_claim_independence ... ok
+test database_rollback_after_artifact_publication_retries_without_extra_file_or_attempt ... ok
+test identities_include_scientific_versions_and_stage ... ok
+test durable_corpus_controls_survive_restart_and_block_publication ... ok
+test artifact_file_quota_reserves_staging_and_final_entries_before_publication ... ok
+test expired_worker_is_fenced_and_duplicate_finish_is_idempotent ... ok
+test final_holdout_cannot_be_reserved_after_training_exposure ... ok
+test frozen_holdout_blocks_leakage_and_repeated_tuning_after_restart ... ok
+test lease_snapshot_validation_checks_attempt_expiry_and_terminal_state ... ok
+test multi_range_reservation_rolls_back_when_a_later_range_is_exposed ... ok
+test immutable_replay_checkpoints_fence_stale_workers_and_survive_restart ... ok
+test legacy_inline_receipts_above_new_threshold_upgrade_without_rewriting_identity ... ok
+test protected_oos_registration_and_reservation_are_exclusive_and_durable ... ok
+test result_tampering_is_detected_on_read_and_integrity_check ... ok
+test restart_backup_and_restore_preserve_committed_wal_and_results ... ok
+test stale_leases_do_not_publish_files_and_uncommitted_files_recover_without_overwrite ... ok
+test large_receipts_are_file_backed_exact_idempotent_and_backup_portable ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.84s
+
+     Running tests/streaming_cli.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/7a41dcee4116d704/out/streaming_cli-7a41dcee4116d704)
+
+running 3 tests
+test decode_refuses_tampered_consumed_artifact_and_prefix ... ok
+test decode_state_persists_across_process_restarts ... ok
+test describe_then_decode_matches_library_roundtrip ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/tick_index.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/5487c1d910e7d697/out/tick_index-5487c1d910e7d697)
+
+running 1 test
+test seeded_barrier_queries_match_sequential_on_effective_quotes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/training_diagnostics.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/ced923b889f51915/out/training_diagnostics-ced923b889f51915)
+
+running 2 tests
+test training_breakdown_uses_exit_year_entry_bins_and_strict_loss_streaks ... ok
+test empty_overflow_chronology_scope_and_reason_budgets_fail_explicitly ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/uncertainty.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/d3f97f73209d2ad6/out/uncertainty-d3f97f73209d2ad6)
+
+running 5 tests
+test independently_calculated_bounds_and_declared_multiplicity ... ok
+test no_data_is_not_zero_uncertainty_and_breakevens_are_not_wins ... ok
+test time_block_bound_matches_independent_weighted_hoeffding_calculation ... ok
+test clustered_successes_do_not_gain_certainty_by_repeating_same_block ... ok
+test uncertainty_changes_monotonically_and_never_certifies_independence ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/validation.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/6cf612d20f5ee0cf/out/validation-6cf612d20f5ee0cf)
+
+running 5 tests
+test exact_fifty_percent_and_fifty_per_year_pass_numeric_only ... ok
+test below_threshold_break_even_and_unresolved_do_not_qualify ... ok
+test timestamps_and_future_outcomes_are_not_silently_sorted_or_accepted ... ok
+test folds_are_calendar_quarters_prior_only_with_purge_embargo ... ok
+test streak_crosses_calendar_boundary_and_break_even_does_not_reset_it ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/windows.rs (/root/.hermes/cache/scratch/m6-target/debug/build/rust-strategy-factory/24a5bbc802fb280e/out/windows-24a5bbc802fb280e)
+
+running 6 tests
+test malformed_serialized_masks_fail_validation_without_index_panics ... ok
+test pending_orders_cannot_be_placed_before_window_or_filled_after_it ... ok
+test prior_warmup_is_available_without_pre_window_positions ... ok
+test end_is_exclusive_and_future_quotes_cannot_close_or_change_window_positions ... ok
+test valid_future_numeric_overflow_cannot_change_an_earlier_window_or_higher_features ... ok
+test independent_window_uses_parent_dataset_identity_and_cannot_repeat_retuned_holdout ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+EXIT=0
+END_UTC=2026-11-25T01:20:58Z

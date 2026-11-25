@@ -1,0 +1,21 @@
+{"queue_capacity":1,"run_id":"5d2908975ecd14adc9d9345f5f2044670726889de489a7891df3302eba26652e","state":"coordinator_started","worker_count":1}
+{
+  "id": "5d2908975ecd14adc9d9345f5f2044670726889de489a7891df3302eba26652e",
+  "state": "running",
+  "cursor": 200,
+  "executed": 199,
+  "reused": 0,
+  "rejected": 1,
+  "failed": 0,
+  "active": false,
+  "latest": "fecd5d591ebc71cc2f4b978a0535442099f1c434835d82ce0ce37b8c7a7a8f62",
+  "last_error": null,
+  "improvements": {
+    "queued": 0,
+    "completed": 0,
+    "failed": 0,
+    "child_receipt_links": 0,
+    "max_depth": 0,
+    "accepted_descendants": 0
+  }
+}

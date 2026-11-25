@@ -6,20 +6,21 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
-## Latest verified local milestone (2026-11-24)
+## Latest verified local milestone (2026-11-25)
 
-HEAD `a5030f8` on `main` == `origin/main` (pushed). Commits this session:
-`b8571d8` (V2 seven-instrument scope, P0 fixes, verified gold-only data deletion), `a066dfa`,
-`3705bc8`, `cf179c5` (browser integration fixes), `702360b` (docs milestone 1),
-`f0ff8db` (P0.2 CandleScreen proof-authorization contract), `9824a4f` (P0.4 real-data
-scientific qualification path), `4c050a2` (P0.3 continuous cross-month accounting),
-`a9601e8` (P0.2 ordered full-history coverage command + receipt), `a5030f8` (rustfmt).
+HEAD `98cdc79` on `main` == `origin/main` (pushed). Milestone chain:
+`b8571d8` (V2 seven-instrument scope, P0 fixes, verified gold-only data deletion),
+`a5030f8`/`a9601e8` (P0.2–P0.4), `e1b1356` (state), `18d6e9b` (M2 ten families),
+`57c13fc` (M5 contract suite + evidence), `98cdc79` (M3 stage machine + telemetry).
 
-- Hosted CI run **45486926751** on `a5030f8`: **success** (Rust checks workflow).
-- Hosted CI run **45486211553** on `a9601e8`: **success** (Rust checks workflow, all jobs).
-- `scripts/check.sh` on `RSF_BUILDER_PROFILE=hermes-v2-m1`: **EXIT=0**, all suites pass.
-  Log: `/root/.hermes/cache/scratch/m1-check19.log` (outside repo; durable evidence is the commit +
-  hosted CI above).
+- Full `scripts/check.sh` ladder on `RSF_BUILDER_PROFILE=hermes-v2-m1`: **EXIT=0**
+  (`/root/.hermes/cache/scratch/m3-check1.log`), including the M5 contract suite and
+  `tests/stage_machine.rs` (4/4). `cargo clippy --locked --all-targets -- -D warnings`: EXIT=0.
+- Milestone 3: append-only immutable stage lineage with holdout-gated protected
+  stage, bounded telemetry replay, exactly-40% inclusive Stage-1 policy with
+  proven-bound rejection. CLI `machine advance <registry> <experiment-key.json>`.
+- Hosted CI: see the run for `98cdc79` below once concluded; `a5030f8` was success
+  (run 45486926751). Never treat a pending run as passed.
 - `npm run test:browser`: all 13 scripts pass locally. Earlier browser failures traced to the V2
   removal of XAUUSD moving the protocol fixture onto GBPUSD, which collided with the GBPUSD crash
   fixture's protected fold windows; the synthetic crash fixture now sits in Feb 2026 (outside every
@@ -71,10 +72,41 @@ pipeline; synthetic refusal preserved where required.
 
 ## Implement next (ordered)
 
-1. **Milestone 3**: durable stage transitions, 40% Stage-1 policy with proven-bound handling,
-   bounded population, immutable evaluator, telemetry/lineage.
-2. **Milestones 4–7**: shared preparation caches, full validation, measured optimization
-   (correctness first, reference-equivalence proofs), VPS acceptance evidence.
+1. **Milestone 7 final owner step**: reboot persistence on the target host requires an
+   explicit owner manual reboot (agent blocklist). Everything else is captured below.
+
+## Completed: Milestones 4, 6, 7 (2026-11-25)
+
+**M4 shared preparation caches:** `src/prep_cache.rs` + `tests/prep_cache.rs` (10/10) with
+exact scope identity over instrument/dataset/strategy/costs/engine/config/window/stage,
+content-addressed durable artifacts, byte caps, immutable index triggers, hash verification,
+deduplication, cold/warm parity, protected isolation and partial-write recovery. Evidence:
+`docs/VERIFICATION/milestone4-prep-cache.md`. No scientific gate modified.
+
+**M6 optimization and cleanup:** measured baseline with exact two-run parity
+(`milestone6-research-baseline-summary.json`, identical canonical sha256 across passes A/B),
+cold/warm isolated build timings, clippy `-D warnings` clean, dependency/license/advisory
+review, and honest hosted-CI status. Evidence: `docs/VERIFICATION/milestone6-*`.
+
+**M7 VPS acceptance evidence:** full-history ordered-coverage run of all 154 partitions
+(2,819 chunks), release build, recovery verify/restore parity and dashboard/operations checks
+at exact revision `98cdc79`. Reboot persistence not re-verified; requires owner manual action.
+Evidence: `docs/VERIFICATION/milestone7-*`.
+
+**Browser suite repaired for the new grammar:** `scripts/browser-check.cjs` now asserts the
+proof contract (`ProvenNoMarketEntry` + `fixed-market-stop-infeasible-v1`) instead of the
+removed-enumerator signal count, and `scripts/browser-long-ledger-check.cjs` verifies
+`corpus-replay` determinism plus stored-receipt structure. Full suite: 13/13 scripts pass.
+
+## Completed: Milestone 5 (2026-11-25)
+
+`tests/milestone5_full_validation.rs` (555 lines) pins the acceptance contract over the
+existing frozen-protocol, continuous-accounting, exposure-protection and scientific-gate
+machinery: RealStructurallyValid admitted / below-bar refused / synthetic never granted;
+prior-only folds with 24h embargo and boundary-leakage rejection; continuous exit-year
+reconciliation; all ten families evaluated; exact numerical gates and synthetic gate
+rejection. Evidence: `docs/VERIFICATION/milestone5-full-validation.md`. Covered by the
+full check.sh ladder (EXIT=0).
 
 ## Completed: Milestone 2 (2026-11-24)
 
