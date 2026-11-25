@@ -33,6 +33,11 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           shared-key: rust-cache-v1
+      # 2026-11-25 regression guard: scripts/check.sh (the mandatory local push
+      # gate) runs rustfmt --check, but this job previously ran only `cargo test`,
+      # so an unformatted src/research.rs reached main while hosted CI stayed
+      # green. Run the same format gate here so the defect fails CI too.
+      - run: cargo fmt --all -- --check
       - run: cargo test --locked --lib --bins --tests
   browser:
     name: browser

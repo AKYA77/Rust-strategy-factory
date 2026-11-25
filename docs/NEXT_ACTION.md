@@ -6,6 +6,22 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
+## Verified gate repair (2026-11-25, continuity run)
+
+Baseline `main` `f8e4eafbd56a344ce17a29eebb4c1a215137ea85` was clean and equal to
+`origin/main`, but the mandatory `scripts/check.sh` failed at its first layer:
+`cargo fmt --all -- --check` EXIT=1 on `src/research.rs:1474` (introduced by `2177da0`).
+Hosted `rust-checks` had no format step, so CI run 45634655873 on the same SHA was green
+despite the broken local gate. Fixed by applying the exact rustfmt rewrite (whitespace only)
+and adding `cargo fmt --all -- --check` to `.github/workflows/ci.yml` `rust-checks`.
+
+Verified after: `cargo fmt --all -- --check` EXIT=0, clippy `-D warnings` EXIT=0, full
+`scripts/check.sh` EXIT=0 with **744 passed / 0 failed across 69 binaries** (lib 276), zero
+failing test names. Evidence: `docs/VERIFICATION/fmt-gate-regression-2026-11-25.md`.
+Commit SHA and hosted CI conclusion are stamped into this file in the follow-up
+reconciliation entry; no `in_progress` run is called a pass. No financial/scientific/data
+rule changed. V2 milestones 1–6 remain evidenced; Milestone 7 remains NOT accepted.
+
 ## Latest verified local milestone (2026-11-25)
 
 Cursor 2026-11-25: `main` HEAD `767f777` (Stage-1 CandleScreen CLI regression fix,
@@ -100,14 +116,15 @@ pipeline; synthetic refusal preserved where required.
 
 ## Implement next (ordered)
 
-1. **Milestone 7 remaining items are owner-gated**: reboot persistence on the target host
-   requires an explicit owner manual reboot (agent blocklist); deploying the exact-HEAD
-   release and clearing the 20 stale XAUUSD entries from the *installed*
-   `~/.local/share/rust-strategy-factory/config/research.json` are production cutover /
-   service actions requiring owner authorization. The repo itself is clean of gold
-   references; only the installed copy is stale and it is crash-looping the research unit.
-2. Re-run the M7 evidence ladder after any owner-authorized cutover, then update
-   `docs/VERIFICATION/milestone7*` and this file.
+1. **Milestone 7 remaining items are external-evidence gates only** (see
+   `docs/VERIFICATION/milestone7-vps-acceptance.md` §7): the exact-HEAD release is deployed
+   and the prep-cache crash is fixed (items 1–2 RESOLVED, service `active (running)` with zero
+   crash-restarts). Still open: (3) authenticated dashboard endpoints were not exercised —
+   `browser_vault` has no saved logins and new credentials may not be created by an agent;
+   (4) a fresh reboot persistence proof requires an explicit owner manual reboot (agent
+   blocklist). Neither can be closed by repository code.
+2. After any owner authorization for those gates, re-run the M7 evidence ladder and update
+   `docs/VERIFICATION/milestone7*` and this file. No software milestone remains unachieved.
 
 ## Completed: Milestones 4 and 6 (2026-11-25)
 

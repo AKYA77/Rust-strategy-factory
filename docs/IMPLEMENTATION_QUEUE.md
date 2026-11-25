@@ -2,6 +2,19 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-25 (formatting gate): baseline clean `main` `f8e4eaf` had
+`scripts/check.sh` EXIT=1 at `cargo fmt --all -- --check` on `src/research.rs:1474`
+(introduced by `2177da0`); hosted `rust-checks` ran only `cargo test`, so CI run 45634655873
+on that SHA was green despite the broken local gate. Fixed with the exact rustfmt rewrite
+(whitespace only) and a `cargo fmt --all -- --check` step in `.github/workflows/ci.yml`.
+Post-fix ladder: fmt/clippy EXIT=0, `scripts/check.sh` EXIT=0, **744 passed / 0 failed over
+69 binaries** (lib 276), zero named test failures — correcting the earlier unverified
+746/70 figure. Evidence: `docs/VERIFICATION/fmt-gate-regression-2026-11-25.md`. Commit SHA
+and terminal CI conclusion are stamped in the follow-up reconciliation. No V2 scientific
+rule or seven-instrument scope changed. V2 milestones 1–6 evidenced; Milestone 7 still NOT
+accepted (only external-evidence gates 3–4 remain: saved dashboard credentials and owner
+manual reboot). No further software milestone is unachieved.
+
 Integration state: all open PRs have been merged into `main` — the Codex stack #8–#13, the independent campaign-owned ledger #1, the Hermes historical Parquet→native migration #6, and earlier checkpoint PRs #2–#5/#7 via #14 (merge commit `3d2d6f2`); PR #53 (main CI restoration, commit 858a289); PR #52 (registered full-period real-data executor, merge commit ba66956); and PR #54 (20-month training window + OOS holdout config; Conversion::usd sentinel contract restored, merge commit bda7fca). Every PR head commit is an ancestor of `origin/main`; all PRs were closed as merged with history preserved. local `main` HEAD is `767f777` (Stage-1 CLI regression fix over nine integrated bot commits; parent `4b52ea4`), pushed to `origin/main` in this run. Hosted CI push runs **45528848345**
 on `2ced8fe` and **45535143330** on `b17ce34` both concluded **success on all 7 jobs** (release-build, browser, rust-checks,
 data-compute-identity, full-horizon, check-operations, dependency-audit); the earlier

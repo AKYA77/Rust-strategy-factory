@@ -1474,10 +1474,8 @@ impl Driver {
         // unaffected, only warm-cache reuse is lost until old entries age out.
         let c: Vec<candles::Candle> = match self.prep_cache.get(&candle_scope)? {
             Some(hit) => {
-                let value: serde_json::Value = prep_cache::decode(
-                    &hit.data,
-                    &hit.receipt.content_hash,
-                )?;
+                let value: serde_json::Value =
+                    prep_cache::decode(&hit.data, &hit.receipt.content_hash)?;
                 serde_json::from_value(value).map_err(|e| e.to_string())?
             }
             None => {
