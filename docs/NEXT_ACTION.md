@@ -6,6 +6,29 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
+## Conversion implementation reconciliation at HEAD (2026-11-25 continuity run)
+
+Baseline clean `main` `c3ee6c0` (== `origin/main`, 0/0 ahead-behind, no other worker, heavy lock
+acquired). Commit `c3ee6c0` ("Reconcile conversion implementation for USDJPY/USDCHF/USDCAD") was
+already on `main` but not yet reflected in the ledgers; this run verified it and reconciled the
+evidence.
+
+- `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`): **EXIT=0**, **759 passed / 0 failed across
+  71 binaries** (lib 276), zero named failures; fmt and clippy clean.
+- Focused: `verify_conversion` 13/13, `real_conversion_evidence` 2/2.
+- Red/green on the behavior change: restoring parent `15a635e`'s assertion
+  `replay_corpus(...).is_err()` in `tests/corpus.rs` made
+  `corpus_account_replay_matches_all_materialized_receipt_fields` **FAIL** (`EXIT=101`); the HEAD
+  assertion `.is_ok()` passes (`EXIT=0`). File restored byte-for-byte; tree clean.
+- Changed paths: `src/main.rs`, `src/tick_engine.rs`, `tests/corpus.rs`, `tests/verify_conversion.rs`
+  (+2 tests). Non-USD quotes now derive exact event-aligned reciprocal conversions (bid Long /
+  ask Short) instead of being refused; identity sentinel still refused for non-USD; class remains
+  REAL_STRUCTURALLY_VALID, eligibility none; no scientific/financial/security rule changed.
+- Evidence: `docs/VERIFICATION/conversion-implementation-reconciliation-2026-11-25.md`. Hosted CI
+  run **45676627807** on exact SHA `c3ee6c0` reached terminal `completed`/`success` on all 7 jobs.
+  The docs-reconciliation commit's CI is recorded only after it concludes. V2 milestones 1–6
+  remain evidenced; M7 remains NOT accepted (two owner-only external gates).
+
 ## Verified gate repair (2026-11-25, continuity run)
 
 Baseline `main` `f8e4eafbd56a344ce17a29eebb4c1a215137ea85` was clean and equal to

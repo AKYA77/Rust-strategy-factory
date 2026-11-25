@@ -2,6 +2,20 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-25 (conversion implementation reconciliation): baseline clean `main`
+`c3ee6c0` (== `origin/main`, 0/0, no other worker, heavy lock acquired). The already-pushed
+implementation commit `c3ee6c0` (src/main.rs, src/tick_engine.rs, tests/corpus.rs,
+tests/verify_conversion.rs +2 tests) derives exact event-aligned reciprocal conversions for
+USDJPY/USDCHF/USDCAD instead of refusing non-USD quotes; identity sentinel stays refused, class
+REAL_STRUCTURALLY_VALID, eligibility none. Verified: `scripts/check.sh` EXIT=0, **759 passed / 0
+failed over 71 binaries** (lib 276), zero named failures; focused verify_conversion 13/13 and
+real_conversion_evidence 2/2. Red/green: restoring parent `15a635e`'s `.is_err()` assertion made
+`tests/corpus.rs::corpus_account_replay_matches_all_materialized_receipt_fields` FAIL (EXIT=101);
+HEAD's `.is_ok()` passes (EXIT=0), file restored byte-for-byte and tree clean. Evidence:
+`docs/VERIFICATION/conversion-implementation-reconciliation-2026-11-25.md`. Hosted CI run
+**45676627807** on exact SHA `c3ee6c0` reached terminal success on all 7 jobs. No financial,
+scientific, provenance, data-scope or security rule changed; M7 external gates unchanged.
+
 Continuity run 2026-11-25 (real-corpus conversion evidence): baseline clean `main` `18bba89`
 had `scripts/check.sh` EXIT=0, 755 passed / 0 failed over 70 binaries (lib 276). Added
 `tests/real_conversion_evidence.rs` (2 tests) and
