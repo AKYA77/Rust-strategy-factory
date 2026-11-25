@@ -1014,9 +1014,14 @@ pub fn family_checkpoints() -> Vec<Candidate> {
                 ),
                 Family::DailyPivotReversal => (
                     Rule::All(vec![
-                        Rule::AboveMean { window: 50 },
-                        Rule::CrossMean {
+                        Rule::ChannelEdge {
+                            window: 50,
+                            basis_points: 2000,
+                            upper: false,
+                        },
+                        Rule::RsiCross {
                             window: 20,
+                            basis_points: 3000,
                             above: true,
                         },
                     ]),
