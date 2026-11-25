@@ -37,8 +37,10 @@ consumed-byte blake3). Red/green: with the *wrong* synthetic-vs-corpus expectati
 control FAILED (`250/37661` vs `1/150644`, a silent 1000x divergence); with the true `assert_ne!`
 invariant both tests passed (EXIT=0, 2/2). Evidence:
 `docs/VERIFICATION/real-corpus-conversion-2026-11-25.md`; `docs/CONVERSION_CONVENTION.md` now
-states that synthetic fixtures are not the real corpus scale. Commit SHA / CI ID recorded after
-publication. No financial, scientific, provenance or security rule changed; class remains
+states that synthetic fixtures are not the real corpus scale. Increment commit
+`83213c15df87356ffd897dabce04b9438458ecb8`; hosted CI run **45668913065** on that exact SHA
+reached terminal `completed` / `success` on all 7 jobs (browser, release-build, full-horizon,
+dependency-audit, data-compute-identity, rust-checks, check-operations). No financial, scientific, provenance or security rule changed; class remains
 REAL_STRUCTURALLY_VALID with eligibility none. M7 external gates unchanged.
 
 Post-increment full ladder on the corrected tree: `scripts/check.sh` **EXIT=0**, **757 passed /

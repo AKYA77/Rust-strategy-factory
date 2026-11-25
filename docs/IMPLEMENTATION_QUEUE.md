@@ -11,9 +11,10 @@ Verified USDJPY/USDCHF/USDCAD on actual 2025-03 `.rsf` chunks: 100,000 events ea
 each, exact cross-product rates, strict event alignment, all validation safeguards, no identity
 conversion, bound provenance hashes. Red control failed with a 1000x synthetic-scale rate that
 still passed validation; green invariant passed 2/2. Post-increment full `scripts/check.sh`
-EXIT=0, 757 passed / 0 failed over 71 binaries (lib 276), new target 2/2. Commit SHA / CI ID
-recorded after publication. No financial, scientific, data-scope or security rule changed; M7 external gates
-still open. No further software milestone is unachieved.
+EXIT=0, 757 passed / 0 failed over 71 binaries (lib 276), new target 2/2. Increment commit
+`83213c15df87356ffd897dabce04b9438458ecb8`; hosted CI run **45668913065** on that exact SHA
+concluded terminal `success` on all 7 jobs. No financial, scientific, data-scope or security rule
+changed; M7 external gates still open. No further software milestone is unachieved.
 
 Continuity run 2026-11-25 (formatting gate): baseline clean `main` `f8e4eaf` had
 `scripts/check.sh` EXIT=1 at `cargo fmt --all -- --check` on `src/research.rs:1474`
