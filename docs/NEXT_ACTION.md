@@ -8,6 +8,18 @@ continue. Never treat a pending CI run as passed.
 
 ## Latest verified local milestone (2026-11-25)
 
+Cursor 2026-11-25: `main` HEAD `767f777` (Stage-1 CandleScreen CLI regression fix,
+integrating nine previously unpushed bot commits; parent `4b52ea4`). Before:
+`scripts/check.sh` EXIT=101 at `4b52ea4`, failing
+`tests/research_cli.rs::independent_rust_process_runs_pauses_resumes_and_stops_at_durable_checkpoints`
+(`QueryReturnedNoRows` on a stale `state='completed'` query). After: full ladder
+EXIT=0, **744 passed / 0 failed across 67 test binaries** (lib 276). Evidence:
+`docs/VERIFICATION/stage1-cli-regression-2026-11-25.md`. The inherited bot line
+adds `src/daily_checkpoint.rs`, family renames, CandleScreen entry gating, prep-cache
+integration in `Driver::step`, and `improvement_children=1`/`max_depth=1` in both
+real-data configs; these are integrated and test-verified, not scientifically
+qualified. M7 remains NOT accepted.
+
 HEAD `b17ce34` on `main` == `origin/main` (pushed). Milestone chain:
 `b8571d8` (V2 seven-instrument scope, P0 fixes, verified gold-only data deletion),
 `a5030f8`/`a9601e8` (P0.2–P0.4), `e1b1356` (state), `18d6e9b` (M2 ten families),
