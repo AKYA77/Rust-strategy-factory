@@ -10,8 +10,8 @@
       "start_ms": 1735689600000,
       "end_exclusive_ms": 1738360797318
     },
-    "improvement_children": 0,
-    "improvement_max_depth": 0,
+    "improvement_children": 1,
+    "improvement_max_depth": 1,
     "shadow_policy": null,
     "proof_policy": null,
     "indexed_policy": null,

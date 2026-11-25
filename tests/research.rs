@@ -91,7 +91,7 @@ fn configured_shadow_policy_separates_cache_identity_and_survives_driver_restart
         EvaluationOptions {
             feature_cells: 1_000_000,
             evaluation: None,
-            stage: Stage::TickVerification,
+            stage: Stage::CandleScreen,
             shadow_policy: Some(&policy),
             proof_policy: None,
             indexed_policy: None,

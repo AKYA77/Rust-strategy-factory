@@ -5,15 +5,34 @@ use rust_strategy_factory::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 fn fixture() -> Vec<Candle> {
-    (0..1200)
-        .map(|i| {
-            let phase = i % 80;
-            let wave = if phase < 40 { phase } else { 80 - phase };
-            let close = 100000 + wave * 50;
-            let wick = if i % 97 == 0 { 1000 } else { 20 };
+    // Deterministic multi-regime fixture with known truth: every typed family
+    // must produce a real signal cohort on at least one regime. Regimes:
+    // range-bound oscillation, sustained rally, sharp drop/V recovery, rally.
+    let mut px: Vec<i64> = Vec::new();
+    for i in 0..600 {
+        px.push(100000 + ((i % 40) as i64 - 20) * 10 + if i % 17 == 0 { 400 } else { 0 });
+    }
+    for i in 0..400 {
+        px.push(*px.last().unwrap() + 40 + ((i % 20) as i64 - 10) * 8);
+    }
+    for _ in 0..6 {
+        for _ in 0..30 {
+            px.push(*px.last().unwrap() - 150);
+        }
+        for _ in 0..30 {
+            px.push(*px.last().unwrap() + 160);
+        }
+    }
+    for i in 0..300 {
+        px.push(*px.last().unwrap() + 25 + if i % 12 == 0 { -180 } else { 5 });
+    }
+    px.iter()
+        .enumerate()
+        .map(|(i, &close)| {
+            let wick = if i % 23 == 0 { 300 } else { 15 };
             Candle {
-                start_ms: 1735689600000 + i * 60000,
-                available_ms: 1735689660000 + i * 60000,
+                start_ms: 1735689600000 + i as i64 * 60000,
+                available_ms: 1735689660000 + i as i64 * 60000,
                 publication_sequence: i as u64,
                 bid: Ohlc {
                     open: close,
@@ -43,7 +62,7 @@ fn every_family_has_valid_unique_templates_and_actual_nonzero_signal_cohorts() {
     let mut ids = BTreeSet::new();
     let mut counts = BTreeMap::new();
     let c = fixture();
-    let mut f = Features::new(&c, 1200 * 40).unwrap();
+    let mut f = Features::new(&c, c.len() * 40).unwrap();
     for candidate in &candidates {
         candidate.strategy.canonical().unwrap();
         let n = f.signal(&candidate.strategy.rule).unwrap().count();
@@ -69,9 +88,10 @@ fn every_family_has_valid_unique_templates_and_actual_nonzero_signal_cohorts() {
 #[test]
 fn all_family_signals_are_prefix_causal_and_reusable() {
     let full = fixture();
-    let prefix = &full[..600];
-    let mut f = Features::new(&full, 1200 * 40).unwrap();
-    let mut p = Features::new(prefix, 600 * 40).unwrap();
+    let half = full.len() / 2;
+    let prefix = &full[..half];
+    let mut f = Features::new(&full, full.len() * 40).unwrap();
+    let mut p = Features::new(prefix, half * 40).unwrap();
     for candidate in strategies::family_checkpoints()
         .into_iter()
         .filter(|c| c.strategy.timeframe == Timeframe::M1)

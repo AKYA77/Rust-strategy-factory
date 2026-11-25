@@ -90,9 +90,24 @@ pub fn decision_hash(key: &ExperimentKey, from: &Stage, to: &Stage) -> Result<St
 }
 
 /// Record the entry transition CandleScreen -> TickVerification for a freshly
-/// registered candidate. Idempotent: a candidate already present keeps its
-/// existing lineage.
-pub fn record_entry(registry: &Registry, key: &ExperimentKey) -> Result<()> {
+/// registered candidate, but only after the Stage-1 screening outcome has been
+/// established and the candidate passed the relevant numerical gate.
+///
+/// - A rejected candidate cannot continue: no entry transition is recorded and
+///   the candidate stays at CandleScreen.
+/// - An uncertain (held) candidate is not mislabeled as passed: no entry
+///   transition is recorded either; it must be resolved against exact replay.
+/// - A passing candidate advances to TickVerification; the decision hash binds
+///   the Stage-1 gate evidence so the hash independently demonstrates the
+///   candidate passed the gate.
+///
+/// Idempotent: a candidate already present keeps its existing lineage.
+pub fn record_entry(
+    registry: &Registry,
+    key: &ExperimentKey,
+    gate_passed: bool,
+    gate_evidence: &str,
+) -> Result<()> {
     let id = key.identity()?;
     let tx = crate::storage::writer_tx(&registry.connection).map_err(|e| e.to_string())?;
     let existing: Option<i64> = tx
@@ -107,18 +122,15 @@ pub fn record_entry(registry: &Registry, key: &ExperimentKey) -> Result<()> {
     if existing.is_some() {
         return Ok(());
     }
-    // Entry depends on the stage the candidate actually entered: TickVerification
-    // means the CandleScreen -> TickVerification edge was traversed.
-    let (from, to) = match key.stage {
-        Stage::CandleScreen => (Stage::CandleScreen.clone(), Stage::TickVerification.clone()),
-        Stage::TickVerification => (Stage::CandleScreen.clone(), Stage::TickVerification.clone()),
-        Stage::IndependentValidation => (
-            Stage::TickVerification.clone(),
-            Stage::IndependentValidation.clone(),
-        ),
-    };
+    // Only a CandleScreen candidate that passed the Stage-1 numerical gate may
+    // record the entry transition. The decision hash binds the gate evidence,
+    // so it cannot be reproduced without the candidate having passed.
+    if key.stage != Stage::CandleScreen || !gate_passed || gate_evidence.is_empty() {
+        return Ok(());
+    }
+    let (from, to) = (Stage::CandleScreen.clone(), Stage::TickVerification.clone());
     let at_ms = chrono::Utc::now().timestamp_millis();
-    let digest = decision_hash(key, &from, &to)?;
+    let digest = entry_decision_hash(key, &from, &to, gate_evidence)?;
     tx.execute(
         "INSERT INTO stage_transitions(experiment_id,sequence,from_stage,to_stage,at_ms,decision_hash)
          VALUES (?1,1,?2,?3,?4,?5)",
@@ -126,6 +138,24 @@ pub fn record_entry(registry: &Registry, key: &ExperimentKey) -> Result<()> {
     )
     .map_err(|e| e.to_string())?;
     tx.commit().map_err(|e| e.to_string())
+}
+
+/// Decision hash for the CandleScreen -> TickVerification entry transition.
+/// Binds the experiment identity and the Stage-1 gate evidence so the hash
+/// independently demonstrates the candidate passed the relevant numerical gate.
+pub fn entry_decision_hash(
+    key: &ExperimentKey,
+    from: &Stage,
+    to: &Stage,
+    gate_evidence: &str,
+) -> Result<String> {
+    hash(&(
+        "stage-decision-v1",
+        key.identity()?,
+        label(from),
+        label(to),
+        gate_evidence,
+    ))
 }
 
 /// Full ordered transition history for one experiment.

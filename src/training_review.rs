@@ -295,7 +295,7 @@ fn run(
         let evaluation_ref = evaluation.as_ref();
         let stage = evaluation_ref
             .map(|e| e.stage.clone())
-            .unwrap_or(crate::storage::Stage::TickVerification);
+            .unwrap_or(key.stage.clone());
         let execution = research::evaluate_configured(
             registry,
             input,

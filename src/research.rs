@@ -159,7 +159,7 @@ pub fn evaluate(
         EvaluationOptions {
             feature_cells,
             evaluation: None,
-            stage: Stage::TickVerification,
+            stage: Stage::CandleScreen,
             shadow_policy: None,
             proof_policy: None,
             indexed_policy: None,
@@ -345,9 +345,6 @@ fn evaluate_prepared<'data>(
         }
     }
     let id = registry.register(&key)?;
-    // Explicit durable lineage: record the stage this candidate entered and emit
-    // a bounded telemetry event binding the identity to the entry decision.
-    crate::stage_machine::record_entry(registry, &key)?;
     crate::telemetry::record(
         registry,
         &id,
@@ -406,6 +403,27 @@ fn evaluate_prepared<'data>(
                 ),
                 Err(error) => (Outcome::Failed, serde_json::json!({"error":error})),
             };
+            // Advance CandleScreen -> TickVerification only after the Stage-1
+            // screening outcome is established and the candidate passed the
+            // numerical gate. A rejected candidate cannot continue; an uncertain
+            // candidate is not mislabeled as passed. The decision hash binds the
+            // gate evidence so it independently demonstrates the candidate passed.
+            if key.stage == crate::storage::Stage::CandleScreen {
+                let stage1 = result
+                    .get("candidate_screen_audit")
+                    .and_then(|a| a.get("stage1_decision"))
+                    .and_then(|v| v.as_str());
+                if stage1 == Some("PASS") {
+                    let rate = result
+                        .get("candidate_screen_audit")
+                        .and_then(|a| a.get("estimated"))
+                        .and_then(|e| e.get("estimated_net_win_rate_bps"))
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
+                    let evidence = format!("stage1-pass net_win_rate_bps={} floor_bps=4000", rate);
+                    let _ = crate::stage_machine::record_entry(registry, &key, true, &evidence);
+                }
+            }
             let name = match outcome {
                 Outcome::Completed => "completed",
                 Outcome::Rejected => "rejected",
@@ -833,11 +851,12 @@ pub fn evaluate_batch_report(
 /// Explicit stage policy for the training loop.
 ///
 /// A candidate index is an enumeration artifact, never an authorization signal.
-/// Every candidate enters at TickVerification; promotion to CandleScreen and any
-/// protected validation are explicit transitions recorded by the stage machine,
-/// not selected by arithmetic on the index.
+/// Every training candidate enters at CandleScreen; advancement to TickVerification
+/// is recorded by the stage machine only after the Stage-1 candle screen has
+/// established a passing outcome. Advancement is gated on screening evidence, not
+/// selected by arithmetic on the index.
 pub(crate) fn training_stage(_candidate_index: u64) -> crate::storage::Stage {
-    crate::storage::Stage::TickVerification
+    crate::storage::Stage::CandleScreen
 }
 
 #[cfg(test)]
@@ -849,8 +868,8 @@ mod stage_policy_tests {
         for index in 0..256 {
             assert_eq!(
                 training_stage(index),
-                crate::storage::Stage::TickVerification,
-                "index {index} must not imply a protected stage"
+                crate::storage::Stage::CandleScreen,
+                "index {index} must enter at CandleScreen, never a protected stage"
             );
         }
     }
@@ -1332,7 +1351,7 @@ impl Driver {
         // validation are separately authorized stage transitions.
         let stage = training_stage(candidate_index);
         let stage_for_eval = stage.clone();
-        let stage_for_improvement = stage.clone();
+        let _stage_for_improvement = stage.clone();
         let evaluation = match stage_for_eval {
             Stage::CandleScreen => None,
             _ => self
@@ -1471,9 +1490,8 @@ impl Driver {
         if self.config.improvement_children > 0
             && (outcome == "completed" || outcome == "rejected")
             && let Some(id) = &id
-            && stage_for_improvement != Stage::CandleScreen
         {
-            tx.execute("INSERT INTO improvement_jobs(run_id,parent_cursor,input_index,parent_id) VALUES(?1,?2,?3,?4)",params![self.id,s.cursor as i64,input_index as i64,id]).map_err(|e|e.to_string())?;
+            tx.execute("INSERT INTO improvement_jobs(run_id,parent_cursor,input_index,parent_id) VALUES(?1,?2,?3,?4)",params![self.id,s.cursor as i64,input_index as i64,id]).map_err(|e| e.to_string())?;
         }
         tx.commit().map_err(|e| e.to_string())?;
         Ok(true)

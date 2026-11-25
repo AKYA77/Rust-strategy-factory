@@ -201,3 +201,54 @@ fn stage_lineage_and_telemetry_are_immutable() {
             .is_err()
     );
 }
+
+#[test]
+fn record_entry_advances_only_after_a_passing_stage1_gate() {
+    let db = path("entry-gate");
+    let mut registry = Registry::open(&db).unwrap();
+
+    // Rejected candidate cannot continue: no CandleScreen -> TickVerification edge.
+    let k_reject = key(Stage::CandleScreen, "ds-reject", "protocol-a", 1000, 2000);
+    let id_reject = registry.register(&k_reject).unwrap();
+    stage_machine::record_entry(&registry, &k_reject, false, "reject@39bps").unwrap();
+    assert!(
+        stage_machine::history(&registry, &id_reject)
+            .unwrap()
+            .is_empty()
+    );
+
+    // Held (uncertain) candidate is not mislabeled as passed: no edge either.
+    let k_hold = key(Stage::CandleScreen, "ds-hold", "protocol-a", 1000, 2000);
+    let id_hold = registry.register(&k_hold).unwrap();
+    stage_machine::record_entry(&registry, &k_hold, false, "hold@40bps").unwrap();
+    assert!(
+        stage_machine::history(&registry, &id_hold)
+            .unwrap()
+            .is_empty()
+    );
+
+    // Accepted candidate advances, and the hash binds the Stage-1 gate evidence.
+    let k_pass = key(Stage::CandleScreen, "ds-pass", "protocol-a", 1000, 2000);
+    let id_pass = registry.register(&k_pass).unwrap();
+    stage_machine::record_entry(&registry, &k_pass, true, "pass@40bps").unwrap();
+    let history = stage_machine::history(&registry, &id_pass).unwrap();
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].from_stage, Stage::CandleScreen);
+    assert_eq!(history[0].to_stage, Stage::TickVerification);
+    let bound = stage_machine::entry_decision_hash(
+        &k_pass,
+        &Stage::CandleScreen,
+        &Stage::TickVerification,
+        "pass@40bps",
+    )
+    .unwrap();
+    let other = stage_machine::entry_decision_hash(
+        &k_pass,
+        &Stage::CandleScreen,
+        &Stage::TickVerification,
+        "pass@39bps",
+    )
+    .unwrap();
+    assert_eq!(history[0].decision_hash, bound);
+    assert_ne!(bound, other, "hash must depend on the gate evidence");
+}

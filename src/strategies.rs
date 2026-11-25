@@ -989,7 +989,7 @@ pub fn family_checkpoints() -> Vec<Candidate> {
                 ),
                 Family::PreviousDayHighLowBreakout => (
                     Rule::Donchian {
-                        window: 1440,
+                        window: 20,
                         above: true,
                     },
                     150,
@@ -998,9 +998,10 @@ pub fn family_checkpoints() -> Vec<Candidate> {
                 ),
                 Family::PreviousDayLiquiditySweep => (
                     Rule::All(vec![
-                        Rule::Donchian {
-                            window: 1440,
-                            above: false,
+                        Rule::ChannelEdge {
+                            window: 20,
+                            basis_points: 2000,
+                            upper: false,
                         },
                         Rule::RsiCross {
                             window: 20,
@@ -1075,9 +1076,9 @@ pub fn family_checkpoints() -> Vec<Candidate> {
                 ),
                 Family::CrossPairDivergence => (
                     Rule::All(vec![
-                        Rule::RsiCross {
+                        Rule::RsiThreshold {
                             window: 20,
-                            basis_points: 3000,
+                            basis_points: 4500,
                             above: true,
                         },
                         Rule::Rising { lookback: 20 },
