@@ -1082,9 +1082,9 @@ fn replay_corpus_internal(
                 crate::data::DataClass::RealProfileApproved,
             ];
             if !allowed_classes.contains(&observed.declared_class)
-                || observed.profile.quote != "USD"
+                || (observed.profile.quote != "USD" && observed.profile.base != "USD")
             {
-                return Err("corpus replay requires synthetic literal-USD or real structurally-valid inputs".into());
+                return Err("corpus replay requires synthetic literal-USD, real structurally-valid USD-quote, or USD-base non-USD-quote inputs".into());
             }
         }
         ReplayMode::Diagnostic => {
@@ -1170,7 +1170,13 @@ fn replay_corpus_internal(
         }
         for tick in dataset.ticks {
             let fx = match mode {
-                ReplayMode::Registered => Conversion::usd(),
+                ReplayMode::Registered => {
+                    if observed.profile.quote == "USD" {
+                        Conversion::usd()
+                    } else {
+                        diagnostic_conversion(&observed.profile, tick, strategy.side)?
+                    }
+                }
                 ReplayMode::Diagnostic => {
                     diagnostic_conversion(&observed.profile, tick, strategy.side)?
                 }

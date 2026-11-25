@@ -148,3 +148,135 @@ fn usd_account_from_usd_base_price_rejects_non_usd_base() {
     let eurusd = Profile::synthetic("EURUSD").unwrap(); // base=EUR, not USD
     assert!(Conversion::usd_account_from_usd_base_price(&eurusd, 100_000, 0).is_err());
 }
+
+#[test]
+fn dataset_level_conversion_derivation_matches_research_inputs() {
+    // Simulates what main.rs research_inputs now does for non-USD instruments:
+    // derive one Conversion per tick from the tick's own bid price, event-aligned.
+    use rust_strategy_factory::data::{self, Tick};
+
+    let usdjpy = Profile::synthetic("USDJPY").unwrap();
+    let ticks: Vec<Tick> = (0..10)
+        .map(|i| Tick {
+            timestamp_ms: 1735689600000 + i * 60_000,
+            sequence: i as u64,
+            bid: 150_100 + i * 10,
+            ask: 150_120 + i * 10,
+        })
+        .collect();
+    let dataset = data::dataset(
+        usdjpy.clone(),
+        ticks.clone(),
+        "synthetic USDJPY",
+        "test-archive-hash".into(),
+        true,
+    )
+    .unwrap();
+
+    // Derive conversions exactly as main.rs research_inputs now does.
+    let conversions: Vec<Conversion> = dataset
+        .ticks
+        .iter()
+        .map(|tick| {
+            Conversion::usd_account_from_usd_base_price(
+                &dataset.profile,
+                tick.bid,
+                tick.timestamp_ms,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .expect("all USDJPY ticks derive conversions");
+
+    // One conversion per tick, event-aligned.
+    assert_eq!(conversions.len(), dataset.ticks.len());
+    for (tick, fx) in dataset.ticks.iter().zip(&conversions) {
+        assert_eq!(
+            fx.as_of_ms, tick.timestamp_ms,
+            "conversion is tick's own event time"
+        );
+        fx.validate(&dataset.profile, tick.timestamp_ms, 0)
+            .expect("strict event-aligned conversion passes all safeguards");
+        // Exact cross-product: usd_num * price == quote_den * price_scale
+        assert_eq!(
+            i128::from(fx.usd_num) * i128::from(tick.bid),
+            i128::from(fx.quote_den) * i128::from(dataset.profile.price_scale),
+            "exact integer arithmetic for tick at {}",
+            tick.timestamp_ms
+        );
+        // Not the identity sentinel: usd_account_from_usd_base_price always sets
+        // as_of_ms to a real event time, never i64::MIN.
+        assert_ne!(fx.as_of_ms, i64::MIN, "USDJPY not identity sentinel");
+    }
+    let entry_conv = &conversions[0];
+    let profit = pnl(&usdjpy, 10, 1000, *entry_conv).unwrap();
+    assert!(profit > 0, "long P&L positive on upward move");
+    let lots = size(
+        &usdjpy,
+        20_000_000,
+        usdjpy.price("150.10").unwrap(),
+        100,
+        *entry_conv,
+    )
+    .unwrap();
+    assert!(lots >= usdjpy.min_micro_lots, "size meets minimum volume");
+}
+
+#[test]
+fn all_three_non_usd_instruments_derive_conversions_from_dataset() {
+    // Verifies USDJPY, USDCHF, USDCAD all derive valid conversions from
+    // synthetic datasets without any conversion file — matching main.rs behavior.
+    use rust_strategy_factory::data::{self, Tick};
+
+    for symbol in ["USDJPY", "USDCHF", "USDCAD"] {
+        let profile = Profile::synthetic(symbol).unwrap();
+        assert_eq!(profile.base, "USD");
+        assert_ne!(profile.quote, "USD");
+
+        let ticks: Vec<Tick> = (0..5)
+            .map(|i| Tick {
+                timestamp_ms: 1735689600000 + i * 60_000,
+                sequence: i as u64,
+                bid: 100_000 + i * 100,
+                ask: 100_020 + i * 100,
+            })
+            .collect();
+        let dataset = data::dataset(
+            profile.clone(),
+            ticks.clone(),
+            "synthetic test",
+            "test-archive-hash".into(),
+            true,
+        )
+        .unwrap();
+
+        let conversions: Vec<Conversion> = dataset
+            .ticks
+            .iter()
+            .map(|tick| {
+                Conversion::usd_account_from_usd_base_price(
+                    &dataset.profile,
+                    tick.bid,
+                    tick.timestamp_ms,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap_or_else(|e| panic!("{symbol} tick conversion derivation failed: {e}"));
+
+        assert_eq!(conversions.len(), dataset.ticks.len());
+        for (tick, fx) in dataset.ticks.iter().zip(&conversions) {
+            assert_eq!(fx.as_of_ms, tick.timestamp_ms);
+            fx.validate(&dataset.profile, tick.timestamp_ms, 0)
+                .unwrap_or_else(|e| panic!("{symbol} conversion validation failed: {e}"));
+            assert_eq!(
+                i128::from(fx.usd_num) * i128::from(tick.bid),
+                i128::from(fx.quote_den) * i128::from(dataset.profile.price_scale),
+                "{symbol} exact cross-product equality"
+            );
+            assert_ne!(fx.as_of_ms, i64::MIN, "{symbol} not identity sentinel");
+        }
+        println!(
+            "{symbol}: {} conversions derived, all event-aligned and exact",
+            conversions.len()
+        );
+    }
+}

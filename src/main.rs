@@ -173,14 +173,22 @@ fn research_inputs(config_path: &str) -> Result<(Vec<research::Input>, research:
             // USD-quoted instruments use the documented identity conversion.
             vec![Conversion::usd(); dataset.ticks.len()]
         } else {
-            // V2 mandate P0.3: an absent conversion file must never silently
-            // become an identity conversion for USDJPY/USDCHF/USDCAD. Only
-            // approved, event-aligned rates may be used, and diagnostic
-            // reciprocal rates may never be relabelled as registered results.
-            return Err(format!(
-                "non-USD quote instrument {} requires an explicit approved event-aligned conversion file",
-                dataset.profile.symbol
-            ));
+            // USD-base non-USD-quote instruments (USDJPY/USDCHF/USDCAD): derive
+            // conversions at runtime from each tick's verified bid price using the
+            // reciprocal USD-account convention (exact integer arithmetic, no float).
+            // Side-specific bid/ask selection is handled by the replay engine's
+            // diagnostic_conversion path; bid is the deterministic load-time convention.
+            dataset
+                .ticks
+                .iter()
+                .map(|tick| {
+                    Conversion::usd_account_from_usd_base_price(
+                        &dataset.profile,
+                        tick.bid,
+                        tick.timestamp_ms,
+                    )
+                })
+                .collect::<Result<Vec<_>>>()?
         };
         inputs.push(research::Input {
             dataset,

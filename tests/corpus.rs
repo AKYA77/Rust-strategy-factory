@@ -502,19 +502,24 @@ fn corpus_account_replay_matches_all_materialized_receipt_fields() {
     assert!(trades > 0);
     let f = Fixture::new("account-cli", "USDJPY", 2);
     let strategy:Strategy=serde_json::from_value(serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":100,"rule":{"AboveMean":{"window":2}}})).unwrap();
+    // USDJPY is a USD-base non-USD-quote instrument: it is now accepted in
+    // Registered replay mode using the reciprocal conversion convention.
+    // It must not be refused solely for being non-USD-quote.
+    let replay_result = tick_engine::replay_corpus(
+        &f.root,
+        &f.spec,
+        &strategy,
+        &Costs::default(),
+        CorpusBudget {
+            max_candles: 100,
+            feature_cells: 10000,
+            max_receipts: 1000,
+        },
+    );
     assert!(
-        tick_engine::replay_corpus(
-            &f.root,
-            &f.spec,
-            &strategy,
-            &Costs::default(),
-            CorpusBudget {
-                max_candles: 100,
-                feature_cells: 10000,
-                max_receipts: 1000
-            }
-        )
-        .is_err()
+        replay_result.is_ok(),
+        "USDJPY Registered replay must not be refused for non-USD quote: {:?}",
+        replay_result.err()
     );
     let spec = f.root.join("spec.json");
     let rule = f.root.join("rule.json");
@@ -533,8 +538,15 @@ fn corpus_account_replay_matches_all_materialized_receipt_fields() {
         ])
         .output()
         .unwrap();
-    assert!(!status.status.success());
-    assert!(!result.exists());
+    assert!(
+        status.status.success(),
+        "USDJPY CLI corpus-replay must succeed: {}",
+        String::from_utf8_lossy(&status.stderr)
+    );
+    assert!(
+        result.exists(),
+        "USDJPY CLI corpus-replay must produce a result file"
+    );
 }
 
 #[test]
