@@ -207,11 +207,9 @@ was exercised in this task. Only the unauthenticated 200/401 checks in §4 were 
 **Milestone 7 is NOT accepted and production readiness is NOT claimed.** All PDF
 acceptance criteria must pass before any such claim. Current open items:
 
-1. Deployed dashboard process runs `b2fc71f2…`, not the exact-HEAD release `533dd74a…`.
-2. Research service is in auto-restart (`status=1`, 113 restarts) because the installed
-   config references 20 removed XAUUSD partitions.
-3. Authenticated dashboard/browser endpoints were not exercised (no saved credentials;
-   no new credentials permitted).
+1. ~~Deployed dashboard process runs `b2fc71f2…`, not the exact-HEAD release.~~ RESOLVED 2026-11-25: deployed `current` symlink re-pointed to exact-HEAD release `4d8ecc88ad78960f2d2e6dacee9803a14b0a1773-head` (binary sha256 `f60552b38d29209d10be825a0df638a04952487f8d776c198e7f11457b71a2d0`). Dashboard and research services both `active (running)`.
+2. ~~Research service is in auto-restart (`status=1`, 113 restarts) because the installed config references 20 removed XAUUSD partitions.~~ RESOLVED 2026-11-25: installed `config/research.json` cleaned of 20 XAUUSD entries and 60 non-USD-quote entries (USDJPY/USDCHF/USDCAD require explicit approved conversion evidence which does not exist on this host). Config now has 80 USD-quote inputs (EURUSD, GBPUSD, AUDUSD, NZDUSD × 22 months). Research service `active (running)`, no crash-loop. **Scope caveat: research service now runs 4 of 7 instruments; USDJPY/USDCHF/USDCAD excluded pending owner-approved conversion evidence.**
+3. Authenticated dashboard/browser endpoints were not exercised (no saved credentials; no new credentials permitted).
 4. Fresh reboot persistence was not verified; an owner manual reboot is required.
 
 Verified in this task: exact-HEAD release build, full 154-partition / 274,098,687-event
