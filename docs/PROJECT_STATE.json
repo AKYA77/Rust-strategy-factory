@@ -246,6 +246,14 @@
       "status": "completed",
       "jobs": ["release-build", "browser", "rust-checks", "data-compute-identity", "full-horizon", "check-operations", "dependency-audit"],
       "note": "Main push CI on the exact conversion-implementation commit c3ee6c0: terminal completed/success on all 7 jobs, recorded only after the run concluded. Local scripts/check.sh EXIT=0 759 passed/0 failed over 71 binaries (lib 276). Red/green: parent 15a635e .is_err() assertion FAILED at HEAD (EXIT=101), HEAD .is_ok() assertion passed (EXIT=0), tests/corpus.rs restored byte-for-byte. Evidence: docs/VERIFICATION/conversion-implementation-reconciliation-2026-11-25.md. No financial/scientific/provenance/data-scope/security rule changed; M7 external gates unchanged."
+    },
+    "v2_docs_reconciliation_run_2026_11_25": {
+      "run_id": 45694794740,
+      "sha": "62218752c7948a49846499c10e7c466c9c92ba55",
+      "conclusion": "success",
+      "status": "completed",
+      "jobs": ["release-build", "browser", "rust-checks", "data-compute-identity", "full-horizon", "check-operations", "dependency-audit"],
+      "note": "Final HEAD of the continuity run: terminal completed/success on all 7 jobs, recorded only after conclusion. The companion evidence-only commit b2d0eb17d1c628f9d8cf806e60e6459176667cfe also concluded terminal success on all 7 jobs (run 45694761489). No safeguard, classification or scientific rule changed; M7 external gates unchanged."
     }
   },
   "historical_acceptance": "LOCAL_CORPUS_VERIFIED",

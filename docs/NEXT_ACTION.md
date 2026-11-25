@@ -26,7 +26,8 @@ evidence.
   REAL_STRUCTURALLY_VALID, eligibility none; no scientific/financial/security rule changed.
 - Evidence: `docs/VERIFICATION/conversion-implementation-reconciliation-2026-11-25.md`. Hosted CI
   run **45676627807** on exact SHA `c3ee6c0` reached terminal `completed`/`success` on all 7 jobs.
-  The docs-reconciliation commit's CI is recorded only after it concludes. V2 milestones 1–6
+  The docs-reconciliation commits `b2d0eb1` (evidence file) and `6221875` (ledgers) both reached
+  terminal `completed`/`success` on all 7 jobs (runs **45694761489**, **45694794740**). V2 milestones 1–6
   remain evidenced; M7 remains NOT accepted (two owner-only external gates).
 
 ## Verified gate repair (2026-11-25, continuity run)

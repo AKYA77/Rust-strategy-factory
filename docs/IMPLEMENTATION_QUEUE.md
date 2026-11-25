@@ -13,8 +13,10 @@ real_conversion_evidence 2/2. Red/green: restoring parent `15a635e`'s `.is_err()
 `tests/corpus.rs::corpus_account_replay_matches_all_materialized_receipt_fields` FAIL (EXIT=101);
 HEAD's `.is_ok()` passes (EXIT=0), file restored byte-for-byte and tree clean. Evidence:
 `docs/VERIFICATION/conversion-implementation-reconciliation-2026-11-25.md`. Hosted CI run
-**45676627807** on exact SHA `c3ee6c0` reached terminal success on all 7 jobs. No financial,
-scientific, provenance, data-scope or security rule changed; M7 external gates unchanged.
+**45676627807** on exact SHA `c3ee6c0` reached terminal success on all 7 jobs; the two
+docs-reconciliation commits `b2d0eb1` and `6221875` also concluded terminal success on all 7 jobs
+(runs **45694761489**, **45694794740**). No financial, scientific, provenance, data-scope or
+security rule changed; M7 external gates unchanged.
 
 Continuity run 2026-11-25 (real-corpus conversion evidence): baseline clean `main` `18bba89`
 had `scripts/check.sh` EXIT=0, 755 passed / 0 failed over 70 binaries (lib 276). Added
