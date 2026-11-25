@@ -19,8 +19,8 @@
 //! no-entry evaluation, or a failure.
 
 use crate::Result;
-use rusqlite::OptionalExtension;
 use rusqlite::Connection;
+use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -787,7 +787,8 @@ mod tests {
     fn candidate_ids_bind_to_daily_checkpoint_identity() {
         // The daily checkpoint is keyed by candidate identity, so a hash derived
         // from the candidate binds the checkpoint to its strategy identity.
-        let id = crate::data::hash(&("daily-checkpoint-v1", "eurusd", "opening-range-breakout")).unwrap();
+        let id = crate::data::hash(&("daily-checkpoint-v1", "eurusd", "opening-range-breakout"))
+            .unwrap();
         assert!(!id.is_empty());
         let _ = id;
     }
