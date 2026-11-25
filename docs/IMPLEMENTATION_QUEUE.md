@@ -2,8 +2,8 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
-Integration state: all open PRs have been merged into `main` — the Codex stack #8–#13, the independent campaign-owned ledger #1, the Hermes historical Parquet→native migration #6, and earlier checkpoint PRs #2–#5/#7 via #14 (merge commit `3d2d6f2`); PR #53 (main CI restoration, commit 858a289); PR #52 (registered full-period real-data executor, merge commit ba66956); and PR #54 (20-month training window + OOS holdout config; Conversion::usd sentinel contract restored, merge commit bda7fca). Every PR head commit is an ancestor of `origin/main`; all PRs were closed as merged with history preserved. `origin/main` is at `2ced8fe` (== local HEAD, pushed). Hosted CI push run **45528848345**
-on that exact SHA concluded **success on all 7 jobs** (release-build, browser, rust-checks,
+Integration state: all open PRs have been merged into `main` — the Codex stack #8–#13, the independent campaign-owned ledger #1, the Hermes historical Parquet→native migration #6, and earlier checkpoint PRs #2–#5/#7 via #14 (merge commit `3d2d6f2`); PR #53 (main CI restoration, commit 858a289); PR #52 (registered full-period real-data executor, merge commit ba66956); and PR #54 (20-month training window + OOS holdout config; Conversion::usd sentinel contract restored, merge commit bda7fca). Every PR head commit is an ancestor of `origin/main`; all PRs were closed as merged with history preserved. `origin/main` is at `b17ce34` (== local HEAD, pushed). Hosted CI push runs **45528848345**
+on `2ced8fe` and **45535143330** on `b17ce34` both concluded **success on all 7 jobs** (release-build, browser, rust-checks,
 data-compute-identity, full-horizon, check-operations, dependency-audit); the earlier
 `98cdc79`/`57c13fc`/`18d6e9b` push runs failed only the browser job and are superseded by the
 `2ced8fe` browser-script repair. Local `scripts/check.sh` at `2ced8fe`: EXIT=0, 733 passed /

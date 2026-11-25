@@ -8,11 +8,12 @@ continue. Never treat a pending CI run as passed.
 
 ## Latest verified local milestone (2026-11-25)
 
-HEAD `2ced8fe` on `main` == `origin/main` (pushed). Milestone chain:
+HEAD `b17ce34` on `main` == `origin/main` (pushed). Milestone chain:
 `b8571d8` (V2 seven-instrument scope, P0 fixes, verified gold-only data deletion),
 `a5030f8`/`a9601e8` (P0.2–P0.4), `e1b1356` (state), `18d6e9b` (M2 ten families),
 `57c13fc` (M5 contract suite + evidence), `98cdc79` (M3 stage machine + telemetry),
-`2ced8fe` (M4 prep caches + M6 measured baseline + M7 evidence + browser repair).
+`2ced8fe` (M4 prep caches + M6 measured baseline + M7 evidence + browser repair),
+`b17ce34` (M7 evidence re-pin to `2ced8fe` + state-ledger reconciliation).
 
 - Full `scripts/check.sh` ladder on `RSF_BUILDER_PROFILE=hermes-v2-m1` at `2ced8fe`:
   **EXIT=0**, 733 passed / 0 failed across 69 test binaries (8m40s), including the M5
@@ -23,6 +24,9 @@ HEAD `2ced8fe` on `main` == `origin/main` (pushed). Milestone chain:
   check-operations, dependency-audit). Earlier `98cdc79`/`57c13fc`/`18d6e9b` push runs
   failed only the browser job (runs 45521997695/45519520343/45504435877); `2ced8fe`
   repairs `scripts/browser-check.cjs` and `scripts/browser-long-ledger-check.cjs`.
+- Hosted CI run **45535143330** on the exact push SHA `b17ce34` (this docs/evidence
+  reconciliation commit): **all 7 jobs success** (same seven job names). Terminal
+  conclusion recorded only after the run completed.
 - Milestone 3: append-only immutable stage lineage with holdout-gated protected
   stage, bounded telemetry replay, exactly-40% inclusive Stage-1 policy with
   proven-bound rejection. CLI `machine advance <registry> <experiment-key.json>`.
