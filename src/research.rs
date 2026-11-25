@@ -1392,7 +1392,7 @@ impl Driver {
             self.prep_cache.get_or_fill(&candle_scope, || {
                 let c = candles::build(d, strategy.timeframe)?;
                 let value = serde_json::to_value(&c).map_err(|e| e.to_string())?;
-                Ok(prep_cache::encode(&value)?)
+                prep_cache::encode(&value)
             })?;
         let value: serde_json::Value = prep_cache::decode(
             &candles_artifact.data,

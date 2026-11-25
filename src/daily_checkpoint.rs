@@ -141,6 +141,7 @@ impl DailyCheckpointStore {
     /// `session_open`, `market_open`, `observations_present` and
     /// `sufficient_history` are the domain preconditions evaluated only against
     /// data available at the checkpoint.
+    #[allow(clippy::too_many_arguments)]
     pub fn decision(
         &mut self,
         candidate_id: &str,
@@ -380,7 +381,7 @@ impl DailyCheckpointStore {
                  FROM daily_checkpoints WHERE candidate_id=?1 ORDER BY session_day DESC",
             )
             .map_err(|e| format!("daily-checkpoint prepare failed: {e}"))?;
-        let mut iter = stmt
+        let iter = stmt
             .query_map(rusqlite::params![candidate_id], |r| {
                 let skip_reason = match r.get::<_, Option<String>>(3)? {
                     Some(s) => Some(match s.as_str() {
@@ -687,7 +688,7 @@ mod tests {
         } // store dropped; connection closed, WAL checkpointed
 
         // Reopen as if after a process restart / across a historical chunk boundary.
-        let store = DailyCheckpointStore::open(&path).unwrap();
+        let mut store = DailyCheckpointStore::open(&path).unwrap();
         let rec = store
             .record("strategy-v1::restart-case", day)
             .unwrap()
