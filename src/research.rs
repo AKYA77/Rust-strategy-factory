@@ -1467,17 +1467,30 @@ impl Driver {
             stage: prep_cache::Stage::Candle,
             protection: Protection::Standard,
         };
-        let (candles_artifact, _candle_status) =
-            self.prep_cache.get_or_fill(&candle_scope, || {
-                let c = candles::build(d, strategy.timeframe)?;
-                let value = serde_json::to_value(&c).map_err(|e| e.to_string())?;
-                prep_cache::encode(&value)
-            })?;
-        let value: serde_json::Value = prep_cache::decode(
-            &candles_artifact.data,
-            &candles_artifact.receipt.content_hash,
-        )?;
-        let c: Vec<candles::Candle> = serde_json::from_value(value).map_err(|e| e.to_string())?;
+        // Try the shared prep cache first; a warm hit reuses identical bytes.
+        // On a miss, build candles directly. If the cache store budget is
+        // exhausted (append-only cache has no eviction), fall back to uncached
+        // computation rather than crashing the service: correctness is
+        // unaffected, only warm-cache reuse is lost until old entries age out.
+        let c: Vec<candles::Candle> = match self.prep_cache.get(&candle_scope)? {
+            Some(hit) => {
+                let value: serde_json::Value = prep_cache::decode(
+                    &hit.data,
+                    &hit.receipt.content_hash,
+                )?;
+                serde_json::from_value(value).map_err(|e| e.to_string())?
+            }
+            None => {
+                let candles = candles::build(d, strategy.timeframe)?;
+                let value = serde_json::to_value(&candles).map_err(|e| e.to_string())?;
+                let encoded = prep_cache::encode(&value)?;
+                // Best-effort cache store: budget exhaustion is not fatal.
+                if let Err(e) = self.prep_cache.put(&candle_scope, &encoded) {
+                    eprintln!("prep cache put skipped: {e}");
+                }
+                candles
+            }
+        };
         let visible = evaluation.as_ref().map_or(c.len(), |e| {
             c.partition_point(|c| c.available_ms < e.window.end_exclusive_ms)
         });

@@ -31,9 +31,9 @@ use std::{
 /// Hard per-artifact ceiling (independent of the caller's configured limit).
 pub const MAX_ARTIFACT_BYTES: usize = 16 * 1024 * 1024;
 /// Hard physical store ceiling, counted as summed file lengths.
-pub const MAX_STORE_BYTES: u64 = 512 * 1024 * 1024;
+pub const MAX_STORE_BYTES: u64 = 8 * 1024 * 1024 * 1024;
 /// Hard artifact-count ceiling.
-pub const MAX_ARTIFACTS: usize = 4096;
+pub const MAX_ARTIFACTS: usize = 65536;
 /// Maximum admissible scope window (~100 years, in milliseconds).
 pub const MAX_WINDOW_MS: i64 = 100 * 366 * 24 * 60 * 60 * 1000;
 pub const RECEIPT_VERSION: &str = "prep-cache-receipt-v1";
