@@ -38,9 +38,13 @@ causal/provenance/impact/threshold contracts. RED fmt EXIT=1 → GREEN EXIT=0;
 focused `cargo test --locked --lib economic_calendar` 8/8 EXIT=0. Final-tree
 `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`): **EXIT=0**, **765 passed /
 0 failed across 72 test binaries** (lib 278), zero named failures, fmt/clippy
-clean (+2 over the 763 baseline are the new calendar guards). Hosted CI for the
-repair commit is pending; only a terminal conclusion will be recorded.
-Evidence: `docs/VERIFICATION/fmt-gate-repair-2026-11-26.md`.
+clean (+2 over the 763 baseline are the new calendar guards).
+Evidence: `docs/VERIFICATION/fmt-gate-repair-2026-11-26.md`. Hosted CI
+**45837439949** on the exact repair SHA
+`16afb16c5b55ea48fe8b0129820399ec19af29c4` reached terminal `completed` /
+`success` on all 7 jobs (release-build, browser, rust-checks,
+data-compute-identity, full-horizon, check-operations, dependency-audit); no
+in-progress run was called a pass. Remote SHA verified equal to local HEAD.
 
 V2 software milestones 1–6 remain evidenced; M7 still NOT accepted (two owner-only
 external gates: saved dashboard credentials via `browser_vault` and a fresh owner

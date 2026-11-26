@@ -24,8 +24,10 @@ Calendar wiring reviewed as inert w.r.t. signals/fills/receipts (`news_blackout_
 is never called); gap events are diagnostic corpus observations, not approved
 calendar facts or closed-session evidence, consistent with the WITHDRAWN policy.
 No financial, scientific, provenance, data-scope or security rule changed; class
-`REAL_STRUCTURALLY_VALID`, eligibility none. Hosted CI for the repair commit
-pending; only terminal conclusions recorded. Evidence:
+`REAL_STRUCTURALLY_VALID`, eligibility none. Hosted CI **45837439949** on the exact
+repair SHA `16afb16c5b55ea48fe8b0129820399ec19af29c4` reached terminal
+`completed`/`success` on all 7 jobs (including the previously failing rust-checks);
+only terminal conclusions recorded. Evidence:
 `docs/VERIFICATION/fmt-gate-repair-2026-11-26.md`. V2 milestones 1–6 evidenced;
 M7 NOT accepted (two owner-only external gates). No software milestone unachieved.
 

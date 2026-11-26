@@ -80,9 +80,11 @@ weakened. Class remains `REAL_STRUCTURALLY_VALID`, eligibility none.
 ## CI status
 
 Hosted CI for the repair commit is recorded in the ledger continuity entry in
-`docs/NEXT_ACTION.md` once it reaches a terminal conclusion; no in-progress run is
-claimed as passed. The failed run 45822773618 is retained as evidence of the defect
-and is superseded by the repair.
+`docs/NEXT_ACTION.md`: run **45837439949** on exact SHA
+`16afb16c5b55ea48fe8b0129820399ec19af29c4` reached terminal `completed` /
+`success` on all 7 jobs, including the previously failing `rust-checks`; no
+in-progress run was claimed as passed. The failed run 45822773618 is retained as
+evidence of the defect and is superseded by the repair.
 
 V2 software milestones 1–6 remain evidenced. Milestone 7 remains NOT accepted: the
 two owner-only external gates (saved dashboard credentials via `browser_vault` and
