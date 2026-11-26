@@ -6,6 +6,30 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
+## CI-record continuity for ca76653 (2026-11-26 continuity run)
+
+Baseline clean `main` `ca76653c7a5a7c590beb7f1b69b0bce19df88742` == `origin/main`
+(0 ahead/0 behind, `git ls-remote` identical), no other cargo/rustc worker, heavy
+lock acquired. The only unrecorded verified increment was the terminal hosted CI
+result for the CI-record commit itself: run **45863237225** (push, `main`, head_sha
+exactly `ca76653c7a5a7c590beb7f1b69b0bce19df88742`) reached `completed`/`success`
+on all 7 jobs (release-build, browser, rust-checks, data-compute-identity,
+full-horizon, check-operations, dependency-audit). No in-progress run was called a pass.
+
+- Baseline `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`): **EXIT=0**,
+  **765 passed / 0 failed across 72 test binaries** (lib 278), zero named failures,
+  fmt and `clippy -D warnings` clean. The pinned-head provenance check forced a
+  project-only rebuild before the ladder; no source changed.
+- Docs-only CI-record continuity: no code, financial, scientific, provenance,
+  data-scope or security rule changed; the existing regression guards
+  (`tests/cached_receipt_convention.rs` 3 tests, `src/economic_calendar.rs`
+  gap-contract tests) are unchanged, so no new behavioral regression test applies.
+- V2 software milestones 1–6 remain evidenced; M7 is still NOT accepted (two
+  owner-only external gates: saved dashboard credentials via `browser_vault` and
+  a fresh owner manual reboot). No software milestone is unachieved by repository
+  code; further CI-record commits add no project value while those gates remain
+  owner-blocked.
+
 ## CI-record continuity for 981466a (2026-11-26 continuity run)
 
 Baseline clean `main` `981466ab675673820e759d015e389160162d53f2` == `origin/main`

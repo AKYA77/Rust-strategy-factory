@@ -2,6 +2,23 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-26 (CI-record continuity for ca76653): baseline clean `main`
+`ca76653c7a5a7c590beb7f1b69b0bce19df88742` == `origin/main` (0/0, `git ls-remote`
+identical), no other cargo/rustc worker, heavy lock acquired. The only unrecorded
+verified increment was the terminal hosted CI result for the CI-record commit
+itself: run **45863237225** (push, `main`, head_sha exactly `ca76653`) `completed`/
+`success` on all 7 jobs (release-build, browser, rust-checks, data-compute-identity,
+full-horizon, check-operations, dependency-audit). Baseline `scripts/check.sh`
+(`RSF_BUILDER_PROFILE=hermes-v2-m1`): **EXIT=0, 765 passed / 0 failed over 72
+binaries** (lib 278), zero named failures, fmt/clippy clean; the head-provenance
+check forced a project-only rebuild first, with no source change. Docs-only
+CI-record continuity: no code, financial, scientific, provenance, data-scope or
+security rule changed; the existing `tests/cached_receipt_convention.rs` (3 tests)
+and `src/economic_calendar.rs` gap-contract guards are unchanged, so no new
+behavioral regression test applies. V2 milestones 1–6 evidenced; M7 NOT accepted
+(two owner-only external gates). No software milestone unachieved; further
+CI-record commits add no project value while those gates remain owner-blocked.
+
 Continuity run 2026-11-26 (CI-record continuity for 981466a): baseline clean `main`
 `981466ab675673820e759d015e389160162d53f2` == `origin/main` (0/0, `git ls-remote`
 identical), no other cargo/rustc worker, heavy lock acquired. The only unrecorded
