@@ -112,7 +112,7 @@ fn conversion_never_uses_future_or_stale_quotes() {
     assert!(fx.validate(&p, 1000, 1000).is_err());
 }
 #[test]
-fn usd_account_reciprocal_conversion_is_exact_and_direction_based() {
+fn usd_account_reciprocal_conversion_is_exact_and_bid_based() {
     let jpy = Profile::synthetic("USDJPY").unwrap();
     let long = Conversion::usd_account_from_usd_base_price(&jpy, 150_000, 1_000).unwrap();
     assert_eq!(
