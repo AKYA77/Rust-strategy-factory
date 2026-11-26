@@ -2,6 +2,19 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-26 (cached-receipt CI-record continuity): baseline clean `main`
+`ef3c33a3cc0414e31d2621b1139e18d64a534fed` == `origin/main` (0/0, `git ls-remote` identical), no
+other cargo/rustc worker, heavy lock acquired. `scripts/check.sh`
+(`RSF_BUILDER_PROFILE=hermes-v2-m1`): EXIT=0, **763 passed / 0 failed over 72 binaries** (lib 276),
+zero named failures, fmt/Clippy clean. The docs-only CI-record reconciliation commit `ef3c33a` had
+a terminal hosted CI result not yet in the ledgers: run **45771533851** (push, `main`, head_sha
+exactly `ef3c33a`) `completed`/`success` on all 7 jobs (release-build, browser, rust-checks,
+data-compute-identity, full-horizon, check-operations, dependency-audit). Docs-only: no code,
+financial, scientific, provenance, data-scope or security rule changed; the existing
+`tests/cached_receipt_convention.rs` (3 tests) regression guard is unchanged. V2 software
+milestones 1–6 evidenced; M7 NOT accepted (two owner-only external gates). No software milestone
+is unachieved.
+
 Continuity run 2026-11-26 (cached-receipt reconciliation CI record): baseline clean `main`
 `fe15d1d17aeb3d78c118f20009a5dfe110462da8` == `origin/main` (0/0), no other cargo/rustc worker,
 heavy lock acquired. Baseline `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`) EXIT=0,
