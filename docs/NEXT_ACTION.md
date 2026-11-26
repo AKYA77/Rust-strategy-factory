@@ -6,6 +6,46 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
+## Format-gate repair and calendar-wiring reconciliation (2026-11-26 continuity run)
+
+Baseline clean `main` `d1f55eaf2d320b36d021bc1453620bed573f5f05` == `origin/main`
+(0 ahead/0 behind, `git ls-remote` identical), no other cargo/rustc worker, heavy
+lock acquired. Two already-pushed commits beyond the ledgers' prior head `9442d85`
+were reconciled: `dbc7598` (docs-only CI record — hosted run **45814075396**,
+head_sha exactly `dbc7598`, terminal `completed`/`success` on all 7 jobs) and
+`d1f55ea` (economic-calendar wiring).
+
+**Defect (RED):** `d1f55ea` claimed fmt-clean, but hosted run **45822773618** on
+that exact SHA concluded `completed`/`failure`: only `rust-checks` (job
+139919015606) failed at `cargo fmt --all -- --check`; the other 6 jobs succeeded
+and its tests were skipped. Local pinned-toolchain reproduction: EXIT=1 with four
+indentation diffs in `benches/batch.rs:99`, `benches/indexed_factory.rs:73`,
+`benches/proof_screen.rs:65`, `tests/windows.rs:311`. Evidence:
+`docs/VERIFICATION/fmt-gate-repair-2026-11-26-before.log`.
+
+**Scientific review:** `Features::news_blackout_mask()` is never called in any
+signal/evaluation path, so the calendar wiring is inert w.r.t. signals, fills and
+financial receipts — no strategy outcome, classification or receipt hash changed.
+Gap events are local-corpus diagnostic observations with provenance and causal
+`published_ms`, never approved calendar facts or closed-session evidence; the
+module doc now states this explicitly, consistent with the WITHDRAWN calendar
+policy. No financial, scientific, provenance, data-scope or security rule weakened;
+class `REAL_STRUCTURALLY_VALID`, eligibility none.
+
+**Fix (GREEN):** canonical `cargo fmt --all` (whitespace only, 4 lines) plus two new
+unit regressions in `src/economic_calendar.rs` pinning `from_corpus_gaps()`
+causal/provenance/impact/threshold contracts. RED fmt EXIT=1 → GREEN EXIT=0;
+focused `cargo test --locked --lib economic_calendar` 8/8 EXIT=0. Final-tree
+`scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`): **EXIT=0**, **765 passed /
+0 failed across 72 test binaries** (lib 278), zero named failures, fmt/clippy
+clean (+2 over the 763 baseline are the new calendar guards). Hosted CI for the
+repair commit is pending; only a terminal conclusion will be recorded.
+Evidence: `docs/VERIFICATION/fmt-gate-repair-2026-11-26.md`.
+
+V2 software milestones 1–6 remain evidenced; M7 still NOT accepted (two owner-only
+external gates: saved dashboard credentials via `browser_vault` and a fresh owner
+manual reboot). No software milestone is unachieved by repository code.
+
 ## CI-record continuity for 9442d85 (2026-11-26 continuity run)
 
 Baseline clean `main` `9442d85742be85b99798027f102950450e0fa9ee` == `origin/main` (0 ahead/0

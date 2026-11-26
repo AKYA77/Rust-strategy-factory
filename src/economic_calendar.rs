@@ -2,8 +2,9 @@
 //!
 //! This module is wired into the research pipeline through [`Features::with_context`]
 //! and [`Features::news_blackout_mask`]. Calendar events are derived from observed
-//! corpus gap data (market closures detected in the local historical corpus) and
-//! carry provenance metadata. Every event carries publication/as-of metadata, and
+//! corpus gap data (diagnostic gap observations only — not approved market-calendar
+//! facts, calendar-completeness claims or closed-session evidence) and carry
+//! provenance metadata. Every event carries publication/as-of metadata, and
 //! callers must enforce causal availability through [`EconomicEvent::is_available_at`].
 //!
 //! No external data acquisition is performed here. Calendar events are derived
@@ -368,5 +369,70 @@ mod tests {
         unknown.published_ms = None;
         assert!(!unknown.is_available_at(ts));
         assert!(event("EURUSD", ts, ImpactLevel::High).is_available_at(ts));
+    }
+
+    #[test]
+    fn corpus_gap_events_are_causal_provenance_tagged_and_impact_bounded() {
+        use crate::data::Tick;
+        let tick = |ms, seq| Tick {
+            timestamp_ms: ms,
+            sequence: seq,
+            bid: 100,
+            ask: 102,
+        };
+        let base = 1_735_689_600_000i64;
+        // Regular 1-minute cadence, then a ~2h gap and a 2-day gap.
+        let short_gap_end = base + 120_000 + 2 * 3_600_000;
+        let long_gap_end = short_gap_end + 172_800_000;
+        let ticks = vec![
+            tick(base, 1),
+            tick(base + 60_000, 2),
+            tick(short_gap_end, 3),
+            tick(long_gap_end, 4),
+        ];
+        let cal = EconomicCalendar::from_corpus_gaps("EURUSD", &ticks, 3_600_000).unwrap();
+        assert_eq!(cal.len(), 2);
+
+        let short = &cal.events_at(short_gap_end).unwrap()[0];
+        assert_eq!(short.instrument, "EURUSD");
+        assert_eq!(short.event_type, EventType::Other);
+        assert_eq!(short.impact, ImpactLevel::Medium);
+        assert_eq!(short.source_id, "corpus-gap-analysis-v1");
+        assert_eq!(short.revision, "rev-1");
+        assert_eq!(short.published_ms, Some(short_gap_end));
+        // No look-ahead: the gap event is not knowable before the post-gap tick.
+        assert!(short.is_available_at(short_gap_end));
+        assert!(!short.is_available_at(short_gap_end - 1));
+        // No released/forecast values are fabricated from a gap.
+        assert!(short.actual.is_none() && short.forecast.is_none() && short.previous.is_none());
+
+        let long = &cal.events_at(long_gap_end).unwrap()[0];
+        assert_eq!(long.impact, ImpactLevel::High);
+        assert_eq!(long.published_ms, Some(long_gap_end));
+    }
+
+    #[test]
+    fn corpus_gap_thresholds_are_validated_and_normal_cadence_emits_nothing() {
+        use crate::data::Tick;
+        let ticks: Vec<Tick> = (0..5i64)
+            .map(|i| Tick {
+                timestamp_ms: 1_000 + i * 60_000,
+                sequence: i as u64,
+                bid: 100,
+                ask: 102,
+            })
+            .collect();
+        assert!(EconomicCalendar::from_corpus_gaps("EURUSD", &ticks, 0).is_err());
+        assert!(EconomicCalendar::from_corpus_gaps("EURUSD", &ticks, -1).is_err());
+        assert!(
+            EconomicCalendar::from_corpus_gaps("EURUSD", &ticks, 3_600_000)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            EconomicCalendar::from_corpus_gaps("EURUSD", &[], 3_600_000)
+                .unwrap()
+                .is_empty()
+        );
     }
 }

@@ -1,0 +1,36 @@
+Diff in /root/workspace/Rust-strategy-factory/benches/batch.rs:99:
+             Input {
+                 dataset,
+                 conversions,
+-            economic_calendar: None,
++                economic_calendar: None,
+             }
+         })
+         .collect::<Vec<_>>();
+Diff in /root/workspace/Rust-strategy-factory/benches/indexed_factory.rs:73:
+             Input {
+                 dataset,
+                 conversions,
+-            economic_calendar: None,
++                economic_calendar: None,
+             }
+         })
+         .collect::<Vec<_>>();
+Diff in /root/workspace/Rust-strategy-factory/benches/proof_screen.rs:65:
+             Input {
+                 dataset,
+                 conversions,
+-            economic_calendar: None,
++                economic_calendar: None,
+             }
+         })
+         .collect::<Vec<_>>();
+Diff in /root/workspace/Rust-strategy-factory/tests/windows.rs:311:
+             )
+             .unwrap(),
+             conversions: vec![Conversion::usd(); n],
+-        economic_calendar: None,
++            economic_calendar: None,
+         }
+     }
+     let base = history(false);

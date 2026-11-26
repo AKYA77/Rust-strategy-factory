@@ -2,6 +2,33 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-26 (format-gate repair + calendar-wiring reconciliation):
+baseline clean `main` `d1f55eaf2d320b36d021bc1453620bed573f5f05` == `origin/main`
+(0/0, `git ls-remote` identical), no other cargo/rustc worker, heavy lock acquired.
+Reconciled `dbc7598` (docs-only CI record; hosted run **45814075396**, terminal
+`completed`/`success` on all 7 jobs) and `d1f55ea` (economic-calendar wiring). The
+latter broke the mandatory format gate despite claiming fmt-clean: hosted run
+**45822773618** concluded `completed`/`failure` with only `rust-checks` failing at
+`cargo fmt --all -- --check` (job 139919015606, step 5); the other six jobs
+succeeded and its tests were skipped. Local pinned-toolchain reproduction EXIT=1
+with four indentation diffs in `benches/batch.rs:99`, `benches/indexed_factory.rs:73`,
+`benches/proof_screen.rs:65`, `tests/windows.rs:311`.
+
+Fix: canonical `cargo fmt --all` (whitespace only) + two new unit regressions in
+`src/economic_calendar.rs` for the previously untested `from_corpus_gaps()` path
+(causal `published_ms`, provenance tags, impact bounds, threshold validation).
+RED fmt EXIT=1 → GREEN EXIT=0; focused calendar tests 8/8; final-tree
+`scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`) **EXIT=0**, **765 passed /
+0 failed over 72 binaries** (lib 278), zero named failures, fmt/clippy clean.
+Calendar wiring reviewed as inert w.r.t. signals/fills/receipts (`news_blackout_mask`
+is never called); gap events are diagnostic corpus observations, not approved
+calendar facts or closed-session evidence, consistent with the WITHDRAWN policy.
+No financial, scientific, provenance, data-scope or security rule changed; class
+`REAL_STRUCTURALLY_VALID`, eligibility none. Hosted CI for the repair commit
+pending; only terminal conclusions recorded. Evidence:
+`docs/VERIFICATION/fmt-gate-repair-2026-11-26.md`. V2 milestones 1–6 evidenced;
+M7 NOT accepted (two owner-only external gates). No software milestone unachieved.
+
 Continuity run 2026-11-26 (CI-record continuity for 9442d85): baseline clean `main`
 `9442d85742be85b99798027f102950450e0fa9ee` == `origin/main` (0/0, `git ls-remote` identical), no
 other cargo/rustc worker, heavy lock acquired. `scripts/check.sh`
