@@ -6,6 +6,33 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
+## CI-record continuity for d14cd41 (2026-11-27 continuity run)
+
+Baseline clean `main` `d14cd4129703185026f01e63dd351f63e404af13` == `origin/main`
+(0 ahead/0 behind, `git ls-remote` identical), no other cargo/rustc worker, heavy
+lock acquired. The only unrecorded verified increment was the terminal hosted CI
+result for the CI-record commit itself: run **45899547434** (push, `main`, head_sha
+exactly `d14cd4129703185026f01e63dd351f63e404af13`) reached `completed`/`success`
+on all 7 jobs (release-build, browser, rust-checks, data-compute-identity,
+full-horizon, check-operations, dependency-audit). No in-progress run was called a pass.
+
+- Baseline `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`, with
+  `CARGO_HOME=/workspace/.cargo RUSTUP_HOME=/workspace/.rustup
+  PATH=/workspace/.cargo/bin:$PATH`): **EXIT=0**, **765 passed / 0 failed across 72
+  test binaries** (lib 278), 0 ignored, zero named failures, fmt and
+  `clippy -D warnings` clean; started 2026-11-26T23:41:52Z, ended
+  2026-11-26T23:50:23Z. The head-provenance check forced a project-only rebuild
+  (9009 files, 3.0 GiB) before the ladder; no source changed.
+- Docs-only CI-record continuity: no code, financial, scientific, provenance,
+  data-scope or security rule changed; the existing regression guards
+  (`tests/cached_receipt_convention.rs` 3 tests, `src/economic_calendar.rs`
+  gap-contract tests) are unchanged, so no new behavioral regression test applies.
+- V2 software milestones 1–6 remain evidenced; M7 is still NOT accepted. Both
+  open items were re-confirmed as owner-only this run: `browser_vault list`
+  returned no saved logins, and a fresh reboot remains an owner manual action.
+  No software milestone is unachieved by repository code; further CI-record
+  commits add no project value while those gates remain owner-blocked.
+
 ## CI-record continuity for e62c1a2 (2026-11-26 continuity run)
 
 Baseline clean `main` `e62c1a2d2245248bddb890537fc8c7ad7936bdfb` == `origin/main`
