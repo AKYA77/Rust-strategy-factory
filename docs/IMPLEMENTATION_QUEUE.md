@@ -2,6 +2,27 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-26 (cached-receipt convention reconciliation): baseline clean `main`
+`d3f354eb842a822e94de652caa54305f16a2e6db` == `origin/main` (0/0), no other worker, heavy
+lock acquired. Verified four already-pushed commits beyond the ledgers' prior head `3b789b2`:
+`34aae4b` (ledger CI record), `be6553e` (PROJECT_STATE scope correction + 16 limitations
+strings), `8a8e41c` (test rename), `d3f354e` (6 non-USD cached reports' conversion_policy
+label switched to `diagnostic_reciprocal_closing_rate_v1_bid_only`). Changed-line audit over
+`3b789b2..HEAD`: only 138 policy labels, 16 limitations strings, 1 test rename, 4 ledger CI
+lines, 2 blank lines -- no numeric field, receipt_hash, count, P&L, classification, gate or
+financial/scientific assertion changed. Relabel is truthful: the cached execution strategy is
+`"side": "Long"`, so Long fills use `bid` under both the superseded direction-based rule and
+the active bid-only rule; numbers and hashes stay valid. New
+`tests/cached_receipt_convention.rs` (3 tests) pins this: RED with `3b789b2` cached files FAILED
+(EXIT=101, `long_bid_short_ask` vs `bid_only`), GREEN after byte-for-byte HEAD restore 3/3
+(EXIT=0). `scripts/check.sh` EXIT=0 760 passed/0 failed over 71 binaries baseline, and EXIT=0
+**763 passed / 0 failed over 72 binaries** (lib 276) on the final tree. Hosted CI terminal
+success on all 7 jobs for 45736386703, 45740888354, 45741014575, 45741284289. Evidence:
+`docs/VERIFICATION/cached-receipt-convention-reconciliation-2026-11-26.md`. No financial,
+scientific, provenance, data-scope or security rule changed; class stays REAL_STRUCTURALLY_VALID,
+eligibility none; V2 milestones 1–6 evidenced, M7 NOT accepted (owner-only external gates).
+No further software milestone is unachieved.
+
 Continuity run 2026-11-26 (bid-only conversion convention reconciliation): baseline clean
 `main` `38fcc736863e4bb59b888134d958b963d27b3138` == `origin/main`, no other worker, heavy
 lock acquired. Verified two already-pushed, previously unreconciled commits:

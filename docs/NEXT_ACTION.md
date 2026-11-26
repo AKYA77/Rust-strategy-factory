@@ -6,6 +6,40 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
+## Cached-receipt convention reconciliation (2026-11-26 continuity run)
+
+Baseline clean `main` `d3f354eb842a822e94de652caa54305f16a2e6db` == `origin/main` (0/0),
+no other worker, heavy lock acquired. Four already-pushed commits beyond the ledgers' prior
+HEAD `3b789b2` were verified: `34aae4b` (ledger CI record for run 45734055499), `be6553e`
+(PROJECT_STATE scope correction + 16 cached-report `limitations` strings), `8a8e41c`
+(test rename `..._direction_based` -> `..._bid_based` in `tests/core.rs`), and `d3f354e`
+(6 non-USD cached reports' `conversion_policy` label `..._long_bid_short_ask` ->
+`..._bid_only`). Changed-line audit over `3b789b2..HEAD`: 138 policy labels, 16 limitations
+strings, 1 test rename, 4 ledger CI lines, 2 blank lines; no numeric field, `receipt_hash`,
+count, P&L, classification, eligibility, gate or financial/scientific assertion changed.
+
+Relabelling is truthful: the cached execution uses `"side": "Long"`
+(`m1-long-above-mean-v1.json`), so Long fills take `bid` under both the superseded
+direction-based rule and the active bid-only rule; no Short fill existed, hence numbers and
+receipt hashes are unchanged. `SCIENTIFIC_VALIDATION_RECEIPT.json` keeps the old string as the
+historical pre-relabel validation receipt.
+
+- Baseline `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`): **EXIT=0**, **760 passed / 0
+  failed across 71 binaries** (lib 276), zero named failures, fmt and clippy clean.
+- RED/GREEN: new `tests/cached_receipt_convention.rs` (3 tests) pins labels to the active code
+  constants and the long-only strategy. With the `3b789b2` versions of the six non-USD cached
+  reports, `cached_diagnostic_receipt_labels_match_active_convention` FAILED (`EXIT=101`,
+  `long_bid_short_ask` vs `bid_only`); after byte-for-byte HEAD restore it passed 3/3 (`EXIT=0`).
+- Final-tree `scripts/check.sh`: **EXIT=0**, **763 passed / 0 failed across 72 binaries** (lib
+  276), including the new 3-test binary; fmt and clippy clean.
+- Hosted CI terminal conclusions: **45736386703** (`34aae4b`), **45740888354** (`be6553e`),
+  **45741014575** (`8a8e41c`), **45741284289** (`d3f354e`) -- each `completed`/`success` on all
+  7 jobs. No in-progress run called a pass.
+- Evidence: `docs/VERIFICATION/cached-receipt-convention-reconciliation-2026-11-26.md`. No
+  financial, scientific, provenance, data-scope or security rule changed; class stays
+  REAL_STRUCTURALLY_VALID, eligibility none. V2 milestones 1–6 remain evidenced; M7 is still
+  NOT accepted (two owner-only external gates). No further software milestone is unachieved.
+
 ## Bid-only conversion convention reconciliation (2026-11-26 continuity run)
 
 Baseline clean `main` `38fcc736863e4bb59b888134d958b963d27b3138` == `origin/main` (0/0),
