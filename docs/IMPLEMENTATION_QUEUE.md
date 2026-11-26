@@ -2,6 +2,18 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-26 (cached-receipt reconciliation CI record): baseline clean `main`
+`fe15d1d17aeb3d78c118f20009a5dfe110462da8` == `origin/main` (0/0), no other cargo/rustc worker,
+heavy lock acquired. Baseline `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`) EXIT=0,
+**763 passed / 0 failed over 72 binaries** (lib 276), zero named failures (fmt, clippy `-D warnings`
+and all tests passed). The reconciliation commit `fe15d1d` had a terminal hosted CI result that
+was not yet in the ledgers: run **45754331414** (push, `main`, head_sha exactly `fe15d1d`)
+`completed`/`success` on all 7 jobs (release-build, browser, rust-checks, data-compute-identity,
+full-horizon, check-operations, dependency-audit). Docs-only CI-record reconciliation: no code,
+financial, scientific, provenance, data-scope or security rule changed; the existing regression
+guard `tests/cached_receipt_convention.rs` (3 tests) is unchanged. V2 software milestones 1–6
+evidenced; M7 NOT accepted (owner-only external gates). No software milestone is unachieved.
+
 Continuity run 2026-11-26 (cached-receipt convention reconciliation): baseline clean `main`
 `d3f354eb842a822e94de652caa54305f16a2e6db` == `origin/main` (0/0), no other worker, heavy
 lock acquired. Verified four already-pushed commits beyond the ledgers' prior head `3b789b2`:

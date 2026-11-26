@@ -6,6 +6,27 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
+## Cached-receipt reconciliation CI record (2026-11-26 continuity run)
+
+Baseline clean `main` `fe15d1d17aeb3d78c118f20009a5dfe110462da8` == `origin/main` (0 ahead/0
+behind, `git ls-remote origin refs/heads/main` identical), no other cargo/rustc worker, heavy lock
+acquired. The only unrecorded verified increment is the terminal hosted CI result for the
+reconciliation commit itself: run **45754331414** (push, `main`, head_sha exactly `fe15d1d`) reached
+`completed`/`success` on all 7 jobs (release-build, browser, rust-checks, data-compute-identity,
+full-horizon, check-operations, dependency-audit). No in-progress run was called a pass.
+
+- Baseline `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`, under the heavy lock): **EXIT=0**,
+  **763 passed / 0 failed across 72 test binaries** (lib 276), zero named failures. `check.sh` runs
+  `cargo fmt --all -- --check`, `cargo clippy --locked --all-targets -- -D warnings`, then
+  `cargo test --locked --lib --bins --tests`; EXIT=0 means all three layers passed.
+- No code, financial, scientific, provenance, data-scope or security rule changed in this run; the
+  reconciliation regression guard `tests/cached_receipt_convention.rs` (3 tests) from `fe15d1d`
+  remains in force and is unchanged. Docs-only CI-record reconciliation, so no new behavioral
+  regression test applies.
+- V2 software milestones 1–6 remain evidenced; M7 is still NOT accepted (two owner-only external
+  gates: saved dashboard credentials and a fresh owner manual reboot). No software milestone is
+  unachieved by repository code.
+
 ## Cached-receipt convention reconciliation (2026-11-26 continuity run)
 
 Baseline clean `main` `d3f354eb842a822e94de652caa54305f16a2e6db` == `origin/main` (0/0),
