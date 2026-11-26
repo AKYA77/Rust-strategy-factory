@@ -2,6 +2,30 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-26 (bid-only conversion convention reconciliation): baseline clean
+`main` `38fcc736863e4bb59b888134d958b963d27b3138` == `origin/main`, no other worker, heavy
+lock acquired. Verified two already-pushed, previously unreconciled commits:
+`617f21575129130127c37c4b7d917ad1fd41326a` (code fix: diagnostic replay `diagnostic_conversion`
+now bid-only for both sides, matching the research loader that derives conversions before a
+side is known; policy string `diagnostic_reciprocal_closing_rate_v1_bid_only`) and
+`38fcc736863e4bb59b888134d958b963d27b3138` (docs: per-partition conversion memory, 2 GiB
+input-file vs 8 GB post-load RAM budget, 20-month/22-month coverage gap of 74 missing inputs,
+limitations #7/#8). `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`): **EXIT=0**,
+**760 passed / 0 failed over 71 binaries** (lib 276), zero named failures, fmt and clippy
+clean — correcting the stale `762/72` ledger figure. Red/green: with the old direction-based
+`diagnostic_conversion` body restored, the lib unit test
+`worker_preparation_tests::diagnostic_conversion_is_bid_based_reciprocal` FAILED (`EXIT=101`,
+`(10,1501)` vs `(1,150)`) and `tests/verify_conversion.rs::
+all_three_non_usd_instruments_derive_conversions_from_dataset` FAILED (`EXIT=101`,
+"USDJPY loader vs tick engine Short"); after byte-for-byte restore both passed (`EXIT=0`, 1/1
+and 14/14), tree clean. Hosted CI: run **45701751661** (`617f215`) and **45716427171**
+(`38fcc73`) both terminal `completed`/`success` on all 7 jobs; the docs-only `80dbddd` run
+45697619785 was terminal `failure` (retained, superseded). Evidence:
+`docs/VERIFICATION/bid-only-convention-reconciliation-2026-11-26.md`. No financial,
+scientific, provenance, data-scope or security rule changed; class stays
+REAL_STRUCTURALLY_VALID, eligibility none. V2 milestones 1–6 evidenced; M7 NOT accepted
+(two owner-only external gates). No further software milestone is unachieved.
+
 Continuity run 2026-11-25 (conversion implementation reconciliation): baseline clean `main`
 `c3ee6c0` (== `origin/main`, 0/0, no other worker, heavy lock acquired). The already-pushed
 implementation commit `c3ee6c0` (src/main.rs, src/tick_engine.rs, tests/corpus.rs,

@@ -6,6 +6,42 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
+## Bid-only conversion convention reconciliation (2026-11-26 continuity run)
+
+Baseline clean `main` `38fcc736863e4bb59b888134d958b963d27b3138` == `origin/main` (0/0),
+no other worker, heavy lock acquired. Two already-pushed commits were unreconciled in the
+ledgers and are now verified:
+
+- `617f21575129130127c37c4b7d917ad1fd41326a` (code fix): `tick_engine::diagnostic_conversion`
+  is bid-only for both sides (Side ignored), matching `src/main.rs::research_inputs()` which
+  derives conversions at load time before a side is known; policy string renamed to
+  `diagnostic_reciprocal_closing_rate_v1_bid_only`. This corrects the Short-side divergence
+  between the research loader (bid) and diagnostic replay (previously ask). Exact integer
+  arithmetic, strict `as_of_ms` alignment and all `Conversion::validate` safeguards preserved;
+  reciprocal convention remains an unverified research assumption, not a broker rule.
+- `38fcc736863e4bb59b888134d958b963d27b3138` (docs only): measured conversion memory per
+  partition (2 GiB input-file budget vs 8 GB post-load RAM budget; ~6.58 GB of conversion
+  vectors for the full corpus), 20-month dev vs 22-month corpus coverage gap (74 missing
+  inputs), limitations #7/#8, 14 validation-safeguard tests.
+
+- `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`): **EXIT=0**, **760 passed / 0 failed
+  across 71 test binaries** (lib 276), zero named failures, fmt and clippy clean. This
+  corrects the stale `762/72` figure set by `617f215`; a fresh full run yields 760/71.
+- Red/green: restoring the pre-`617f215` direction-based `diagnostic_conversion` body made
+  `tick_engine::worker_preparation_tests::diagnostic_conversion_is_bid_based_reciprocal` FAIL
+  (`EXIT=101`, `(10,1501)` vs `(1,150)`) and `tests/verify_conversion.rs::
+  all_three_non_usd_instruments_derive_conversions_from_dataset` FAIL (`EXIT=101`,
+  "USDJPY loader vs tick engine Short"); after byte-for-byte restore both pass (`EXIT=0`,
+  1/1 and 14/14). Tree clean.
+- Hosted CI: run **45701751661** on `617f215` and **45716427171** on `38fcc73` both reached
+  terminal `completed`/`success` on all 7 jobs. Docs-only `80dbddd` run 45697619785 had a
+  terminal `failure`, retained as history and superseded. No in-progress run called a pass.
+- Evidence: `docs/VERIFICATION/bid-only-convention-reconciliation-2026-11-26.md`. No
+  financial, scientific, provenance, data-scope or security rule changed; class remains
+  REAL_STRUCTURALLY_VALID, eligibility none. V2 software milestones 1–6 remain evidenced;
+  M7 is still NOT accepted (two owner-only external gates: saved dashboard credentials and
+  a fresh owner manual reboot). No further software milestone is unachieved.
+
 ## Conversion implementation reconciliation at HEAD (2026-11-25 continuity run)
 
 Baseline clean `main` `c3ee6c0` (== `origin/main`, 0/0 ahead-behind, no other worker, heavy lock
@@ -24,6 +60,8 @@ evidence.
   (+2 tests). Non-USD quotes now derive exact event-aligned reciprocal conversions (bid Long /
   ask Short) instead of being refused; identity sentinel still refused for non-USD; class remains
   REAL_STRUCTURALLY_VALID, eligibility none; no scientific/financial/security rule changed.
+  NOTE (superseded): at `c3ee6c0` the diagnostic replay used bid Long / ask Short; `617f215`
+  (2026-11-26, above) unified both sides to bid-only so the research loader and replay agree.
 - Evidence: `docs/VERIFICATION/conversion-implementation-reconciliation-2026-11-25.md`. Hosted CI
   run **45676627807** on exact SHA `c3ee6c0` reached terminal `completed`/`success` on all 7 jobs.
   The docs-reconciliation commits `b2d0eb1` (evidence file) and `6221875` (ledgers) both reached
