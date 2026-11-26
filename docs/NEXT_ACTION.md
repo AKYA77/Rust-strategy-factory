@@ -6,6 +6,34 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
+## CI-record continuity for 981466a (2026-11-26 continuity run)
+
+Baseline clean `main` `981466ab675673820e759d015e389160162d53f2` == `origin/main`
+(0 ahead/0 behind, `git ls-remote` identical), no other cargo/rustc worker, heavy
+lock acquired. The only unrecorded verified increment was the terminal hosted CI
+result for the CI-record commit itself: run **45839693702** (push, `main`, head_sha
+exactly `981466ab675673820e759d015e389160162d53f2`) reached `completed`/`success`
+on all 7 jobs (release-build, browser, rust-checks, data-compute-identity,
+full-horizon, check-operations, dependency-audit). No in-progress run was called a pass.
+
+- Baseline `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`): the first ladder
+  hit a transient lock-contention flake — `tests/restore_cutover.rs::
+  restore_cutover_fences_copied_actors_and_revives_on_restored_copy` FAILED
+  (`EXIT=101`, `"another recovery operation is active"` at
+  `tests/restore_cutover.rs:69`); the test passed 3/3 in isolation and a second
+  full ladder was clean: **EXIT=0**, **765 passed / 0 failed across 72 test
+  binaries** (lib 278), zero named failures, fmt and clippy `-D warnings` clean.
+  No repository code changed, so the flake is environmental/parallel-load, not a
+  regression; the passing re-run is the recorded baseline.
+- Docs-only CI-record continuity: no code, financial, scientific, provenance,
+  data-scope or security rule changed; the existing regression guards
+  (`tests/cached_receipt_convention.rs` 3 tests, `src/economic_calendar.rs` 2
+  gap-contract tests) are unchanged, so no new behavioral regression test applies.
+- V2 software milestones 1–6 remain evidenced; M7 is still NOT accepted (two
+  owner-only external gates: saved dashboard credentials via `browser_vault` and
+  a fresh owner manual reboot). No software milestone is unachieved; further
+  CI-record commits add no project value while those gates remain owner-blocked.
+
 ## Format-gate repair and calendar-wiring reconciliation (2026-11-26 continuity run)
 
 Baseline clean `main` `d1f55eaf2d320b36d021bc1453620bed573f5f05` == `origin/main`

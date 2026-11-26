@@ -2,6 +2,25 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-26 (CI-record continuity for 981466a): baseline clean `main`
+`981466ab675673820e759d015e389160162d53f2` == `origin/main` (0/0, `git ls-remote`
+identical), no other cargo/rustc worker, heavy lock acquired. The only unrecorded
+verified increment was the terminal hosted CI result for the CI-record commit itself:
+run **45839693702** (push, `main`, head_sha exactly `981466a`) `completed`/`success`
+on all 7 jobs (release-build, browser, rust-checks, data-compute-identity,
+full-horizon, check-operations, dependency-audit). Baseline `scripts/check.sh`
+(`RSF_BUILDER_PROFILE=hermes-v2-m1`): first ladder hit a transient lock flake in
+`tests/restore_cutover.rs::restore_cutover_fences_copied_actors_and_revives_on_restored_copy`
+(`EXIT=101`, `"another recovery operation is active"`), passed 3/3 in isolation, and a
+second full ladder was clean **EXIT=0, 765 passed / 0 failed over 72 binaries**
+(lib 278), fmt/clippy clean. Docs-only CI-record continuity: no code, financial,
+scientific, provenance, data-scope or security rule changed; the existing
+`tests/cached_receipt_convention.rs` (3 tests) and `src/economic_calendar.rs` (2
+gap-contract) guards are unchanged, so no new behavioral regression test applies.
+V2 software milestones 1–6 evidenced; M7 NOT accepted (two owner-only external gates).
+No software milestone is unachieved; further CI-record commits add no project value
+while those gates remain owner-blocked.
+
 Continuity run 2026-11-26 (format-gate repair + calendar-wiring reconciliation):
 baseline clean `main` `d1f55eaf2d320b36d021bc1453620bed573f5f05` == `origin/main`
 (0/0, `git ls-remote` identical), no other cargo/rustc worker, heavy lock acquired.
