@@ -26,6 +26,10 @@ scientific, provenance, data-scope or security rule changed; class stays
 REAL_STRUCTURALLY_VALID, eligibility none. V2 milestones 1–6 evidenced; M7 NOT accepted
 (two owner-only external gates). No further software milestone is unachieved.
 
+Post-push terminal CI: reconciliation commit `3b789b28ed6b946e21ffdddb60a8f278da7438e7`
+hosted run **45734055499** concluded `completed`/`success` on all 7 jobs; remote SHA verified
+equal to local HEAD. Recorded only after the run reached a terminal conclusion.
+
 Continuity run 2026-11-25 (conversion implementation reconciliation): baseline clean `main`
 `c3ee6c0` (== `origin/main`, 0/0, no other worker, heavy lock acquired). The already-pushed
 implementation commit `c3ee6c0` (src/main.rs, src/tick_engine.rs, tests/corpus.rs,

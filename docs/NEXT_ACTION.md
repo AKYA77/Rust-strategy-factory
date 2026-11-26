@@ -42,6 +42,11 @@ ledgers and are now verified:
   M7 is still NOT accepted (two owner-only external gates: saved dashboard credentials and
   a fresh owner manual reboot). No further software milestone is unachieved.
 
+  Post-push: the reconciliation commit `3b789b28ed6b946e21ffdddb60a8f278da7438e7` produced
+  hosted CI run **45734055499**, which reached terminal `completed`/`success` on all 7 jobs
+  (release-build, browser, rust-checks, data-compute-identity, full-horizon, check-operations,
+  dependency-audit); remote SHA `3b789b2` verified equal to local HEAD.
+
 ## Conversion implementation reconciliation at HEAD (2026-11-25 continuity run)
 
 Baseline clean `main` `c3ee6c0` (== `origin/main`, 0/0 ahead-behind, no other worker, heavy lock
