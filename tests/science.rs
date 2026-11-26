@@ -96,6 +96,7 @@ fn input() -> Input {
         )
         .unwrap(),
         conversions: vec![Conversion::usd(); n],
+        economic_calendar: None,
     }
 }
 #[test]
@@ -408,6 +409,7 @@ fn identical_numeric_histories_on_different_instruments_have_independent_holdout
     let b = Input {
         dataset,
         conversions: a.conversions.clone(),
+        economic_calendar: None,
     };
     assert_eq!(
         a.dataset.manifest.content_hash,

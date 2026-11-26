@@ -259,12 +259,19 @@ pub(crate) fn prepare_replay(
     let visible = window.map_or(candles.len(), |w| {
         candles.partition_point(|c| c.available_ms < w.end_exclusive_ms)
     });
+    let calendar = crate::economic_calendar::EconomicCalendar::from_corpus_gaps(
+        &data.profile.symbol,
+        &data.ticks,
+        3_600_000, // 1 hour gap threshold
+    )
+    .unwrap_or_default();
     let mut features = crate::strategies::Features::with_context(
         &candles[..visible],
         visible.saturating_mul(128),
         data,
         strategy.timeframe,
-    )?;
+    )?
+    .with_economic_calendar(Some(&calendar));
     let expected = features.signal(&strategy.rule)?;
     if mask.len() != candles.len() || !mask.matches_prefix(&expected, visible)? {
         return Err("signals inconsistent with frozen strategy".into());

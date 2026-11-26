@@ -50,6 +50,7 @@ fn input(last: i64) -> Input {
         )
         .unwrap(),
         conversions: vec![Conversion::usd(); 5],
+        economic_calendar: None,
     }
 }
 fn strategy() -> Strategy {
@@ -534,6 +535,7 @@ fn exact_proof_rejection_audits_and_comparable_children_preserve_real_evidence()
         vec![Input {
             dataset: input.dataset.clone(),
             conversions: input.conversions.clone(),
+            economic_calendar: None,
         }],
         research::Config {
             proof_policy: Some(audited_policy.clone()),

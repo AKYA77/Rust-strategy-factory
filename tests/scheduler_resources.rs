@@ -117,6 +117,7 @@ fn research_input() -> Input {
         )
         .unwrap(),
         conversions: vec![Conversion::usd(); n],
+        economic_calendar: None,
     }
 }
 #[test]

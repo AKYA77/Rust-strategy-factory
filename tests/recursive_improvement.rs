@@ -49,6 +49,7 @@ fn input() -> Input {
         )
         .unwrap(),
         conversions: vec![Conversion::usd(); 5],
+        economic_calendar: None,
     }
 }
 

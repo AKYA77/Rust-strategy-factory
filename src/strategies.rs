@@ -403,6 +403,16 @@ impl<'a> Features<'a> {
         features.context = Some((data, timeframe));
         Ok(features)
     }
+    /// Attach an economic calendar derived from corpus gap data. The calendar
+    /// enables [`Features::news_blackout_mask`] for high-impact market closure
+    /// events. Pass `None` to operate without calendar filtering.
+    pub fn with_economic_calendar(
+        mut self,
+        calendar: Option<&'a crate::economic_calendar::EconomicCalendar>,
+    ) -> Self {
+        self.economic_calendar = calendar;
+        self
+    }
     pub(crate) fn with_frames(
         candles: &'a [Candle],
         max_cells: usize,

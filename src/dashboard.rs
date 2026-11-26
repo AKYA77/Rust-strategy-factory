@@ -2897,6 +2897,7 @@ mod training_lineage_tests {
         let input = research::Input {
             conversions: vec![crate::contracts::Conversion::usd(); dataset.ticks.len()],
             dataset,
+            economic_calendar: None,
         };
         let strategy = crate::strategies::Strategy {
             timeframe: crate::candles::Timeframe::M1,

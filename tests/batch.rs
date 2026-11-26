@@ -65,6 +65,7 @@ fn input(symbol: &str) -> Input {
     Input {
         dataset,
         conversions,
+        economic_calendar: None,
     }
 }
 fn strategies() -> Vec<Strategy> {
@@ -296,6 +297,7 @@ fn shared_batch_preflight_refuses_invalid_budgets_or_mixed_primary_frames() {
     let mut corrupted = Input {
         dataset: input.dataset.clone(),
         conversions: input.conversions.clone(),
+        economic_calendar: None,
     };
     corrupted.dataset.ticks[0].bid += corrupted.dataset.profile.tick;
     assert!(

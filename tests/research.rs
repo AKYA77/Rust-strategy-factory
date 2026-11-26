@@ -43,6 +43,7 @@ fn input(symbol: &str) -> Input {
         )
         .unwrap(),
         conversions: vec![Conversion::usd(); n],
+        economic_calendar: None,
     }
 }
 fn open(path: &std::path::Path) -> Driver {

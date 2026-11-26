@@ -167,6 +167,7 @@ fn main() {
                     let input = Input {
                         dataset: data,
                         conversions: conversion,
+                        economic_calendar: None,
                     };
                     for candidate in &candidates {
                         let result = research::evaluate(

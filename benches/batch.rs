@@ -99,6 +99,7 @@ fn main() {
             Input {
                 dataset,
                 conversions,
+            economic_calendar: None,
             }
         })
         .collect::<Vec<_>>();

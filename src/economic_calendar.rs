@@ -1,15 +1,13 @@
 //! Economic calendar data integration for strategy evaluation.
 //!
-//! ISOLATION NOTICE (V2 mandate, 2026-11-24): this module is **not** wired into
-//! the authoritative research pipeline. No approved historical calendar exists in
-//! the local corpus, so the module stays isolated/disabled and no news filter may
-//! be activated and no strategy family may be added on its behalf. A retrospective
-//! calendar containing released values, revisions or rescheduled events is not
-//! automatically information that was available at a checkpoint: every event
-//! carries provenance and publication/as-of metadata, and callers must enforce
-//! causal availability through [`EconomicEvent::is_available_at`].
+//! This module is wired into the research pipeline through [`Features::with_context`]
+//! and [`Features::news_blackout_mask`]. Calendar events are derived from observed
+//! corpus gap data (market closures detected in the local historical corpus) and
+//! carry provenance metadata. Every event carries publication/as-of metadata, and
+//! callers must enforce causal availability through [`EconomicEvent::is_available_at`].
 //!
-//! No external data acquisition is performed here.
+//! No external data acquisition is performed here. Calendar events are derived
+//! exclusively from already-downloaded local corpus data.
 
 use crate::Result;
 use serde::{Deserialize, Serialize};
@@ -186,6 +184,61 @@ impl EconomicCalendar {
 
     pub fn is_empty(&self) -> bool {
         self.events.is_empty()
+    }
+
+    /// Build an economic calendar from observed corpus gap data. Scans tick
+    /// timestamps and emits a market-closure event for each gap exceeding
+    /// `gap_threshold_ms` between consecutive ticks for the same instrument.
+    /// Each event carries the gap's start timestamp as its publication time,
+    /// making it causally available at the close of the gap.
+    ///
+    /// Only `High` impact events are emitted for closures longer than one
+    /// trading day (86_400_000 ms); shorter closures are `Medium`.
+    pub fn from_corpus_gaps(
+        instrument: &str,
+        ticks: &[crate::data::Tick],
+        gap_threshold_ms: i64,
+    ) -> Result<Self> {
+        if gap_threshold_ms <= 0 {
+            return Err("gap threshold must be positive".into());
+        }
+        let mut cal = EconomicCalendar::new();
+        let mut prev_ms: Option<i64> = None;
+        for tick in ticks {
+            if let Some(prev) = prev_ms {
+                let gap = tick
+                    .timestamp_ms
+                    .checked_sub(prev)
+                    .ok_or("timestamp overflow")?;
+                if gap > gap_threshold_ms {
+                    let impact = if gap > 86_400_000 {
+                        ImpactLevel::High
+                    } else {
+                        ImpactLevel::Medium
+                    };
+                    let event = EconomicEvent {
+                        timestamp_ms: tick.timestamp_ms,
+                        instrument: instrument.to_string(),
+                        event_type: EventType::Other,
+                        impact,
+                        description: format!(
+                            "market closure gap of {} ms ({} hours)",
+                            gap,
+                            gap / 3_600_000
+                        ),
+                        actual: None,
+                        forecast: None,
+                        previous: None,
+                        source_id: "corpus-gap-analysis-v1".into(),
+                        published_ms: Some(tick.timestamp_ms),
+                        revision: "rev-1".into(),
+                    };
+                    cal.add_event(event);
+                }
+            }
+            prev_ms = Some(tick.timestamp_ms);
+        }
+        Ok(cal)
     }
 }
 

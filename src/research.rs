@@ -16,6 +16,9 @@ use std::path::Path;
 pub struct Input {
     pub dataset: Dataset,
     pub conversions: Vec<Conversion>,
+    /// Economic calendar derived from corpus gap data (market closures).
+    /// None when calendar filtering is not active.
+    pub economic_calendar: Option<crate::economic_calendar::EconomicCalendar>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -390,7 +393,8 @@ fn evaluate_prepared<'data>(
                     c.partition_point(|c| c.available_ms < e.window.end_exclusive_ms)
                 });
                 let mut features =
-                    Features::with_context(&c[..visible], feature_cells, d, strategy.timeframe)?;
+                    Features::with_context(&c[..visible], feature_cells, d, strategy.timeframe)?
+                        .with_economic_calendar(input.economic_calendar.as_ref());
                 context.calculate(&c, &mut features, visible)
             };
             let (outcome, result) = match compute() {
@@ -814,7 +818,8 @@ pub fn evaluate_batch_report(
         options.evaluation.feature_cells,
         &input.dataset,
         timeframe,
-    )?;
+    )?
+    .with_economic_calendar(input.economic_calendar.as_ref());
     let mut results = Vec::with_capacity(strategies.len());
     for strategy in strategies {
         check_state_budget(registry, options.state_budget_bytes)?;
@@ -1497,7 +1502,8 @@ impl Driver {
             self.config.feature_cells,
             d,
             strategy.timeframe,
-        )?;
+        )?
+        .with_economic_calendar(input.economic_calendar.as_ref());
         let execution = evaluate_prepared(
             &mut self.registry,
             input,

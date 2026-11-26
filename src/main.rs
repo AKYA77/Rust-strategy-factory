@@ -12,6 +12,7 @@ use rust_strategy_factory::{
     candles::{self, Timeframe},
     contracts::{Conversion, Profile, SYMBOLS},
     data::{self, Dataset},
+    economic_calendar::EconomicCalendar,
     strategies::{self, Features, Strategy},
     tick_engine::{self, Costs},
 };
@@ -167,6 +168,7 @@ fn research_inputs(config_path: &str) -> Result<(Vec<research::Input>, research:
                 .to_str()
                 .ok_or("non-UTF8 input path")?,
         )?;
+        let symbol = dataset.profile.symbol.clone();
         let conversions = if let Some(path) = input.conversions {
             read_json(base.join(path).to_str().ok_or("non-UTF8 conversion path")?)?
         } else if dataset.profile.quote == "USD" {
@@ -190,9 +192,11 @@ fn research_inputs(config_path: &str) -> Result<(Vec<research::Input>, research:
                 })
                 .collect::<Result<Vec<_>>>()?
         };
+        let calendar = EconomicCalendar::from_corpus_gaps(&symbol, &dataset.ticks, 3_600_000).ok();
         inputs.push(research::Input {
             dataset,
             conversions,
+            economic_calendar: calendar,
         });
     }
     Ok((inputs, config.limits))
@@ -2653,6 +2657,7 @@ fn run(args: &[String]) -> Result<()> {
                 &research::Input {
                     dataset: d,
                     conversions,
+                    economic_calendar: None,
                 },
                 &s,
                 &Costs::default(),

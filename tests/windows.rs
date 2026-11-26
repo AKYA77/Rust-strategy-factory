@@ -60,6 +60,7 @@ fn input(extra: bool) -> Input {
         )
         .unwrap(),
         conversions: vec![Conversion::usd(); n],
+        economic_calendar: None,
     }
 }
 fn strategy() -> Strategy {
@@ -310,6 +311,7 @@ fn valid_future_numeric_overflow_cannot_change_an_earlier_window_or_higher_featu
             )
             .unwrap(),
             conversions: vec![Conversion::usd(); n],
+        economic_calendar: None,
         }
     }
     let base = history(false);

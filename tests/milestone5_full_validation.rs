@@ -95,6 +95,7 @@ fn input(synthetic: bool) -> Input {
         )
         .unwrap(),
         conversions: vec![Conversion::usd(); n],
+        economic_calendar: None,
     }
 }
 
