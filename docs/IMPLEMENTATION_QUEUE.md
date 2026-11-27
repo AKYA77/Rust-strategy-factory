@@ -2,6 +2,31 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-27 (CI-record continuity for f9b4b89): baseline clean `main`
+`f9b4b89611d0ad9e0ff12366ae404e3225a75b6b` == `origin/main` (0/0), no other
+cargo/rustc worker, heavy lock acquired. HEAD is the docs-only CI-record commit
+"Record terminal hosted CI 46026413867 for fix commit 04bb753"; its own hosted push
+CI run **46047221221** (head_sha exactly `f9b4b89611d0ad9e0ff...`, event `push`,
+branch `main`) reached terminal `completed`/`success` on all 7 jobs (release-build,
+browser, rust-checks, data-compute-identity, full-horizon, check-operations,
+dependency-audit), created 2026-11-27T18:08:45Z, concluded 18:24:52Z; no in-progress
+run called a pass. This was the sole unrecorded verified increment — the prior ledger
+stopped at `04bb753` (run 46026413867). Baseline `scripts/check.sh`
+(`RSF_BUILDER_PROFILE=hermes-v2-m1`): **EXIT=0, 765 passed / 0 failed / 0 ignored over
+72 binaries** (lib 278), zero named failures, fmt/clippy clean; 20:23:30Z–20:35:03Z;
+three provenance entries on exact HEAD and a head-provenance rebuild first (9013 files,
+3.0 GiB), no source changed. An initial attempt wrapped in an outer
+`flock -n ... bash scripts/check.sh` self-deadlocked against cargo-locked.sh's internal
+`flock -w` and was killed (CHECK_EXIT=143); running check.sh directly (it self-locks)
+gave the clean result. Docs-only CI record: no new behavioral regression test applies,
+no percentage changed; existing `tests/scheduler_resources.rs`,
+`tests/cached_receipt_convention.rs` and `src/economic_calendar.rs` guards unchanged.
+Read-only owner-gate re-check: `browser_vault list` empty; no reboot since 2026-11-22
+(`who -b`, uptime 5d3h24m); deployed user-scope units research
+`activating`/`auto-restart` `NRestarts=887`, dashboard `inactive`/`dead`
+`NRestarts=32266`. V2 milestones 1–6 evidenced; M7 NOT accepted. Rubric: software
+~85%, verified E2E ~80%, unchanged.
+
 Continuity run 2026-11-27 (CI-record continuity for 04bb753): baseline clean `main`
 `04bb7535fc549963d46b02339fd2c26a6abdf59c` == `origin/main` (0/0), no other
 cargo/rustc worker, heavy lock acquired. HEAD is the real code fix "Fix load-dependent
