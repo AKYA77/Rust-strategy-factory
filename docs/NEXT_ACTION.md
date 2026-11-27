@@ -6,6 +6,40 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
+## CI-record continuity for 04bb753 (2026-11-27 continuity run)
+
+Baseline clean `main` `04bb7535fc549963d46b02339fd2c26a6abdf59c` == `origin/main`
+(0 ahead/0 behind), no other cargo/rustc worker, heavy lock acquired. This HEAD is the
+real code fix "Fix load-dependent adaptive worker-selection fixture flake"; its own
+hosted push CI, run **46026413867** (head_sha exactly `04bb7535fc...`), reached terminal
+`completed`/`success` on all 7 jobs (release-build, browser, rust-checks,
+data-compute-identity, full-horizon, check-operations, dependency-audit); created
+2026-11-27T15:36:31Z, concluded 15:51:22Z. No in-progress run was called a pass. This
+was the one unrecorded verified increment: the prior ledger head stopped at the parent
+commit `eacf7f6` (run 45988023105) and did not record this fix commit's own CI result.
+
+- Baseline `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`, with
+  `CARGO_HOME=/workspace/.cargo RUSTUP_HOME=/workspace/.rustup
+  PATH=/workspace/.cargo/bin:$PATH`): **EXIT=0**, **765 passed / 0 failed / 0 ignored
+  across 72 test binaries** (lib 278), zero named failures, fmt and `clippy -D warnings`
+  clean; started 2026-11-27T17:55:02Z, ended 18:07:11Z. The head-provenance check
+  forced a project-only rebuild first (9013 files, 3.0 GiB); no source changed.
+- Regression evidence for this increment already exists and is unchanged: the flake
+  fix's RED baseline (`eacf7f6`, `tests/scheduler_resources.rs::adaptive_batch_...`
+  EXIT=101 "never downscaled: [4, 3, 3, 2]") and GREEN final tree are documented in
+  `docs/VERIFICATION/adaptive-worker-selection-fixture-flake-2026-11-27.md`; the fixed
+  fixture (24 jobs, 40 rounds, `used.last() == Some(&1)`) is in HEAD. This is a docs-only
+  CI record, so no new behavioral regression test applies and no completion percentage
+  changed.
+- Read-only owner-gate re-check: `browser_vault list` empty; `who -b` 2026-11-22 17:47
+  and `uptime` 5d1h20m, so no fresh reboot. Deployed user-scope units remain research
+  `activating`/`auto-restart` `NRestarts=863` and dashboard `inactive`/`dead`
+  `NRestarts=32266`. No service, config, conversion authority or cutover changed; no
+  gate weakened.
+- V2 software milestones 1–6 remain evidenced; M7 still NOT accepted (two owner-only
+  external gates). Latest recorded rubric (`docs/historical-migration/PROGRESS.md`):
+  software ~85%, verified end-to-end ~80% — unchanged by this docs-only increment.
+
 ## Adaptive worker-selection fixture flake fix (2026-11-27 continuity run)
 
 Baseline clean `main` `eacf7f663ee2cb8f03150a0c73a1781cfa235528` == `origin/main`, no other cargo/rustc worker, heavy lock acquired. Mandatory `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`, with `CARGO_HOME=/workspace/.cargo RUSTUP_HOME=/workspace/.rustup PATH=/workspace/.cargo/bin:$PATH`) was **RED: EXIT=101** (started 2026-11-27T15:12:30Z, ended 15:22:17Z) at `tests/scheduler_resources.rs::adaptive_batch_measures_cpu_and_adapts_workers_without_changing_receipts`, panicking `never downscaled: [4, 3, 3, 2]` at line 350; 56 earlier test binaries had 653 passing tests, the failing binary had 5 passed / 1 failed. Root cause: the 8-job / 10-round adaptive fixture can reach `complete` before measured selection steps down to `minimum_workers=1` when a host-sampling window holds the down-streak. Production `worker_selection::select` is unchanged; its floor contract is pinned by the pure unit test `sustained_pressure_steps_down_to_floor_and_never_below`.

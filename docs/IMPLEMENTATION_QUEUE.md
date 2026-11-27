@@ -2,6 +2,26 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-27 (CI-record continuity for 04bb753): baseline clean `main`
+`04bb7535fc549963d46b02339fd2c26a6abdf59c` == `origin/main` (0/0), no other
+cargo/rustc worker, heavy lock acquired. HEAD is the real code fix "Fix load-dependent
+adaptive worker-selection fixture flake"; its hosted push CI run **46026413867**
+(head_sha exactly `04bb7535fc...`) reached terminal `completed`/`success` on all 7 jobs
+(release-build, browser, rust-checks, data-compute-identity, full-horizon,
+check-operations, dependency-audit), created 15:36:31Z, concluded 15:51:22Z; no
+in-progress run called a pass. This was the sole unrecorded verified increment — the
+prior ledger stopped at parent `eacf7f6` (run 45988023105). Baseline `scripts/check.sh`
+(`RSF_BUILDER_PROFILE=hermes-v2-m1`): **EXIT=0, 765 passed / 0 failed / 0 ignored over
+72 binaries** (lib 278), zero named failures, fmt/clippy clean; 17:55:02Z–18:07:11Z;
+head-provenance rebuild first (9013 files, 3.0 GiB), no source changed. The flake fix's
+own RED→GREEN regression evidence is unchanged in
+`docs/VERIFICATION/adaptive-worker-selection-fixture-flake-2026-11-27.md`; docs-only
+CI record here, no new test applies and no percentage changed. Read-only owner-gate
+re-check: `browser_vault list` empty; no reboot since 2026-11-22 (`who -b`, uptime
+5d1h20m); deployed user-scope units research `activating`/`auto-restart`
+`NRestarts=863`, dashboard `inactive`/`dead` `NRestarts=32266`. V2 milestones 1–6
+evidenced; M7 NOT accepted. Rubric: software ~85%, verified E2E ~80%, unchanged.
+
 Continuity run 2026-11-27 (adaptive worker-selection fixture flake fix): baseline clean `main`
 `eacf7f663ee2cb8f03150a0c73a1781cfa235528` == `origin/main`, no other cargo/rustc worker,
 heavy lock acquired. Baseline `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`) was
