@@ -6,6 +6,49 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
+## CI-record continuity for 8c9a6fd + deployed-service evidence correction (2026-11-27 continuity run)
+
+Baseline clean `main` `8c9a6fd6aec0fd318da4bf071679c284c6b430a5` == `origin/main`
+(0 ahead/0 behind, `git ls-remote` identical), no other cargo/rustc worker, heavy
+lock acquired. The unrecorded verified increment was the terminal hosted CI result
+for the CI-record commit itself: run **45926014164** (push, `main`, head_sha exactly
+`8c9a6fd`) reached `completed`/`success` on all 7 jobs (release-build, browser,
+rust-checks, data-compute-identity, full-horizon, check-operations,
+dependency-audit). No in-progress run was called a pass.
+
+- Baseline `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`, with
+  `CARGO_HOME=/workspace/.cargo RUSTUP_HOME=/workspace/.rustup
+  PATH=/workspace/.cargo/bin:$PATH`): **EXIT=0**, **765 passed / 0 failed across 72
+  test binaries** (lib 278), 0 ignored, zero named failures, fmt and
+  `clippy -D warnings` clean; log ended 2026-11-27T04:28:48Z. The head-provenance
+  check forced a project-only rebuild (9009 files, 3.0 GiB) before the ladder; no
+  source changed.
+- **New finding / corrected evidence (read-only):** the deployed user units are
+  `rust-strategy-factory-research.service` and
+  `rust-strategy-factory-dashboard.service`; the previous ledger entry's `rsf-*`
+  probe checked nonexistent units, so its "active (running), NRestarts=0" claim is
+  unsupported. Actual state: research `activating`/`auto-restart`, `NRestarts=704`,
+  exiting 1 on `non-USD quote instrument USDJPY requires an explicit approved
+  event-aligned conversion file`; dashboard `inactive`/`dead`, `NRestarts=32266`
+  after an earlier `Address already in use` loop. The installed config has 140
+  inputs (20 months x 7 instruments) and 0 conversion fields. No service, unit or
+  config was changed: approved conversion authority and production cutover are
+  owner-only, and no gate was weakened (no 1/1 USD rate for a non-USD quote, no
+  inferred rate, no diagnostic result relabelled approved). Evidence:
+  `docs/VERIFICATION/live-service-state-2026-11-27.md`.
+- `browser_vault list` still returned no saved logins; `Linger=yes` is not a reboot
+  proof. A 2026-11-22 owner-reboot record (skill/PROGRESS.md/PROJECT_STATE.json)
+  conflicts with the M7 receipt's still-open reboot item; this read-only run neither
+  closes nor reopens that gate.
+- Docs-only evidence correction: no code, financial, scientific, provenance,
+  data-scope or security rule changed; existing regression guards
+  (`tests/cached_receipt_convention.rs` 3 tests, `src/economic_calendar.rs`
+  gap-contract tests) are unchanged, so no new behavioral regression test applies
+  and no completion percentage changed.
+- V2 software milestones 1–6 remain evidenced; M7 is still NOT accepted. Latest
+  recorded rubric (`docs/historical-migration/PROGRESS.md`): software ~85%, verified
+  end-to-end ~80% -- unchanged by this docs-only increment.
+
 ## CI-record continuity for 513395d (2026-11-27 continuity run)
 
 Baseline clean `main` `513395db6f86db5d6d025cccac33c88cbd2ba2a3` == `origin/main`

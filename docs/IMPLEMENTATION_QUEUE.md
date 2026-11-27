@@ -2,6 +2,30 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-27 (CI-record for 8c9a6fd + deployed-service evidence correction):
+baseline clean `main` `8c9a6fd6aec0fd318da4bf071679c284c6b430a5` == `origin/main`
+(0/0, `git ls-remote` identical), no other cargo/rustc worker, heavy lock acquired.
+Run **45926014164** on head_sha exactly `8c9a6fd` reached terminal `completed`/
+`success` on all 7 jobs (release-build, browser, rust-checks, data-compute-identity,
+full-horizon, check-operations, dependency-audit); no in-progress run called a pass.
+Baseline `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`): **EXIT=0, 765 passed
+/ 0 failed over 72 binaries** (lib 278), 0 ignored, zero named failures, fmt/clippy
+clean; log ended 2026-11-27T04:28:48Z; head-provenance check forced a project-only
+rebuild (9009 files, 3.0 GiB), no source changed. New read-only finding: actual
+deployed units are `rust-strategy-factory-{research,dashboard}.service` -- research
+`activating`/`auto-restart` `NRestarts=704` (exit 1, USDJPY missing an explicit
+approved event-aligned conversion file), dashboard `inactive`/`dead` `NRestarts=32266`;
+installed config 140 inputs / 0 conversion fields. The previous entry's `rsf-*`
+probe and its "active, NRestarts=0" claim are corrected by
+`docs/VERIFICATION/live-service-state-2026-11-27.md`. No service/config/cutover
+change: conversion authority and production changes are owner-only; no gate weakened.
+`browser_vault list` empty; `Linger=yes` is not reboot proof; the recorded 2026-11-22
+owner reboot conflicts with the M7 receipt's open reboot item and is not re-decided
+here. Docs-only evidence correction: no code/financial/scientific/provenance/
+data-scope/security rule changed; existing regression guards unchanged, no new test
+applies, no percentage gain. V2 milestones 1–6 evidenced; M7 NOT accepted. Rubric:
+software ~85%, verified E2E ~80%, unchanged.
+
 Continuity run 2026-11-27 (CI-record continuity for 513395d): baseline clean `main`
 `513395db6f86db5d6d025cccac33c88cbd2ba2a3` == `origin/main` (0/0, `git ls-remote`
 identical), no other cargo/rustc worker, heavy lock acquired. The only unrecorded
