@@ -6,6 +6,41 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
+## CI-record continuity for 9945182 (2026-11-27 continuity run)
+
+Baseline clean `main` `99451820f86bccf02b9e9d81d72d5412811b6db0` == `origin/main`
+(0 ahead/0 behind), no other cargo/rustc worker, heavy lock acquired. This HEAD is the
+docs-only CI-record commit "Record terminal hosted CI 46047221221 for CI-record commit
+f9b4b89"; its own hosted push CI, run **46064782802** (head_sha exactly
+`99451820f86bccf02b9e9d81d72d5412811b6db0`, event `push`, branch `main`), reached
+terminal `completed`/`success` on all 7 jobs (release-build, full-horizon,
+dependency-audit, data-compute-identity, rust-checks, browser, check-operations);
+created 2026-11-27T20:36:26Z, updated/concluded 20:51:37Z. No in-progress run was
+called a pass. This was the one unrecorded verified increment: the prior ledger head
+stopped at `f9b4b89` (run 46047221221) and did not record this CI-record commit's own
+CI result.
+
+- Baseline `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`, with
+  `CARGO_HOME=/workspace/.cargo RUSTUP_HOME=/workspace/.rustup
+  PATH=/workspace/.cargo/bin:$PATH`): **EXIT=0**, **765 passed / 0 failed / 0 ignored
+  across 72 test binaries** (lib 278), zero named failures, fmt and
+  `clippy -D warnings` clean. The head-provenance check forced a project-only rebuild
+  first (9013 files, 3.0 GiB); no source changed. Invoked as `bash scripts/check.sh`
+  directly (it self-locks); no outer `flock -n` wrapper (that self-deadlocks against
+  cargo-locked.sh's internal `flock -w`).
+- This is a docs-only CI record, so no new behavioral regression test applies and no
+  completion percentage changed. Existing guards (`tests/scheduler_resources.rs`
+  fixture, `tests/cached_receipt_convention.rs`, `src/economic_calendar.rs`
+  gap-contract tests) are unchanged.
+- Read-only owner-gate re-check: `browser_vault list` empty; `who -b` 2026-11-22 17:47
+  and uptime 5d6h, so no fresh reboot. Deployed user-scope units remain research
+  `activating`/`auto-restart` `NRestarts=918` and dashboard `inactive`/`dead`
+  `NRestarts=32266`. No service, config, conversion authority or cutover changed; no
+  gate weakened.
+- V2 software milestones 1–6 remain evidenced; M7 still NOT accepted (two owner-only
+  external gates). Latest recorded rubric (`docs/historical-migration/PROGRESS.md`):
+  software ~85%, verified end-to-end ~80% — unchanged by this docs-only increment.
+
 ## CI-record continuity for f9b4b89 (2026-11-27 continuity run)
 
 Baseline clean `main` `f9b4b89611d0ad9e0ff12366ae404e3225a75b6b` == `origin/main`
