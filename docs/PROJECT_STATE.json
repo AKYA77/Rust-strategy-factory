@@ -388,6 +388,14 @@
       "status": "completed",
       "jobs": ["release-build", "browser", "rust-checks", "data-compute-identity", "full-horizon", "check-operations", "dependency-audit"],
       "note": "Main push CI on the exact docs-only CI-record continuity commit 8c9a6fd: terminal completed/success on all 7 jobs, recorded only after the run concluded. Baseline scripts/check.sh EXIT=0 765 passed/0 failed over 72 binaries (lib 278), 0 ignored, zero named failures, fmt and clippy clean; log ended 2026-11-27T04:28:48Z; the head-provenance check forced a project-only rebuild first (9009 files, 3.0 GiB), no source changed. Remote SHA 8c9a6fd verified equal to local HEAD. Docs-only evidence correction: no code, financial, scientific, provenance, data-scope or security rule changed. Deployed units rust-strategy-factory-{research,dashboard}.service were observed read-only: research activating/auto-restart NRestarts=704 (exit 1 on USDJPY without an explicit approved event-aligned conversion file), dashboard inactive/dead NRestarts=32266; installed config has 140 inputs/0 conversion fields. The earlier rsf-* probe's active/NRestarts=0 claim is corrected in docs/VERIFICATION/live-service-state-2026-11-27.md; no service, config or cutover change was made and no gate was weakened. browser_vault list empty; Linger=yes is not a reboot proof; the recorded 2026-11-22 owner reboot conflicts with the M7 receipt's open reboot item and is not re-decided here. M7 remains NOT accepted."
+    },
+    "v2_ci_record_continuity_de43cd9_run_2026_11_27": {
+      "run_id": 45940321277,
+      "sha": "de43cd986e8aec924505806a6f18b8b6b75332ab",
+      "conclusion": "success",
+      "status": "completed",
+      "jobs": ["release-build", "browser", "rust-checks", "data-compute-identity", "full-horizon", "check-operations", "dependency-audit"],
+      "note": "Main push CI on the exact docs-only CI-record continuity commit de43cd9: terminal completed/success on all 7 jobs, recorded only after the run concluded. Baseline scripts/check.sh EXIT=0 765 passed/0 failed/0 ignored over 72 binaries (lib 278), zero named failures, fmt and clippy clean; started 2026-11-27T06:33:03Z, ended 2026-11-27T06:41:37Z; the head-provenance check forced a project-only rebuild first (no source changed). Remote SHA de43cd9 verified equal to local HEAD. Docs-only CI-record continuity: no code, financial, scientific, provenance, data-scope or security rule changed; M7 external gates unchanged (browser_vault list empty; who -b 2026-11-22 17:47 so no fresh reboot; deployed user-scope units research activating/auto-restart NRestarts=731, dashboard inactive/dead NRestarts=32266, installed config 140 inputs/0 conversion fields; plain systemctl had hit stale system-scope duplicates)."
     }
   },
   "historical_acceptance": "LOCAL_CORPUS_VERIFIED",

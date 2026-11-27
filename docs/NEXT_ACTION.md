@@ -6,6 +6,42 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
+## CI-record continuity for de43cd9 (2026-11-27 continuity run)
+
+Baseline clean `main` `de43cd986e8aec924505806a6f18b8b6b75332ab` == `origin/main`
+(0 ahead/0 behind, `git ls-remote` identical), no other cargo/rustc worker, heavy
+lock acquired. The only unrecorded verified increment was the terminal hosted CI
+result for the CI-record commit itself: run **45940321277** (push, `main`, head_sha
+exactly `de43cd9`) reached `completed`/`success` on all 7 jobs (rust-checks, browser,
+data-compute-identity, full-horizon, release-build, dependency-audit,
+check-operations). No in-progress run was called a pass.
+
+- Baseline `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`, with
+  `CARGO_HOME=/workspace/.cargo RUSTUP_HOME=/workspace/.rustup
+  PATH=/workspace/.cargo/bin:$PATH`): **EXIT=0**, **765 passed / 0 failed / 0
+  ignored across 72 test binaries** (lib 278), zero named failures, fmt and
+  `clippy -D warnings` clean; started 2026-11-27T06:33:03Z, ended
+  2026-11-27T06:41:37Z. The head-provenance check forced a project-only rebuild
+  before the ladder; no source changed.
+- Read-only owner-gate re-check: `browser_vault list` still returned no saved
+  logins; `who -b` = 2026-11-22 17:47 and `uptime` 4d13h, so no fresh reboot.
+  Service-scope reconciliation: plain `systemctl show` hit stale **system-scope**
+  units (`active`/`running`, `NRestarts=0` since 2026-11-25); the actually deployed
+  units are **user-scope** (`systemctl --user`): research `activating`/
+  `auto-restart` `NRestarts=731`, dashboard `inactive`/`dead` `NRestarts=32266`.
+  Installed `/root/.local/share/rust-strategy-factory/config/research.json` still
+  has 140 inputs, 0 conversion fields, USDJPY present. This confirms the prior
+  correction rather than a state change; no service, config or cutover change was
+  made and no gate was weakened.
+- Docs-only CI-record continuity: no code, financial, scientific, provenance,
+  data-scope or security rule changed; the existing regression guards
+  (`tests/cached_receipt_convention.rs` 3 tests, `src/economic_calendar.rs`
+  gap-contract tests) are unchanged, so no new behavioral regression test applies
+  and no completion percentage changed.
+- V2 software milestones 1–6 remain evidenced; M7 is still NOT accepted. Latest
+  recorded rubric (`docs/historical-migration/PROGRESS.md`): software ~85%, verified
+  end-to-end ~80% -- unchanged by this docs-only increment.
+
 ## CI-record continuity for 8c9a6fd + deployed-service evidence correction (2026-11-27 continuity run)
 
 Baseline clean `main` `8c9a6fd6aec0fd318da4bf071679c284c6b430a5` == `origin/main`
