@@ -2,6 +2,27 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-27 (adaptive worker-selection fixture flake fix): baseline clean `main`
+`eacf7f663ee2cb8f03150a0c73a1781cfa235528` == `origin/main`, no other cargo/rustc worker,
+heavy lock acquired. Baseline `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`) was
+**EXIT=101** (15:12:30Z–15:22:17Z): only
+`tests/scheduler_resources.rs::adaptive_batch_measures_cpu_and_adapts_workers_without_changing_receipts`
+failed (`never downscaled: [4, 3, 3, 2]` at line 350; binary 5 passed / 1 failed; 56 earlier
+binaries 653 passed), because the 8-job/10-round fixture completed before measured worker
+selection reached the floor on a noisy host window. Production selection logic unchanged
+(its floor is pinned by `sustained_pressure_steps_down_to_floor_and_never_below`). Test-only
+fix in `tests/scheduler_resources.rs`: 24 jobs, 40 max rounds, `expected.len() == 24`, extra
+`used.last() == Some(&1)` assertion, original contract/receipt assertions retained. Focused
+target 5/5 isolated runs EXIT=0 before and after; final-tree `scripts/check.sh`
+**EXIT=0, 765 passed / 0 failed / 0 ignored over 72 binaries** (lib 278), zero named failures,
+fmt/clippy clean (15:26:46Z–15:35:24Z). Hosted run **45988023105** on exact HEAD `eacf7f6`
+terminal `completed`/`success` on all 7 jobs. `browser_vault list` empty, no reboot since
+2026-11-22, research `activating` NRestarts=830 / dashboard `inactive` NRestarts=32266.
+No code, financial, scientific, provenance, data-scope or security rule changed; class
+REAL_STRUCTURALLY_VALID, eligibility none. V2 milestones 1–6 evidenced; M7 NOT accepted;
+rubric software ~85%, verified E2E ~80%, unchanged. Evidence:
+`docs/VERIFICATION/adaptive-worker-selection-fixture-flake-2026-11-27.md`.
+
 Continuity run 2026-11-27 (CI-record continuity for 8802a83): baseline clean `main`
 `8802a834b41e6627259b9554ca8fa3064e4b7d18` == `origin/main` (0/0, `git ls-remote`
 identical), no other cargo/rustc worker, heavy lock acquired. The only unrecorded

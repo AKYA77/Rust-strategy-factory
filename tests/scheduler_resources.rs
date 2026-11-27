@@ -247,7 +247,11 @@ fn batch_config(
     workers: usize,
     policy: Option<serde_json::Value>,
 ) -> PathBuf {
-    let strategies: Vec<serde_json::Value> = (80..160)
+    // Enough jobs to outlast the adaptive policy's step-down sequence even when
+    // a sampled host window is idle/unknown and holds the down-streak for a
+    // round: the batch must still be running when selection reaches the floor,
+    // otherwise the measured floor is never observable in `workers_used`.
+    let strategies: Vec<serde_json::Value> = (80..320)
         .step_by(10)
         .map(|n| {
             serde_json::json!({"timeframe":"M1","side":"Long","stop_ticks":n,"rule":{"AboveMean":{"window":2}}})
@@ -294,7 +298,7 @@ fn adaptive_batch_measures_cpu_and_adapts_workers_without_changing_receipts() {
             "corpus-batch",
             control_config.to_str().unwrap(),
             control_db.to_str().unwrap(),
-            "10",
+            "40",
         ])
         .output()
         .unwrap();
@@ -310,7 +314,7 @@ fn adaptive_batch_measures_cpu_and_adapts_workers_without_changing_receipts() {
         "legacy output gained keys"
     );
     let expected = completed_hashes(&control);
-    assert_eq!(expected.len(), 8);
+    assert_eq!(expected.len(), 24);
     // Adaptive: declared 4 workers, forced sustained downscale (any busy tick is
     // at or above 1/u64::MAX; upscale below 0 is impossible), hysteresis 1
     // => 4,3,2,1,1,... while receipts stay identical.
@@ -327,7 +331,7 @@ fn adaptive_batch_measures_cpu_and_adapts_workers_without_changing_receipts() {
             "corpus-batch",
             adaptive_config.to_str().unwrap(),
             adaptive_db.to_str().unwrap(),
-            "10",
+            "40",
         ])
         .output()
         .unwrap();
@@ -348,6 +352,7 @@ fn adaptive_batch_measures_cpu_and_adapts_workers_without_changing_receipts() {
         .collect();
     assert_eq!(used[0], 4);
     assert!(used.contains(&1), "never downscaled: {used:?}");
+    assert_eq!(used.last(), Some(&1), "did not stay at floor: {used:?}");
     assert!(
         used.windows(2).all(|w| w[1] <= w[0]),
         "non-monotone under forced pressure: {used:?}"

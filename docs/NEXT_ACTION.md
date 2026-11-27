@@ -6,6 +6,14 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
+## Adaptive worker-selection fixture flake fix (2026-11-27 continuity run)
+
+Baseline clean `main` `eacf7f663ee2cb8f03150a0c73a1781cfa235528` == `origin/main`, no other cargo/rustc worker, heavy lock acquired. Mandatory `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`, with `CARGO_HOME=/workspace/.cargo RUSTUP_HOME=/workspace/.rustup PATH=/workspace/.cargo/bin:$PATH`) was **RED: EXIT=101** (started 2026-11-27T15:12:30Z, ended 15:22:17Z) at `tests/scheduler_resources.rs::adaptive_batch_measures_cpu_and_adapts_workers_without_changing_receipts`, panicking `never downscaled: [4, 3, 3, 2]` at line 350; 56 earlier test binaries had 653 passing tests, the failing binary had 5 passed / 1 failed. Root cause: the 8-job / 10-round adaptive fixture can reach `complete` before measured selection steps down to `minimum_workers=1` when a host-sampling window holds the down-streak. Production `worker_selection::select` is unchanged; its floor contract is pinned by the pure unit test `sustained_pressure_steps_down_to_floor_and_never_below`.
+
+Fix (test-only): `tests/scheduler_resources.rs` now uses 24 jobs, 40 max rounds for control and adaptive runs, `expected.len() == 24`, and adds `used.last() == Some(&1)` while keeping all original contract assertions and identical-receipt checks. RED before / GREEN after: focused target 5/5 isolated runs EXIT=0 on both trees; final-tree `scripts/check.sh` **EXIT=0, 765 passed / 0 failed / 0 ignored across 72 test binaries** (lib 278), zero named failures, fmt and `clippy -D warnings` clean (15:26:46Z–15:35:24Z). Evidence: `docs/VERIFICATION/adaptive-worker-selection-fixture-flake-2026-11-27.md`.
+
+Hosted CI: run **45988023105** on exact HEAD `eacf7f6` reached terminal `completed`/`success` on all 7 jobs (release-build, full-horizon, browser, rust-checks, dependency-audit, data-compute-identity, check-operations); no in-progress run called a pass. Read-only gate re-check: `browser_vault list` empty; `who -b` 2026-11-22 17:47, uptime 4d22h, no fresh reboot; user-scope research `activating`/`auto-restart` `NRestarts=830`, dashboard `inactive`/`dead` `NRestarts=32266`. No service, config, cutover, financial, scientific, provenance, data-scope or security rule changed; class stays REAL_STRUCTURALLY_VALID with eligibility none. V2 milestones 1–6 remain evidenced; M7 still NOT accepted (two owner-only external gates). Rubric: software ~85%, verified E2E ~80%, unchanged.
+
 ## CI-record continuity for 8802a83 (2026-11-27 continuity run)
 
 Baseline clean `main` `8802a834b41e6627259b9554ca8fa3064e4b7d18` == `origin/main`
