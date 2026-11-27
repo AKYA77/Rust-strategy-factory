@@ -6,6 +6,38 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
+## CI-record continuity for 3f4dd6a (2026-11-27 continuity run)
+
+Baseline clean `main` `3f4dd6af02ca82b46a2fa0c23021c5a378cab053` == `origin/main`
+(0 ahead/0 behind, `git ls-remote` identical), no other cargo/rustc worker, heavy
+lock acquired. The only unrecorded verified increment was the terminal hosted CI
+result for the CI-record commit itself: run **45953612456** (push, `main`, head_sha
+exactly `3f4dd6a`) reached `completed`/`success` on all 7 jobs (rust-checks, browser,
+data-compute-identity, full-horizon, release-build, dependency-audit,
+check-operations). No in-progress run was called a pass.
+
+- Baseline `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`, with
+  `CARGO_HOME=/workspace/.cargo RUSTUP_HOME=/workspace/.rustup
+  PATH=/workspace/.cargo/bin:$PATH`): **EXIT=0**, **765 passed / 0 failed / 0
+  ignored across 72 test binaries** (lib 278), zero named failures, fmt and
+  `clippy -D warnings` clean. The head-provenance check forced a project-only
+  rebuild before the ladder (9009 files, 3.0 GiB); no source changed.
+- Read-only owner-gate re-check: `browser_vault list` returned no saved logins;
+  `who -b` = 2026-11-22 17:47 and `uptime` 4d15h, so no fresh reboot. Deployed
+  user-scope units remain research `activating`/`auto-restart` `NRestarts=755`
+  and dashboard `inactive`/`dead` `NRestarts=32266`; installed config has 140
+  inputs / 0 conversion fields. No service, config or cutover change; no gate
+  weakened (no USD identity rate for a non-USD quote, no inferred rate, no
+  diagnostic result relabelled approved).
+- Docs-only CI-record continuity: no code, financial, scientific, provenance,
+  data-scope or security rule changed; existing regression guards
+  (`tests/cached_receipt_convention.rs` 3 tests, `src/economic_calendar.rs`
+  gap-contract tests) are unchanged, so no new behavioral regression test
+  applies and no completion percentage changed.
+- V2 software milestones 1–6 remain evidenced; M7 is still NOT accepted. Latest
+  recorded rubric (`docs/historical-migration/PROGRESS.md`): software ~85%,
+  verified end-to-end ~80% -- unchanged by this docs-only increment.
+
 ## CI-record continuity for de43cd9 (2026-11-27 continuity run)
 
 Baseline clean `main` `de43cd986e8aec924505806a6f18b8b6b75332ab` == `origin/main`
