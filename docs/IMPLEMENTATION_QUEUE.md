@@ -2,6 +2,26 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-27 (CI-record continuity for 513395d): baseline clean `main`
+`513395db6f86db5d6d025cccac33c88cbd2ba2a3` == `origin/main` (0/0, `git ls-remote`
+identical), no other cargo/rustc worker, heavy lock acquired. The only unrecorded
+verified increment was the terminal hosted CI result for the CI-record commit
+itself: run **45913367601** (push, `main`, head_sha exactly `513395d`) `completed`/
+`success` on all 7 jobs (release-build, browser, rust-checks, data-compute-identity,
+full-horizon, check-operations, dependency-audit). Baseline `scripts/check.sh`
+(`RSF_BUILDER_PROFILE=hermes-v2-m1`): **EXIT=0, 765 passed / 0 failed over 72
+binaries** (lib 278), 0 ignored, zero named failures, fmt/clippy clean; log ended
+2026-11-27T02:01:51Z; the head-provenance check forced a project-only rebuild first,
+no source changed. Docs-only CI-record continuity: no code, financial, scientific,
+provenance, data-scope or security rule changed; the existing
+`tests/cached_receipt_convention.rs` (3 tests) and `src/economic_calendar.rs`
+gap-contract guards are unchanged, so no new behavioral regression test applies.
+V2 software milestones 1–6 evidenced; M7 NOT accepted — `browser_vault list` still
+returned no saved logins and a fresh reboot remains owner-only (units
+active/running, NRestarts=0, Linger=yes, but no reboot proof). No software milestone
+unachieved; further CI-record commits add no project value while those gates remain
+owner-blocked.
+
 Continuity run 2026-11-27 (CI-record continuity for d14cd41): baseline clean `main`
 `d14cd4129703185026f01e63dd351f63e404af13` == `origin/main` (0/0, `git ls-remote`
 identical), no other cargo/rustc worker, heavy lock acquired. The only unrecorded
