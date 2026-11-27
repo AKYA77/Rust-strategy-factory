@@ -2,6 +2,27 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-27 (CI-record continuity for 8802a83): baseline clean `main`
+`8802a834b41e6627259b9554ca8fa3064e4b7d18` == `origin/main` (0/0, `git ls-remote`
+identical), no other cargo/rustc worker, heavy lock acquired. The only unrecorded
+verified increment was the terminal hosted CI result for the CI-record commit
+itself: run **45969419004** (push, `main`, head_sha exactly `8802a834b41e6627259b9554ca8fa3064e4b7d18`)
+`completed`/`success` on all 7 jobs (rust-checks, browser, data-compute-identity,
+full-horizon, release-build, dependency-audit, check-operations); no in-progress
+run called a pass. Baseline `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`):
+**EXIT=0, 765 passed / 0 failed / 0 ignored over 72 binaries** (lib 278), zero
+named failures, fmt/clippy clean; started 2026-11-27T10:57:52Z, ended 11:07:13Z;
+no source changed. Docs-only CI-record continuity: no code, financial, scientific,
+provenance, data-scope or security rule changed; the existing
+`tests/cached_receipt_convention.rs` (3 tests) and `src/economic_calendar.rs`
+gap-contract guards are unchanged, so no new behavioral regression test applies.
+Read-only owner-gate re-check: `browser_vault list` empty; no reboot since
+2026-11-22 (`who -b`, `uptime` 4d18h); deployed user-scope units remain research
+`activating`/`auto-restart` `NRestarts=781` and dashboard `inactive`/`dead`
+`NRestarts=32266`; installed config 140 inputs / 0 conversion fields. V2
+milestones 1–6 evidenced; M7 NOT accepted. Rubric: software ~85%, verified E2E
+~80%, unchanged.
+
 Continuity run 2026-11-27 (CI-record continuity for 3f4dd6a): baseline clean `main`
 `3f4dd6af02ca82b46a2fa0c23021c5a378cab053` == `origin/main` (0/0, `git ls-remote`
 identical), no other cargo/rustc worker, heavy lock acquired. The only unrecorded
