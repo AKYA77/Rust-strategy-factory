@@ -6,6 +6,63 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
+## P0 CI regression fix: restore-cutover parallel flock flake (2026-11-28 continuity run)
+
+Baseline clean `main` `96d817e3133879cd2df33b1fb8e0a3953929ae29` == `origin/main`
+(0 ahead/0 behind), no other cargo/rustc worker, heavy lock acquired. Baseline
+`scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`, with
+`CARGO_HOME=/workspace/.cargo RUSTUP_HOME=/workspace/.rustup
+PATH=/workspace/.cargo/bin:$PATH`): **EXIT=0, 765 passed / 0 failed / 0 ignored
+across 72 test binaries** (lib 278), zero named failures, fmt and
+`clippy -D warnings` clean; 03:09:42Z–03:19:07Z; head-provenance check forced a
+project-only rebuild first (9013 files, 3.0 GiB), no source changed; invoked
+directly (it self-locks), no outer `flock -n` wrapper.
+
+Hosted CI run **46091460854** on exact HEAD `96d817e...` (`push`, `main`, created
+2026-11-28T01:07:05Z, concluded 01:25:19Z) reached terminal `completed` /
+**`failure`**: 6/7 jobs `success` (full-horizon, dependency-audit,
+check-operations, release-build, data-compute-identity, browser); `rust-checks`
+job 140813099183 failed at `cargo test --locked --lib --bins --tests`, with
+`tests/restore_cutover.rs::restore_cutover_fences_copied_actors_and_revives_on_restored_copy`
+panicking at line 69:46 `called Result::unwrap() on an Err value: "another
+recovery operation is active"` (binary 2 passed / 1 failed). No in-progress run
+was called a pass; this failed run is retained as evidence, not hidden.
+
+Reproduction on that exact tree: **4 failures / 60** parallel runs of the
+compiled test binary, **8 failures / 120** with an `LD_PRELOAD` `flock` errno
+interceptor, **0 failures / 40** with `--test-threads=1`. The interceptor logged
+`flock(fd, LOCK_EX|LOCK_NB)` returning `errno=11` (`EWOULDBLOCK`) on the same
+`<db>.recovery/.operations.lock` path in the same PID/thread just after a
+successful acquire. Root cause: the CLI test forks `Command::new(binary)`
+children while the two library tests hold the flock; the child inherits the
+lock's open file description until `exec` closes CLOEXEC descriptors, producing
+a spurious conflict. The product's fail-fast conflict and the dashboard 409
+CONFLICT semantics are correct and were unchanged.
+
+Fix (test-only): `tests/restore_cutover.rs` now takes a process-local
+poison-tolerant `Mutex<()>` at the start of all three tests in that binary, so
+the fork window does not overlap library recovery calls. RED→GREEN regression
+evidence: focused `cargo test --locked --test restore_cutover` 3/3; repeated
+parallel binary loops **0 failures / 150** and **0 failures / 80** with **zero
+`errno=11` flock events** under the same interceptor. Final-tree
+`scripts/check.sh` **EXIT=0, 765 passed / 0 failed / 0 ignored over 72 binaries**
+(lib 278), zero named failures, fmt/clippy clean; 03:27:46Z–03:37:00Z. Test count
+is unchanged because the fix serializes existing tests, not adds one. Evidence:
+`docs/VERIFICATION/restore-cutover-flock-flake-2026-11-28.md`.
+
+Changed paths for this increment: `tests/restore_cutover.rs`,
+`docs/VERIFICATION/restore-cutover-flock-flake-2026-11-28.md`, this file,
+`docs/IMPLEMENTATION_QUEUE.md`, `docs/PROJECT_STATE.json`. Read-only owner-gate
+re-check: `browser_vault list` empty; `who -b` 2026-11-22 17:47 and uptime 5d10h40m,
+so no fresh reboot; deployed user-scope units research `activating`/`auto-restart`
+`NRestarts=971` and dashboard `inactive`/`dead` `NRestarts=32266`. No service,
+config, conversion authority or cutover changed; no gate weakened. V2 software
+milestones 1–6 remain evidenced; M7 still NOT accepted (two owner-only external
+gates). Latest recorded rubric (`docs/historical-migration/PROGRESS.md`):
+software ~85%, verified end-to-end ~80% — unchanged by this correctness fix.
+Hosted CI for the pushed fix commit is recorded in the CI-record entry below
+after the run concludes; a pending run is never called a pass.
+
 ## CI-record continuity for cd8ee81 (2026-11-28 continuity run)
 
 Baseline clean `main` `cd8ee8117106e9ec839dc31d61a2c126e8aff184` == `origin/main`

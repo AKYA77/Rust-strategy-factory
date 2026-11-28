@@ -8,8 +8,23 @@ use serde_json::json;
 use std::{
     fs,
     process::Command,
+    sync::Mutex,
     time::{SystemTime, UNIX_EPOCH},
 };
+
+// The CLI case forks a child process while the two library cases hold an
+// exclusive `.operations.lock` flock. A forked child inherits that lock's
+// open-file-description until exec closes its CLOEXEC descriptors, so a
+// concurrent library call can observe a spurious `EWOULDBLOCK` that the
+// recovery API correctly reports as "another recovery operation is active".
+// Serialize just these three tests: the product's fail-fast conflict contract
+// (and the dashboard's 409 CONFLICT semantics) stay unchanged.
+static RECOVERY_CUTOVER_SERIAL: Mutex<()> = Mutex::new(());
+fn serial() -> std::sync::MutexGuard<'static, ()> {
+    RECOVERY_CUTOVER_SERIAL
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 fn nanos() -> u128 {
     SystemTime::now()
@@ -40,6 +55,7 @@ fn key() -> ExperimentKey {
 
 #[test]
 fn restore_cutover_fences_copied_actors_and_revives_on_restored_copy() {
+    let _serial = serial();
     let root = std::env::temp_dir().join(format!("rsf-cutover-{}-{}", std::process::id(), nanos()));
     fs::create_dir(&root).unwrap();
     let db = root.join("state.sqlite");
@@ -103,6 +119,7 @@ fn restore_cutover_fences_copied_actors_and_revives_on_restored_copy() {
 
 #[test]
 fn restore_cutover_rollback_on_failure_leaves_original_untouched() {
+    let _serial = serial();
     let root =
         std::env::temp_dir().join(format!("rsf-rollback-{}-{}", std::process::id(), nanos()));
     fs::create_dir(&root).unwrap();
@@ -147,6 +164,7 @@ fn restore_cutover_rollback_on_failure_leaves_original_untouched() {
 
 #[test]
 fn cli_restore_cutover_registry_check_passes_on_restored_copy() {
+    let _serial = serial();
     let root = std::env::temp_dir().join(format!(
         "rsf-cutover-cli-{}-{}",
         std::process::id(),
