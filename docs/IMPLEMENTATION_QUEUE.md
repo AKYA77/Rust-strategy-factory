@@ -2,6 +2,27 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-28 (CI-record continuity for 23a353d): baseline clean `main`
+`23a353d31a8098682c68aa06e2b486008552fdbc` == `origin/main` (0/0, `git ls-remote`
+identical), no other cargo/rustc worker, heavy lock acquired. HEAD is the docs-only
+CI-record commit "Record terminal hosted CI 46115792355 for CI-record commit d98cbc5";
+its own hosted push CI run **46126329310** (head_sha exactly `23a353d...`, event
+`push`, branch `main`, created 2026-11-28T08:32:52Z, concluded 08:47:22Z) reached
+terminal `completed`/`success` on all 7 jobs (rust-checks, browser, full-horizon,
+release-build, dependency-audit, data-compute-identity, check-operations; each read
+explicitly, slowest never called a pass while in progress). This was the sole
+unrecorded verified increment — the prior ledger stopped at `d98cbc5`
+(run 46115792355). Baseline `scripts/check.sh`
+(`RSF_BUILDER_PROFILE=hermes-v2-m1`): **EXIT=0, 765 passed / 0 failed / 0 ignored
+over 72 binaries** (lib 278), zero named failures, fmt/clippy clean;
+10:35:42Z–10:48:07Z; invoked directly (it self-locks), no outer flock wrapper;
+tree clean after. Docs-only CI record: no new behavioral regression test applies,
+no percentage changed; existing restore_cutover/scheduler_resources/
+cached_receipt_convention/economic_calendar guards unchanged. Read-only owner-gate
+re-check: `browser_vault list` empty; no reboot since 2026-11-22 (`who -b`, uptime
+5d17h47m). V2 milestones 1–6 evidenced; M7 NOT accepted (two owner-only external
+gates). Rubric: software ~85%, verified E2E ~80%, unchanged.
+
 Continuity run 2026-11-28 (CI-record continuity for d98cbc5): baseline clean `main`
 `d98cbc54efaed25b1611c59f074c01d60244e33a` == `origin/main` (0/0, `git ls-remote`
 identical), no other cargo/rustc worker, heavy lock acquired. HEAD is the docs-only

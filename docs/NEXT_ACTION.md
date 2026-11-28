@@ -6,6 +6,45 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
+## CI-record continuity for 23a353d (2026-11-28 continuity run)
+
+Baseline clean `main` `23a353d31a8098682c68aa06e2b486008552fdbc` == `origin/main`
+(0 ahead/0 behind, `git ls-remote origin refs/heads/main` identical), no other
+cargo/rustc worker beyond this agent's own shell, heavy lock acquired
+non-blockingly. This HEAD is the docs-only CI-record commit "Record terminal
+hosted CI 46115792355 for CI-record commit d98cbc5"; its own hosted push CI,
+run **46126329310** (head_sha exactly
+`23a353d31a8098682c68aa06e2b486008552fdbc`, event `push`, branch `main`, created
+2026-11-28T08:32:52Z, updated/concluded 08:47:22Z), reached terminal
+`completed`/`success` on all 7 jobs (rust-checks, browser, full-horizon,
+release-build, dependency-audit, data-compute-identity, check-operations). Every
+job was read explicitly with `gh run view 46126329310 --json ...jobs`; the
+slowest (`data-compute-identity`, 08:47:22Z) was never called a pass while
+`in_progress`. No in-progress run was recorded as a pass. This was the sole
+unrecorded verified increment: the prior ledger head stopped at `d98cbc5`
+(run 46115792355) and did not record this CI-record commit's own result.
+
+- Baseline `scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`, with
+  `CARGO_HOME=/workspace/.cargo RUSTUP_HOME=/workspace/.rustup
+  PATH=/workspace/.cargo/bin:$PATH`): **EXIT=0**, **765 passed / 0 failed / 0 ignored
+  across 72 test binaries** (lib 278), zero named failures, fmt and
+  `clippy -D warnings` clean; started 2026-11-28T10:35:42Z, ended 10:48:07Z.
+  Invoked as `bash scripts/check.sh` directly (it self-locks); no outer
+  `flock -n` wrapper. Tree clean after the ladder; no source changed.
+- This is a docs-only CI record, so no new behavioral regression test applies and no
+  completion percentage changed. Existing guards (`tests/restore_cutover.rs`,
+  `tests/scheduler_resources.rs`, `tests/cached_receipt_convention.rs`,
+  `src/economic_calendar.rs`) are unchanged.
+- Read-only owner-gate re-check: `browser_vault list` empty (no saved logins);
+  `who -b` 2026-11-22 17:47 and uptime 5d17h47m, so no fresh reboot. Neither M7
+  external gate can be closed by repository code or by an unattended agent.
+- V2 software milestones 1–6 remain evidenced; M7 still NOT accepted (two owner-only
+  external gates: saved dashboard credentials and a fresh owner manual reboot).
+  Latest recorded rubric (`docs/historical-migration/PROGRESS.md`): software ~85%,
+  verified end-to-end ~80% — unchanged by this docs-only increment. Hosted CI for
+  this CI-record commit is recorded above (run 46126329310); the CI of the new docs
+  commit added by this run is not claimed until it reaches a terminal conclusion.
+
 ## CI-record continuity for d98cbc5 (2026-11-28 continuity run)
 
 Baseline clean `main` `d98cbc54efaed25b1611c59f074c01d60244e33a` == `origin/main`
