@@ -2,6 +2,19 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-28 (CI-record continuity for 6925f5c): pushed fix commit
+`6925f5c22ae4fa1ac57c6ea6e7a45eacbded8a06` ("Fix restore-cutover parallel flock
+flake (CI 46091460854)"), `git ls-remote` remote SHA verified equal to local
+HEAD. Hosted push CI run **46103907624** (head_sha exactly `6925f5c...`, event
+`push`, branch `main`, created 2026-11-28T03:39:35Z, concluded 03:57:42Z)
+reached terminal `completed`/`success` on all 7 jobs (release-build, browser,
+rust-checks, data-compute-identity, full-horizon, check-operations,
+dependency-audit); `rust-checks` (red on 96d817e) green at 03:42:36Z and
+`data-compute-identity` still in_progress until 03:57:41Z, never called a pass
+early. Docs-only CI record: no source changed, no new behavioral regression test
+applies, no percentage changed. V2 milestones 1–6 evidenced; M7 NOT accepted;
+rubric software ~85%, verified E2E ~80%, unchanged.
+
 Continuity run 2026-11-28 (P0 CI regression fix, restore-cutover parallel flock
 flake): baseline clean `main` `96d817e3133879cd2df33b1fb8e0a3953929ae29` ==
 `origin/main` (0/0), no other cargo/rustc worker, heavy lock acquired. Baseline
@@ -35,7 +48,8 @@ Read-only owner-gate re-check: `browser_vault list` empty; no reboot since
 `NRestarts=32266`. No service/config/cutover change; no gate weakened. V2
 milestones 1–6 evidenced; M7 NOT accepted. Rubric: software ~85%, verified E2E
 ~80%, unchanged. Hosted CI for the pushed fix commit is recorded by the
-subsequent CI-record entry after it concludes; pending runs are never passes.
+CI-record entry above (run 46103907624, all 7 jobs terminal success); pending
+runs were never passes.
 
 Continuity run 2026-11-28 (CI-record continuity for cd8ee81): baseline clean `main`
 `cd8ee8117106e9ec839dc31d61a2c126e8aff184` == `origin/main` (0/0), no other

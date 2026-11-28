@@ -6,6 +6,21 @@ MASTER_BLUEPRINT.md and the V2 handover mandate. After every verified milestone 
 evidence/state/this file, commit, push, inspect remote/hosted CI, reread this file from disk and
 continue. Never treat a pending CI run as passed.
 
+## CI-record continuity for 6925f5c (2026-11-28 continuity run)
+
+The fix commit `6925f5c22ae4fa1ac57c6ea6e7a45eacbded8a06`
+("Fix restore-cutover parallel flock flake (CI 46091460854)") was pushed to
+`main`; `git ls-remote origin refs/heads/main` verified the remote SHA equals
+local HEAD. Its hosted push CI, run **46103907624** (head_sha exactly
+`6925f5c22ae4fa1ac57c6ea6e7a45eacbded8a06`, event `push`, branch `main`, created
+2026-11-28T03:39:35Z, updated/concluded 03:57:42Z), reached terminal
+`completed`/`success` on **all 7 jobs**: release-build, browser, rust-checks,
+data-compute-identity, full-horizon, check-operations and dependency-audit.
+`rust-checks` (the job that was red on `96d817e`) concluded success at 03:42:36Z;
+`data-compute-identity` was still `in_progress` until 03:57:41Z and was never
+called a pass early. No in-progress run was recorded as passed. No source changed
+in this docs-only commit; no percentage changed.
+
 ## P0 CI regression fix: restore-cutover parallel flock flake (2026-11-28 continuity run)
 
 Baseline clean `main` `96d817e3133879cd2df33b1fb8e0a3953929ae29` == `origin/main`
@@ -60,8 +75,9 @@ config, conversion authority or cutover changed; no gate weakened. V2 software
 milestones 1–6 remain evidenced; M7 still NOT accepted (two owner-only external
 gates). Latest recorded rubric (`docs/historical-migration/PROGRESS.md`):
 software ~85%, verified end-to-end ~80% — unchanged by this correctness fix.
-Hosted CI for the pushed fix commit is recorded in the CI-record entry below
-after the run concludes; a pending run is never called a pass.
+Hosted CI for the pushed fix commit is recorded in the CI-record entry above
+(run 46103907624, terminal success on all 7 jobs); a pending run was never
+called a pass.
 
 ## CI-record continuity for cd8ee81 (2026-11-28 continuity run)
 
