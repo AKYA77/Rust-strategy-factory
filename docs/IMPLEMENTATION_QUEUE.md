@@ -2,6 +2,28 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-28 (CI-record continuity for cd8ee81): baseline clean `main`
+`cd8ee8117106e9ec839dc31d61a2c126e8aff184` == `origin/main` (0/0), no other
+cargo/rustc worker, heavy lock acquired. HEAD is the docs-only CI-record commit
+"Record terminal hosted CI 46064782802 for CI-record commit 9945182"; its own hosted
+push CI run **46079144455** (head_sha exactly `cd8ee81...`, event `push`, branch
+`main`) reached terminal `completed`/`success` on all 7 jobs (release-build, browser,
+rust-checks, data-compute-identity, full-horizon, check-operations,
+dependency-audit), created 2026-11-27T22:51:39Z, concluded 23:05:58Z; no in-progress
+run called a pass. This was the sole unrecorded verified increment — the prior
+ledger stopped at `9945182` (run 46064782802). Baseline `scripts/check.sh`
+(`RSF_BUILDER_PROFILE=hermes-v2-m1`): **EXIT=0, 765 passed / 0 failed / 0 ignored over
+72 binaries** (lib 278), zero named failures, fmt/clippy clean; 00:53:41Z–01:05:38Z;
+head-provenance check forced a project-only rebuild first (9013 files, 3.0 GiB), no
+source changed. Docs-only CI record: no new behavioral regression test applies, no
+percentage changed; existing `tests/scheduler_resources.rs`,
+`tests/cached_receipt_convention.rs` and `src/economic_calendar.rs` guards unchanged.
+Read-only owner-gate re-check: `browser_vault list` empty; no reboot since 2026-11-22
+(`who -b`, uptime 5d8h); deployed user-scope units research
+`activating`/`auto-restart` `NRestarts=942`, dashboard `inactive`/`dead`
+`NRestarts=32266`. V2 milestones 1–6 evidenced; M7 NOT accepted. Rubric: software
+~85%, verified E2E ~80%, unchanged.
+
 Continuity run 2026-11-27 (CI-record continuity for 9945182): baseline clean `main`
 `99451820f86bccf02b9e9d81d72d5412811b6db0` == `origin/main` (0/0), no other
 cargo/rustc worker, heavy lock acquired. HEAD is the docs-only CI-record commit
