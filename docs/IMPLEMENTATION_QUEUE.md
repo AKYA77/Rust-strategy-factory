@@ -2,6 +2,27 @@
 
 Status: SOFTWARE_INCOMPLETE. This ledger does not replace the full directive.
 
+Continuity run 2026-11-28 (CI-record continuity for d98cbc5): baseline clean `main`
+`d98cbc54efaed25b1611c59f074c01d60244e33a` == `origin/main` (0/0, `git ls-remote`
+identical), no other cargo/rustc worker, heavy lock acquired. HEAD is the docs-only
+CI-record commit "Record terminal hosted CI 46105567421 for CI-record commit f7edf27"; its own
+hosted push CI run **46115792355** (head_sha exactly `d98cbc5...`, event `push`, branch
+`main`, created 2026-11-28T06:15:52Z, concluded 06:31:03Z) reached terminal
+`completed`/`success` on all 7 jobs (release-build, full-horizon, rust-checks,
+data-compute-identity, dependency-audit, browser, check-operations; each job read
+explicitly). No in-progress run called a pass. This was the sole unrecorded verified
+increment — the prior ledger stopped at `f7edf27` (run 46105567421). Baseline
+`scripts/check.sh` (`RSF_BUILDER_PROFILE=hermes-v2-m1`): **EXIT=0, 765 passed / 0 failed /
+0 ignored over 72 binaries** (lib 278), zero named failures, fmt/clippy clean;
+08:19:29Z–08:29:50Z; head-provenance rebuild first (9021 files, 3.0 GiB), no source changed.
+Docs-only CI record: no new behavioral regression test applies, no percentage changed;
+existing restore_cutover/scheduler_resources/cached_receipt_convention/economic_calendar
+guards unchanged. Read-only owner-gate re-check: `browser_vault list` empty; no reboot since
+2026-11-22 (`who -b`, uptime 5d15h32m); deployed user-scope research
+`activating`/`auto-restart` `NRestarts=1027`, dashboard `inactive`/`dead`
+`NRestarts=32266`; installed config 140 inputs / 0 conversion fields. V2 milestones 1–6
+evidenced; M7 NOT accepted. Rubric: software ~85%, verified E2E ~80%, unchanged.
+
 Continuity run 2026-11-28 (CI-record continuity for f7edf27): baseline clean `main`
 `f7edf27e3e7ed377fe312c7a301be61f441fd314` == `origin/main` (0/0, `git ls-remote`
 identical), no other cargo/rustc worker, heavy lock acquired. HEAD is the docs-only
